@@ -25,7 +25,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
-import { csvRowsToScooters, parseScooterCsv } from './lib/csv';
+import { csvRowsToScooters, parseScooterImport } from './lib/csv';
 import { loadSupabaseData, subscribeToSupabase, supabase } from './lib/supabase';
 import type { AppData, Battery, Container, Dealer, Scooter, ScooterStatus, WarrantyPart } from './types';
 
@@ -108,10 +108,10 @@ export function App() {
     );
   }, [data.dealers, data.scooters, query]);
 
-  async function handleCsv(event: ChangeEvent<HTMLInputElement>) {
+  async function handleInventoryImport(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const rows = await parseScooterCsv(file);
+    const rows = await parseScooterImport(file);
     setData((current) => ({ ...current, scooters: csvRowsToScooters(rows, current.scooters) }));
     setCsvMessage(`${rows.length} scooterregels geimporteerd uit ${file.name}.`);
     event.target.value = '';
@@ -182,7 +182,7 @@ export function App() {
         </header>
 
         <section className="content">
-          {view === 'dashboard' && <Dashboard data={data} onCsv={handleCsv} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
+          {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'containers' && <Containers data={data} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries batteries={data.batteries} scooters={data.scooters} />}
@@ -222,9 +222,9 @@ function LoginScreen({ onLogin, supabaseEnabled }: { onLogin: () => void; supaba
   );
 }
 
-function Dashboard({ data, onCsv, message, query, setQuery, scooters, onSelect }: {
+function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelect }: {
   data: AppData;
-  onCsv: (event: ChangeEvent<HTMLInputElement>) => void;
+  onImport: (event: ChangeEvent<HTMLInputElement>) => void;
   message: string;
   query: string;
   setQuery: (value: string) => void;
@@ -247,7 +247,7 @@ function Dashboard({ data, onCsv, message, query, setQuery, scooters, onSelect }
           <h1>Dashboard</h1>
           <span>Totaal voorraad: {data.scooters.length}</span>
         </div>
-        <label className="upload-button"><Upload size={16} /> CSV importeren<input type="file" accept=".csv" onChange={onCsv} /></label>
+        <label className="upload-button"><Upload size={16} /> CSV / Excel importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={onImport} /></label>
       </div>
       {message && <div className="notice">{message}</div>}
       <div className="stat-grid">

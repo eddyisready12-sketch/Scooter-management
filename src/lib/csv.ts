@@ -25,29 +25,53 @@ function normalizeStatus(value: string): ScooterStatus {
   return statusFallback;
 }
 
-export function parseScooterCsv(file: File): Promise<CsvScooterRow[]> {
+function normalizeRows(rows: Record<string, unknown>[]): CsvScooterRow[] {
+  return rows.map((row) => ({
+    model: pick(row, ['model', 'type']),
+    frameNumber: pick(row, ['frameNumber', 'frame nummer', 'frame #', 'vin']),
+    engineNumber: pick(row, ['engineNumber', 'engine nummer', 'motor nummer']),
+    color: pick(row, ['kleur', 'color']),
+    speed: pick(row, ['snelheid', 'speed']),
+    status: normalizeStatus(pick(row, ['status'])),
+    dealer: pick(row, ['dealer']),
+    container: pick(row, ['container', 'container number']),
+    licensePlate: pick(row, ['kenteken', 'license plate']),
+    batteryNumber: pick(row, ['accu', 'battery', 'batteryNumber']),
+  })).filter((row) => row.frameNumber);
+}
+
+function parseScooterCsv(file: File): Promise<CsvScooterRow[]> {
   return new Promise((resolve, reject) => {
     Papa.parse<Record<string, unknown>>(file, {
       header: true,
       skipEmptyLines: true,
       complete: (result) => {
-        const rows = result.data.map((row) => ({
-          model: pick(row, ['model', 'type']),
-          frameNumber: pick(row, ['frameNumber', 'frame nummer', 'frame #', 'vin']),
-          engineNumber: pick(row, ['engineNumber', 'engine nummer', 'motor nummer']),
-          color: pick(row, ['kleur', 'color']),
-          speed: pick(row, ['snelheid', 'speed']),
-          status: normalizeStatus(pick(row, ['status'])),
-          dealer: pick(row, ['dealer']),
-          container: pick(row, ['container', 'container number']),
-          licensePlate: pick(row, ['kenteken', 'license plate']),
-          batteryNumber: pick(row, ['accu', 'battery', 'batteryNumber']),
-        })).filter((row) => row.frameNumber);
-        resolve(rows);
+        resolve(normalizeRows(result.data));
       },
       error: reject,
     });
   });
+}
+
+async function parseScooterExcel(file: File): Promise<CsvScooterRow[]> {
+  const XLSX = await import('xlsx');
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const firstSheet = workbook.SheetNames[0];
+  if (!firstSheet) return [];
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[firstSheet], {
+    defval: '',
+    raw: false,
+  });
+  return normalizeRows(rows);
+}
+
+export function parseScooterImport(file: File): Promise<CsvScooterRow[]> {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (extension === 'xlsx' || extension === 'xls') {
+    return parseScooterExcel(file);
+  }
+  return parseScooterCsv(file);
 }
 
 export function csvRowsToScooters(rows: CsvScooterRow[], existing: Scooter[]): Scooter[] {
