@@ -5,13 +5,17 @@ const statusFallback: ScooterStatus = 'Beschikbaar';
 
 function pick(row: Record<string, unknown>, keys: string[]) {
   const normalized = Object.fromEntries(
-    Object.entries(row).map(([key, value]) => [key.toLowerCase().trim(), String(value ?? '').trim()]),
+    Object.entries(row).map(([key, value]) => [normalizeHeader(key), String(value ?? '').trim()]),
   );
   for (const key of keys) {
-    const value = normalized[key.toLowerCase()];
+    const value = normalized[normalizeHeader(key)];
     if (value) return value;
   }
   return '';
+}
+
+function normalizeHeader(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 function normalizeStatus(value: string): ScooterStatus {
@@ -27,16 +31,16 @@ function normalizeStatus(value: string): ScooterStatus {
 
 function normalizeRows(rows: Record<string, unknown>[]): CsvScooterRow[] {
   return rows.map((row) => ({
-    model: pick(row, ['model', 'type']),
-    frameNumber: pick(row, ['frameNumber', 'frame nummer', 'frame #', 'vin']),
-    engineNumber: pick(row, ['engineNumber', 'engine nummer', 'motor nummer']),
-    color: pick(row, ['kleur', 'color']),
-    speed: pick(row, ['snelheid', 'speed']),
+    model: pick(row, ['model', 'type', 'artikel', 'product', 'scooter model']),
+    frameNumber: pick(row, ['frameNumber', 'frame nummer', 'frame #', 'frame', 'vin', 'chassis', 'chassisnummer', 'framenr', 'vin nummer']),
+    engineNumber: pick(row, ['engineNumber', 'engine nummer', 'motor nummer', 'engine', 'motornummer', 'motornr']),
+    color: pick(row, ['kleur', 'color', 'colour', 'kleurcode']),
+    speed: pick(row, ['snelheid', 'speed', 'kmh', 'km/h']),
     status: normalizeStatus(pick(row, ['status'])),
     dealer: pick(row, ['dealer']),
-    container: pick(row, ['container', 'container number']),
-    licensePlate: pick(row, ['kenteken', 'license plate']),
-    batteryNumber: pick(row, ['accu', 'battery', 'batteryNumber']),
+    container: pick(row, ['container', 'container number', 'containernummer', 'container nr']),
+    licensePlate: pick(row, ['kenteken', 'license plate', 'nummerplaat']),
+    batteryNumber: pick(row, ['accu', 'battery', 'batteryNumber', 'accunummer', 'accu nummer']),
   })).filter((row) => row.frameNumber);
 }
 
@@ -59,9 +63,18 @@ async function parseScooterExcel(file: File): Promise<CsvScooterRow[]> {
   const workbook = XLSX.read(buffer, { type: 'array' });
   const firstSheet = workbook.SheetNames[0];
   if (!firstSheet) return [];
+  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[firstSheet], {
+    header: 1,
+    defval: '',
+    raw: false,
+  });
+  const headerIndex = rawRows.findIndex((row) =>
+    row.some((cell) => ['framenumber', 'framenummer', 'frame', 'frame', 'framevin', 'vin', 'chassis'].includes(normalizeHeader(String(cell)))),
+  );
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[firstSheet], {
     defval: '',
     raw: false,
+    range: headerIndex >= 0 ? headerIndex : 0,
   });
   return normalizeRows(rows);
 }
