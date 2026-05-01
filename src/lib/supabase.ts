@@ -49,7 +49,7 @@ export async function upsertScooters(scooters: Scooter[]) {
 
   const { error } = await supabase
     .from('scooters')
-    .upsert(scooters, { onConflict: 'frameNumber' });
+    .upsert(scooters);
 
   if (error) throw error;
 }

@@ -90,11 +90,11 @@ export function parseScooterImport(file: File): Promise<CsvScooterRow[]> {
 export function csvRowsToScooters(rows: CsvScooterRow[], existing: Scooter[]): Scooter[] {
   const byFrame = new Map(existing.map((scooter) => [scooter.frameNumber, scooter]));
 
-  rows.forEach((row, index) => {
+  rows.forEach((row) => {
     if (!row.frameNumber) return;
     const previous = byFrame.get(row.frameNumber);
     byFrame.set(row.frameNumber, {
-      id: previous?.id ?? `csv-${Date.now()}-${index}`,
+      id: previous?.id ?? `scooter-${row.frameNumber.replace(/[^a-z0-9]/gi, '').toLowerCase()}`,
       frameNumber: row.frameNumber,
       engineNumber: row.engineNumber || previous?.engineNumber || '',
       brand: 'RSO',

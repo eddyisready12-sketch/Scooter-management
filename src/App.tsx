@@ -70,6 +70,14 @@ function dealerName(dealers: Dealer[], dealerId?: string) {
   return dealers.find((dealer) => dealer.id === dealerId)?.company ?? '';
 }
 
+function importErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String((error as { message?: unknown }).message);
+  }
+  return JSON.stringify(error);
+}
+
 export function App() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [view, setView] = useState<View>('dashboard');
@@ -126,7 +134,7 @@ export function App() {
       await upsertScooters(importedScooters);
       setCsvMessage(`${rows.length} scooterregels geimporteerd naar het Scooters voorraadblok uit ${file.name}.`);
     } catch (error) {
-      setCsvMessage(error instanceof Error ? `Import mislukt: ${error.message}` : 'Import mislukt.');
+      setCsvMessage(`Import mislukt: ${importErrorMessage(error)}`);
     } finally {
       event.target.value = '';
     }
