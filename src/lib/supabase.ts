@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData } from '../types';
+import type { AppData, Scooter } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -42,4 +42,14 @@ export function subscribeToSupabase(onChange: () => void) {
   return () => {
     void supabase.removeChannel(channel);
   };
+}
+
+export async function upsertScooters(scooters: Scooter[]) {
+  if (!supabase || scooters.length === 0) return;
+
+  const { error } = await supabase
+    .from('scooters')
+    .upsert(scooters, { onConflict: 'frameNumber' });
+
+  if (error) throw error;
 }

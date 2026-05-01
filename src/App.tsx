@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, parseScooterImport } from './lib/csv';
-import { loadSupabaseData, subscribeToSupabase, supabase } from './lib/supabase';
+import { loadSupabaseData, subscribeToSupabase, supabase, upsertScooters } from './lib/supabase';
 import type { AppData, Battery, Container, Dealer, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'batteries' | 'dealers' | 'warranty' | 'search';
@@ -111,10 +111,25 @@ export function App() {
   async function handleInventoryImport(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const rows = await parseScooterImport(file);
-    setData((current) => ({ ...current, scooters: csvRowsToScooters(rows, current.scooters) }));
-    setCsvMessage(`${rows.length} scooterregels geimporteerd uit ${file.name}.`);
-    event.target.value = '';
+    try {
+      const rows = await parseScooterImport(file);
+      if (rows.length === 0) {
+        setCsvMessage(`Geen scooters gevonden in ${file.name}. Controleer of er een kolom Frame #, VIN of Chassis aanwezig is.`);
+        return;
+      }
+
+      const nextScooters = csvRowsToScooters(rows, data.scooters);
+      const importedFrames = new Set(rows.map((row) => row.frameNumber).filter(Boolean));
+      const importedScooters = nextScooters.filter((scooter) => importedFrames.has(scooter.frameNumber));
+
+      setData((current) => ({ ...current, scooters: nextScooters }));
+      await upsertScooters(importedScooters);
+      setCsvMessage(`${rows.length} scooterregels geimporteerd naar het Scooters voorraadblok uit ${file.name}.`);
+    } catch (error) {
+      setCsvMessage(error instanceof Error ? `Import mislukt: ${error.message}` : 'Import mislukt.');
+    } finally {
+      event.target.value = '';
+    }
   }
 
   function updateScooter(updated: Scooter) {
