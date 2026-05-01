@@ -524,25 +524,43 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
   return (
     <div className="drawer-backdrop" onMouseDown={onClose}>
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="drawer-header"><h2>{scooter.frameNumber} {scooter.engineNumber}</h2><button onClick={onClose}>Close</button></div>
-        <div className="drawer-grid">
-          <section className="panel">
-            <dl><dt>Frame nummer</dt><dd>{scooter.frameNumber}</dd><dt>Engine nummer</dt><dd>{scooter.engineNumber}</dd><dt>Merk</dt><dd>{scooter.brand}</dd><dt>Model</dt><dd>{scooter.model}</dd><dt>Kleur</dt><dd>{scooter.color}</dd></dl>
+        <div className="drawer-header">
+          <div>
+            <span>Scooter detail</span>
+            <h2>{scooter.frameNumber}</h2>
+          </div>
+          <button onClick={onClose}>Close</button>
+        </div>
+        <div className="drawer-grid detail-grid">
+          <section className="panel detail-card">
+            <div className="panel-title"><Bike size={16} /> Identificatie</div>
+            <dl className="detail-list">
+              <dt>Frame nummer</dt><dd>{scooter.frameNumber}</dd>
+              <dt>Engine nummer</dt><dd>{scooter.engineNumber || '-'}</dd>
+              <dt>Merk</dt><dd>{scooter.brand}</dd>
+              <dt>Model</dt><dd>{scooter.model}</dd>
+              <dt>Kleur</dt><dd>{scooter.color}</dd>
+            </dl>
           </section>
-          <section className="panel form-panel">
-            <label>Kleur<input value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })} /></label>
-            <label>Snelheid<input value={draft.speed} onChange={(e) => setDraft({ ...draft, speed: e.target.value })} /></label>
-            <label>Kenteken<input value={draft.licensePlate ?? ''} onChange={(e) => setDraft({ ...draft, licensePlate: e.target.value })} /></label>
-            <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{Object.keys(statusColor).map((status) => <option key={status}>{status}</option>)}</select></label>
-            <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value })}><option value="">Geen dealer</option>{dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
-            <button className="primary-button" onClick={() => onUpdate(draft)}>Verander gegevens</button>
+          <section className="panel drawer-edit-card">
+            <div className="panel-title"><Wrench size={16} /> Gegevens wijzigen</div>
+            <div className="drawer-form">
+              <label>Kleur<input value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })} /></label>
+              <label>Snelheid<input value={draft.speed} onChange={(e) => setDraft({ ...draft, speed: e.target.value })} /></label>
+              <label>Kenteken<input value={draft.licensePlate ?? ''} onChange={(e) => setDraft({ ...draft, licensePlate: e.target.value })} /></label>
+              <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{Object.keys(statusColor).map((status) => <option key={status}>{status}</option>)}</select></label>
+              <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value })}><option value="">Geen dealer</option>{dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
+            </div>
+            <div className="drawer-actions">
+              <button className="primary-button" onClick={() => onUpdate(draft)}>Verander gegevens</button>
+            </div>
           </section>
         </div>
         <div className="two-col">
-          <section className="panel"><div className="panel-title"><UserRound size={16} /> Dealer</div><p>{dealerName(dealers, scooter.dealerId) || 'Nog geen dealer geselecteerd'}</p></section>
-          <section className="panel"><div className="panel-title"><ShieldCheck size={16} /> Warranty</div>{warranties.length ? warranties.map((w) => <p key={w.id}>{w.partName} - {w.status}</p>) : <p>Geen warranty claims</p>}</section>
+          <section className="panel drawer-info-panel"><div className="panel-title"><UserRound size={16} /> Dealer</div><p>{dealerName(dealers, scooter.dealerId) || 'Nog geen dealer geselecteerd'}</p></section>
+          <section className="panel drawer-info-panel"><div className="panel-title"><ShieldCheck size={16} /> Warranty</div>{warranties.length ? warranties.map((w) => <p key={w.id}>{w.partName} - {w.status}</p>) : <p>Geen warranty claims</p>}</section>
         </div>
-        <section className="panel"><div className="panel-title"><FileText size={16} /> Documenten</div><p>Nog geen documenten toegevoegd</p></section>
+        <section className="panel drawer-info-panel"><div className="panel-title"><FileText size={16} /> Documenten</div><p>Nog geen documenten toegevoegd</p></section>
       </aside>
     </div>
   );

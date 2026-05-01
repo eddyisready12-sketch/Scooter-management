@@ -607,11 +607,11 @@ dd {
 }
 
 .drawer {
-  width: min(920px, 100vw);
+  width: min(960px, 100vw);
   height: 100vh;
   overflow: auto;
   background: #eef2f6;
-  padding: 22px;
+  padding: 26px;
   box-shadow: -18px 0 40px rgba(0, 0, 0, 0.22);
 }
 
@@ -620,25 +620,104 @@ dd {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
+}
+
+.drawer-header span {
+  display: block;
+  margin-bottom: 5px;
+  color: #66717b;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .drawer-header h2 {
   margin: 0;
+  font-size: 24px;
+  line-height: 1.15;
 }
 
 .drawer-header button {
   border: 1px solid #c8d1da;
   border-radius: 4px;
   background: #fff;
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 38px;
+  padding: 0 16px;
+  color: #1c2732;
 }
 
 .drawer-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+}
+
+.detail-grid {
+  align-items: start;
+}
+
+.detail-card,
+.drawer-edit-card,
+.drawer-info-panel {
+  overflow: hidden;
+}
+
+.detail-list {
+  margin: 0;
+  padding: 8px 16px 16px;
+}
+
+.detail-list dt,
+.detail-list dd {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.detail-list dt {
+  color: #1c2732;
+}
+
+.drawer-edit-card {
+  padding-bottom: 16px;
+}
+
+.drawer-form {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.drawer-form label {
+  display: grid;
+  gap: 6px;
+  color: #1c2732;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.drawer-form input,
+.drawer-form select {
+  width: 100%;
+  min-height: 38px;
+  font-weight: 600;
+}
+
+.drawer-actions {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0 16px;
+}
+
+.drawer-actions .primary-button {
+  margin: 0;
+}
+
+.drawer-info-panel p {
+  margin: 0;
+  padding: 18px 16px;
+  color: #2f3a45;
 }
 
 @media (max-width: 980px) {
