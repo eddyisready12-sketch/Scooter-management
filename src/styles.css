@@ -109,6 +109,7 @@ button {
 
 .content {
   width: min(1180px, calc(100vw - 288px));
+  margin: 0 auto;
   padding: 22px;
 }
 
