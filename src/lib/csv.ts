@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import type { CsvScooterRow, Scooter, ScooterStatus } from '../types';
+import type { CsvScooterRow, Dealer, Scooter, ScooterStatus } from '../types';
 
 const statusFallback: ScooterStatus = 'Beschikbaar';
 
@@ -44,20 +44,43 @@ function normalizeRows(rows: Record<string, unknown>[]): CsvScooterRow[] {
   })).filter((row) => row.frameNumber);
 }
 
-function parseScooterCsv(file: File): Promise<CsvScooterRow[]> {
+function normalizeDealerRows(rows: Record<string, unknown>[]): Dealer[] {
+  return rows.map((row) => {
+    const company = pick(row, ['bedrijf', 'bedrijfsnaam', 'company', 'dealer', 'dealernaam', 'naam']);
+    const firstName = pick(row, ['voornaam', 'first name', 'firstname']);
+    const lastName = pick(row, ['achternaam', 'last name', 'lastname']);
+    const name = pick(row, ['contactpersoon', 'contact', 'naam contact']) || [firstName, lastName].filter(Boolean).join(' ') || company;
+    const email = pick(row, ['email', 'e-mail', 'mail']);
+    const phone = pick(row, ['telefoon', 'tel', 'phone', 'mobiel', 'mobile']);
+    const city = pick(row, ['woonplaats', 'plaats', 'city', 'stad']);
+    const address = [pick(row, ['adres', 'address', 'straat']), pick(row, ['postcode', 'postal code', 'zipcode'])].filter(Boolean).join(', ');
+    const stableKey = company || email || phone || name;
+    return {
+      id: `dealer-${stableKey.replace(/[^a-z0-9]/gi, '').toLowerCase()}`,
+      name,
+      company,
+      email,
+      phone,
+      city,
+      address,
+    };
+  }).filter((dealer) => dealer.company || dealer.email || dealer.name);
+}
+
+function readCsvRows(file: File): Promise<Record<string, unknown>[]> {
   return new Promise((resolve, reject) => {
     Papa.parse<Record<string, unknown>>(file, {
       header: true,
       skipEmptyLines: true,
       complete: (result) => {
-        resolve(normalizeRows(result.data));
+        resolve(result.data);
       },
       error: reject,
     });
   });
 }
 
-async function parseScooterExcel(file: File): Promise<CsvScooterRow[]> {
+async function readExcelRows(file: File, headerCandidates: string[]): Promise<Record<string, unknown>[]> {
   const XLSX = await import('xlsx');
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
@@ -69,22 +92,29 @@ async function parseScooterExcel(file: File): Promise<CsvScooterRow[]> {
     raw: false,
   });
   const headerIndex = rawRows.findIndex((row) =>
-    row.some((cell) => ['framenumber', 'framenummer', 'frame', 'frame', 'framevin', 'vin', 'chassis'].includes(normalizeHeader(String(cell)))),
+    row.some((cell) => headerCandidates.includes(normalizeHeader(String(cell)))),
   );
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[firstSheet], {
+  return XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[firstSheet], {
     defval: '',
     raw: false,
     range: headerIndex >= 0 ? headerIndex : 0,
   });
-  return normalizeRows(rows);
 }
 
 export function parseScooterImport(file: File): Promise<CsvScooterRow[]> {
   const extension = file.name.split('.').pop()?.toLowerCase();
   if (extension === 'xlsx' || extension === 'xls') {
-    return parseScooterExcel(file);
+    return readExcelRows(file, ['framenumber', 'framenummer', 'frame', 'framevin', 'vin', 'chassis']).then(normalizeRows);
   }
-  return parseScooterCsv(file);
+  return readCsvRows(file).then(normalizeRows);
+}
+
+export function parseDealerImport(file: File): Promise<Dealer[]> {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (extension === 'xlsx' || extension === 'xls') {
+    return readExcelRows(file, ['bedrijf', 'bedrijfsnaam', 'company', 'dealer', 'dealernaam', 'email', 'telefoon']).then(normalizeDealerRows);
+  }
+  return readCsvRows(file).then(normalizeDealerRows);
 }
 
 export function csvRowsToScooters(rows: CsvScooterRow[], existing: Scooter[]): Scooter[] {

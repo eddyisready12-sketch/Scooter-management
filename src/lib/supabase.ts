@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Scooter } from '../types';
+import type { AppData, Dealer, Scooter } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -50,6 +50,16 @@ export async function upsertScooters(scooters: Scooter[]) {
   const { error } = await supabase
     .from('scooters')
     .upsert(scooters);
+
+  if (error) throw error;
+}
+
+export async function upsertDealers(dealers: Dealer[]) {
+  if (!supabase || dealers.length === 0) return;
+
+  const { error } = await supabase
+    .from('dealers')
+    .upsert(dealers);
 
   if (error) throw error;
 }

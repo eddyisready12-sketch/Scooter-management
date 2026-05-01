@@ -25,8 +25,8 @@ import {
   Wrench,
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
-import { csvRowsToScooters, parseScooterImport } from './lib/csv';
-import { loadSupabaseData, subscribeToSupabase, supabase, upsertScooters } from './lib/supabase';
+import { csvRowsToScooters, parseDealerImport, parseScooterImport } from './lib/csv';
+import { loadSupabaseData, subscribeToSupabase, supabase, upsertDealers, upsertScooters } from './lib/supabase';
 import type { AppData, Battery, Container, Dealer, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'batteries' | 'dealers' | 'warranty' | 'search';
@@ -85,6 +85,7 @@ export function App() {
   const [query, setQuery] = useState('');
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [csvMessage, setCsvMessage] = useState('');
+  const [dealerImportMessage, setDealerImportMessage] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -135,6 +136,30 @@ export function App() {
       setCsvMessage(`${rows.length} scooterregels geimporteerd naar het Scooters voorraadblok uit ${file.name}.`);
     } catch (error) {
       setCsvMessage(`Import mislukt: ${importErrorMessage(error)}`);
+    } finally {
+      event.target.value = '';
+    }
+  }
+
+  async function handleDealerImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const dealers = await parseDealerImport(file);
+      if (dealers.length === 0) {
+        setDealerImportMessage(`Geen dealers gevonden in ${file.name}. Controleer kolommen zoals Bedrijfsnaam, Dealer, Email of Telefoon.`);
+        return;
+      }
+
+      setData((current) => {
+        const byId = new Map(current.dealers.map((dealer) => [dealer.id, dealer]));
+        dealers.forEach((dealer) => byId.set(dealer.id, dealer));
+        return { ...current, dealers: Array.from(byId.values()) };
+      });
+      await upsertDealers(dealers);
+      setDealerImportMessage(`${dealers.length} dealers geimporteerd naar het Dealers blok uit ${file.name}.`);
+    } catch (error) {
+      setDealerImportMessage(`Dealer import mislukt: ${importErrorMessage(error)}`);
     } finally {
       event.target.value = '';
     }
@@ -209,7 +234,7 @@ export function App() {
           {view === 'containers' && <Containers data={data} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries batteries={data.batteries} scooters={data.scooters} />}
-          {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} />}
+          {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} />}
           {view === 'search' && <GlobalSearch data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
         </section>
@@ -404,10 +429,17 @@ function Batteries({ batteries, scooters }: { batteries: Battery[]; scooters: Sc
   );
 }
 
-function Dealers({ dealers, scooters }: { dealers: Dealer[]; scooters: Scooter[] }) {
+function Dealers({ dealers, scooters, onImport, message }: { dealers: Dealer[]; scooters: Scooter[]; onImport: (event: ChangeEvent<HTMLInputElement>) => void; message: string }) {
   return (
     <>
-      <h1>Dealers</h1>
+      <div className="page-title-row">
+        <div>
+          <h1>Dealers</h1>
+          <span>Totaal dealers: {dealers.length}</span>
+        </div>
+        <label className="upload-button"><Upload size={16} /> Dealers importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={onImport} /></label>
+      </div>
+      {message && <div className="notice">{message}</div>}
       <SearchPanel query="" setQuery={() => undefined} />
       <div className="two-col">
         <ListPanel title="Alle dealers" items={dealers.map((dealer) => `${dealer.name} - ${dealer.company} - ${dealer.email}`)} />

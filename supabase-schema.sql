@@ -72,3 +72,44 @@ alter publication supabase_realtime add table dealers;
 alter publication supabase_realtime add table batteries;
 alter publication supabase_realtime add table warranty_parts;
 alter publication supabase_realtime add table documents;
+
+alter table dealers enable row level security;
+alter table scooters enable row level security;
+
+create policy "Allow public read dealers"
+on dealers
+for select
+to anon
+using (true);
+
+create policy "Allow public insert dealers"
+on dealers
+for insert
+to anon
+with check (true);
+
+create policy "Allow public update dealers"
+on dealers
+for update
+to anon
+using (true)
+with check (true);
+
+create policy "Allow public read scooters"
+on scooters
+for select
+to anon
+using (true);
+
+create policy "Allow public insert scooters"
+on scooters
+for insert
+to anon
+with check (true);
+
+create policy "Allow public update scooters"
+on scooters
+for update
+to anon
+using (true)
+with check (true);
