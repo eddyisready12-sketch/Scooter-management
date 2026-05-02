@@ -30,6 +30,7 @@ import { loadSupabaseData, subscribeToSupabase, supabase, upsertDealers, upsertS
 import type { AppData, Battery, Container, Dealer, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'batteries' | 'dealers' | 'warranty' | 'search';
+type ImportTarget = 'scooters' | 'dealers';
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -117,9 +118,7 @@ export function App() {
     );
   }, [data.dealers, data.scooters, query]);
 
-  async function handleInventoryImport(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  async function importScooterFile(file: File) {
     try {
       const rows = await parseScooterImport(file);
       if (rows.length === 0) {
@@ -136,18 +135,16 @@ export function App() {
       setCsvMessage(`${rows.length} scooterregels geimporteerd naar het Scooters voorraadblok uit ${file.name}.`);
     } catch (error) {
       setCsvMessage(`Import mislukt: ${importErrorMessage(error)}`);
-    } finally {
-      event.target.value = '';
     }
   }
 
-  async function handleDealerImport(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  async function importDealerFile(file: File, showDashboardMessage = false) {
     try {
       const dealers = await parseDealerImport(file);
       if (dealers.length === 0) {
-        setDealerImportMessage(`Geen dealers gevonden in ${file.name}. Controleer kolommen zoals Bedrijfsnaam, Dealer, Email of Telefoon.`);
+        const message = `Geen dealers gevonden in ${file.name}. Controleer kolommen zoals Bedrijfsnaam, Dealer, Email of Telefoon.`;
+        if (showDashboardMessage) setCsvMessage(message);
+        setDealerImportMessage(message);
         return;
       }
 
@@ -157,9 +154,35 @@ export function App() {
         return { ...current, dealers: Array.from(byId.values()) };
       });
       await upsertDealers(dealers);
-      setDealerImportMessage(`${dealers.length} dealers geimporteerd naar het Dealers blok uit ${file.name}.`);
+      const message = `${dealers.length} dealers geimporteerd naar het Dealers blok uit ${file.name}.`;
+      if (showDashboardMessage) setCsvMessage(message);
+      setDealerImportMessage(message);
     } catch (error) {
-      setDealerImportMessage(`Dealer import mislukt: ${importErrorMessage(error)}`);
+      const message = `Dealer import mislukt: ${importErrorMessage(error)}`;
+      if (showDashboardMessage) setCsvMessage(message);
+      setDealerImportMessage(message);
+    }
+  }
+
+  async function handleInventoryImport(target: ImportTarget, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      if (target === 'dealers') {
+        await importDealerFile(file, true);
+      } else {
+        await importScooterFile(file);
+      }
+    } finally {
+      event.target.value = '';
+    }
+  }
+
+  async function handleDealerImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      await importDealerFile(file);
     } finally {
       event.target.value = '';
     }
@@ -272,13 +295,14 @@ function LoginScreen({ onLogin, supabaseEnabled }: { onLogin: () => void; supaba
 
 function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelect }: {
   data: AppData;
-  onImport: (event: ChangeEvent<HTMLInputElement>) => void;
+  onImport: (target: ImportTarget, event: ChangeEvent<HTMLInputElement>) => void;
   message: string;
   query: string;
   setQuery: (value: string) => void;
   scooters: Scooter[];
   onSelect: (scooter: Scooter) => void;
 }) {
+  const [importTarget, setImportTarget] = useState<ImportTarget>('scooters');
   const cards: Array<{ label: ScooterStatus; icon: typeof Bike }> = [
     { label: 'Beschikbaar', icon: Bike },
     { label: 'Verkocht dealer', icon: Wrench },
@@ -295,7 +319,16 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
           <h1>Dashboard</h1>
           <span>Totaal voorraad: {data.scooters.length}</span>
         </div>
-        <label className="upload-button"><Upload size={16} /> CSV / Excel importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={onImport} /></label>
+        <div className="import-controls">
+          <label>
+            Import naar
+            <select value={importTarget} onChange={(event) => setImportTarget(event.target.value as ImportTarget)}>
+              <option value="scooters">Scooters voorraadblok</option>
+              <option value="dealers">Dealers blok</option>
+            </select>
+          </label>
+          <label className="upload-button"><Upload size={16} /> CSV / Excel importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={(event) => onImport(importTarget, event)} /></label>
+        </div>
       </div>
       {message && <div className="notice">{message}</div>}
       <div className="stat-grid">
