@@ -543,6 +543,7 @@ function Batteries({ batteries, scooters }: { batteries: Battery[]; scooters: Sc
 
 function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealers: Dealer[]; scooters: Scooter[]; onImport: (event: ChangeEvent<HTMLInputElement>) => void; onAddDealer: (event: FormEvent<HTMLFormElement>) => Promise<void>; message: string }) {
   const [showAddDealer, setShowAddDealer] = useState(false);
+  const [selectedDealer, setSelectedDealer] = useState<Dealer | null>(null);
   const sortedDealers = [...dealers].sort((a, b) => (a.company || a.name).localeCompare(b.company || b.name, 'nl', { sensitivity: 'base' }));
   async function submitDealer(event: FormEvent<HTMLFormElement>) {
     await onAddDealer(event);
@@ -563,7 +564,7 @@ function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealer
       {message && <div className="notice">{message}</div>}
       <SearchPanel query="" setQuery={() => undefined} />
       <div className="two-col">
-        <DealerTablePanel dealers={sortedDealers} />
+        <DealerTablePanel dealers={sortedDealers} onSelect={setSelectedDealer} />
         <ListPanel title="In consignatie" items={dealers.map((dealer) => `${scooters.filter((s) => s.dealerId === dealer.id && s.status === 'In consignatie').length} bij ${dealer.company} (${dealer.city})`)} />
       </div>
       {showAddDealer && (
@@ -595,11 +596,14 @@ function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealer
           </form>
         </div>
       )}
+      {selectedDealer && (
+        <DealerDetailModal dealer={selectedDealer} onClose={() => setSelectedDealer(null)} />
+      )}
     </>
   );
 }
 
-function DealerTablePanel({ dealers }: { dealers: Dealer[] }) {
+function DealerTablePanel({ dealers, onSelect }: { dealers: Dealer[]; onSelect: (dealer: Dealer) => void }) {
   return (
     <section className="panel list-panel">
       <div className="panel-title"><UsersRound size={16} /> Alle dealers</div>
@@ -613,15 +617,40 @@ function DealerTablePanel({ dealers }: { dealers: Dealer[] }) {
             <span>Email</span>
           </div>
           {dealers.map((dealer) => (
-            <div className="dealer-table-row" key={dealer.id}>
+            <button className="dealer-table-row" key={dealer.id} onClick={() => onSelect(dealer)}>
               <span>{dealer.company || '-'}</span>
               <span>{dealer.name || '-'}</span>
               <span>{dealer.email || '-'}</span>
-            </div>
+            </button>
           ))}
         </div>
       )}
     </section>
+  );
+}
+
+function DealerDetailModal({ dealer, onClose }: { dealer: Dealer; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <section className="modal-card dealer-detail-modal" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <span>Dealerkaart</span>
+            <h2>{dealer.company || dealer.name}</h2>
+          </div>
+          <button type="button" onClick={onClose}>Close</button>
+        </div>
+        <dl className="dealer-detail-list">
+          <dt>Company name</dt><dd>{dealer.company || '-'}</dd>
+          <dt>Klantnaam</dt><dd>{dealer.name || '-'}</dd>
+          <dt>Email</dt><dd>{dealer.email || '-'}</dd>
+          <dt>Telefoon</dt><dd>{dealer.phone || '-'}</dd>
+          <dt>Straat + huisnummer</dt><dd>{dealer.address || '-'}</dd>
+          <dt>Postcode</dt><dd>{dealer.Postalcode || '-'}</dd>
+          <dt>Woonplaats</dt><dd>{dealer.city || '-'}</dd>
+        </dl>
+      </section>
+    </div>
   );
 }
 

@@ -573,6 +573,20 @@ tbody tr:hover {
   padding: 11px 0;
 }
 
+.dealer-table-row {
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  background: transparent;
+  color: #17202a;
+  text-align: left;
+}
+
+.dealer-table-row:hover {
+  background: #f3f8ff;
+}
+
 .dealer-table-header {
   color: #4f5b66;
   font-size: 12px;
@@ -583,6 +597,16 @@ tbody tr:hover {
 .dealer-table-row span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.dealer-detail-list {
+  margin: 0;
+  padding: 8px 20px 22px;
+}
+
+.dealer-detail-list dt,
+.dealer-detail-list dd {
+  min-height: 42px;
 }
 
 .modal-backdrop {
