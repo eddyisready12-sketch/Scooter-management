@@ -438,13 +438,41 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
 }) {
   const [pageSize, setPageSize] = useState<number | 'all'>(20);
   const [page, setPage] = useState(1);
-  const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(scooters.length / pageSize));
+  const [columnFilters, setColumnFilters] = useState({
+    model: '',
+    frame: '',
+    color: '',
+    licensePlate: '',
+    speed: '',
+    status: '',
+    dealer: '',
+    invoice: '',
+  });
+  const filteredRows = scooters.filter((scooter) => {
+    const dealer = dealerName(dealers, scooter.dealerId);
+    return (
+      scooter.model.toLowerCase().includes(columnFilters.model.toLowerCase()) &&
+      scooter.frameNumber.toLowerCase().includes(columnFilters.frame.toLowerCase()) &&
+      scooter.color.toLowerCase().includes(columnFilters.color.toLowerCase()) &&
+      (scooter.licensePlate || '').toLowerCase().includes(columnFilters.licensePlate.toLowerCase()) &&
+      (!columnFilters.speed || scooter.speed === columnFilters.speed) &&
+      (!columnFilters.status || scooter.status === columnFilters.status) &&
+      dealer.toLowerCase().includes(columnFilters.dealer.toLowerCase()) &&
+      (scooter.invoiceNumber || '').toLowerCase().includes(columnFilters.invoice.toLowerCase())
+    );
+  });
+  const speedOptions = Array.from(new Set(scooters.map((scooter) => scooter.speed).filter(Boolean))).sort();
+  const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const visibleScooters = pageSize === 'all'
-    ? scooters
-    : scooters.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const firstEntry = scooters.length === 0 ? 0 : pageSize === 'all' ? 1 : (safePage - 1) * pageSize + 1;
-  const lastEntry = pageSize === 'all' ? scooters.length : Math.min(safePage * pageSize, scooters.length);
+    ? filteredRows
+    : filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const firstEntry = filteredRows.length === 0 ? 0 : pageSize === 'all' ? 1 : (safePage - 1) * pageSize + 1;
+  const lastEntry = pageSize === 'all' ? filteredRows.length : Math.min(safePage * pageSize, filteredRows.length);
+  function setColumnFilter(key: keyof typeof columnFilters, value: string) {
+    setColumnFilters((current) => ({ ...current, [key]: value }));
+    setPage(1);
+  }
 
   return (
     <section className="panel">
@@ -465,7 +493,19 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
       </div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Model</th><th>Frame #</th><th>Kleur</th><th>Kenteken</th><th>Snelheid</th><th>Status</th><th>Dealer</th><th>Factuur</th></tr></thead>
+          <thead>
+            <tr><th>Model</th><th>Frame #</th><th>Kleur</th><th>Kenteken</th><th>Snelheid</th><th>Status</th><th>Dealer</th><th>Factuur</th></tr>
+            <tr className="filter-row">
+              <th><input value={columnFilters.model} onChange={(event) => setColumnFilter('model', event.target.value)} aria-label="Filter model" /></th>
+              <th><input value={columnFilters.frame} onChange={(event) => setColumnFilter('frame', event.target.value)} aria-label="Filter frame" /></th>
+              <th><input value={columnFilters.color} onChange={(event) => setColumnFilter('color', event.target.value)} aria-label="Filter kleur" /></th>
+              <th><input value={columnFilters.licensePlate} onChange={(event) => setColumnFilter('licensePlate', event.target.value)} aria-label="Filter kenteken" /></th>
+              <th><select value={columnFilters.speed} onChange={(event) => setColumnFilter('speed', event.target.value)} aria-label="Filter snelheid"><option value="">Alle</option>{speedOptions.map((speed) => <option value={speed} key={speed}>{speed}</option>)}</select></th>
+              <th><select value={columnFilters.status} onChange={(event) => setColumnFilter('status', event.target.value)} aria-label="Filter status"><option value="">Alle</option>{Object.keys(statusColor).map((status) => <option value={status} key={status}>{status}</option>)}</select></th>
+              <th><input value={columnFilters.dealer} onChange={(event) => setColumnFilter('dealer', event.target.value)} aria-label="Filter dealer" /></th>
+              <th><input value={columnFilters.invoice} onChange={(event) => setColumnFilter('invoice', event.target.value)} aria-label="Filter factuur" /></th>
+            </tr>
+          </thead>
           <tbody>
             {visibleScooters.map((scooter) => (
               <tr key={scooter.id} onClick={() => onSelect(scooter)}>
@@ -483,7 +523,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
         </table>
       </div>
       <div className="table-footer">
-        <span>Showing {firstEntry} to {lastEntry} of {scooters.length} entries</span>
+        <span>Showing {firstEntry} to {lastEntry} of {filteredRows.length} entries</span>
         {pageSize !== 'all' && (
           <div className="pagination">
             <button disabled={safePage <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button>

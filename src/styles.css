@@ -303,6 +303,19 @@ th {
   font-weight: 700;
 }
 
+.filter-row th {
+  background: #fff;
+  padding: 8px;
+}
+
+.filter-row input,
+.filter-row select {
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 7px;
+  font-size: 13px;
+}
+
 tbody tr:nth-child(odd) {
   background: #f2f2f2;
 }
