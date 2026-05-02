@@ -1095,6 +1095,26 @@ function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: F
 
 function Maintenance({ data, addMaintenance }: { data: AppData; addMaintenance: (event: FormEvent<HTMLFormElement>) => void }) {
   const sortedMaintenance = [...data.maintenance].sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
+  const [selectedFrame, setSelectedFrame] = useState(data.scooters[0]?.frameNumber ?? '');
+  const [maintenanceLicensePlate, setMaintenanceLicensePlate] = useState(data.scooters[0]?.licensePlate ?? '');
+  const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame);
+
+  function normalizePlate(value: string) {
+    return value.replace(/[^a-z0-9]/gi, '').toUpperCase();
+  }
+
+  function handleMaintenanceScooterChange(frameNumber: string) {
+    const scooter = data.scooters.find((item) => item.frameNumber === frameNumber);
+    setSelectedFrame(frameNumber);
+    setMaintenanceLicensePlate(scooter?.licensePlate ?? '');
+  }
+
+  function handleMaintenancePlateChange(value: string) {
+    setMaintenanceLicensePlate(value);
+    const scooter = data.scooters.find((item) => normalizePlate(item.licensePlate ?? '') === normalizePlate(value));
+    if (scooter) setSelectedFrame(scooter.frameNumber);
+  }
+
   return (
     <>
       <div className="page-title-row">
@@ -1127,7 +1147,7 @@ function Maintenance({ data, addMaintenance }: { data: AppData; addMaintenance: 
           <div className="panel-title"><Plus size={16} /> Onderhoud toevoegen</div>
           <div className="form-grid warranty-form-grid">
             <label>Scooter
-              <select name="scooterFrame" required>
+              <select name="scooterFrame" required value={selectedFrame} onChange={(event) => handleMaintenanceScooterChange(event.target.value)}>
                 {data.scooters.map((scooter) => (
                   <option value={scooter.frameNumber} key={scooter.id}>
                     {scooter.frameNumber} - {scooter.licensePlate || 'geen kenteken'}
@@ -1136,7 +1156,8 @@ function Maintenance({ data, addMaintenance }: { data: AppData; addMaintenance: 
               </select>
             </label>
             <label>Onderhoudsdatum<input name="serviceDate" type="date" required /></label>
-            <label>Kenteken<input name="licensePlate" placeholder="bijv. FVZ16T" /></label>
+            <label>Kenteken<input name="licensePlate" placeholder="bijv. FVZ16T" value={maintenanceLicensePlate} onChange={(event) => handleMaintenancePlateChange(event.target.value)} /></label>
+            <label>Framenummer<input value={selectedScooter?.frameNumber ?? ''} readOnly /></label>
             <label>Type onderhoud<input name="serviceType" placeholder="bijv. 500 km beurt" required /></label>
             <label>Kilometerstand<input name="mileage" inputMode="numeric" /></label>
             <label>Volgende onderhoudsdatum<input name="nextServiceDate" type="date" /></label>
