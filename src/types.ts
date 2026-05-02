@@ -64,7 +64,11 @@ export type Battery = {
   model: string;
   spec: string;
   scooterFrame?: string;
-  status: 'Voorraad' | 'In consignatie' | 'Gekoppeld';
+  status: 'Beschikbaar' | 'Voorraad' | 'In consignatie' | 'Gekoppeld' | 'Verkocht';
+  dealerId?: string;
+  orderNumber?: string;
+  chargeDate?: string;
+  soldAt?: string;
 };
 
 export type BatteryModel = {

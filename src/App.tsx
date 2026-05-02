@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport } from './lib/csv';
-import { loadSupabaseData, subscribeToSupabase, supabase, upsertBatteryModels, upsertDealers, upsertMaintenanceRecords, upsertScooters } from './lib/supabase';
+import { loadSupabaseData, subscribeToSupabase, supabase, upsertBatteries, upsertBatteryModels, upsertDealers, upsertMaintenanceRecords, upsertScooters } from './lib/supabase';
 import type { AppData, Battery, BatteryModel, Container, Dealer, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
@@ -516,6 +516,16 @@ export function App() {
     }
   }
 
+  async function updateBattery(battery: Battery) {
+    try {
+      await upsertBatteries([battery]);
+      setData((current) => ({ ...current, batteries: current.batteries.map((item) => item.id === battery.id ? battery : item) }));
+      setBatteryMessage(`Accu ${battery.lotNumber} is bijgewerkt.`);
+    } catch (error) {
+      setBatteryMessage(`Accu opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   if (!loggedIn) {
     return <LoginScreen onLogin={() => setLoggedIn(true)} supabaseEnabled={Boolean(supabase)} />;
   }
@@ -558,7 +568,7 @@ export function App() {
           {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'containers' && <Containers data={data} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
-          {view === 'batteries' && <Batteries batteries={data.batteries} batteryModels={data.batteryModels} addBatteryModel={addBatteryModel} message={batteryMessage} />}
+          {view === 'batteries' && <Batteries data={data} addBatteryModel={addBatteryModel} updateBattery={updateBattery} message={batteryMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
@@ -897,7 +907,9 @@ function Scooters({ data, query, setQuery, scooters, onSelect }: { data: AppData
   );
 }
 
-function Batteries({ batteries, batteryModels, addBatteryModel, message }: { batteries: Battery[]; batteryModels: BatteryModel[]; addBatteryModel: (event: FormEvent<HTMLFormElement>) => Promise<void>; message: string }) {
+function Batteries({ data, addBatteryModel, updateBattery, message }: { data: AppData; addBatteryModel: (event: FormEvent<HTMLFormElement>) => Promise<void>; updateBattery: (battery: Battery) => Promise<void>; message: string }) {
+  const { batteries, batteryModels, dealers, scooters } = data;
+  const [selectedBattery, setSelectedBattery] = useState<Battery | null>(null);
   return (
     <>
       <div className="page-title-row">
@@ -917,11 +929,11 @@ function Batteries({ batteries, batteryModels, addBatteryModel, message }: { bat
           {batteries.length === 0 ? (
             <div className="empty-state inline"><BatteryCharging size={22} /><strong>Nog geen accu's</strong><span>Voeg een accu toe om voorraad en koppelingen te beheren.</span></div>
           ) : batteries.map((battery) => (
-            <div className="battery-row" key={battery.id}>
+            <button className="battery-row battery-row-button" key={battery.id} onClick={() => setSelectedBattery(battery)}>
               <strong>{battery.lotNumber}</strong>
-              <span>{battery.model} - {battery.spec}</span>
-              <small>{battery.status}</small>
-            </div>
+              <span>{battery.model} - {battery.spec}{battery.scooterFrame ? ` - ${battery.scooterFrame}` : ''}</span>
+              <small>{battery.status}{battery.dealerId ? ` - ${dealerName(dealers, battery.dealerId)}` : ''}</small>
+            </button>
           ))}
         </section>
         <div className="battery-side">
@@ -951,7 +963,127 @@ function Batteries({ batteries, batteryModels, addBatteryModel, message }: { bat
           </form>
         </div>
       </div>
+      {selectedBattery && (
+        <BatteryDetailModal
+          battery={selectedBattery}
+          batteryModels={batteryModels}
+          dealers={dealers}
+          scooters={scooters}
+          onClose={() => setSelectedBattery(null)}
+          onUpdate={async (battery) => {
+            await updateBattery(battery);
+            setSelectedBattery(battery);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function BatteryDetailModal({ battery, batteryModels, dealers, scooters, onClose, onUpdate }: { battery: Battery; batteryModels: BatteryModel[]; dealers: Dealer[]; scooters: Scooter[]; onClose: () => void; onUpdate: (battery: Battery) => Promise<void> }) {
+  const [draft, setDraft] = useState<Battery>(battery);
+  const linkedScooter = scooters.find((scooter) => scooter.frameNumber === draft.scooterFrame);
+  const sortedDealers = [...dealers].sort((a, b) => (a.company || a.name).localeCompare(b.company || b.name, 'nl', { sensitivity: 'base' }));
+
+  function updateDraft(next: Partial<Battery>) {
+    setDraft((current) => ({ ...current, ...next }));
+  }
+
+  async function markSold(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await onUpdate({
+      ...draft,
+      status: 'Verkocht',
+      dealerId: String(form.get('dealerId') ?? '') || undefined,
+      orderNumber: String(form.get('orderNumber') ?? '').trim(),
+      soldAt: String(form.get('soldAt') ?? '') || undefined,
+    });
+  }
+
+  async function markConsignment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await onUpdate({
+      ...draft,
+      status: 'In consignatie',
+      dealerId: String(form.get('dealerId') ?? '') || undefined,
+    });
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal-card battery-detail-modal" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <span>Accu detail</span>
+            <h2>Accu {battery.lotNumber}</h2>
+          </div>
+          <button type="button" onClick={onClose}>Close</button>
+        </div>
+        <div className="battery-detail-grid">
+          <section className="panel detail-card">
+            <dl className="detail-list">
+              <dt>Status</dt><dd>{draft.status}</dd>
+              <dt>Dealer</dt><dd>{dealerName(dealers, draft.dealerId) || '-'}</dd>
+              <dt>Order nummer</dt><dd>{draft.orderNumber || '-'}</dd>
+            </dl>
+          </section>
+          <section className="panel detail-card">
+            <dl className="detail-list">
+              <dt>Laad datum</dt><dd>{formatDate(draft.chargeDate)}</dd>
+              <dt>Model</dt><dd>{draft.model}</dd>
+              <dt>Scooter</dt><dd>{linkedScooter ? linkedScooter.frameNumber : (draft.scooterFrame || '-')}</dd>
+            </dl>
+          </section>
+        </div>
+        <div className="battery-detail-grid">
+          <form className="panel form-panel" onSubmit={markSold}>
+            <div className="panel-title"><Search size={16} /> Markeer als verkocht</div>
+            <div className="form-grid single">
+              <label>Dealer<select name="dealerId" defaultValue={draft.dealerId ?? ''}><option value="">Selecteer ...</option>{sortedDealers.map((dealer) => <option key={dealer.id} value={dealer.id}>{dealer.company || dealer.name}</option>)}</select></label>
+              <label>Order nr*<input name="orderNumber" defaultValue={draft.orderNumber ?? ''} required /></label>
+              <label>Datum verkocht<input name="soldAt" type="date" defaultValue={draft.soldAt ?? ''} /></label>
+            </div>
+            <button className="primary-button">Opslaan</button>
+          </form>
+          <form className="panel form-panel" onSubmit={markConsignment}>
+            <div className="panel-title"><Search size={16} /> Markeer als in consignatie</div>
+            <div className="form-grid single">
+              <label>Dealer<select name="dealerId" defaultValue={draft.dealerId ?? ''}><option value="">Selecteer ...</option>{sortedDealers.map((dealer) => <option key={dealer.id} value={dealer.id}>{dealer.company || dealer.name}</option>)}</select></label>
+            </div>
+            <button className="primary-button">Opslaan</button>
+          </form>
+        </div>
+        <section className="panel form-panel">
+          <div className="panel-title"><Search size={16} /> Wijzig accu gegevens</div>
+          <div className="form-grid battery-edit-grid">
+            <label>Model*
+              <select value={draft.model} onChange={(event) => {
+                const model = batteryModels.find((item) => item.name === event.target.value);
+                updateDraft({ model: event.target.value, spec: model?.spec ?? draft.spec });
+              }}>
+                {[draft.model, ...batteryModels.map((model) => model.name)].filter((value, index, array) => value && array.indexOf(value) === index).map((model) => <option key={model} value={model}>{model}</option>)}
+              </select>
+            </label>
+            <label>Lotnum*<input value={draft.lotNumber} onChange={(event) => updateDraft({ lotNumber: event.target.value })} /></label>
+            <label>Laad datum<input type="date" value={draft.chargeDate ?? ''} onChange={(event) => updateDraft({ chargeDate: event.target.value })} /></label>
+            <label>Scooter
+              <select value={draft.scooterFrame ?? ''} onChange={(event) => updateDraft({ scooterFrame: event.target.value || undefined })}>
+                <option value="">Geen scooter</option>
+                {scooters.map((scooter) => <option key={scooter.id} value={scooter.frameNumber}>{scooter.frameNumber} - {scooter.licensePlate || scooter.model}</option>)}
+              </select>
+            </label>
+            <label>Status
+              <select value={draft.status} onChange={(event) => updateDraft({ status: event.target.value as Battery['status'] })}>
+                {['Beschikbaar', 'Voorraad', 'In consignatie', 'Gekoppeld', 'Verkocht'].map((status) => <option key={status}>{status}</option>)}
+              </select>
+            </label>
+          </div>
+          <button className="primary-button" onClick={() => onUpdate(draft)}>Wijzigen</button>
+        </section>
+      </div>
+    </div>
   );
 }
 

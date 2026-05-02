@@ -57,9 +57,9 @@ export const demoData: AppData = {
   containers,
   dealers,
   batteries: [
-    { id: 'b1', lotNumber: 'ASFC18-221026N001', model: 'JD60V30AH', spec: '60V 30Ah 1800Wh', scooterFrame: scooters[0].frameNumber, status: 'Gekoppeld' },
-    { id: 'b2', lotNumber: 'ASFC18-230328N005', model: 'JD72V20AH', spec: '72V 20Ah 1440Wh', status: 'Voorraad' },
-    { id: 'b3', lotNumber: 'ADRC14-230328N009', model: 'JD60V30AH', spec: '60V 30Ah 1800Wh', status: 'In consignatie' },
+    { id: 'b1', lotNumber: 'ASFC18-221026N001', model: 'JD60V30AH', spec: '60V 30Ah 1800Wh', scooterFrame: scooters[0].frameNumber, status: 'Beschikbaar', chargeDate: '2023-07-10' },
+    { id: 'b2', lotNumber: 'ASFC18-230328N005', model: 'JD72V20AH', spec: '72V 20Ah 1440Wh', status: 'Voorraad', chargeDate: '2023-08-02' },
+    { id: 'b3', lotNumber: 'ADRC14-230328N009', model: 'JD60V30AH', spec: '60V 30Ah 1800Wh', dealerId: 'd2', status: 'In consignatie', chargeDate: '2023-08-18' },
   ],
   batteryModels: [
     { id: 'battery-model-jd60v30ah', name: 'JD60V30AH', spec: '60V 30Ah 1800Wh', nominalVoltage: '67.2V', nominalCapacity: '30Ah', ratedEnergy: '1800Wh', maxChargeVoltage: '67.2V', minDischargeVoltage: '45V' },

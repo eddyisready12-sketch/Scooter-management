@@ -700,6 +700,19 @@ tbody tr:hover {
   border-bottom: 1px solid #dce1e6;
 }
 
+.battery-row-button {
+  width: calc(100% - 28px);
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.battery-row-button:hover {
+  color: #0075ff;
+}
+
 .battery-model-row strong {
   color: #0075ff;
 }
@@ -711,6 +724,30 @@ tbody tr:hover {
 
 .battery-model-form-grid {
   grid-template-columns: 1fr;
+}
+
+.battery-detail-modal {
+  width: min(940px, calc(100vw - 32px));
+  background: #eef2f6;
+}
+
+.battery-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 14px 16px 0;
+}
+
+.battery-detail-grid .panel {
+  margin-bottom: 0;
+}
+
+.battery-detail-modal > .form-panel {
+  margin: 14px 16px 16px;
+}
+
+.battery-edit-grid {
+  grid-template-columns: minmax(180px, 0.8fr) 1fr;
 }
 
 .warranty-form-grid {
