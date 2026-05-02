@@ -874,6 +874,9 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
 function Containers({ data }: { data: AppData }) {
   const pending = data.containers.filter((container) => container.status !== 'Aangekomen');
   const arrived = data.containers.filter((container) => container.status === 'Aangekomen');
+  const inTransit = data.containers.filter((container) => container.status === 'Onderweg');
+  const origin = data.containers.filter((container) => container.status === 'In land van herkomst');
+  const containerScooters = data.scooters.filter((scooter) => scooter.containerId);
   return (
     <>
       <div className="page-title-row">
@@ -881,19 +884,46 @@ function Containers({ data }: { data: AppData }) {
           <h1>Containers</h1>
           <span>{data.containers.length} containers geregistreerd</span>
         </div>
-        <button className="secondary-button"><Plus size={16} /> Container</button>
+        <div className="header-actions">
+          <button className="secondary-button"><Upload size={16} /> Importeren</button>
+          <button className="primary-button"><Plus size={16} /> Container</button>
+        </div>
       </div>
-      <section className="panel import-row"><button className="link-button"><Upload size={15} /> Container importeren</button></section>
-      <div className="two-col">
+      <div className="container-summary-grid">
+        <section className="panel container-summary-card">
+          <span>Totaal containers</span>
+          <strong>{data.containers.length}</strong>
+          <small>{containerScooters.length} scooters gekoppeld</small>
+        </section>
+        <section className="panel container-summary-card">
+          <span>Nog niet aangekomen</span>
+          <strong>{pending.length}</strong>
+          <small>{inTransit.length} onderweg, {origin.length} herkomstland</small>
+        </section>
+        <section className="panel container-summary-card">
+          <span>Aangekomen</span>
+          <strong>{arrived.length}</strong>
+          <small>Meest recent bovenaan</small>
+        </section>
+      </div>
+      <div className="container-status-grid">
         <ListPanel title="Containers nog niet aangekomen" items={pending.map((c) => `${c.number} - ${c.invoiceNumber}`)} />
         <ListPanel title="Meest recent aangekomen containers" items={arrived.map((c) => `${c.number} - ${c.invoiceNumber}`)} green />
       </div>
-      <h2>Scooters per container</h2>
+      <div className="section-heading">
+        <div>
+          <h2>Scooters per container</h2>
+          <span>Bekijk per zending welke scooters beschikbaar, in consignatie of verkocht zijn.</span>
+        </div>
+      </div>
       {data.containers.length === 0 ? (
-        <section className="panel empty-state">
-          <Boxes size={24} />
-          <strong>Nog geen containers</strong>
-          <span>Importeer of voeg een container toe om scooters per zending te groeperen.</span>
+        <section className="panel container-empty-state">
+          <div className="empty-icon"><Boxes size={26} /></div>
+          <div>
+            <strong>Nog geen containers</strong>
+            <span>Importeer of voeg een container toe om scooters per zending te groeperen.</span>
+          </div>
+          <button className="secondary-button"><Upload size={16} /> Container importeren</button>
         </section>
       ) : (
         <div className="container-grid">

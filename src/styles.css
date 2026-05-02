@@ -550,6 +550,77 @@ tbody tr:hover {
   gap: 14px;
 }
 
+.container-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.container-summary-card {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+}
+
+.container-summary-card span,
+.container-summary-card small,
+.section-heading span {
+  color: #65717d;
+}
+
+.container-summary-card strong {
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.container-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 10px 0 12px;
+}
+
+.section-heading h2 {
+  margin: 0 0 4px;
+}
+
+.container-empty-state {
+  min-height: 136px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+.container-empty-state div:nth-child(2) {
+  display: grid;
+  gap: 5px;
+  flex: 1;
+}
+
+.container-empty-state span {
+  color: #65717d;
+}
+
+.empty-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  background: #edf2f6;
+  color: #65717d;
+}
+
 .card-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1303,6 +1374,8 @@ dd {
   .card-grid,
   .two-col,
   .container-grid,
+  .container-summary-grid,
+  .container-status-grid,
   .drawer-grid,
   .search-grid {
     grid-template-columns: 1fr;
@@ -1390,6 +1463,11 @@ dd {
 
   .modal-actions {
     flex-direction: column-reverse;
+  }
+
+  .container-empty-state {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .dealer-table-header,
