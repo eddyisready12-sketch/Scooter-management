@@ -31,6 +31,7 @@ import type { AppData, Battery, Container, Dealer, Scooter, ScooterStatus, Warra
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'batteries' | 'dealers' | 'warranty' | 'search';
 type ImportTarget = 'scooters' | 'dealers';
+type ImportScooterStatus = ScooterStatus | 'file';
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -118,7 +119,7 @@ export function App() {
     );
   }, [data.dealers, data.scooters, query]);
 
-  async function importScooterFile(file: File) {
+  async function importScooterFile(file: File, statusOverride?: ScooterStatus) {
     try {
       const rows = await parseScooterImport(file);
       if (rows.length === 0) {
@@ -126,13 +127,14 @@ export function App() {
         return;
       }
 
-      const nextScooters = csvRowsToScooters(rows, data.scooters);
+      const nextScooters = csvRowsToScooters(rows, data.scooters, statusOverride);
       const importedFrames = new Set(rows.map((row) => row.frameNumber).filter(Boolean));
       const importedScooters = nextScooters.filter((scooter) => importedFrames.has(scooter.frameNumber));
 
       setData((current) => ({ ...current, scooters: nextScooters }));
       await upsertScooters(importedScooters);
-      setCsvMessage(`${rows.length} scooterregels geimporteerd naar het Scooters voorraadblok uit ${file.name}.`);
+      const targetStatus = statusOverride ? ` met status ${statusOverride}` : '';
+      setCsvMessage(`${rows.length} scooterregels geimporteerd naar het Scooters voorraadblok${targetStatus} uit ${file.name}.`);
     } catch (error) {
       setCsvMessage(`Import mislukt: ${importErrorMessage(error)}`);
     }
@@ -164,14 +166,14 @@ export function App() {
     }
   }
 
-  async function handleInventoryImport(target: ImportTarget, event: ChangeEvent<HTMLInputElement>) {
+  async function handleInventoryImport(target: ImportTarget, status: ImportScooterStatus, event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
       if (target === 'dealers') {
         await importDealerFile(file, true);
       } else {
-        await importScooterFile(file);
+        await importScooterFile(file, status === 'file' ? undefined : status);
       }
     } finally {
       event.target.value = '';
@@ -295,7 +297,7 @@ function LoginScreen({ onLogin, supabaseEnabled }: { onLogin: () => void; supaba
 
 function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelect }: {
   data: AppData;
-  onImport: (target: ImportTarget, event: ChangeEvent<HTMLInputElement>) => void;
+  onImport: (target: ImportTarget, status: ImportScooterStatus, event: ChangeEvent<HTMLInputElement>) => void;
   message: string;
   query: string;
   setQuery: (value: string) => void;
@@ -303,6 +305,7 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
   onSelect: (scooter: Scooter) => void;
 }) {
   const [importTarget, setImportTarget] = useState<ImportTarget>('scooters');
+  const [importStatus, setImportStatus] = useState<ImportScooterStatus>('file');
   const cards: Array<{ label: ScooterStatus; icon: typeof Bike }> = [
     { label: 'Beschikbaar', icon: Bike },
     { label: 'Verkocht dealer', icon: Wrench },
@@ -327,7 +330,16 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
               <option value="dealers">Dealers blok</option>
             </select>
           </label>
-          <label className="upload-button"><Upload size={16} /> CSV / Excel importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={(event) => onImport(importTarget, event)} /></label>
+          {importTarget === 'scooters' && (
+            <label>
+              Scooter status
+              <select value={importStatus} onChange={(event) => setImportStatus(event.target.value as ImportScooterStatus)}>
+                <option value="file">Status uit bestand</option>
+                {Object.keys(statusColor).map((status) => <option value={status} key={status}>{status}</option>)}
+              </select>
+            </label>
+          )}
+          <label className="upload-button"><Upload size={16} /> CSV / Excel importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={(event) => onImport(importTarget, importStatus, event)} /></label>
         </div>
       </div>
       {message && <div className="notice">{message}</div>}

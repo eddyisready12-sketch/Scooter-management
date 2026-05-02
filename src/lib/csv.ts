@@ -117,7 +117,7 @@ export function parseDealerImport(file: File): Promise<Dealer[]> {
   return readCsvRows(file).then(normalizeDealerRows);
 }
 
-export function csvRowsToScooters(rows: CsvScooterRow[], existing: Scooter[]): Scooter[] {
+export function csvRowsToScooters(rows: CsvScooterRow[], existing: Scooter[], statusOverride?: ScooterStatus): Scooter[] {
   const byFrame = new Map(existing.map((scooter) => [scooter.frameNumber, scooter]));
 
   rows.forEach((row) => {
@@ -131,7 +131,7 @@ export function csvRowsToScooters(rows: CsvScooterRow[], existing: Scooter[]): S
       model: row.model || previous?.model || 'SENSE',
       color: row.color || previous?.color || 'MATT BLACK',
       speed: row.speed || previous?.speed || '45km/h',
-      status: row.status || previous?.status || 'Beschikbaar',
+      status: statusOverride || row.status || previous?.status || 'Beschikbaar',
       dealerId: previous?.dealerId,
       containerId: previous?.containerId,
       licensePlate: row.licensePlate || previous?.licensePlate,
