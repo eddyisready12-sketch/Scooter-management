@@ -321,6 +321,7 @@ export function App() {
       city,
       address,
       Postalcode: postalCode,
+      active: true,
     };
 
     try {
@@ -351,6 +352,19 @@ export function App() {
         : `${normalized.frameNumber} is bijgewerkt.`);
     } catch (error) {
       setCsvMessage(`Scooter opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
+  async function updateDealer(updated: Dealer) {
+    setData((current) => ({
+      ...current,
+      dealers: current.dealers.map((dealer) => (dealer.id === updated.id ? updated : dealer)),
+    }));
+    try {
+      await upsertDealers([updated]);
+      setDealerImportMessage(`${updated.company || updated.name} is bijgewerkt.`);
+    } catch (error) {
+      setDealerImportMessage(`Dealer opslaan mislukt: ${importErrorMessage(error)}`);
     }
   }
 
@@ -461,7 +475,7 @@ export function App() {
           {view === 'containers' && <Containers data={data} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries batteries={data.batteries} scooters={data.scooters} />}
-          {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} message={dealerImportMessage} />}
+          {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} />}
           {view === 'search' && <GlobalSearch data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
         </section>
@@ -833,10 +847,14 @@ function Batteries({ batteries, scooters }: { batteries: Battery[]; scooters: Sc
   );
 }
 
-function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealers: Dealer[]; scooters: Scooter[]; onImport: (event: ChangeEvent<HTMLInputElement>) => void; onAddDealer: (event: FormEvent<HTMLFormElement>) => Promise<void>; message: string }) {
+function Dealers({ dealers, scooters, onImport, onAddDealer, onUpdateDealer, message }: { dealers: Dealer[]; scooters: Scooter[]; onImport: (event: ChangeEvent<HTMLInputElement>) => void; onAddDealer: (event: FormEvent<HTMLFormElement>) => Promise<void>; onUpdateDealer: (dealer: Dealer) => Promise<void>; message: string }) {
   const [showAddDealer, setShowAddDealer] = useState(false);
   const [selectedDealer, setSelectedDealer] = useState<Dealer | null>(null);
-  const sortedDealers = [...dealers].sort((a, b) => (a.company || a.name).localeCompare(b.company || b.name, 'nl', { sensitivity: 'base' }));
+  const sortedDealers = [...dealers].sort((a, b) => {
+    const activeRank = Number(b.active !== false) - Number(a.active !== false);
+    if (activeRank !== 0) return activeRank;
+    return (a.company || a.name).localeCompare(b.company || b.name, 'nl', { sensitivity: 'base' });
+  });
   async function submitDealer(event: FormEvent<HTMLFormElement>) {
     await onAddDealer(event);
     setShowAddDealer(false);
@@ -889,7 +907,14 @@ function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealer
         </div>
       )}
       {selectedDealer && (
-        <DealerDetailModal dealer={selectedDealer} onClose={() => setSelectedDealer(null)} />
+        <DealerDetailModal
+          dealer={selectedDealer}
+          onClose={() => setSelectedDealer(null)}
+          onUpdate={async (dealer) => {
+            await onUpdateDealer(dealer);
+            setSelectedDealer(dealer);
+          }}
+        />
       )}
     </>
   );
@@ -906,13 +931,15 @@ function DealerTablePanel({ dealers, onSelect }: { dealers: Dealer[]; onSelect: 
           <div className="dealer-table-header">
             <span>Company name</span>
             <span>Klantnaam</span>
-            <span>Email</span>
+            <span>Actief</span>
           </div>
           {dealers.map((dealer) => (
             <button className="dealer-table-row" key={dealer.id} onClick={() => onSelect(dealer)}>
               <span>{dealer.company || '-'}</span>
               <span>{dealer.name || '-'}</span>
-              <span>{dealer.email || '-'}</span>
+              <span className={dealer.active === false ? 'inactive-status' : 'active-status'}>
+                {dealer.active === false ? '-' : <CheckCircle2 size={18} aria-label="Actief" />}
+              </span>
             </button>
           ))}
         </div>
@@ -921,7 +948,8 @@ function DealerTablePanel({ dealers, onSelect }: { dealers: Dealer[]; onSelect: 
   );
 }
 
-function DealerDetailModal({ dealer, onClose }: { dealer: Dealer; onClose: () => void }) {
+function DealerDetailModal({ dealer, onClose, onUpdate }: { dealer: Dealer; onClose: () => void; onUpdate: (dealer: Dealer) => Promise<void> }) {
+  const isActive = dealer.active !== false;
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <section className="modal-card dealer-detail-modal" onMouseDown={(event) => event.stopPropagation()}>
@@ -935,12 +963,22 @@ function DealerDetailModal({ dealer, onClose }: { dealer: Dealer; onClose: () =>
         <dl className="dealer-detail-list">
           <dt>Company name</dt><dd>{dealer.company || '-'}</dd>
           <dt>Klantnaam</dt><dd>{dealer.name || '-'}</dd>
+          <dt>Status</dt><dd>{isActive ? 'Actief' : 'Niet actief'}</dd>
           <dt>Email</dt><dd>{dealer.email || '-'}</dd>
           <dt>Telefoon</dt><dd>{dealer.phone || '-'}</dd>
           <dt>Straat + huisnummer</dt><dd>{dealer.address || '-'}</dd>
           <dt>Postcode</dt><dd>{dealer.Postalcode || '-'}</dd>
           <dt>Woonplaats</dt><dd>{dealer.city || '-'}</dd>
         </dl>
+        <div className="modal-actions">
+          <button
+            className={isActive ? 'secondary-button' : 'primary-button'}
+            type="button"
+            onClick={() => onUpdate({ ...dealer, active: !isActive })}
+          >
+            {isActive ? 'Zet niet actief' : 'Zet actief'}
+          </button>
+        </div>
       </section>
     </div>
   );

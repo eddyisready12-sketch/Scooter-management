@@ -6,7 +6,8 @@ create table if not exists dealers (
   phone text,
   city text,
   address text,
-  "Postalcode" text
+  "Postalcode" text,
+  active boolean default true
 );
 
 create table if not exists containers (
