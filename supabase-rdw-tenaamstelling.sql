@@ -2,7 +2,11 @@ alter table scooters
   add column if not exists "firstAdmissionDate" date,
   add column if not exists "firstRegistrationDate" date,
   add column if not exists "lastRegistrationDate" date,
-  add column if not exists "emissionClass" text;
+  add column if not exists "emissionClass" text,
+  add column if not exists "rdwType" text,
+  add column if not exists "rdwTypeApprovalNumber" text,
+  add column if not exists "rdwVariant" text,
+  add column if not exists "rdwExecution" text;
 
 update scooters
 set status = 'Verkocht klant'

@@ -156,6 +156,10 @@ async function fetchRdwRegistration(licensePlate: string) {
     datum_eerste_tenaamstelling_in_nederland_dt?: string;
     datum_eerste_toelating?: string;
     datum_eerste_toelating_dt?: string;
+    type?: string;
+    typegoedkeuringsnummer?: string;
+    variant?: string;
+    uitvoering?: string;
   }>;
   const fuelRows = await fuelResponse.json() as Array<{
     uitlaatemissieniveau?: string;
@@ -170,6 +174,10 @@ async function fetchRdwRegistration(licensePlate: string) {
     firstRegistrationDate: rdwDateToInputDate(record.datum_eerste_tenaamstelling_in_nederland_dt || record.datum_eerste_tenaamstelling_in_nederland),
     lastRegistrationDate: rdwDateToInputDate(record.datum_tenaamstelling_dt || record.datum_tenaamstelling),
     emissionClass: fuelRecord?.uitlaatemissieniveau || fuelRecord?.milieuklasse_eg_goedkeuring_licht || '',
+    rdwType: record.type || '',
+    rdwTypeApprovalNumber: record.typegoedkeuringsnummer || '',
+    rdwVariant: record.variant || '',
+    rdwExecution: record.uitvoering || '',
   };
 }
 
@@ -361,6 +369,10 @@ export function App() {
           firstRegistrationDate: rdwData.firstRegistrationDate || scooter.firstRegistrationDate,
           lastRegistrationDate: rdwData.lastRegistrationDate || scooter.lastRegistrationDate,
           emissionClass: rdwData.emissionClass || scooter.emissionClass,
+          rdwType: rdwData.rdwType || scooter.rdwType,
+          rdwTypeApprovalNumber: rdwData.rdwTypeApprovalNumber || scooter.rdwTypeApprovalNumber,
+          rdwVariant: rdwData.rdwVariant || scooter.rdwVariant,
+          rdwExecution: rdwData.rdwExecution || scooter.rdwExecution,
         }));
       } catch {
         failed.push(scooter.licensePlate ?? scooter.frameNumber);
@@ -1030,6 +1042,10 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
         firstRegistrationDate: rdwData.firstRegistrationDate || draft.firstRegistrationDate,
         lastRegistrationDate: rdwData.lastRegistrationDate || draft.lastRegistrationDate,
         emissionClass: rdwData.emissionClass || draft.emissionClass,
+        rdwType: rdwData.rdwType || draft.rdwType,
+        rdwTypeApprovalNumber: rdwData.rdwTypeApprovalNumber || draft.rdwTypeApprovalNumber,
+        rdwVariant: rdwData.rdwVariant || draft.rdwVariant,
+        rdwExecution: rdwData.rdwExecution || draft.rdwExecution,
       };
       setDraft(nextDraft);
       await onUpdate(nextDraft);
@@ -1060,7 +1076,6 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
               <dt>Merk</dt><dd>{scooter.brand}</dd>
               <dt>Model</dt><dd>{scooter.model}</dd>
               <dt>Kleur</dt><dd>{scooter.color}</dd>
-              <dt>Factuur</dt><dd>{scooter.invoiceNumber || '-'}</dd>
               <dt>Kenteken</dt><dd>{scooter.licensePlate || '-'}</dd>
               <dt>Emissie</dt><dd>{scooter.emissionClass || '-'}</dd>
             </dl>
@@ -1073,6 +1088,7 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
               <label>Kenteken<input value={draft.licensePlate ?? ''} onChange={(e) => setDraft({ ...draft, licensePlate: e.target.value })} /></label>
               <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{Object.keys(statusColor).map((status) => <option key={status}>{status}</option>)}</select></label>
               <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value })}><option value="">Geen dealer</option>{dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
+              <label>Factuur<input value={draft.invoiceNumber ?? ''} onChange={(e) => setDraft({ ...draft, invoiceNumber: e.target.value })} /></label>
               <label>Eerste toelating<input type="date" value={draft.firstAdmissionDate ?? ''} onChange={(e) => setDraft({ ...draft, firstAdmissionDate: e.target.value })} /></label>
               <label>Eerste eigenaar<input type="date" value={draft.firstRegistrationDate ?? ''} onChange={(e) => setDraft({ ...draft, firstRegistrationDate: e.target.value })} /></label>
               <label>Laatste tenaamstelling<input type="date" value={draft.lastRegistrationDate ?? ''} onChange={(e) => setDraft({ ...draft, lastRegistrationDate: e.target.value })} /></label>
@@ -1099,6 +1115,10 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
             <dt>Eerste eigenaar</dt><dd>{formatDate(scooter.firstRegistrationDate)}</dd>
             <dt>Laatste tenaamstelling</dt><dd>{formatDate(scooter.lastRegistrationDate)}</dd>
             <dt>Emissie</dt><dd>{scooter.emissionClass || '-'}</dd>
+            <dt>Type</dt><dd>{scooter.rdwType || '-'}</dd>
+            <dt>Typegoedkeuringsnummer</dt><dd>{scooter.rdwTypeApprovalNumber || '-'}</dd>
+            <dt>Variant</dt><dd>{scooter.rdwVariant || '-'}</dd>
+            <dt>Uitvoering</dt><dd>{scooter.rdwExecution || '-'}</dd>
             <dt>Ouderdom</dt><dd>{formatVehicleAge(scooter.firstAdmissionDate)}</dd>
             <dt>Status</dt><dd>{registrationComplete ? <span className="registration-badge"><CheckCircle2 size={16} /> Tenaamgesteld</span> : 'Nog niet compleet'}</dd>
           </dl>

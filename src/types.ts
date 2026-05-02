@@ -23,6 +23,10 @@ export type Scooter = {
   firstRegistrationDate?: string;
   lastRegistrationDate?: string;
   emissionClass?: string;
+  rdwType?: string;
+  rdwTypeApprovalNumber?: string;
+  rdwVariant?: string;
+  rdwExecution?: string;
   batteryNumber?: string;
   invoiceNumber?: string;
   arrivedAt?: string;
