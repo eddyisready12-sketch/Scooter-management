@@ -1021,6 +1021,12 @@ tbody tr:hover {
   padding: 0 20px 20px;
 }
 
+.bulk-textarea {
+  min-height: 150px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  line-height: 1.45;
+}
+
 .import-row {
   display: flex;
   justify-content: space-between;

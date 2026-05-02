@@ -520,6 +520,46 @@ export function App() {
     }
   }
 
+  async function addBatteries(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const lotNumbers = [...new Set(String(form.get('lotNumbers') ?? '')
+      .split(/[\n,;]+/)
+      .map((value) => value.trim())
+      .filter(Boolean))];
+    const modelName = String(form.get('model') ?? '').trim();
+    const batteryModel = data.batteryModels.find((model) => model.name === modelName);
+    const chargeDate = String(form.get('chargeDate') ?? '').trim();
+    const status = String(form.get('status') ?? 'Beschikbaar') as Battery['status'];
+    if (lotNumbers.length === 0 || !modelName) {
+      setBatteryMessage('Vul minimaal een lotnummer en model in.');
+      return;
+    }
+
+    const batteries: Battery[] = lotNumbers.map((lotNumber) => ({
+      id: stableId('battery', lotNumber),
+      lotNumber,
+      model: modelName,
+      spec: batteryModel?.spec ?? '',
+      status,
+      ...(chargeDate ? { chargeDate } : {}),
+    }));
+
+    try {
+      await upsertBatteries(batteries);
+      setData((current) => {
+        const batteryMap = new Map(current.batteries.map((battery) => [battery.id, battery]));
+        batteries.forEach((battery) => batteryMap.set(battery.id, battery));
+        return { ...current, batteries: [...batteryMap.values()].sort((a, b) => a.lotNumber.localeCompare(b.lotNumber, 'nl', { sensitivity: 'base' })) };
+      });
+      formElement.reset();
+      setBatteryMessage(`${batteries.length} accu${batteries.length === 1 ? '' : "'s"} toegevoegd.`);
+    } catch (error) {
+      setBatteryMessage(`Accu toevoegen mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   async function updateBattery(battery: Battery) {
     try {
       await upsertBatteries([battery]);
@@ -572,7 +612,7 @@ export function App() {
           {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'containers' && <Containers data={data} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
-          {view === 'batteries' && <Batteries data={data} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
+          {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
@@ -911,9 +951,11 @@ function Scooters({ data, query, setQuery, scooters, onSelect }: { data: AppData
   );
 }
 
-function Batteries({ data, addBatteryModel, updateBattery, onSelectScooter, message }: { data: AppData; addBatteryModel: (event: FormEvent<HTMLFormElement>) => Promise<void>; updateBattery: (battery: Battery) => Promise<void>; onSelectScooter: (scooter: Scooter) => void; message: string }) {
+function Batteries({ data, addBatteries, addBatteryModel, updateBattery, onSelectScooter, message }: { data: AppData; addBatteries: (event: FormEvent<HTMLFormElement>) => Promise<void>; addBatteryModel: (event: FormEvent<HTMLFormElement>) => Promise<void>; updateBattery: (battery: Battery) => Promise<void>; onSelectScooter: (scooter: Scooter) => void; message: string }) {
   const { batteries, batteryModels, dealers, scooters } = data;
   const [selectedBattery, setSelectedBattery] = useState<Battery | null>(null);
+  const [showAddBattery, setShowAddBattery] = useState(false);
+  const defaultBatteryModel = batteryModels[0]?.name ?? '';
   const batteryGroups = [
     {
       title: 'Beschikbaar',
@@ -934,6 +976,9 @@ function Batteries({ data, addBatteryModel, updateBattery, onSelectScooter, mess
         <div>
           <h1>Accu's</h1>
           <span>{batteries.length} accu's geregistreerd</span>
+        </div>
+        <div className="header-actions">
+          <button className="secondary-button" onClick={() => setShowAddBattery(true)}><Plus size={16} /> Accu</button>
         </div>
       </div>
       {message && <div className="notice">{message}</div>}
@@ -1001,6 +1046,43 @@ function Batteries({ data, addBatteryModel, updateBattery, onSelectScooter, mess
             setSelectedBattery(battery);
           }}
         />
+      )}
+      {showAddBattery && (
+        <div className="modal-backdrop" onMouseDown={() => setShowAddBattery(false)}>
+          <form className="modal-card" onSubmit={async (event) => {
+            await addBatteries(event);
+            setShowAddBattery(false);
+          }} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <span>Accu voorraad</span>
+                <h2>Accu's toevoegen</h2>
+              </div>
+              <button type="button" onClick={() => setShowAddBattery(false)}>Close</button>
+            </div>
+            <div className="form-grid single">
+              <label>Lotnummers*
+                <textarea name="lotNumbers" className="bulk-textarea" placeholder={'ASFC18 221026N001\nADRC14 221023N002\nASFC18 230328N005'} required />
+              </label>
+              <label>Model*
+                <select name="model" defaultValue={defaultBatteryModel} required>
+                  <option value="">Selecteer ...</option>
+                  {batteryModels.map((model) => <option key={model.id} value={model.name}>{model.name} - {model.spec}</option>)}
+                </select>
+              </label>
+              <label>Status
+                <select name="status" defaultValue="Beschikbaar">
+                  {['Beschikbaar', 'Voorraad', 'In consignatie', 'Gekoppeld', 'Verkocht'].map((status) => <option key={status}>{status}</option>)}
+                </select>
+              </label>
+              <label>Laad datum<input name="chargeDate" type="date" /></label>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="secondary-button" onClick={() => setShowAddBattery(false)}>Annuleren</button>
+              <button className="primary-button">Toevoegen</button>
+            </div>
+          </form>
+        </div>
       )}
     </>
   );
