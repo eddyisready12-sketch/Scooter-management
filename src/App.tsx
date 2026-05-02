@@ -58,12 +58,10 @@ const statusColor: Record<ScooterStatus, string> = {
 const maintenancePackages = {
   small: {
     label: 'Kleine onderhoudsbeurt',
-    price: '€ 89,00 incl. btw',
     items: ['Olie verversen', 'Bougie vervangen', 'Bandenspanningscheck', 'Luchtfiltercheck', 'Profielcheck', 'Remblokkencheck', 'Verlichtingscheck'],
   },
   large: {
     label: 'Grote onderhoudsbeurt',
-    price: '€ 145,00 incl. btw',
     items: ['Olie verversen', 'Bougie vervangen', 'Bandenspanningscheck', 'Luchtfiltercheck', 'Profielcheck', 'Remblokkencheck', 'Verlichtingscheck', 'Kleppen stellen', 'Smering bewegende onderdelen', 'V-snaarcheck', 'Variorollencheck'],
   },
 } as const;
@@ -1119,6 +1117,7 @@ function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: F
 function Maintenance({ data, addMaintenance, message }: { data: AppData; addMaintenance: (event: FormEvent<HTMLFormElement>) => void; message: string }) {
   const [historyQuery, setHistoryQuery] = useState('');
   const [selectedPackage, setSelectedPackage] = useState<keyof typeof maintenancePackages>('small');
+  const [selectedMaintenance, setSelectedMaintenance] = useState<MaintenanceRecord | null>(null);
   const sortedMaintenance = [...data.maintenance].sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
   const [selectedFrame, setSelectedFrame] = useState(data.scooters[0]?.frameNumber ?? '');
   const [maintenanceLicensePlate, setMaintenanceLicensePlate] = useState(data.scooters[0]?.licensePlate ?? '');
@@ -1203,7 +1202,7 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
           ) : visibleMaintenance.map((record) => {
             const scooter = data.scooters.find((item) => item.frameNumber === record.scooterFrame);
             return (
-              <div className="maintenance-row" key={record.id}>
+              <button className="maintenance-row" key={record.id} onClick={() => setSelectedMaintenance(record)}>
                 <div>
                   <strong>{record.licensePlate || scooter?.licensePlate || 'Geen kenteken'}</strong>
                   <span>{record.scooterFrame} - {scooter?.model || 'Scooter'} - {record.servicePackage || record.serviceType}</span>
@@ -1212,7 +1211,7 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
                 </div>
                 <span className="status-pill">{record.status}</span>
                 <small>Volgende: {formatDate(record.nextServiceDate)}</small>
-              </div>
+              </button>
             );
           })}
         </section>
@@ -1237,7 +1236,7 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
                 <option>{maintenancePackages.large.label}</option>
               </select>
             </label>
-            <label>Type onderhoud<input name="serviceType" value={`${maintenancePackages[selectedPackage].label} - ${maintenancePackages[selectedPackage].price}`} readOnly /></label>
+            <label>Type onderhoud<input name="serviceType" value={maintenancePackages[selectedPackage].label} readOnly /></label>
             <label>Kilometerstand<input name="mileage" inputMode="numeric" /></label>
             <label>Volgende onderhoudsdatum<input name="nextServiceDate" type="date" /></label>
             <label>Status
@@ -1248,7 +1247,7 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
               </select>
             </label>
             <fieldset className="maintenance-checklist">
-              <legend>{maintenancePackages[selectedPackage].label} <span>{maintenancePackages[selectedPackage].price}</span></legend>
+              <legend>{maintenancePackages[selectedPackage].label}</legend>
               {maintenancePackages[selectedPackage].items.map((item) => (
                 <label key={item}><input type="checkbox" name="checklist" value={item} /> {item}</label>
               ))}
@@ -1258,7 +1257,48 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
           <button className="primary-button">Toevoegen</button>
         </form>
       </div>
+      {selectedMaintenance && (
+        <MaintenanceDetailModal
+          record={selectedMaintenance}
+          scooter={data.scooters.find((item) => item.frameNumber === selectedMaintenance.scooterFrame)}
+          onClose={() => setSelectedMaintenance(null)}
+        />
+      )}
     </>
+  );
+}
+
+function MaintenanceDetailModal({ record, scooter, onClose }: { record: MaintenanceRecord; scooter?: Scooter; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <section className="modal-card maintenance-detail-modal" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <span>Onderhoud</span>
+            <h2>{record.licensePlate || scooter?.licensePlate || record.scooterFrame}</h2>
+          </div>
+          <button type="button" onClick={onClose}>Close</button>
+        </div>
+        <dl className="dealer-detail-list">
+          <dt>Kenteken</dt><dd>{record.licensePlate || scooter?.licensePlate || '-'}</dd>
+          <dt>Framenummer</dt><dd>{record.scooterFrame}</dd>
+          <dt>Scooter</dt><dd>{scooter ? `${scooter.model} - ${scooter.color} - ${scooter.speed}` : '-'}</dd>
+          <dt>Pakket</dt><dd>{record.servicePackage || '-'}</dd>
+          <dt>Type onderhoud</dt><dd>{record.serviceType}</dd>
+          <dt>Onderhoudsdatum</dt><dd>{formatDate(record.serviceDate)}</dd>
+          <dt>Kilometerstand</dt><dd>{record.mileage || '-'}</dd>
+          <dt>Volgende onderhoud</dt><dd>{formatDate(record.nextServiceDate)}</dd>
+          <dt>Status</dt><dd>{record.status}</dd>
+          <dt>Notities</dt><dd>{record.notes || '-'}</dd>
+        </dl>
+        <section className="maintenance-detail-checklist">
+          <h3>Checklist ({record.checklist?.length ?? 0})</h3>
+          {record.checklist?.length ? record.checklist.map((item) => (
+            <div className="checklist-result" key={item}><CheckCircle2 size={16} /> {item}</div>
+          )) : <p className="empty">Geen checklistpunten afgevinkt.</p>}
+        </section>
+      </section>
+    </div>
   );
 }
 
