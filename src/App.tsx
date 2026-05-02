@@ -937,7 +937,7 @@ function Batteries({ data, addBatteryModel, updateBattery, message }: { data: Ap
         <div className="panel-title"><Search size={16} /> Accu zoeken</div>
         <div className="inline-search"><input placeholder="Lotnummer, model of gekoppelde scooter" /><button className="primary-button"><Search size={15} /></button></div>
       </section>
-      <div className="two-col battery-layout">
+      <div className="battery-layout">
         <div className="battery-groups">
           {batteryGroups.map((group) => (
             <section className="panel list-panel" key={group.title}>
