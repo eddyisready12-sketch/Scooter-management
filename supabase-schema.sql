@@ -34,6 +34,7 @@ create table if not exists scooters (
   "firstRegistrationDate" date,
   "lastRegistrationDate" date,
   "ownerCount" integer,
+  "emissionClass" text,
   "batteryNumber" text,
   "invoiceNumber" text,
   "arrivedAt" timestamptz,

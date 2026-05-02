@@ -135,13 +135,23 @@ async function fetchRdwRegistration(licensePlate: string) {
   const normalizedPlate = licensePlate.replace(/[^a-z0-9]/gi, '').toUpperCase();
   if (!normalizedPlate) throw new Error('Vul eerst een kenteken in.');
 
-  const params = new URLSearchParams({
+  const vehicleParams = new URLSearchParams({
     kenteken: normalizedPlate,
     $limit: '1',
   });
-  const response = await fetch(`https://opendata.rdw.nl/resource/m9d7-ebf2.json?${params.toString()}`);
-  if (!response.ok) throw new Error(`RDW gaf status ${response.status}.`);
-  const rows = await response.json() as Array<{
+  const fuelParams = new URLSearchParams({
+    kenteken: normalizedPlate,
+    $limit: '1',
+  });
+
+  const [vehicleResponse, fuelResponse] = await Promise.all([
+    fetch(`https://opendata.rdw.nl/resource/m9d7-ebf2.json?${vehicleParams.toString()}`),
+    fetch(`https://opendata.rdw.nl/resource/8ys7-d773.json?${fuelParams.toString()}`),
+  ]);
+  if (!vehicleResponse.ok) throw new Error(`RDW voertuigdata gaf status ${vehicleResponse.status}.`);
+  if (!fuelResponse.ok) throw new Error(`RDW emissiedata gaf status ${fuelResponse.status}.`);
+
+  const vehicleRows = await vehicleResponse.json() as Array<{
     datum_tenaamstelling?: string;
     datum_tenaamstelling_dt?: string;
     datum_eerste_tenaamstelling_in_nederland?: string;
@@ -150,13 +160,19 @@ async function fetchRdwRegistration(licensePlate: string) {
     datum_eerste_toelating_dt?: string;
     aantal_eigenaren?: string;
   }>;
-  const record = rows[0];
+  const fuelRows = await fuelResponse.json() as Array<{
+    uitlaatemissieniveau?: string;
+    milieuklasse_eg_goedkeuring_licht?: string;
+  }>;
+  const record = vehicleRows[0];
   if (!record) throw new Error(`Geen RDW data gevonden voor kenteken ${normalizedPlate}.`);
+  const fuelRecord = fuelRows[0];
 
   return {
     firstRegistrationDate: rdwDateToInputDate(record.datum_eerste_tenaamstelling_in_nederland_dt || record.datum_eerste_tenaamstelling_in_nederland || record.datum_eerste_toelating_dt || record.datum_eerste_toelating),
     lastRegistrationDate: rdwDateToInputDate(record.datum_tenaamstelling_dt || record.datum_tenaamstelling),
     ownerCount: record.aantal_eigenaren ? Number(record.aantal_eigenaren) : undefined,
+    emissionClass: fuelRecord?.uitlaatemissieniveau || fuelRecord?.milieuklasse_eg_goedkeuring_licht || '',
   };
 }
 
@@ -950,6 +966,7 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
         firstRegistrationDate: rdwData.firstRegistrationDate || draft.firstRegistrationDate,
         lastRegistrationDate: rdwData.lastRegistrationDate || draft.lastRegistrationDate,
         ownerCount: rdwData.ownerCount ?? draft.ownerCount,
+        emissionClass: rdwData.emissionClass || draft.emissionClass,
       };
       setDraft(nextDraft);
       await onUpdate(nextDraft);
@@ -984,6 +1001,7 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
               <dt>Kleur</dt><dd>{scooter.color}</dd>
               <dt>Factuur</dt><dd>{scooter.invoiceNumber || '-'}</dd>
               <dt>Kenteken</dt><dd>{scooter.licensePlate || '-'}</dd>
+              <dt>Emissie</dt><dd>{scooter.emissionClass || '-'}</dd>
             </dl>
           </section>
           <section className="panel drawer-edit-card">
@@ -997,6 +1015,7 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
               <label>Eerste tenaamstelling<input type="date" value={draft.firstRegistrationDate ?? ''} onChange={(e) => setDraft({ ...draft, firstRegistrationDate: e.target.value })} /></label>
               <label>Laatste tenaamstelling<input type="date" value={draft.lastRegistrationDate ?? ''} onChange={(e) => setDraft({ ...draft, lastRegistrationDate: e.target.value })} /></label>
               <label>Aantal eigenaren<input type="number" min={0} value={draft.ownerCount ?? ''} onChange={(e) => setDraft({ ...draft, ownerCount: e.target.value === '' ? undefined : Number(e.target.value) })} /></label>
+              <label>Emissie<input value={draft.emissionClass ?? ''} onChange={(e) => setDraft({ ...draft, emissionClass: e.target.value })} /></label>
             </div>
             <div className="drawer-actions">
               <button className="primary-button" onClick={() => onUpdate(draft)}>Verander gegevens</button>
@@ -1018,6 +1037,7 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
             <dt>Eerste tenaamstelling</dt><dd>{formatDate(scooter.firstRegistrationDate)}</dd>
             <dt>Laatste tenaamstelling</dt><dd>{formatDate(scooter.lastRegistrationDate)}</dd>
             <dt>Aantal eigenaren</dt><dd>{scooter.ownerCount ?? '-'}</dd>
+            <dt>Emissie</dt><dd>{scooter.emissionClass || '-'}</dd>
             <dt>Ouderdom</dt><dd>{formatVehicleAge(scooter.firstRegistrationDate)}</dd>
             <dt>Status</dt><dd>{registrationComplete ? <span className="registration-badge"><CheckCircle2 size={16} /> Tenaamgesteld</span> : 'Nog niet compleet'}</dd>
           </dl>

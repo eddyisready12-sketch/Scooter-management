@@ -22,6 +22,7 @@ export type Scooter = {
   firstRegistrationDate?: string;
   lastRegistrationDate?: string;
   ownerCount?: number;
+  emissionClass?: string;
   batteryNumber?: string;
   invoiceNumber?: string;
   arrivedAt?: string;

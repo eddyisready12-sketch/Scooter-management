@@ -1,7 +1,8 @@
 alter table scooters
   add column if not exists "firstRegistrationDate" date,
   add column if not exists "lastRegistrationDate" date,
-  add column if not exists "ownerCount" integer;
+  add column if not exists "ownerCount" integer,
+  add column if not exists "emissionClass" text;
 
 update scooters
 set status = 'Verkocht klant'
