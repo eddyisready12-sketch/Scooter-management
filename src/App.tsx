@@ -83,11 +83,9 @@ function dealerName(dealers: Dealer[], dealerId?: string) {
 function isRegistrationComplete(scooter: Scooter) {
   return Boolean(
     scooter.licensePlate?.trim() &&
+    scooter.firstAdmissionDate &&
     scooter.firstRegistrationDate &&
-    scooter.lastRegistrationDate &&
-    scooter.ownerCount !== undefined &&
-    scooter.ownerCount !== null &&
-    !Number.isNaN(Number(scooter.ownerCount)),
+    scooter.lastRegistrationDate,
   );
 }
 
@@ -95,9 +93,9 @@ function normalizeRegistrationStatus(scooter: Scooter): Scooter {
   return isRegistrationComplete(scooter) ? { ...scooter, status: 'Verkocht klant' } : scooter;
 }
 
-function formatVehicleAge(firstRegistrationDate?: string) {
-  if (!firstRegistrationDate) return '-';
-  const start = new Date(firstRegistrationDate);
+function formatVehicleAge(firstAdmissionDate?: string) {
+  if (!firstAdmissionDate) return '-';
+  const start = new Date(firstAdmissionDate);
   const end = new Date();
   if (Number.isNaN(start.getTime()) || start > end) return '-';
 
@@ -158,7 +156,6 @@ async function fetchRdwRegistration(licensePlate: string) {
     datum_eerste_tenaamstelling_in_nederland_dt?: string;
     datum_eerste_toelating?: string;
     datum_eerste_toelating_dt?: string;
-    aantal_eigenaren?: string;
   }>;
   const fuelRows = await fuelResponse.json() as Array<{
     uitlaatemissieniveau?: string;
@@ -169,9 +166,9 @@ async function fetchRdwRegistration(licensePlate: string) {
   const fuelRecord = fuelRows[0];
 
   return {
-    firstRegistrationDate: rdwDateToInputDate(record.datum_eerste_tenaamstelling_in_nederland_dt || record.datum_eerste_tenaamstelling_in_nederland || record.datum_eerste_toelating_dt || record.datum_eerste_toelating),
+    firstAdmissionDate: rdwDateToInputDate(record.datum_eerste_toelating_dt || record.datum_eerste_toelating),
+    firstRegistrationDate: rdwDateToInputDate(record.datum_eerste_tenaamstelling_in_nederland_dt || record.datum_eerste_tenaamstelling_in_nederland),
     lastRegistrationDate: rdwDateToInputDate(record.datum_tenaamstelling_dt || record.datum_tenaamstelling),
-    ownerCount: record.aantal_eigenaren ? Number(record.aantal_eigenaren) : undefined,
     emissionClass: fuelRecord?.uitlaatemissieniveau || fuelRecord?.milieuklasse_eg_goedkeuring_licht || '',
   };
 }
@@ -360,9 +357,9 @@ export function App() {
         const rdwData = await fetchRdwRegistration(scooter.licensePlate ?? '');
         updatedScooters.push(normalizeRegistrationStatus({
           ...scooter,
+          firstAdmissionDate: rdwData.firstAdmissionDate || scooter.firstAdmissionDate,
           firstRegistrationDate: rdwData.firstRegistrationDate || scooter.firstRegistrationDate,
           lastRegistrationDate: rdwData.lastRegistrationDate || scooter.lastRegistrationDate,
-          ownerCount: rdwData.ownerCount ?? scooter.ownerCount,
           emissionClass: rdwData.emissionClass || scooter.emissionClass,
         }));
       } catch {
@@ -1029,16 +1026,14 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
       const rdwData = await fetchRdwRegistration(draft.licensePlate ?? '');
       const nextDraft = {
         ...draft,
+        firstAdmissionDate: rdwData.firstAdmissionDate || draft.firstAdmissionDate,
         firstRegistrationDate: rdwData.firstRegistrationDate || draft.firstRegistrationDate,
         lastRegistrationDate: rdwData.lastRegistrationDate || draft.lastRegistrationDate,
-        ownerCount: rdwData.ownerCount ?? draft.ownerCount,
         emissionClass: rdwData.emissionClass || draft.emissionClass,
       };
       setDraft(nextDraft);
       await onUpdate(nextDraft);
-      setRdwMessage(rdwData.ownerCount === undefined
-        ? 'RDW datums zijn opgehaald. Aantal eigenaren staat niet in de vrije RDW open data en kan handmatig gevuld worden.'
-        : 'RDW tenaamstelling is opgehaald en opgeslagen.');
+      setRdwMessage('RDW voertuigdata is opgehaald en opgeslagen.');
     } catch (error) {
       setRdwMessage(`RDW ophalen mislukt: ${importErrorMessage(error)}`);
     } finally {
@@ -1078,9 +1073,9 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
               <label>Kenteken<input value={draft.licensePlate ?? ''} onChange={(e) => setDraft({ ...draft, licensePlate: e.target.value })} /></label>
               <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{Object.keys(statusColor).map((status) => <option key={status}>{status}</option>)}</select></label>
               <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value })}><option value="">Geen dealer</option>{dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
-              <label>Eerste tenaamstelling<input type="date" value={draft.firstRegistrationDate ?? ''} onChange={(e) => setDraft({ ...draft, firstRegistrationDate: e.target.value })} /></label>
+              <label>Eerste toelating<input type="date" value={draft.firstAdmissionDate ?? ''} onChange={(e) => setDraft({ ...draft, firstAdmissionDate: e.target.value })} /></label>
+              <label>Eerste eigenaar<input type="date" value={draft.firstRegistrationDate ?? ''} onChange={(e) => setDraft({ ...draft, firstRegistrationDate: e.target.value })} /></label>
               <label>Laatste tenaamstelling<input type="date" value={draft.lastRegistrationDate ?? ''} onChange={(e) => setDraft({ ...draft, lastRegistrationDate: e.target.value })} /></label>
-              <label>Aantal eigenaren<input type="number" min={0} value={draft.ownerCount ?? ''} onChange={(e) => setDraft({ ...draft, ownerCount: e.target.value === '' ? undefined : Number(e.target.value) })} /></label>
               <label>Emissie<input value={draft.emissionClass ?? ''} onChange={(e) => setDraft({ ...draft, emissionClass: e.target.value })} /></label>
             </div>
             <div className="drawer-actions">
@@ -1100,11 +1095,11 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
         <section className="panel drawer-info-panel rdw-panel">
           <div className="panel-title"><ShieldCheck size={16} /> RDW tenaamstelling</div>
           <dl className="detail-list rdw-list">
-            <dt>Eerste tenaamstelling</dt><dd>{formatDate(scooter.firstRegistrationDate)}</dd>
+            <dt>Eerste toelating</dt><dd>{formatDate(scooter.firstAdmissionDate)}</dd>
+            <dt>Eerste eigenaar</dt><dd>{formatDate(scooter.firstRegistrationDate)}</dd>
             <dt>Laatste tenaamstelling</dt><dd>{formatDate(scooter.lastRegistrationDate)}</dd>
-            <dt>Aantal eigenaren</dt><dd>{scooter.ownerCount ?? '-'}</dd>
             <dt>Emissie</dt><dd>{scooter.emissionClass || '-'}</dd>
-            <dt>Ouderdom</dt><dd>{formatVehicleAge(scooter.firstRegistrationDate)}</dd>
+            <dt>Ouderdom</dt><dd>{formatVehicleAge(scooter.firstAdmissionDate)}</dd>
             <dt>Status</dt><dd>{registrationComplete ? <span className="registration-badge"><CheckCircle2 size={16} /> Tenaamgesteld</span> : 'Nog niet compleet'}</dd>
           </dl>
         </section>
