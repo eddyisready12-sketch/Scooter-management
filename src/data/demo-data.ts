@@ -61,6 +61,10 @@ export const demoData: AppData = {
     { id: 'b2', lotNumber: 'ASFC18-230328N005', model: 'JD72V20AH', spec: '72V 20Ah 1440Wh', status: 'Voorraad' },
     { id: 'b3', lotNumber: 'ADRC14-230328N009', model: 'JD60V30AH', spec: '60V 30Ah 1800Wh', status: 'In consignatie' },
   ],
+  batteryModels: [
+    { id: 'battery-model-jd60v30ah', name: 'JD60V30AH', spec: '60V 30Ah 1800Wh', nominalVoltage: '67.2V', nominalCapacity: '30Ah', ratedEnergy: '1800Wh', maxChargeVoltage: '67.2V', minDischargeVoltage: '45V' },
+    { id: 'battery-model-jd72v20ah', name: 'JD72V20AH', spec: '72V 20Ah 1440Wh', nominalVoltage: '84V', nominalCapacity: '20Ah', ratedEnergy: '1440Wh', maxChargeVoltage: '84V', minDischargeVoltage: '56V' },
+  ],
   warranties: [
     { id: 'w1', scooterFrame: scooters[0].frameNumber, partName: 'Controller', partNumber: 'RSO-CTRL-45', claimDate: '2026-04-21', warrantyUntil: '2028-04-21', status: 'Open', dealerId: 'd1', notes: 'Intermittent throttle response.' },
     { id: 'w2', scooterFrame: scooters[4].frameNumber, partName: 'Battery pack', partNumber: 'RSO-BAT-60V', claimDate: '2026-03-18', warrantyUntil: '2028-03-18', status: 'In behandeling', dealerId: 'd2', notes: 'Capacity drops under load.' },

@@ -56,6 +56,17 @@ create table if not exists batteries (
   status text not null
 );
 
+create table if not exists battery_models (
+  id text primary key,
+  name text not null,
+  spec text not null,
+  "nominalVoltage" text,
+  "nominalCapacity" text,
+  "ratedEnergy" text,
+  "maxChargeVoltage" text,
+  "minDischargeVoltage" text
+);
+
 create table if not exists warranty_parts (
   id text primary key,
   "scooterFrame" text references scooters("frameNumber"),
@@ -97,12 +108,14 @@ alter publication supabase_realtime add table scooters;
 alter publication supabase_realtime add table containers;
 alter publication supabase_realtime add table dealers;
 alter publication supabase_realtime add table batteries;
+alter publication supabase_realtime add table battery_models;
 alter publication supabase_realtime add table warranty_parts;
 alter publication supabase_realtime add table maintenance_records;
 alter publication supabase_realtime add table documents;
 
 alter table dealers enable row level security;
 alter table scooters enable row level security;
+alter table battery_models enable row level security;
 alter table maintenance_records enable row level security;
 
 create policy "Allow public read dealers"
@@ -138,6 +151,25 @@ with check (true);
 
 create policy "Allow public update scooters"
 on scooters
+for update
+to anon
+using (true)
+with check (true);
+
+create policy "Allow public read battery models"
+on battery_models
+for select
+to anon
+using (true);
+
+create policy "Allow public insert battery models"
+on battery_models
+for insert
+to anon
+with check (true);
+
+create policy "Allow public update battery models"
+on battery_models
 for update
 to anon
 using (true)

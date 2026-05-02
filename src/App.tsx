@@ -27,8 +27,8 @@ import {
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport } from './lib/csv';
-import { loadSupabaseData, subscribeToSupabase, supabase, upsertDealers, upsertMaintenanceRecords, upsertScooters } from './lib/supabase';
-import type { AppData, Battery, Container, Dealer, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
+import { loadSupabaseData, subscribeToSupabase, supabase, upsertBatteryModels, upsertDealers, upsertMaintenanceRecords, upsertScooters } from './lib/supabase';
+import type { AppData, Battery, BatteryModel, Container, Dealer, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'dealers';
@@ -202,6 +202,7 @@ export function App() {
   const [csvMessage, setCsvMessage] = useState('');
   const [dealerImportMessage, setDealerImportMessage] = useState('');
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
+  const [batteryMessage, setBatteryMessage] = useState('');
   const [statusFilter, setStatusFilter] = useState<ScooterStatus | 'all'>('all');
 
   useEffect(() => {
@@ -480,6 +481,41 @@ export function App() {
     }
   }
 
+  async function addBatteryModel(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const name = String(form.get('name') ?? '').trim();
+    const spec = String(form.get('spec') ?? '').trim();
+    if (!name || !spec) {
+      setBatteryMessage('Vul minimaal naam en spec in.');
+      return;
+    }
+    const model: BatteryModel = {
+      id: stableId('battery-model', `${name}-${spec}`),
+      name,
+      spec,
+      nominalVoltage: String(form.get('nominalVoltage') ?? '').trim(),
+      nominalCapacity: String(form.get('nominalCapacity') ?? '').trim(),
+      ratedEnergy: String(form.get('ratedEnergy') ?? '').trim(),
+      maxChargeVoltage: String(form.get('maxChargeVoltage') ?? '').trim(),
+      minDischargeVoltage: String(form.get('minDischargeVoltage') ?? '').trim(),
+    };
+
+    try {
+      await upsertBatteryModels([model]);
+      setData((current) => {
+        const models = new Map(current.batteryModels.map((item) => [item.id, item]));
+        models.set(model.id, model);
+        return { ...current, batteryModels: [...models.values()].sort((a, b) => a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' })) };
+      });
+      formElement.reset();
+      setBatteryMessage(`${model.name} is toegevoegd aan de accu modellen.`);
+    } catch (error) {
+      setBatteryMessage(`Accu model opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   if (!loggedIn) {
     return <LoginScreen onLogin={() => setLoggedIn(true)} supabaseEnabled={Boolean(supabase)} />;
   }
@@ -522,7 +558,7 @@ export function App() {
           {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'containers' && <Containers data={data} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
-          {view === 'batteries' && <Batteries batteries={data.batteries} scooters={data.scooters} />}
+          {view === 'batteries' && <Batteries batteries={data.batteries} batteryModels={data.batteryModels} addBatteryModel={addBatteryModel} message={batteryMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
@@ -861,7 +897,7 @@ function Scooters({ data, query, setQuery, scooters, onSelect }: { data: AppData
   );
 }
 
-function Batteries({ batteries, scooters }: { batteries: Battery[]; scooters: Scooter[] }) {
+function Batteries({ batteries, batteryModels, addBatteryModel, message }: { batteries: Battery[]; batteryModels: BatteryModel[]; addBatteryModel: (event: FormEvent<HTMLFormElement>) => Promise<void>; message: string }) {
   return (
     <>
       <div className="page-title-row">
@@ -870,6 +906,7 @@ function Batteries({ batteries, scooters }: { batteries: Battery[]; scooters: Sc
           <span>{batteries.length} accu's geregistreerd</span>
         </div>
       </div>
+      {message && <div className="notice">{message}</div>}
       <section className="panel compact-search">
         <div className="panel-title"><Search size={16} /> Accu zoeken</div>
         <div className="inline-search"><input placeholder="Lotnummer, model of gekoppelde scooter" /><button className="primary-button"><Search size={15} /></button></div>
@@ -887,11 +924,32 @@ function Batteries({ batteries, scooters }: { batteries: Battery[]; scooters: Sc
             </div>
           ))}
         </section>
-        <section className="panel form-panel">
-          <div className="panel-title"><Plus size={16} /> Voeg nieuwe accu toe</div>
-          <div className="form-grid"><label>Model<input /></label><label>Lotnummer<input /></label><label>Laad datum<input type="date" /></label><label>Scooter<select>{scooters.slice(0, 8).map((s) => <option key={s.id}>{s.frameNumber}</option>)}</select></label></div>
-          <button className="primary-button">Toevoegen</button>
-        </section>
+        <div className="battery-side">
+          <section className="panel list-panel">
+            <div className="panel-title"><BriefcaseBusiness size={16} /> Alle accu modellen</div>
+            {batteryModels.length === 0 ? (
+              <div className="empty-state inline"><BatteryCharging size={22} /><strong>Nog geen accu modellen</strong><span>Voeg een model toe met de technische specificaties.</span></div>
+            ) : batteryModels.map((model) => (
+              <div className="battery-row battery-model-row" key={model.id}>
+                <strong>{model.name} - {model.spec}</strong>
+                <span>{[model.nominalVoltage, model.nominalCapacity, model.ratedEnergy, model.maxChargeVoltage, model.minDischargeVoltage].filter(Boolean).join(' ')}</span>
+              </div>
+            ))}
+          </section>
+          <form className="panel form-panel" onSubmit={addBatteryModel}>
+            <div className="panel-title"><BatteryCharging size={16} /> Voeg nieuw model toe</div>
+            <div className="form-grid battery-model-form-grid">
+              <label>Naam*<input name="name" required /></label>
+              <label>Spec*<input name="spec" required /></label>
+              <label>Nom voltage*<input name="nominalVoltage" required /></label>
+              <label>Nom capacity*<input name="nominalCapacity" required /></label>
+              <label>Rate energy*<input name="ratedEnergy" required /></label>
+              <label>Max charge volt*<input name="maxChargeVoltage" required /></label>
+              <label>Min discharge volt*<input name="minDischargeVoltage" required /></label>
+            </div>
+            <button className="primary-button">Toevoegen</button>
+          </form>
+        </div>
       </div>
     </>
   );

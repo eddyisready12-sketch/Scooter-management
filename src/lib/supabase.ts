@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Dealer, MaintenanceRecord, Scooter } from '../types';
+import type { AppData, BatteryModel, Dealer, MaintenanceRecord, Scooter } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -13,6 +13,7 @@ const tableMap: Record<keyof AppData, string> = {
   containers: 'containers',
   dealers: 'dealers',
   batteries: 'batteries',
+  batteryModels: 'battery_models',
   warranties: 'warranty_parts',
   maintenance: 'maintenance_records',
   documents: 'documents',
@@ -71,6 +72,16 @@ export async function upsertMaintenanceRecords(records: MaintenanceRecord[]) {
   const { error } = await supabase
     .from('maintenance_records')
     .upsert(records);
+
+  if (error) throw error;
+}
+
+export async function upsertBatteryModels(models: BatteryModel[]) {
+  if (!supabase || models.length === 0) return;
+
+  const { error } = await supabase
+    .from('battery_models')
+    .upsert(models);
 
   if (error) throw error;
 }

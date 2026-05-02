@@ -67,6 +67,17 @@ export type Battery = {
   status: 'Voorraad' | 'In consignatie' | 'Gekoppeld';
 };
 
+export type BatteryModel = {
+  id: string;
+  name: string;
+  spec: string;
+  nominalVoltage: string;
+  nominalCapacity: string;
+  ratedEnergy: string;
+  maxChargeVoltage: string;
+  minDischargeVoltage: string;
+};
+
 export type WarrantyPart = {
   id: string;
   scooterFrame: string;
@@ -109,6 +120,7 @@ export type AppData = {
   containers: Container[];
   dealers: Dealer[];
   batteries: Battery[];
+  batteryModels: BatteryModel[];
   warranties: WarrantyPart[];
   maintenance: MaintenanceRecord[];
   documents: DocumentRecord[];
