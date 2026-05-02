@@ -463,7 +463,7 @@ export function App() {
       licensePlate: licensePlate || scooter?.licensePlate || '',
       servicePackage,
       serviceDate: String(form.get('serviceDate')),
-      serviceType: String(form.get('serviceType')),
+      serviceType: servicePackage,
       ...(mileage ? { mileage } : {}),
       ...(nextServiceDate ? { nextServiceDate } : {}),
       status: String(form.get('status')) as MaintenanceRecord['status'],
@@ -1236,7 +1236,6 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
                 <option>{maintenancePackages.large.label}</option>
               </select>
             </label>
-            <label>Type onderhoud<input name="serviceType" value={maintenancePackages[selectedPackage].label} readOnly /></label>
             <label>Kilometerstand<input name="mileage" inputMode="numeric" /></label>
             <label>Volgende onderhoudsdatum<input name="nextServiceDate" type="date" /></label>
             <label>Status
