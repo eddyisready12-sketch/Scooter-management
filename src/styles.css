@@ -998,12 +998,20 @@ dd {
 
 .drawer-actions {
   display: flex;
+  gap: 10px;
   justify-content: flex-start;
   padding: 0 16px;
 }
 
-.drawer-actions .primary-button {
+.drawer-actions .primary-button,
+.drawer-actions .secondary-button {
   margin: 0;
+}
+
+.drawer-note {
+  margin: 10px 16px 0;
+  color: #51606f;
+  font-size: 13px;
 }
 
 .drawer-info-panel p {

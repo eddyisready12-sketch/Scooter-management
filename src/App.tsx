@@ -17,6 +17,7 @@ import {
   Menu,
   PackagePlus,
   Plus,
+  RefreshCw,
   Search,
   ShieldCheck,
   Upload,
@@ -66,6 +67,13 @@ function formatDate(value?: string) {
     hour: value.includes('T') ? '2-digit' : undefined,
     minute: value.includes('T') ? '2-digit' : undefined,
   }).format(new Date(value));
+}
+
+function rdwDateToInputDate(value?: string) {
+  if (!value) return '';
+  if (value.includes('T')) return value.slice(0, 10);
+  if (/^\d{8}$/.test(value)) return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+  return value;
 }
 
 function dealerName(dealers: Dealer[], dealerId?: string) {
@@ -121,6 +129,35 @@ function importErrorMessage(error: unknown) {
 
 function stableId(prefix: string, value: string) {
   return `${prefix}-${value.replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
+}
+
+async function fetchRdwRegistration(licensePlate: string) {
+  const normalizedPlate = licensePlate.replace(/[^a-z0-9]/gi, '').toUpperCase();
+  if (!normalizedPlate) throw new Error('Vul eerst een kenteken in.');
+
+  const params = new URLSearchParams({
+    kenteken: normalizedPlate,
+    $limit: '1',
+  });
+  const response = await fetch(`https://opendata.rdw.nl/resource/m9d7-ebf2.json?${params.toString()}`);
+  if (!response.ok) throw new Error(`RDW gaf status ${response.status}.`);
+  const rows = await response.json() as Array<{
+    datum_tenaamstelling?: string;
+    datum_tenaamstelling_dt?: string;
+    datum_eerste_tenaamstelling_in_nederland?: string;
+    datum_eerste_tenaamstelling_in_nederland_dt?: string;
+    datum_eerste_toelating?: string;
+    datum_eerste_toelating_dt?: string;
+    aantal_eigenaren?: string;
+  }>;
+  const record = rows[0];
+  if (!record) throw new Error(`Geen RDW data gevonden voor kenteken ${normalizedPlate}.`);
+
+  return {
+    firstRegistrationDate: rdwDateToInputDate(record.datum_eerste_tenaamstelling_in_nederland_dt || record.datum_eerste_tenaamstelling_in_nederland || record.datum_eerste_toelating_dt || record.datum_eerste_toelating),
+    lastRegistrationDate: rdwDateToInputDate(record.datum_tenaamstelling_dt || record.datum_tenaamstelling),
+    ownerCount: record.aantal_eigenaren ? Number(record.aantal_eigenaren) : undefined,
+  };
 }
 
 export function App() {
@@ -899,7 +936,33 @@ function ListPanel({ title, items, green = false }: { title: string; items: stri
 
 function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { scooter: Scooter; dealers: Dealer[]; warranties: WarrantyPart[]; onClose: () => void; onUpdate: (scooter: Scooter) => void | Promise<void> }) {
   const [draft, setDraft] = useState(scooter);
+  const [rdwLoading, setRdwLoading] = useState(false);
+  const [rdwMessage, setRdwMessage] = useState('');
   const registrationComplete = isRegistrationComplete(scooter);
+
+  async function handleRdwFetch() {
+    setRdwLoading(true);
+    setRdwMessage('');
+    try {
+      const rdwData = await fetchRdwRegistration(draft.licensePlate ?? '');
+      const nextDraft = {
+        ...draft,
+        firstRegistrationDate: rdwData.firstRegistrationDate || draft.firstRegistrationDate,
+        lastRegistrationDate: rdwData.lastRegistrationDate || draft.lastRegistrationDate,
+        ownerCount: rdwData.ownerCount ?? draft.ownerCount,
+      };
+      setDraft(nextDraft);
+      await onUpdate(nextDraft);
+      setRdwMessage(rdwData.ownerCount === undefined
+        ? 'RDW datums zijn opgehaald. Aantal eigenaren staat niet in de vrije RDW open data en kan handmatig gevuld worden.'
+        : 'RDW tenaamstelling is opgehaald en opgeslagen.');
+    } catch (error) {
+      setRdwMessage(`RDW ophalen mislukt: ${importErrorMessage(error)}`);
+    } finally {
+      setRdwLoading(false);
+    }
+  }
+
   return (
     <div className="drawer-backdrop" onMouseDown={onClose}>
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
@@ -937,7 +1000,11 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
             </div>
             <div className="drawer-actions">
               <button className="primary-button" onClick={() => onUpdate(draft)}>Verander gegevens</button>
+              <button className="secondary-button" disabled={rdwLoading} onClick={handleRdwFetch}>
+                <RefreshCw size={15} /> {rdwLoading ? 'RDW ophalen...' : 'Haal RDW data op'}
+              </button>
             </div>
+            {rdwMessage && <p className="drawer-note">{rdwMessage}</p>}
           </section>
         </div>
         <div className="two-col">
