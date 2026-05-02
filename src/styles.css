@@ -229,6 +229,22 @@ h2 {
   padding: 14px;
 }
 
+.table-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.table-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.table-controls select {
+  min-height: 34px;
+}
+
 .button-group {
   display: flex;
 }
@@ -296,7 +312,32 @@ tbody tr:hover {
 }
 
 .table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 0 14px 16px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination button {
+  min-height: 32px;
+  border: 1px solid #c8d1da;
+  border-radius: 4px;
+  background: #fff;
+  color: #0075ff;
+  padding: 0 10px;
+}
+
+.pagination button:disabled {
+  cursor: not-allowed;
+  color: #9aa5af;
+  background: #f4f6f8;
 }
 
 .primary-button,
@@ -1008,6 +1049,12 @@ dd {
 
   .page-title-row,
   .table-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .table-controls,
+  .table-footer {
     align-items: stretch;
     flex-direction: column;
   }

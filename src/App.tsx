@@ -417,7 +417,7 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
         </div>
       )}
       <ScooterTable
-        scooters={scooters.slice(0, 20)}
+        scooters={scooters}
         dealers={data.dealers}
         query={query}
         setQuery={setQuery}
@@ -436,18 +436,38 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
   onSelect: (scooter: Scooter) => void;
   title?: string;
 }) {
+  const [pageSize, setPageSize] = useState<number | 'all'>(20);
+  const [page, setPage] = useState(1);
+  const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(scooters.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const visibleScooters = pageSize === 'all'
+    ? scooters
+    : scooters.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const firstEntry = scooters.length === 0 ? 0 : pageSize === 'all' ? 1 : (safePage - 1) * pageSize + 1;
+  const lastEntry = pageSize === 'all' ? scooters.length : Math.min(safePage * pageSize, scooters.length);
+
   return (
     <section className="panel">
       <div className="panel-title"><Bike size={16} /> {title}</div>
       <div className="table-toolbar">
         <div className="button-group"><button>CSV</button><button>Excel</button><button>PDF</button><button>Print</button></div>
-        <label>Search: <input value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+        <div className="table-controls">
+          <label>Rows:
+            <select value={pageSize} onChange={(event) => { setPageSize(event.target.value === 'all' ? 'all' : Number(event.target.value)); setPage(1); }}>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value="all">Alles</option>
+            </select>
+          </label>
+          <label>Search: <input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></label>
+        </div>
       </div>
       <div className="table-wrap">
         <table>
           <thead><tr><th>Model</th><th>Frame #</th><th>Kleur</th><th>Kenteken</th><th>Snelheid</th><th>Status</th><th>Dealer</th><th>Factuur</th></tr></thead>
           <tbody>
-            {scooters.map((scooter) => (
+            {visibleScooters.map((scooter) => (
               <tr key={scooter.id} onClick={() => onSelect(scooter)}>
                 <td>{scooter.model}</td>
                 <td><button className="link-button">{scooter.frameNumber}</button></td>
@@ -462,7 +482,16 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
           </tbody>
         </table>
       </div>
-      <div className="table-footer">Showing 1 to {scooters.length} of {scooters.length} entries</div>
+      <div className="table-footer">
+        <span>Showing {firstEntry} to {lastEntry} of {scooters.length} entries</span>
+        {pageSize !== 'all' && (
+          <div className="pagination">
+            <button disabled={safePage <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button>
+            <span>{safePage} / {totalPages}</span>
+            <button disabled={safePage >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Next</button>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -748,7 +777,7 @@ function GlobalSearch({ data, query, setQuery, scooters, onSelect }: { data: App
     <>
       <h1>Zoeken</h1>
       <SearchPanel query={query} setQuery={setQuery} />
-      <ScooterTable scooters={scooters.slice(0, 25)} dealers={data.dealers} query={query} setQuery={setQuery} onSelect={onSelect} />
+      <ScooterTable scooters={scooters} dealers={data.dealers} query={query} setQuery={setQuery} onSelect={onSelect} />
     </>
   );
 }
