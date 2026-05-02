@@ -543,6 +543,7 @@ function Batteries({ batteries, scooters }: { batteries: Battery[]; scooters: Sc
 
 function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealers: Dealer[]; scooters: Scooter[]; onImport: (event: ChangeEvent<HTMLInputElement>) => void; onAddDealer: (event: FormEvent<HTMLFormElement>) => Promise<void>; message: string }) {
   const [showAddDealer, setShowAddDealer] = useState(false);
+  const sortedDealers = [...dealers].sort((a, b) => (a.company || a.name).localeCompare(b.company || b.name, 'nl', { sensitivity: 'base' }));
   async function submitDealer(event: FormEvent<HTMLFormElement>) {
     await onAddDealer(event);
     setShowAddDealer(false);
@@ -562,7 +563,7 @@ function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealer
       {message && <div className="notice">{message}</div>}
       <SearchPanel query="" setQuery={() => undefined} />
       <div className="two-col">
-        <ListPanel title="Alle dealers" items={dealers.map((dealer) => `${dealer.name} - ${dealer.company} - ${dealer.email}`)} />
+        <DealerTablePanel dealers={sortedDealers} />
         <ListPanel title="In consignatie" items={dealers.map((dealer) => `${scooters.filter((s) => s.dealerId === dealer.id && s.status === 'In consignatie').length} bij ${dealer.company} (${dealer.city})`)} />
       </div>
       {showAddDealer && (
@@ -595,6 +596,32 @@ function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealer
         </div>
       )}
     </>
+  );
+}
+
+function DealerTablePanel({ dealers }: { dealers: Dealer[] }) {
+  return (
+    <section className="panel list-panel">
+      <div className="panel-title"><UsersRound size={16} /> Alle dealers</div>
+      {dealers.length === 0 ? (
+        <p className="empty">N.V.T.</p>
+      ) : (
+        <div className="dealer-table">
+          <div className="dealer-table-header">
+            <span>Company name</span>
+            <span>Klantnaam</span>
+            <span>Email</span>
+          </div>
+          {dealers.map((dealer) => (
+            <div className="dealer-table-row" key={dealer.id}>
+              <span>{dealer.company || '-'}</span>
+              <span>{dealer.name || '-'}</span>
+              <span>{dealer.email || '-'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

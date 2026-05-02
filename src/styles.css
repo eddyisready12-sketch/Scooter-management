@@ -558,6 +558,33 @@ tbody tr:hover {
   max-width: 720px;
 }
 
+.dealer-table {
+  display: grid;
+  padding: 0 14px 14px;
+}
+
+.dealer-table-header,
+.dealer-table-row {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1.25fr;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid #dce1e6;
+  padding: 11px 0;
+}
+
+.dealer-table-header {
+  color: #4f5b66;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dealer-table-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -936,5 +963,11 @@ dd {
 
   .modal-actions {
     flex-direction: column-reverse;
+  }
+
+  .dealer-table-header,
+  .dealer-table-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }
