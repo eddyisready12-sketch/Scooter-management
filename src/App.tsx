@@ -910,6 +910,20 @@ function Scooters({ data, query, setQuery, scooters, onSelect }: { data: AppData
 function Batteries({ data, addBatteryModel, updateBattery, message }: { data: AppData; addBatteryModel: (event: FormEvent<HTMLFormElement>) => Promise<void>; updateBattery: (battery: Battery) => Promise<void>; message: string }) {
   const { batteries, batteryModels, dealers, scooters } = data;
   const [selectedBattery, setSelectedBattery] = useState<Battery | null>(null);
+  const batteryGroups = [
+    {
+      title: 'Beschikbaar',
+      items: batteries.filter((battery) => !['Verkocht', 'In consignatie'].includes(battery.status)),
+    },
+    {
+      title: 'In consignatie',
+      items: batteries.filter((battery) => battery.status === 'In consignatie'),
+    },
+    {
+      title: 'Verkocht',
+      items: batteries.filter((battery) => battery.status === 'Verkocht'),
+    },
+  ];
   return (
     <>
       <div className="page-title-row">
@@ -924,18 +938,22 @@ function Batteries({ data, addBatteryModel, updateBattery, message }: { data: Ap
         <div className="inline-search"><input placeholder="Lotnummer, model of gekoppelde scooter" /><button className="primary-button"><Search size={15} /></button></div>
       </section>
       <div className="two-col battery-layout">
-        <section className="panel list-panel">
-          <div className="panel-title"><BatteryCharging size={16} /> Alle accu's</div>
-          {batteries.length === 0 ? (
-            <div className="empty-state inline"><BatteryCharging size={22} /><strong>Nog geen accu's</strong><span>Voeg een accu toe om voorraad en koppelingen te beheren.</span></div>
-          ) : batteries.map((battery) => (
-            <button className="battery-row battery-row-button" key={battery.id} onClick={() => setSelectedBattery(battery)}>
-              <strong>{battery.lotNumber}</strong>
-              <span>{battery.model} - {battery.spec}{battery.scooterFrame ? ` - ${battery.scooterFrame}` : ''}</span>
-              <small>{battery.status}{battery.dealerId ? ` - ${dealerName(dealers, battery.dealerId)}` : ''}</small>
-            </button>
+        <div className="battery-groups">
+          {batteryGroups.map((group) => (
+            <section className="panel list-panel" key={group.title}>
+              <div className="panel-title"><BatteryCharging size={16} /> {group.title} ({group.items.length})</div>
+              {group.items.length === 0 ? (
+                <div className="empty-state inline"><BatteryCharging size={22} /><strong>Geen accu's</strong><span>Er staan geen accu's in dit blok.</span></div>
+              ) : group.items.map((battery) => (
+                <button className="battery-row battery-row-button" key={battery.id} onClick={() => setSelectedBattery(battery)}>
+                  <strong>{battery.lotNumber}</strong>
+                  <span>{battery.model} - {battery.spec}{battery.scooterFrame ? ` - ${battery.scooterFrame}` : ''}</span>
+                  <small>{battery.status}{battery.dealerId ? ` - ${dealerName(dealers, battery.dealerId)}` : ''}</small>
+                </button>
+              ))}
+            </section>
           ))}
-        </section>
+        </div>
         <div className="battery-side">
           <section className="panel list-panel">
             <div className="panel-title"><BriefcaseBusiness size={16} /> Alle accu modellen</div>

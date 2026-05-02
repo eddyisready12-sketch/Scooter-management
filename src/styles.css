@@ -692,6 +692,11 @@ tbody tr:hover {
   gap: 14px;
 }
 
+.battery-groups {
+  display: grid;
+  gap: 14px;
+}
+
 .battery-row {
   display: grid;
   gap: 4px;
