@@ -197,7 +197,8 @@ export function App() {
 
   async function addDealer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const company = String(form.get('company') ?? '').trim();
     const firstName = String(form.get('firstName') ?? '').trim();
     const lastName = String(form.get('lastName') ?? '').trim();
@@ -228,7 +229,7 @@ export function App() {
       });
       await upsertDealers([dealer]);
       setDealerImportMessage(`${dealer.company || dealer.name} is toegevoegd aan Supabase.`);
-      event.currentTarget.reset();
+      formElement.reset();
     } catch (error) {
       setDealerImportMessage(`Dealer toevoegen mislukt: ${importErrorMessage(error)}`);
     }
@@ -539,10 +540,10 @@ function Batteries({ batteries, scooters }: { batteries: Battery[]; scooters: Sc
   );
 }
 
-function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealers: Dealer[]; scooters: Scooter[]; onImport: (event: ChangeEvent<HTMLInputElement>) => void; onAddDealer: (event: FormEvent<HTMLFormElement>) => void; message: string }) {
+function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealers: Dealer[]; scooters: Scooter[]; onImport: (event: ChangeEvent<HTMLInputElement>) => void; onAddDealer: (event: FormEvent<HTMLFormElement>) => Promise<void>; message: string }) {
   const [showAddDealer, setShowAddDealer] = useState(false);
-  function submitDealer(event: FormEvent<HTMLFormElement>) {
-    onAddDealer(event);
+  async function submitDealer(event: FormEvent<HTMLFormElement>) {
+    await onAddDealer(event);
     setShowAddDealer(false);
   }
   return (
