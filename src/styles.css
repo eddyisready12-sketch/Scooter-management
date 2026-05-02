@@ -609,6 +609,27 @@ tbody tr:hover {
   color: #65717d;
 }
 
+.maintenance-search {
+  margin-bottom: 14px;
+}
+
+.history-card {
+  padding: 0 14px 14px;
+}
+
+.history-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  border-top: 1px solid #dce1e6;
+  padding-top: 14px;
+}
+
+.history-columns p {
+  margin: 8px 0 0;
+  color: #2f3a45;
+}
+
 .battery-layout {
   align-items: start;
 }

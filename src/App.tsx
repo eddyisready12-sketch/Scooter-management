@@ -1100,10 +1100,23 @@ function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: F
 }
 
 function Maintenance({ data, addMaintenance, message }: { data: AppData; addMaintenance: (event: FormEvent<HTMLFormElement>) => void; message: string }) {
+  const [historyQuery, setHistoryQuery] = useState('');
   const sortedMaintenance = [...data.maintenance].sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
   const [selectedFrame, setSelectedFrame] = useState(data.scooters[0]?.frameNumber ?? '');
   const [maintenanceLicensePlate, setMaintenanceLicensePlate] = useState(data.scooters[0]?.licensePlate ?? '');
   const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame);
+  const historyNeedle = normalizePlate(historyQuery);
+  const historyScooter = historyNeedle
+    ? data.scooters.find((scooter) =>
+      normalizePlate(scooter.licensePlate ?? '').includes(historyNeedle) ||
+      normalizePlate(scooter.frameNumber).includes(historyNeedle))
+    : null;
+  const visibleMaintenance = historyScooter
+    ? sortedMaintenance.filter((record) => record.scooterFrame === historyScooter.frameNumber || normalizePlate(record.licensePlate ?? '') === normalizePlate(historyScooter.licensePlate ?? ''))
+    : sortedMaintenance;
+  const historyWarranties = historyScooter
+    ? data.warranties.filter((claim) => claim.scooterFrame === historyScooter.frameNumber)
+    : [];
 
   function normalizePlate(value: string) {
     return value.replace(/[^a-z0-9]/gi, '').toUpperCase();
@@ -1130,12 +1143,46 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
         </div>
       </div>
       {message && <div className="notice">{message}</div>}
+      <section className="panel maintenance-search">
+        <div className="panel-title"><Search size={16} /> Scooter historie zoeken</div>
+        <div className="inline-search">
+          <input value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} placeholder="Zoek kenteken of framenummer" />
+        </div>
+        {historyQuery && !historyScooter && <p className="empty">Geen scooter gevonden voor deze zoekopdracht.</p>}
+        {historyScooter && (
+          <div className="history-card">
+            <dl className="detail-list rdw-list">
+              <dt>Kenteken</dt><dd>{historyScooter.licensePlate || '-'}</dd>
+              <dt>Framenummer</dt><dd>{historyScooter.frameNumber}</dd>
+              <dt>Model</dt><dd>{historyScooter.model}</dd>
+              <dt>Kleur</dt><dd>{historyScooter.color}</dd>
+              <dt>Snelheid</dt><dd>{historyScooter.speed}</dd>
+              <dt>Status</dt><dd>{historyScooter.status}</dd>
+              <dt>RDW</dt><dd>{formatDate(historyScooter.firstAdmissionDate)} - {historyScooter.emissionClass || '-'}</dd>
+            </dl>
+            <div className="history-columns">
+              <div>
+                <strong>Onderhoud ({visibleMaintenance.length})</strong>
+                {visibleMaintenance.length === 0 ? <p className="empty">Geen onderhoud geregistreerd.</p> : visibleMaintenance.map((record) => (
+                  <p key={record.id}>{formatDate(record.serviceDate)} - {record.serviceType} - {record.mileage || '0'} km</p>
+                ))}
+              </div>
+              <div>
+                <strong>Warranty ({historyWarranties.length})</strong>
+                {historyWarranties.length === 0 ? <p className="empty">Geen warranty claims.</p> : historyWarranties.map((claim) => (
+                  <p key={claim.id}>{claim.partName} - {claim.status}</p>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
       <div className="two-col maintenance-layout">
         <section className="panel">
           <div className="panel-title"><ClipboardList size={16} /> Scooter onderhoud</div>
-          {sortedMaintenance.length === 0 ? (
+          {visibleMaintenance.length === 0 ? (
             <div className="empty-state inline"><ClipboardList size={22} /><strong>Nog geen onderhoud</strong><span>Nieuwe onderhoudsregels verschijnen hier zodra je ze toevoegt.</span></div>
-          ) : sortedMaintenance.map((record) => {
+          ) : visibleMaintenance.map((record) => {
             const scooter = data.scooters.find((item) => item.frameNumber === record.scooterFrame);
             return (
               <div className="maintenance-row" key={record.id}>
