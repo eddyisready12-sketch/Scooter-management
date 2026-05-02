@@ -540,6 +540,11 @@ function Batteries({ batteries, scooters }: { batteries: Battery[]; scooters: Sc
 }
 
 function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealers: Dealer[]; scooters: Scooter[]; onImport: (event: ChangeEvent<HTMLInputElement>) => void; onAddDealer: (event: FormEvent<HTMLFormElement>) => void; message: string }) {
+  const [showAddDealer, setShowAddDealer] = useState(false);
+  function submitDealer(event: FormEvent<HTMLFormElement>) {
+    onAddDealer(event);
+    setShowAddDealer(false);
+  }
   return (
     <>
       <div className="page-title-row">
@@ -547,7 +552,10 @@ function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealer
           <h1>Dealers</h1>
           <span>Totaal dealers: {dealers.length}</span>
         </div>
-        <label className="upload-button"><Upload size={16} /> Dealers importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={onImport} /></label>
+        <div className="header-actions">
+          <button className="secondary-button" onClick={() => setShowAddDealer(true)}><Plus size={16} /> Dealer</button>
+          <label className="upload-button"><Upload size={16} /> Dealers importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={onImport} /></label>
+        </div>
       </div>
       {message && <div className="notice">{message}</div>}
       <SearchPanel query="" setQuery={() => undefined} />
@@ -555,22 +563,35 @@ function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealer
         <ListPanel title="Alle dealers" items={dealers.map((dealer) => `${dealer.name} - ${dealer.company} - ${dealer.email}`)} />
         <ListPanel title="In consignatie" items={dealers.map((dealer) => `${scooters.filter((s) => s.dealerId === dealer.id && s.status === 'In consignatie').length} bij ${dealer.company} (${dealer.city})`)} />
       </div>
-      <form className="panel form-panel dealer-form" onSubmit={onAddDealer}>
-        <div className="panel-title"><UsersRound size={16} /> Voeg nieuwe dealer toe</div>
-        <div className="form-grid">
-          <label>Email<input name="email" type="email" /></label>
-          <label>Mobiel<input name="phone" /></label>
-          <label>Bedrijfsnaam<input name="company" required /></label>
-          <label>Voornaam<input name="firstName" /></label>
-          <label>Achternaam<input name="lastName" /></label>
-          <label>Straat<input name="street" /></label>
-          <label>Huisnummer<input name="houseNumber" /></label>
-          <label>Postcode<input name="postalCode" /></label>
-          <label>Woonplaats<input name="city" /></label>
-          <label>Extra info<textarea name="extraInfo" /></label>
+      {showAddDealer && (
+        <div className="modal-backdrop" onMouseDown={() => setShowAddDealer(false)}>
+          <form className="modal-card dealer-modal" onSubmit={submitDealer} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <span>Dealers</span>
+                <h2>Nieuwe dealer</h2>
+              </div>
+              <button type="button" onClick={() => setShowAddDealer(false)}>Close</button>
+            </div>
+            <div className="form-grid">
+              <label>Email<input name="email" type="email" /></label>
+              <label>Mobiel<input name="phone" /></label>
+              <label>Bedrijfsnaam<input name="company" required /></label>
+              <label>Voornaam<input name="firstName" /></label>
+              <label>Achternaam<input name="lastName" /></label>
+              <label>Straat<input name="street" /></label>
+              <label>Huisnummer<input name="houseNumber" /></label>
+              <label>Postcode<input name="postalCode" /></label>
+              <label>Woonplaats<input name="city" /></label>
+              <label>Extra info<textarea name="extraInfo" /></label>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="secondary-button" onClick={() => setShowAddDealer(false)}>Annuleren</button>
+              <button className="primary-button" type="submit">Toevoegen</button>
+            </div>
+          </form>
         </div>
-        <button className="primary-button" type="submit">Toevoegen</button>
-      </form>
+      )}
     </>
   );
 }
