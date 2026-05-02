@@ -55,6 +55,19 @@ const statusColor: Record<ScooterStatus, string> = {
   'In optie': 'orange',
 };
 
+const maintenancePackages = {
+  small: {
+    label: 'Kleine onderhoudsbeurt',
+    price: '€ 89,00 incl. btw',
+    items: ['Olie verversen', 'Bougie vervangen', 'Bandenspanningscheck', 'Luchtfiltercheck', 'Profielcheck', 'Remblokkencheck', 'Verlichtingscheck'],
+  },
+  large: {
+    label: 'Grote onderhoudsbeurt',
+    price: '€ 145,00 incl. btw',
+    items: ['Olie verversen', 'Bougie vervangen', 'Bandenspanningscheck', 'Luchtfiltercheck', 'Profielcheck', 'Remblokkencheck', 'Verlichtingscheck', 'Kleppen stellen', 'Smering bewegende onderdelen', 'V-snaarcheck', 'Variorollencheck'],
+  },
+} as const;
+
 function countByStatus(scooters: Scooter[], status: ScooterStatus) {
   return scooters.filter((scooter) => scooter.status === status).length;
 }
@@ -444,15 +457,19 @@ export function App() {
     const mileage = String(form.get('mileage') ?? '').trim();
     const nextServiceDate = String(form.get('nextServiceDate') ?? '').trim();
     const notes = String(form.get('notes') ?? '').trim();
+    const servicePackage = String(form.get('servicePackage') ?? '').trim();
+    const checklist = form.getAll('checklist').map((item) => String(item));
     const record: MaintenanceRecord = {
       id: `maintenance-${Date.now()}`,
       scooterFrame,
       licensePlate: licensePlate || scooter?.licensePlate || '',
+      servicePackage,
       serviceDate: String(form.get('serviceDate')),
       serviceType: String(form.get('serviceType')),
       ...(mileage ? { mileage } : {}),
       ...(nextServiceDate ? { nextServiceDate } : {}),
       status: String(form.get('status')) as MaintenanceRecord['status'],
+      checklist,
       notes,
     };
     try {
@@ -1101,6 +1118,7 @@ function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: F
 
 function Maintenance({ data, addMaintenance, message }: { data: AppData; addMaintenance: (event: FormEvent<HTMLFormElement>) => void; message: string }) {
   const [historyQuery, setHistoryQuery] = useState('');
+  const [selectedPackage, setSelectedPackage] = useState<keyof typeof maintenancePackages>('small');
   const sortedMaintenance = [...data.maintenance].sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
   const [selectedFrame, setSelectedFrame] = useState(data.scooters[0]?.frameNumber ?? '');
   const [maintenanceLicensePlate, setMaintenanceLicensePlate] = useState(data.scooters[0]?.licensePlate ?? '');
@@ -1188,8 +1206,9 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
               <div className="maintenance-row" key={record.id}>
                 <div>
                   <strong>{record.licensePlate || scooter?.licensePlate || 'Geen kenteken'}</strong>
-                  <span>{record.scooterFrame} - {scooter?.model || 'Scooter'} - {record.serviceType}</span>
+                  <span>{record.scooterFrame} - {scooter?.model || 'Scooter'} - {record.servicePackage || record.serviceType}</span>
                   <small>{formatDate(record.serviceDate)} - {record.mileage || '0'} km</small>
+                  {record.checklist?.length ? <small>{record.checklist.length} checklistpunten afgevinkt</small> : null}
                 </div>
                 <span className="status-pill">{record.status}</span>
                 <small>Volgende: {formatDate(record.nextServiceDate)}</small>
@@ -1212,7 +1231,13 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
             <label>Onderhoudsdatum<input name="serviceDate" type="date" required /></label>
             <label>Kenteken<input name="licensePlate" placeholder="bijv. FVZ16T" value={maintenanceLicensePlate} onChange={(event) => handleMaintenancePlateChange(event.target.value)} /></label>
             <label>Framenummer<input value={selectedScooter?.frameNumber ?? ''} readOnly /></label>
-            <label>Type onderhoud<input name="serviceType" placeholder="bijv. 500 km beurt" required /></label>
+            <label>Onderhoudspakket
+              <select name="servicePackage" value={maintenancePackages[selectedPackage].label} onChange={(event) => setSelectedPackage(event.target.value === maintenancePackages.large.label ? 'large' : 'small')}>
+                <option>{maintenancePackages.small.label}</option>
+                <option>{maintenancePackages.large.label}</option>
+              </select>
+            </label>
+            <label>Type onderhoud<input name="serviceType" value={`${maintenancePackages[selectedPackage].label} - ${maintenancePackages[selectedPackage].price}`} readOnly /></label>
             <label>Kilometerstand<input name="mileage" inputMode="numeric" /></label>
             <label>Volgende onderhoudsdatum<input name="nextServiceDate" type="date" /></label>
             <label>Status
@@ -1222,6 +1247,12 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
                 <option>Aandacht nodig</option>
               </select>
             </label>
+            <fieldset className="maintenance-checklist">
+              <legend>{maintenancePackages[selectedPackage].label} <span>{maintenancePackages[selectedPackage].price}</span></legend>
+              {maintenancePackages[selectedPackage].items.map((item) => (
+                <label key={item}><input type="checkbox" name="checklist" value={item} /> {item}</label>
+              ))}
+            </fieldset>
             <label className="wide-field">Notities<textarea name="notes" /></label>
           </div>
           <button className="primary-button">Toevoegen</button>

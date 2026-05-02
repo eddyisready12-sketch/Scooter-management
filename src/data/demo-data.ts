@@ -66,7 +66,7 @@ export const demoData: AppData = {
     { id: 'w2', scooterFrame: scooters[4].frameNumber, partName: 'Battery pack', partNumber: 'RSO-BAT-60V', claimDate: '2026-03-18', warrantyUntil: '2028-03-18', status: 'In behandeling', dealerId: 'd2', notes: 'Capacity drops under load.' },
   ],
   maintenance: [
-    { id: 'm1', scooterFrame: scooters[2].frameNumber, licensePlate: scooters[2].licensePlate, serviceDate: '2026-04-12', serviceType: 'Aflevercontrole', mileage: '12', nextServiceDate: '2026-10-12', status: 'Uitgevoerd', notes: 'Controle voor aflevering.' },
+    { id: 'm1', scooterFrame: scooters[2].frameNumber, licensePlate: scooters[2].licensePlate, servicePackage: 'Kleine onderhoudsbeurt', serviceDate: '2026-04-12', serviceType: 'Aflevercontrole', mileage: '12', nextServiceDate: '2026-10-12', status: 'Uitgevoerd', checklist: ['Bandenspanningscheck', 'Verlichtingscheck'], notes: 'Controle voor aflevering.' },
   ],
   documents: [
     { id: 'doc1', scooterFrame: scooters[0].frameNumber, type: 'COC', fileName: 'coc-coral-878.pdf', note: 'Uploaded after arrival inspection.' },

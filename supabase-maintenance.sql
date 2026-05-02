@@ -2,13 +2,19 @@ create table if not exists maintenance_records (
   id text primary key,
   "scooterFrame" text references scooters("frameNumber"),
   "licensePlate" text,
+  "servicePackage" text,
   "serviceDate" date not null,
   "serviceType" text not null,
   mileage text,
   "nextServiceDate" date,
   status text not null,
+  checklist jsonb default '[]'::jsonb,
   notes text
 );
+
+alter table maintenance_records
+  add column if not exists "servicePackage" text,
+  add column if not exists checklist jsonb default '[]'::jsonb;
 
 do $$
 begin

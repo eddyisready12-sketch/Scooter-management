@@ -86,11 +86,13 @@ export type MaintenanceRecord = {
   id: string;
   scooterFrame: string;
   licensePlate?: string;
+  servicePackage?: string;
   serviceDate: string;
   serviceType: string;
   mileage?: string;
   nextServiceDate?: string;
   status: 'Gepland' | 'Uitgevoerd' | 'Aandacht nodig';
+  checklist?: string[];
   notes: string;
 };
 
