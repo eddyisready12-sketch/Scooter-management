@@ -1078,6 +1078,10 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
               <dt>Kleur</dt><dd>{scooter.color}</dd>
               <dt>Kenteken</dt><dd>{scooter.licensePlate || '-'}</dd>
               <dt>Emissie</dt><dd>{scooter.emissionClass || '-'}</dd>
+              <dt>Type</dt><dd>{scooter.rdwType || '-'}</dd>
+              <dt>Typegoedkeuringsnummer</dt><dd>{scooter.rdwTypeApprovalNumber || '-'}</dd>
+              <dt>Variant</dt><dd>{scooter.rdwVariant || '-'}</dd>
+              <dt>Uitvoering</dt><dd>{scooter.rdwExecution || '-'}</dd>
             </dl>
           </section>
           <section className="panel drawer-edit-card">
@@ -1115,10 +1119,6 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
             <dt>Eerste eigenaar</dt><dd>{formatDate(scooter.firstRegistrationDate)}</dd>
             <dt>Laatste tenaamstelling</dt><dd>{formatDate(scooter.lastRegistrationDate)}</dd>
             <dt>Emissie</dt><dd>{scooter.emissionClass || '-'}</dd>
-            <dt>Type</dt><dd>{scooter.rdwType || '-'}</dd>
-            <dt>Typegoedkeuringsnummer</dt><dd>{scooter.rdwTypeApprovalNumber || '-'}</dd>
-            <dt>Variant</dt><dd>{scooter.rdwVariant || '-'}</dd>
-            <dt>Uitvoering</dt><dd>{scooter.rdwExecution || '-'}</dd>
             <dt>Ouderdom</dt><dd>{formatVehicleAge(scooter.firstAdmissionDate)}</dd>
             <dt>Status</dt><dd>{registrationComplete ? <span className="registration-badge"><CheckCircle2 size={16} /> Tenaamgesteld</span> : 'Nog niet compleet'}</dd>
           </dl>
