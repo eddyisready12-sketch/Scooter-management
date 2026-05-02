@@ -80,6 +80,10 @@ function importErrorMessage(error: unknown) {
   return JSON.stringify(error);
 }
 
+function stableId(prefix: string, value: string) {
+  return `${prefix}-${value.replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
+}
+
 export function App() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [view, setView] = useState<View>('dashboard');
@@ -191,6 +195,45 @@ export function App() {
     }
   }
 
+  async function addDealer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const company = String(form.get('company') ?? '').trim();
+    const firstName = String(form.get('firstName') ?? '').trim();
+    const lastName = String(form.get('lastName') ?? '').trim();
+    const email = String(form.get('email') ?? '').trim();
+    const phone = String(form.get('phone') ?? '').trim();
+    const street = String(form.get('street') ?? '').trim();
+    const houseNumber = String(form.get('houseNumber') ?? '').trim();
+    const postalCode = String(form.get('postalCode') ?? '').trim();
+    const city = String(form.get('city') ?? '').trim();
+    const extraInfo = String(form.get('extraInfo') ?? '').trim();
+    const name = [firstName, lastName].filter(Boolean).join(' ') || company;
+    const address = [[street, houseNumber].filter(Boolean).join(' '), postalCode, extraInfo].filter(Boolean).join(', ');
+    const dealer: Dealer = {
+      id: stableId('dealer', company || email || phone || name),
+      name,
+      company,
+      email,
+      phone,
+      city,
+      address,
+    };
+
+    try {
+      setData((current) => {
+        const byId = new Map(current.dealers.map((item) => [item.id, item]));
+        byId.set(dealer.id, dealer);
+        return { ...current, dealers: Array.from(byId.values()) };
+      });
+      await upsertDealers([dealer]);
+      setDealerImportMessage(`${dealer.company || dealer.name} is toegevoegd aan Supabase.`);
+      event.currentTarget.reset();
+    } catch (error) {
+      setDealerImportMessage(`Dealer toevoegen mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   function updateScooter(updated: Scooter) {
     setData((current) => ({
       ...current,
@@ -260,7 +303,7 @@ export function App() {
           {view === 'containers' && <Containers data={data} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries batteries={data.batteries} scooters={data.scooters} />}
-          {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} message={dealerImportMessage} />}
+          {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} />}
           {view === 'search' && <GlobalSearch data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
         </section>
@@ -496,7 +539,7 @@ function Batteries({ batteries, scooters }: { batteries: Battery[]; scooters: Sc
   );
 }
 
-function Dealers({ dealers, scooters, onImport, message }: { dealers: Dealer[]; scooters: Scooter[]; onImport: (event: ChangeEvent<HTMLInputElement>) => void; message: string }) {
+function Dealers({ dealers, scooters, onImport, onAddDealer, message }: { dealers: Dealer[]; scooters: Scooter[]; onImport: (event: ChangeEvent<HTMLInputElement>) => void; onAddDealer: (event: FormEvent<HTMLFormElement>) => void; message: string }) {
   return (
     <>
       <div className="page-title-row">
@@ -512,11 +555,22 @@ function Dealers({ dealers, scooters, onImport, message }: { dealers: Dealer[]; 
         <ListPanel title="Alle dealers" items={dealers.map((dealer) => `${dealer.name} - ${dealer.company} - ${dealer.email}`)} />
         <ListPanel title="In consignatie" items={dealers.map((dealer) => `${scooters.filter((s) => s.dealerId === dealer.id && s.status === 'In consignatie').length} bij ${dealer.company} (${dealer.city})`)} />
       </div>
-      <section className="panel form-panel dealer-form">
+      <form className="panel form-panel dealer-form" onSubmit={onAddDealer}>
         <div className="panel-title"><UsersRound size={16} /> Voeg nieuwe dealer toe</div>
-        <div className="form-grid"><label>Email<input /></label><label>Mobiel<input /></label><label>Bedrijfsnaam<input /></label><label>Voornaam<input /></label><label>Achternaam<input /></label><label>Postcode<input /></label><label>Woonplaats<input /></label><label>Extra info<textarea /></label></div>
-        <button className="primary-button">Toevoegen</button>
-      </section>
+        <div className="form-grid">
+          <label>Email<input name="email" type="email" /></label>
+          <label>Mobiel<input name="phone" /></label>
+          <label>Bedrijfsnaam<input name="company" required /></label>
+          <label>Voornaam<input name="firstName" /></label>
+          <label>Achternaam<input name="lastName" /></label>
+          <label>Straat<input name="street" /></label>
+          <label>Huisnummer<input name="houseNumber" /></label>
+          <label>Postcode<input name="postalCode" /></label>
+          <label>Woonplaats<input name="city" /></label>
+          <label>Extra info<textarea name="extraInfo" /></label>
+        </div>
+        <button className="primary-button" type="submit">Toevoegen</button>
+      </form>
     </>
   );
 }
