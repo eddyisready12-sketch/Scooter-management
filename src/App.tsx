@@ -25,7 +25,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
-import { csvRowsToScooters, parseDealerImport, parseScooterImport } from './lib/csv';
+import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport } from './lib/csv';
 import { loadSupabaseData, subscribeToSupabase, supabase, upsertDealers, upsertScooters } from './lib/supabase';
 import type { AppData, Battery, Container, Dealer, Scooter, ScooterStatus, WarrantyPart } from './types';
 
@@ -132,14 +132,18 @@ export function App() {
         return;
       }
 
-      const nextScooters = csvRowsToScooters(rows, data.scooters, statusOverride, data.dealers);
+      const autoDealers = dealerRowsFromScooterRows(rows, data.dealers);
+      const dealersForImport = [...data.dealers, ...autoDealers];
+      const nextScooters = csvRowsToScooters(rows, data.scooters, statusOverride, dealersForImport);
       const importedFrames = new Set(rows.map((row) => row.frameNumber).filter(Boolean));
       const importedScooters = nextScooters.filter((scooter) => importedFrames.has(scooter.frameNumber));
 
-      setData((current) => ({ ...current, scooters: nextScooters }));
+      setData((current) => ({ ...current, dealers: dealersForImport, scooters: nextScooters }));
+      await upsertDealers(autoDealers);
       await upsertScooters(importedScooters);
       const targetStatus = statusOverride ? ` met status ${statusOverride}` : '';
-      setCsvMessage(`${rows.length} scooterregels geimporteerd naar het Scooters voorraadblok${targetStatus} uit ${file.name}.`);
+      const dealerMessage = autoDealers.length ? ` ${autoDealers.length} ontbrekende dealers automatisch toegevoegd.` : '';
+      setCsvMessage(`${rows.length} scooterregels geimporteerd naar het Scooters voorraadblok${targetStatus} uit ${file.name}.${dealerMessage}`);
     } catch (error) {
       setCsvMessage(`Import mislukt: ${importErrorMessage(error)}`);
     }

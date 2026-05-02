@@ -22,6 +22,19 @@ function normalizeValue(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+function nameVariants(value: string) {
+  const clean = value.trim();
+  const variants = new Set([clean]);
+  if (clean.includes(',')) {
+    const [last, first] = clean.split(',').map((part) => part.trim());
+    if (first && last) variants.add(`${first} ${last}`);
+  } else {
+    const parts = clean.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) variants.add(`${parts.slice(1).join(' ')}, ${parts[0]}`);
+  }
+  return Array.from(variants).map(normalizeValue).filter(Boolean);
+}
+
 function normalizeStatus(value: string): ScooterStatus {
   const status = value.toLowerCase();
   if (status.includes('dealer')) return 'Verkocht dealer';
@@ -128,12 +141,41 @@ export function parseDealerImport(file: File): Promise<Dealer[]> {
 
 function findDealerId(dealers: Dealer[], dealerName?: string) {
   if (!dealerName) return undefined;
-  const needle = normalizeValue(dealerName);
-  return dealers.find((dealer) =>
-    [dealer.company, dealer.name, dealer.email]
+  const needles = nameVariants(dealerName);
+  return dealers.find((dealer) => {
+    const haystack = [dealer.company, dealer.name, dealer.email]
       .filter(Boolean)
-      .some((value) => normalizeValue(value).includes(needle) || needle.includes(normalizeValue(value))),
-  )?.id;
+      .flatMap((value) => nameVariants(value));
+    return needles.some((needle) =>
+      haystack.some((value) => value.includes(needle) || needle.includes(value)),
+    );
+  })?.id;
+}
+
+export function dealerRowsFromScooterRows(rows: CsvScooterRow[], existing: Dealer[]): Dealer[] {
+  const byName = new Map(existing.flatMap((dealer) =>
+    [dealer.company, dealer.name].filter(Boolean).map((value) => [normalizeValue(value), dealer] as const),
+  ));
+  const created = new Map<string, Dealer>();
+
+  rows.forEach((row) => {
+    const dealerName = row.dealer?.trim();
+    if (!dealerName || findDealerId([...existing, ...created.values()], dealerName)) return;
+    const id = `dealer-${normalizeValue(dealerName)}`;
+    const dealer = byName.get(normalizeValue(dealerName)) ?? {
+      id,
+      name: dealerName,
+      company: dealerName,
+      email: '',
+      phone: '',
+      city: '',
+      address: '',
+      Postalcode: '',
+    };
+    created.set(dealer.id, dealer);
+  });
+
+  return Array.from(created.values());
 }
 
 export function csvRowsToScooters(rows: CsvScooterRow[], existing: Scooter[], statusOverride?: ScooterStatus, dealers: Dealer[] = []): Scooter[] {
