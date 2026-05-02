@@ -19,6 +19,9 @@ export type Scooter = {
   dealerId?: string;
   containerId?: string;
   licensePlate?: string;
+  firstRegistrationDate?: string;
+  lastRegistrationDate?: string;
+  ownerCount?: number;
   batteryNumber?: string;
   invoiceNumber?: string;
   arrivedAt?: string;

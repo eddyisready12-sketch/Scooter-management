@@ -72,6 +72,45 @@ function dealerName(dealers: Dealer[], dealerId?: string) {
   return dealers.find((dealer) => dealer.id === dealerId)?.company ?? '';
 }
 
+function isRegistrationComplete(scooter: Scooter) {
+  return Boolean(
+    scooter.licensePlate?.trim() &&
+    scooter.firstRegistrationDate &&
+    scooter.lastRegistrationDate &&
+    scooter.ownerCount !== undefined &&
+    scooter.ownerCount !== null &&
+    !Number.isNaN(Number(scooter.ownerCount)),
+  );
+}
+
+function normalizeRegistrationStatus(scooter: Scooter): Scooter {
+  return isRegistrationComplete(scooter) ? { ...scooter, status: 'Verkocht klant' } : scooter;
+}
+
+function formatVehicleAge(firstRegistrationDate?: string) {
+  if (!firstRegistrationDate) return '-';
+  const start = new Date(firstRegistrationDate);
+  const end = new Date();
+  if (Number.isNaN(start.getTime()) || start > end) return '-';
+
+  let years = end.getFullYear() - start.getFullYear();
+  let months = end.getMonth() - start.getMonth();
+  let days = end.getDate() - start.getDate();
+
+  if (days < 0) {
+    months -= 1;
+    const previousMonth = new Date(end.getFullYear(), end.getMonth(), 0);
+    days += previousMonth.getDate();
+  }
+
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  return `${years} jaar, ${months} maanden, ${days} dagen`;
+}
+
 function importErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   if (error && typeof error === 'object' && 'message' in error) {
@@ -240,12 +279,21 @@ export function App() {
     }
   }
 
-  function updateScooter(updated: Scooter) {
+  async function updateScooter(updated: Scooter) {
+    const normalized = normalizeRegistrationStatus(updated);
     setData((current) => ({
       ...current,
-      scooters: current.scooters.map((scooter) => (scooter.id === updated.id ? updated : scooter)),
+      scooters: current.scooters.map((scooter) => (scooter.id === normalized.id ? normalized : scooter)),
     }));
-    setSelectedScooter(updated);
+    setSelectedScooter(normalized);
+    try {
+      await upsertScooters([normalized]);
+      setCsvMessage(isRegistrationComplete(normalized)
+        ? `${normalized.frameNumber} is tenaamgesteld en automatisch naar Verkocht klant gezet.`
+        : `${normalized.frameNumber} is bijgewerkt.`);
+    } catch (error) {
+      setCsvMessage(`Scooter opslaan mislukt: ${importErrorMessage(error)}`);
+    }
   }
 
   function addWarranty(event: FormEvent<HTMLFormElement>) {
@@ -447,9 +495,11 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     status: '',
     dealer: '',
     invoice: '',
+    registration: '',
   });
   const filteredRows = scooters.filter((scooter) => {
     const dealer = dealerName(dealers, scooter.dealerId);
+    const registrationComplete = isRegistrationComplete(scooter);
     return (
       scooter.model.toLowerCase().includes(columnFilters.model.toLowerCase()) &&
       scooter.frameNumber.toLowerCase().includes(columnFilters.frame.toLowerCase()) &&
@@ -458,7 +508,8 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
       (!columnFilters.speed || scooter.speed === columnFilters.speed) &&
       (!columnFilters.status || scooter.status === columnFilters.status) &&
       dealer.toLowerCase().includes(columnFilters.dealer.toLowerCase()) &&
-      (scooter.invoiceNumber || '').toLowerCase().includes(columnFilters.invoice.toLowerCase())
+      (scooter.invoiceNumber || '').toLowerCase().includes(columnFilters.invoice.toLowerCase()) &&
+      (!columnFilters.registration || (columnFilters.registration === 'complete' ? registrationComplete : !registrationComplete))
     );
   });
   const speedOptions = Array.from(new Set(scooters.map((scooter) => scooter.speed).filter(Boolean))).sort();
@@ -494,7 +545,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Model</th><th>Frame #</th><th>Kleur</th><th>Kenteken</th><th>Snelheid</th><th>Status</th><th>Dealer</th><th>Factuur</th></tr>
+            <tr><th>Model</th><th>Frame #</th><th>Kleur</th><th>Kenteken</th><th>Snelheid</th><th>Status</th><th>Dealer</th><th>Factuur</th><th>Tenaam</th></tr>
             <tr className="filter-row">
               <th><input value={columnFilters.model} onChange={(event) => setColumnFilter('model', event.target.value)} aria-label="Filter model" /></th>
               <th><input value={columnFilters.frame} onChange={(event) => setColumnFilter('frame', event.target.value)} aria-label="Filter frame" /></th>
@@ -504,6 +555,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
               <th><select value={columnFilters.status} onChange={(event) => setColumnFilter('status', event.target.value)} aria-label="Filter status"><option value="">Alle</option>{Object.keys(statusColor).map((status) => <option value={status} key={status}>{status}</option>)}</select></th>
               <th><input value={columnFilters.dealer} onChange={(event) => setColumnFilter('dealer', event.target.value)} aria-label="Filter dealer" /></th>
               <th><input value={columnFilters.invoice} onChange={(event) => setColumnFilter('invoice', event.target.value)} aria-label="Filter factuur" /></th>
+              <th><select value={columnFilters.registration} onChange={(event) => setColumnFilter('registration', event.target.value)} aria-label="Filter tenaamstelling"><option value="">Alle</option><option value="complete">Compleet</option><option value="missing">Mist data</option></select></th>
             </tr>
           </thead>
           <tbody>
@@ -517,6 +569,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
                 <td>{scooter.status}</td>
                 <td>{dealerName(dealers, scooter.dealerId) || '-'}</td>
                 <td>{scooter.invoiceNumber || '-'}</td>
+                <td className="registration-cell">{isRegistrationComplete(scooter) ? <CheckCircle2 className="registration-check" size={18} aria-label="Tenaamgesteld" /> : '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -844,8 +897,9 @@ function ListPanel({ title, items, green = false }: { title: string; items: stri
   );
 }
 
-function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { scooter: Scooter; dealers: Dealer[]; warranties: WarrantyPart[]; onClose: () => void; onUpdate: (scooter: Scooter) => void }) {
+function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { scooter: Scooter; dealers: Dealer[]; warranties: WarrantyPart[]; onClose: () => void; onUpdate: (scooter: Scooter) => void | Promise<void> }) {
   const [draft, setDraft] = useState(scooter);
+  const registrationComplete = isRegistrationComplete(scooter);
   return (
     <div className="drawer-backdrop" onMouseDown={onClose}>
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
@@ -866,6 +920,7 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
               <dt>Model</dt><dd>{scooter.model}</dd>
               <dt>Kleur</dt><dd>{scooter.color}</dd>
               <dt>Factuur</dt><dd>{scooter.invoiceNumber || '-'}</dd>
+              <dt>Kenteken</dt><dd>{scooter.licensePlate || '-'}</dd>
             </dl>
           </section>
           <section className="panel drawer-edit-card">
@@ -876,6 +931,9 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
               <label>Kenteken<input value={draft.licensePlate ?? ''} onChange={(e) => setDraft({ ...draft, licensePlate: e.target.value })} /></label>
               <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{Object.keys(statusColor).map((status) => <option key={status}>{status}</option>)}</select></label>
               <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value })}><option value="">Geen dealer</option>{dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
+              <label>Eerste tenaamstelling<input type="date" value={draft.firstRegistrationDate ?? ''} onChange={(e) => setDraft({ ...draft, firstRegistrationDate: e.target.value })} /></label>
+              <label>Laatste tenaamstelling<input type="date" value={draft.lastRegistrationDate ?? ''} onChange={(e) => setDraft({ ...draft, lastRegistrationDate: e.target.value })} /></label>
+              <label>Aantal eigenaren<input type="number" min={0} value={draft.ownerCount ?? ''} onChange={(e) => setDraft({ ...draft, ownerCount: e.target.value === '' ? undefined : Number(e.target.value) })} /></label>
             </div>
             <div className="drawer-actions">
               <button className="primary-button" onClick={() => onUpdate(draft)}>Verander gegevens</button>
@@ -887,6 +945,16 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
           <section className="panel drawer-info-panel"><div className="panel-title"><ShieldCheck size={16} /> Warranty</div>{warranties.length ? warranties.map((w) => <p key={w.id}>{w.partName} - {w.status}</p>) : <p>Geen warranty claims</p>}</section>
         </div>
         <section className="panel drawer-info-panel"><div className="panel-title"><FileText size={16} /> Documenten</div><p>Nog geen documenten toegevoegd</p></section>
+        <section className="panel drawer-info-panel rdw-panel">
+          <div className="panel-title"><ShieldCheck size={16} /> RDW tenaamstelling</div>
+          <dl className="detail-list rdw-list">
+            <dt>Eerste tenaamstelling</dt><dd>{formatDate(scooter.firstRegistrationDate)}</dd>
+            <dt>Laatste tenaamstelling</dt><dd>{formatDate(scooter.lastRegistrationDate)}</dd>
+            <dt>Aantal eigenaren</dt><dd>{scooter.ownerCount ?? '-'}</dd>
+            <dt>Ouderdom</dt><dd>{formatVehicleAge(scooter.firstRegistrationDate)}</dd>
+            <dt>Status</dt><dd>{registrationComplete ? <span className="registration-badge"><CheckCircle2 size={16} /> Tenaamgesteld</span> : 'Nog niet compleet'}</dd>
+          </dl>
+        </section>
       </aside>
     </div>
   );
