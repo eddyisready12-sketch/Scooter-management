@@ -210,7 +210,7 @@ export function App() {
     const city = String(form.get('city') ?? '').trim();
     const extraInfo = String(form.get('extraInfo') ?? '').trim();
     const name = [firstName, lastName].filter(Boolean).join(' ') || company;
-    const address = [[street, houseNumber].filter(Boolean).join(' '), postalCode, extraInfo].filter(Boolean).join(', ');
+    const address = [[street, houseNumber].filter(Boolean).join(' '), extraInfo].filter(Boolean).join(', ');
     const dealer: Dealer = {
       id: stableId('dealer', company || email || phone || name),
       name,
@@ -219,6 +219,7 @@ export function App() {
       phone,
       city,
       address,
+      Postalcode: postalCode,
     };
 
     try {

@@ -58,7 +58,10 @@ function normalizeDealerRows(rows: Record<string, unknown>[]): Dealer[] {
     const email = pick(row, ['email', 'e-mail', 'mail']);
     const phone = pick(row, ['telefoon', 'tel', 'phone', 'mobiel', 'mobile']);
     const city = pick(row, ['woonplaats', 'plaats', 'city', 'stad']);
-    const address = [pick(row, ['adres', 'address', 'straat']), pick(row, ['postcode', 'postal code', 'zipcode'])].filter(Boolean).join(', ');
+    const street = pick(row, ['adres', 'address', 'straat']);
+    const houseNumber = pick(row, ['huisnummer', 'house number', 'housenumber', 'nr']);
+    const address = [street, houseNumber].filter(Boolean).join(' ');
+    const Postalcode = pick(row, ['postcode', 'postal code', 'zipcode', 'postalcode']);
     const stableKey = company || email || phone || name;
     return {
       id: `dealer-${stableKey.replace(/[^a-z0-9]/gi, '').toLowerCase()}`,
@@ -68,6 +71,7 @@ function normalizeDealerRows(rows: Record<string, unknown>[]): Dealer[] {
       phone,
       city,
       address,
+      Postalcode,
     };
   }).filter((dealer) => dealer.company || dealer.email || dealer.name);
 }

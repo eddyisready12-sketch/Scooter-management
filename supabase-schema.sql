@@ -5,7 +5,8 @@ create table if not exists dealers (
   email text,
   phone text,
   city text,
-  address text
+  address text,
+  "Postalcode" text
 );
 
 create table if not exists containers (

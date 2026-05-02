@@ -46,6 +46,7 @@ export type Dealer = {
   phone: string;
   city: string;
   address: string;
+  Postalcode?: string;
 };
 
 export type Battery = {
