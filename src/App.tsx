@@ -955,19 +955,37 @@ function Batteries({ data, addBatteries, addBatteryModel, updateBattery, onSelec
   const { batteries, batteryModels, dealers, scooters } = data;
   const [selectedBattery, setSelectedBattery] = useState<Battery | null>(null);
   const [showAddBattery, setShowAddBattery] = useState(false);
+  const [batteryQuery, setBatteryQuery] = useState('');
   const defaultBatteryModel = batteryModels[0]?.name ?? '';
+  const filteredBatteries = batteries.filter((battery) => {
+    const scooter = scooters.find((item) => item.frameNumber === battery.scooterFrame);
+    const dealer = dealerName(dealers, battery.dealerId);
+    const searchable = [
+      battery.lotNumber,
+      battery.model,
+      battery.spec,
+      battery.status,
+      battery.scooterFrame,
+      battery.orderNumber,
+      dealer,
+      scooter?.licensePlate,
+      scooter?.model,
+      scooter?.color,
+    ].filter(Boolean).join(' ');
+    return searchable.toLowerCase().includes(batteryQuery.toLowerCase().trim());
+  });
   const batteryGroups = [
     {
       title: 'Beschikbaar',
-      items: batteries.filter((battery) => !['Verkocht', 'In consignatie'].includes(battery.status)),
+      items: filteredBatteries.filter((battery) => !['Verkocht', 'In consignatie'].includes(battery.status)),
     },
     {
       title: 'In consignatie',
-      items: batteries.filter((battery) => battery.status === 'In consignatie'),
+      items: filteredBatteries.filter((battery) => battery.status === 'In consignatie'),
     },
     {
       title: 'Verkocht',
-      items: batteries.filter((battery) => battery.status === 'Verkocht'),
+      items: filteredBatteries.filter((battery) => battery.status === 'Verkocht'),
     },
   ];
   return (
@@ -984,7 +1002,10 @@ function Batteries({ data, addBatteries, addBatteryModel, updateBattery, onSelec
       {message && <div className="notice">{message}</div>}
       <section className="panel compact-search">
         <div className="panel-title"><Search size={16} /> Accu zoeken</div>
-        <div className="inline-search"><input placeholder="Lotnummer, model of gekoppelde scooter" /><button className="primary-button"><Search size={15} /></button></div>
+        <div className="inline-search">
+          <input value={batteryQuery} onChange={(event) => setBatteryQuery(event.target.value)} placeholder="Lotnummer, model, dealer, kenteken of gekoppelde scooter" />
+          {batteryQuery && <button className="secondary-button" onClick={() => setBatteryQuery('')}>Reset</button>}
+        </div>
       </section>
       <div className="battery-layout">
         <div className="battery-groups">
