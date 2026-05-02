@@ -61,8 +61,11 @@ export type Battery = {
 export type WarrantyPart = {
   id: string;
   scooterFrame: string;
+  licensePlate?: string;
   partName: string;
   partNumber: string;
+  mileage?: string;
+  age?: string;
   claimDate: string;
   warrantyUntil: string;
   status: 'Open' | 'In behandeling' | 'Goedgekeurd' | 'Afgewezen' | 'Vervangen';

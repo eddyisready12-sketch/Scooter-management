@@ -254,8 +254,11 @@ export function App() {
     const record: WarrantyPart = {
       id: `w-${Date.now()}`,
       scooterFrame: String(form.get('scooterFrame')),
+      licensePlate: String(form.get('licensePlate')),
       partName: String(form.get('partName')),
       partNumber: String(form.get('partNumber')),
+      mileage: String(form.get('mileage')),
+      age: String(form.get('age')),
       claimDate: String(form.get('claimDate')),
       warrantyUntil: String(form.get('warrantyUntil')),
       status: 'Open',
@@ -465,18 +468,34 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
 }
 
 function Containers({ data }: { data: AppData }) {
+  const pending = data.containers.filter((container) => container.status !== 'Aangekomen');
+  const arrived = data.containers.filter((container) => container.status === 'Aangekomen');
   return (
     <>
-      <h1>Containers</h1>
-      <section className="panel import-row"><button className="link-button"><Upload size={15} /> Container importeren</button><Plus size={18} /></section>
+      <div className="page-title-row">
+        <div>
+          <h1>Containers</h1>
+          <span>{data.containers.length} containers geregistreerd</span>
+        </div>
+        <button className="secondary-button"><Plus size={16} /> Container</button>
+      </div>
+      <section className="panel import-row"><button className="link-button"><Upload size={15} /> Container importeren</button></section>
       <div className="two-col">
-        <ListPanel title="Containers nog niet aangekomen" items={data.containers.filter((c) => c.status !== 'Aangekomen').map((c) => `${c.number} - ${c.invoiceNumber}`)} />
-        <ListPanel title="Meest recent aangekomen containers" items={data.containers.filter((c) => c.status === 'Aangekomen').map((c) => `${c.number} - ${c.invoiceNumber}`)} green />
+        <ListPanel title="Containers nog niet aangekomen" items={pending.map((c) => `${c.number} - ${c.invoiceNumber}`)} />
+        <ListPanel title="Meest recent aangekomen containers" items={arrived.map((c) => `${c.number} - ${c.invoiceNumber}`)} green />
       </div>
       <h2>Scooters per container</h2>
-      <div className="container-grid">
-        {data.containers.map((container) => <ContainerCard key={container.id} container={container} scooters={data.scooters.filter((s) => s.containerId === container.id)} dealers={data.dealers} />)}
-      </div>
+      {data.containers.length === 0 ? (
+        <section className="panel empty-state">
+          <Boxes size={24} />
+          <strong>Nog geen containers</strong>
+          <span>Importeer of voeg een container toe om scooters per zending te groeperen.</span>
+        </section>
+      ) : (
+        <div className="container-grid">
+          {data.containers.map((container) => <ContainerCard key={container.id} container={container} scooters={data.scooters.filter((s) => s.containerId === container.id)} dealers={data.dealers} />)}
+        </div>
+      )}
     </>
   );
 }
@@ -531,13 +550,32 @@ function Scooters({ data, query, setQuery, scooters, onSelect }: { data: AppData
 function Batteries({ batteries, scooters }: { batteries: Battery[]; scooters: Scooter[] }) {
   return (
     <>
-      <h1>Accu's</h1>
-      <SearchPanel query="" setQuery={() => undefined} />
-      <div className="two-col">
-        <ListPanel title="Alle accu's" items={batteries.map((battery) => `${battery.lotNumber}, ${battery.spec}`)} />
+      <div className="page-title-row">
+        <div>
+          <h1>Accu's</h1>
+          <span>{batteries.length} accu's geregistreerd</span>
+        </div>
+      </div>
+      <section className="panel compact-search">
+        <div className="panel-title"><Search size={16} /> Accu zoeken</div>
+        <div className="inline-search"><input placeholder="Lotnummer, model of gekoppelde scooter" /><button className="primary-button"><Search size={15} /></button></div>
+      </section>
+      <div className="two-col battery-layout">
+        <section className="panel list-panel">
+          <div className="panel-title"><BatteryCharging size={16} /> Alle accu's</div>
+          {batteries.length === 0 ? (
+            <div className="empty-state inline"><BatteryCharging size={22} /><strong>Nog geen accu's</strong><span>Voeg een accu toe om voorraad en koppelingen te beheren.</span></div>
+          ) : batteries.map((battery) => (
+            <div className="battery-row" key={battery.id}>
+              <strong>{battery.lotNumber}</strong>
+              <span>{battery.model} - {battery.spec}</span>
+              <small>{battery.status}</small>
+            </div>
+          ))}
+        </section>
         <section className="panel form-panel">
           <div className="panel-title"><Plus size={16} /> Voeg nieuwe accu toe</div>
-          <div className="form-grid"><label>Model<input /></label><label>Lotnum<input /></label><label>Laad datum<input type="date" /></label><label>Scooter<select>{scooters.slice(0, 8).map((s) => <option key={s.id}>{s.frameNumber}</option>)}</select></label></div>
+          <div className="form-grid"><label>Model<input /></label><label>Lotnummer<input /></label><label>Laad datum<input type="date" /></label><label>Scooter<select>{scooters.slice(0, 8).map((s) => <option key={s.id}>{s.frameNumber}</option>)}</select></label></div>
           <button className="primary-button">Toevoegen</button>
         </section>
       </div>
@@ -661,13 +699,24 @@ function DealerDetailModal({ dealer, onClose }: { dealer: Dealer; onClose: () =>
 function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: FormEvent<HTMLFormElement>) => void }) {
   return (
     <>
-      <h1>Warranty parts</h1>
+      <div className="page-title-row">
+        <div>
+          <h1>Warranty parts</h1>
+          <span>{data.warranties.length} claims geregistreerd</span>
+        </div>
+      </div>
       <div className="two-col warranty-layout">
         <section className="panel">
           <div className="panel-title"><ShieldCheck size={16} /> Warranty claims</div>
-          {data.warranties.map((claim) => (
+          {data.warranties.length === 0 ? (
+            <div className="empty-state inline"><ShieldCheck size={22} /><strong>Nog geen warranty claims</strong><span>Nieuwe claims verschijnen hier zodra je ze toevoegt.</span></div>
+          ) : data.warranties.map((claim) => (
             <div className="claim-row" key={claim.id}>
-              <div><strong>{claim.partName}</strong><span>{claim.scooterFrame} - {claim.partNumber}</span></div>
+              <div>
+                <strong>{claim.partName}</strong>
+                <span>{claim.scooterFrame} - {claim.licensePlate || 'geen kenteken'} - {claim.partNumber}</span>
+                <small>{claim.mileage || '0'} km - ouderdom {claim.age || '-'}</small>
+              </div>
               <span className="status-pill">{claim.status}</span>
               <small>Warranty until {formatDate(claim.warrantyUntil)}</small>
             </div>
@@ -675,14 +724,17 @@ function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: F
         </section>
         <form className="panel form-panel" onSubmit={addWarranty}>
           <div className="panel-title"><ClipboardList size={16} /> Nieuw warranty part</div>
-          <div className="form-grid single">
+          <div className="form-grid warranty-form-grid">
             <label>Scooter<select name="scooterFrame">{data.scooters.map((s) => <option key={s.id}>{s.frameNumber}</option>)}</select></label>
             <label>Dealer<select name="dealerId">{data.dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
+            <label>Kenteken<input name="licensePlate" /></label>
+            <label>Kilometerstand<input name="mileage" inputMode="numeric" /></label>
+            <label>Ouderdom<input name="age" placeholder="bijv. 14 maanden" /></label>
             <label>Part name<input name="partName" required /></label>
             <label>Part number<input name="partNumber" required /></label>
             <label>Claim date<input name="claimDate" type="date" required /></label>
             <label>Warranty until<input name="warrantyUntil" type="date" required /></label>
-            <label>Notes<textarea name="notes" /></label>
+            <label className="wide-field">Notes<textarea name="notes" /></label>
           </div>
           <button className="primary-button">Toevoegen</button>
         </form>

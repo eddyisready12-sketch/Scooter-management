@@ -142,8 +142,14 @@ export function parseDealerImport(file: File): Promise<Dealer[]> {
 function findDealerId(dealers: Dealer[], dealerName?: string) {
   if (!dealerName) return undefined;
   const needles = nameVariants(dealerName);
+  const companyMatch = dealers.find((dealer) => {
+    const company = normalizeValue(dealer.company || '');
+    return needles.some((needle) => company === needle || company.includes(needle) || needle.includes(company));
+  });
+  if (companyMatch) return companyMatch.id;
+
   return dealers.find((dealer) => {
-    const haystack = [dealer.company, dealer.name, dealer.email]
+    const haystack = [dealer.name, dealer.email]
       .filter(Boolean)
       .flatMap((value) => nameVariants(value));
     return needles.some((needle) =>

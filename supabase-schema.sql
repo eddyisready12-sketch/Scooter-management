@@ -50,8 +50,11 @@ create table if not exists batteries (
 create table if not exists warranty_parts (
   id text primary key,
   "scooterFrame" text references scooters("frameNumber"),
+  "licensePlate" text,
   "partName" text not null,
   "partNumber" text,
+  mileage text,
+  age text,
   "claimDate" date not null,
   "warrantyUntil" date not null,
   status text not null,

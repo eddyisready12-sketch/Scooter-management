@@ -406,6 +406,35 @@ tbody tr:hover {
   margin-bottom: 12px;
 }
 
+.empty-state {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 150px;
+  padding: 24px;
+  color: #65717d;
+  text-align: center;
+}
+
+.empty-state strong {
+  color: #1c2732;
+}
+
+.empty-state.inline {
+  min-height: 150px;
+  margin: 0;
+}
+
+.compact-search {
+  padding-bottom: 14px;
+}
+
+.compact-search .inline-search {
+  padding: 14px;
+  margin: 0;
+  max-width: 560px;
+}
+
 .filter-notice {
   display: flex;
   align-items: center;
@@ -458,6 +487,31 @@ tbody tr:hover {
   margin: 0 14px;
   padding: 12px 0;
   border-bottom: 1px solid #dce1e6;
+}
+
+.battery-layout {
+  align-items: start;
+}
+
+.battery-row {
+  display: grid;
+  gap: 4px;
+  margin: 0 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid #dce1e6;
+}
+
+.battery-row span,
+.battery-row small {
+  color: #65717d;
+}
+
+.warranty-form-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.wide-field {
+  grid-column: 1 / -1;
 }
 
 .green-row {
