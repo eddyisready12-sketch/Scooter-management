@@ -27,10 +27,10 @@ import {
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport } from './lib/csv';
-import { loadSupabaseData, subscribeToSupabase, supabase, upsertDealers, upsertScooters } from './lib/supabase';
-import type { AppData, Battery, Container, Dealer, Scooter, ScooterStatus, WarrantyPart } from './types';
+import { loadSupabaseData, subscribeToSupabase, supabase, upsertDealers, upsertMaintenanceRecords, upsertScooters } from './lib/supabase';
+import type { AppData, Battery, Container, Dealer, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
 
-type View = 'dashboard' | 'containers' | 'scooters' | 'batteries' | 'dealers' | 'warranty' | 'search';
+type View = 'dashboard' | 'containers' | 'scooters' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
 
@@ -41,6 +41,7 @@ const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'batteries', label: "Accu's", icon: BatteryCharging },
   { id: 'dealers', label: 'Dealers', icon: UsersRound },
   { id: 'warranty', label: 'Warranty parts', icon: ShieldCheck },
+  { id: 'maintenance', label: 'Onderhoud', icon: ClipboardList },
   { id: 'search', label: 'Zoeken', icon: Search },
 ];
 
@@ -432,6 +433,32 @@ export function App() {
     event.currentTarget.reset();
   }
 
+  async function addMaintenance(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const scooterFrame = String(form.get('scooterFrame'));
+    const scooter = data.scooters.find((item) => item.frameNumber === scooterFrame);
+    const record: MaintenanceRecord = {
+      id: `maintenance-${Date.now()}`,
+      scooterFrame,
+      licensePlate: scooter?.licensePlate || String(form.get('licensePlate') ?? ''),
+      serviceDate: String(form.get('serviceDate')),
+      serviceType: String(form.get('serviceType')),
+      mileage: String(form.get('mileage') ?? ''),
+      nextServiceDate: String(form.get('nextServiceDate') ?? ''),
+      status: String(form.get('status')) as MaintenanceRecord['status'],
+      notes: String(form.get('notes') ?? ''),
+    };
+    setData((current) => ({ ...current, maintenance: [record, ...current.maintenance] }));
+    try {
+      await upsertMaintenanceRecords([record]);
+    } catch (error) {
+      setCsvMessage(`Onderhoud opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+    formElement.reset();
+  }
+
   if (!loggedIn) {
     return <LoginScreen onLogin={() => setLoggedIn(true)} supabaseEnabled={Boolean(supabase)} />;
   }
@@ -477,6 +504,7 @@ export function App() {
           {view === 'batteries' && <Batteries batteries={data.batteries} scooters={data.scooters} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} />}
+          {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} />}
           {view === 'search' && <GlobalSearch data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
         </section>
       </main>
@@ -486,6 +514,7 @@ export function App() {
           scooter={selectedScooter}
           dealers={data.dealers}
           warranties={data.warranties.filter((warranty) => warranty.scooterFrame === selectedScooter.frameNumber)}
+          maintenance={data.maintenance.filter((record) => record.scooterFrame === selectedScooter.frameNumber)}
           onClose={() => setSelectedScooter(null)}
           onUpdate={updateScooter}
         />
@@ -1064,6 +1093,68 @@ function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: F
   );
 }
 
+function Maintenance({ data, addMaintenance }: { data: AppData; addMaintenance: (event: FormEvent<HTMLFormElement>) => void }) {
+  const sortedMaintenance = [...data.maintenance].sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
+  return (
+    <>
+      <div className="page-title-row">
+        <div>
+          <h1>Onderhoud</h1>
+          <span>{data.maintenance.length} onderhoudsregels geregistreerd</span>
+        </div>
+      </div>
+      <div className="two-col maintenance-layout">
+        <section className="panel">
+          <div className="panel-title"><ClipboardList size={16} /> Scooter onderhoud</div>
+          {sortedMaintenance.length === 0 ? (
+            <div className="empty-state inline"><ClipboardList size={22} /><strong>Nog geen onderhoud</strong><span>Nieuwe onderhoudsregels verschijnen hier zodra je ze toevoegt.</span></div>
+          ) : sortedMaintenance.map((record) => {
+            const scooter = data.scooters.find((item) => item.frameNumber === record.scooterFrame);
+            return (
+              <div className="maintenance-row" key={record.id}>
+                <div>
+                  <strong>{record.licensePlate || scooter?.licensePlate || 'Geen kenteken'}</strong>
+                  <span>{record.scooterFrame} - {scooter?.model || 'Scooter'} - {record.serviceType}</span>
+                  <small>{formatDate(record.serviceDate)} - {record.mileage || '0'} km</small>
+                </div>
+                <span className="status-pill">{record.status}</span>
+                <small>Volgende: {formatDate(record.nextServiceDate)}</small>
+              </div>
+            );
+          })}
+        </section>
+        <form className="panel form-panel" onSubmit={addMaintenance}>
+          <div className="panel-title"><Plus size={16} /> Onderhoud toevoegen</div>
+          <div className="form-grid warranty-form-grid">
+            <label>Scooter
+              <select name="scooterFrame" required>
+                {data.scooters.map((scooter) => (
+                  <option value={scooter.frameNumber} key={scooter.id}>
+                    {scooter.frameNumber} - {scooter.licensePlate || 'geen kenteken'}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>Onderhoudsdatum<input name="serviceDate" type="date" required /></label>
+            <label>Type onderhoud<input name="serviceType" placeholder="bijv. 500 km beurt" required /></label>
+            <label>Kilometerstand<input name="mileage" inputMode="numeric" /></label>
+            <label>Volgende onderhoudsdatum<input name="nextServiceDate" type="date" /></label>
+            <label>Status
+              <select name="status" defaultValue="Gepland">
+                <option>Gepland</option>
+                <option>Uitgevoerd</option>
+                <option>Aandacht nodig</option>
+              </select>
+            </label>
+            <label className="wide-field">Notities<textarea name="notes" /></label>
+          </div>
+          <button className="primary-button">Toevoegen</button>
+        </form>
+      </div>
+    </>
+  );
+}
+
 function GlobalSearch({ data, query, setQuery, scooters, onSelect }: { data: AppData; query: string; setQuery: (value: string) => void; scooters: Scooter[]; onSelect: (scooter: Scooter) => void }) {
   return (
     <>
@@ -1096,7 +1187,7 @@ function ListPanel({ title, items, green = false }: { title: string; items: stri
   );
 }
 
-function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { scooter: Scooter; dealers: Dealer[]; warranties: WarrantyPart[]; onClose: () => void; onUpdate: (scooter: Scooter) => void | Promise<void> }) {
+function ScooterDrawer({ scooter, dealers, warranties, maintenance, onClose, onUpdate }: { scooter: Scooter; dealers: Dealer[]; warranties: WarrantyPart[]; maintenance: MaintenanceRecord[]; onClose: () => void; onUpdate: (scooter: Scooter) => void | Promise<void> }) {
   const [draft, setDraft] = useState(scooter);
   const [rdwLoading, setRdwLoading] = useState(false);
   const [rdwMessage, setRdwMessage] = useState('');
@@ -1182,6 +1273,12 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
           <section className="panel drawer-info-panel"><div className="panel-title"><UserRound size={16} /> Dealer</div><p>{dealerName(dealers, scooter.dealerId) || 'Nog geen dealer geselecteerd'}</p></section>
           <section className="panel drawer-info-panel"><div className="panel-title"><ShieldCheck size={16} /> Warranty</div>{warranties.length ? warranties.map((w) => <p key={w.id}>{w.partName} - {w.status}</p>) : <p>Geen warranty claims</p>}</section>
         </div>
+        <section className="panel drawer-info-panel">
+          <div className="panel-title"><ClipboardList size={16} /> Onderhoud</div>
+          {maintenance.length ? maintenance.map((record) => (
+            <p key={record.id}>{formatDate(record.serviceDate)} - {record.serviceType} - {record.status}</p>
+          )) : <p>Geen onderhoud geregistreerd</p>}
+        </section>
         <section className="panel drawer-info-panel"><div className="panel-title"><FileText size={16} /> Documenten</div><p>Nog geen documenten toegevoegd</p></section>
         <section className="panel drawer-info-panel rdw-panel">
           <div className="panel-title"><ShieldCheck size={16} /> RDW tenaamstelling</div>

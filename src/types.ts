@@ -82,6 +82,18 @@ export type WarrantyPart = {
   notes: string;
 };
 
+export type MaintenanceRecord = {
+  id: string;
+  scooterFrame: string;
+  licensePlate?: string;
+  serviceDate: string;
+  serviceType: string;
+  mileage?: string;
+  nextServiceDate?: string;
+  status: 'Gepland' | 'Uitgevoerd' | 'Aandacht nodig';
+  notes: string;
+};
+
 export type DocumentRecord = {
   id: string;
   scooterFrame: string;
@@ -96,6 +108,7 @@ export type AppData = {
   dealers: Dealer[];
   batteries: Battery[];
   warranties: WarrantyPart[];
+  maintenance: MaintenanceRecord[];
   documents: DocumentRecord[];
 };
 

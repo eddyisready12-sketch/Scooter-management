@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Dealer, Scooter } from '../types';
+import type { AppData, Dealer, MaintenanceRecord, Scooter } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -14,6 +14,7 @@ const tableMap: Record<keyof AppData, string> = {
   dealers: 'dealers',
   batteries: 'batteries',
   warranties: 'warranty_parts',
+  maintenance: 'maintenance_records',
   documents: 'documents',
 };
 
@@ -23,12 +24,12 @@ export async function loadSupabaseData(): Promise<Partial<AppData>> {
   const entries = await Promise.all(
     Object.entries(tableMap).map(async ([key, table]) => {
       const { data, error } = await supabase.from(table).select('*').order('id');
-      if (error) throw error;
+      if (error) return null;
       return [key, data ?? []] as const;
     }),
   );
 
-  return Object.fromEntries(entries) as Partial<AppData>;
+  return Object.fromEntries(entries.filter((entry) => entry !== null)) as Partial<AppData>;
 }
 
 export function subscribeToSupabase(onChange: () => void) {
@@ -60,6 +61,16 @@ export async function upsertDealers(dealers: Dealer[]) {
   const { error } = await supabase
     .from('dealers')
     .upsert(dealers);
+
+  if (error) throw error;
+}
+
+export async function upsertMaintenanceRecords(records: MaintenanceRecord[]) {
+  if (!supabase || records.length === 0) return;
+
+  const { error } = await supabase
+    .from('maintenance_records')
+    .upsert(records);
 
   if (error) throw error;
 }

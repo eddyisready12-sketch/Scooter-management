@@ -589,6 +589,26 @@ tbody tr:hover {
   color: #8b98a5;
 }
 
+.maintenance-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  margin: 0 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid #dce1e6;
+}
+
+.maintenance-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.maintenance-row span:not(.status-pill),
+.maintenance-row small {
+  color: #65717d;
+}
+
 .battery-layout {
   align-items: start;
 }
