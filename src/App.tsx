@@ -573,7 +573,7 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
         setQuery={setQuery}
         onSelect={onSelect}
         title={statusFilter === 'all' ? 'Beschikbare scooters' : `Scooters: ${statusFilter} (${scooters.length})`}
-        onBulkRdwCheck={statusFilter === 'Verkocht dealer' ? onBulkRdwCheck : undefined}
+        onBulkRdwCheck={statusFilter === 'Verkocht dealer' || statusFilter === 'Verkocht klant' ? onBulkRdwCheck : undefined}
       />
     </>
   );
