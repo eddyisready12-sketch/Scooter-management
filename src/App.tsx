@@ -141,6 +141,10 @@ function stableId(prefix: string, value: string) {
   return `${prefix}-${value.replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
 }
 
+function normalizeLookup(value: string) {
+  return value.replace(/[^a-z0-9]/gi, '').toUpperCase();
+}
+
 async function fetchRdwRegistration(licensePlate: string) {
   const normalizedPlate = licensePlate.replace(/[^a-z0-9]/gi, '').toUpperCase();
   if (!normalizedPlate) throw new Error('Vul eerst een kenteken in.');
@@ -568,7 +572,7 @@ export function App() {
           {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'containers' && <Containers data={data} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
-          {view === 'batteries' && <Batteries data={data} addBatteryModel={addBatteryModel} updateBattery={updateBattery} message={batteryMessage} />}
+          {view === 'batteries' && <Batteries data={data} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
@@ -907,7 +911,7 @@ function Scooters({ data, query, setQuery, scooters, onSelect }: { data: AppData
   );
 }
 
-function Batteries({ data, addBatteryModel, updateBattery, message }: { data: AppData; addBatteryModel: (event: FormEvent<HTMLFormElement>) => Promise<void>; updateBattery: (battery: Battery) => Promise<void>; message: string }) {
+function Batteries({ data, addBatteryModel, updateBattery, onSelectScooter, message }: { data: AppData; addBatteryModel: (event: FormEvent<HTMLFormElement>) => Promise<void>; updateBattery: (battery: Battery) => Promise<void>; onSelectScooter: (scooter: Scooter) => void; message: string }) {
   const { batteries, batteryModels, dealers, scooters } = data;
   const [selectedBattery, setSelectedBattery] = useState<Battery | null>(null);
   const batteryGroups = [
@@ -988,6 +992,10 @@ function Batteries({ data, addBatteryModel, updateBattery, message }: { data: Ap
           dealers={dealers}
           scooters={scooters}
           onClose={() => setSelectedBattery(null)}
+          onSelectScooter={(scooter) => {
+            setSelectedBattery(null);
+            onSelectScooter(scooter);
+          }}
           onUpdate={async (battery) => {
             await updateBattery(battery);
             setSelectedBattery(battery);
@@ -998,9 +1006,15 @@ function Batteries({ data, addBatteryModel, updateBattery, message }: { data: Ap
   );
 }
 
-function BatteryDetailModal({ battery, batteryModels, dealers, scooters, onClose, onUpdate }: { battery: Battery; batteryModels: BatteryModel[]; dealers: Dealer[]; scooters: Scooter[]; onClose: () => void; onUpdate: (battery: Battery) => Promise<void> }) {
+function BatteryDetailModal({ battery, batteryModels, dealers, scooters, onClose, onSelectScooter, onUpdate }: { battery: Battery; batteryModels: BatteryModel[]; dealers: Dealer[]; scooters: Scooter[]; onClose: () => void; onSelectScooter: (scooter: Scooter) => void; onUpdate: (battery: Battery) => Promise<void> }) {
   const [draft, setDraft] = useState<Battery>(battery);
+  const [scooterLookup, setScooterLookup] = useState(battery.scooterFrame ?? '');
   const linkedScooter = scooters.find((scooter) => scooter.frameNumber === draft.scooterFrame);
+  const typedScooter = scooterLookup.trim()
+    ? scooters.find((scooter) =>
+      normalizeLookup(scooter.frameNumber) === normalizeLookup(scooterLookup) ||
+      normalizeLookup(scooter.licensePlate ?? '') === normalizeLookup(scooterLookup))
+    : null;
   const sortedDealers = [...dealers].sort((a, b) => (a.company || a.name).localeCompare(b.company || b.name, 'nl', { sensitivity: 'base' }));
 
   function updateDraft(next: Partial<Battery>) {
@@ -1051,7 +1065,7 @@ function BatteryDetailModal({ battery, batteryModels, dealers, scooters, onClose
             <dl className="detail-list">
               <dt>Laad datum</dt><dd>{formatDate(draft.chargeDate)}</dd>
               <dt>Model</dt><dd>{draft.model}</dd>
-              <dt>Scooter</dt><dd>{linkedScooter ? linkedScooter.frameNumber : (draft.scooterFrame || '-')}</dd>
+              <dt>Scooter</dt><dd>{linkedScooter ? <button className="link-button" onClick={() => onSelectScooter(linkedScooter)}>{linkedScooter.frameNumber}</button> : (draft.scooterFrame || '-')}</dd>
             </dl>
           </section>
         </div>
@@ -1087,10 +1101,23 @@ function BatteryDetailModal({ battery, batteryModels, dealers, scooters, onClose
             <label>Lotnum*<input value={draft.lotNumber} onChange={(event) => updateDraft({ lotNumber: event.target.value })} /></label>
             <label>Laad datum<input type="date" value={draft.chargeDate ?? ''} onChange={(event) => updateDraft({ chargeDate: event.target.value })} /></label>
             <label>Scooter
-              <select value={draft.scooterFrame ?? ''} onChange={(event) => updateDraft({ scooterFrame: event.target.value || undefined })}>
-                <option value="">Geen scooter</option>
-                {scooters.map((scooter) => <option key={scooter.id} value={scooter.frameNumber}>{scooter.frameNumber} - {scooter.licensePlate || scooter.model}</option>)}
-              </select>
+              <input
+                list="battery-scooters"
+                placeholder="Plak framenummer of kenteken"
+                value={scooterLookup}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setScooterLookup(value);
+                  const match = scooters.find((scooter) =>
+                    normalizeLookup(scooter.frameNumber) === normalizeLookup(value) ||
+                    normalizeLookup(scooter.licensePlate ?? '') === normalizeLookup(value));
+                  updateDraft({ scooterFrame: match ? match.frameNumber : (value.trim() ? value.trim() : undefined) });
+                }}
+              />
+              <datalist id="battery-scooters">
+                {scooters.map((scooter) => <option key={scooter.id} value={scooter.frameNumber}>{scooter.licensePlate ? `${scooter.licensePlate} - ` : ''}{scooter.model}</option>)}
+              </datalist>
+              <small className={typedScooter ? 'lookup-hint success' : 'lookup-hint'}>{typedScooter ? `${typedScooter.frameNumber} - ${typedScooter.model} - ${dealerName(dealers, typedScooter.dealerId) || 'geen dealer'}` : 'Plak een exact framenummer of kenteken.'}</small>
             </label>
             <label>Status
               <select value={draft.status} onChange={(event) => updateDraft({ status: event.target.value as Battery['status'] })}>

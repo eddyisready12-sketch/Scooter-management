@@ -445,6 +445,10 @@ tbody tr:hover {
   padding: 0;
 }
 
+.link-button:hover {
+  text-decoration: underline;
+}
+
 .icon-button {
   display: grid;
   place-items: center;
@@ -757,6 +761,15 @@ tbody tr:hover {
 
 .battery-edit-grid {
   grid-template-columns: minmax(180px, 0.8fr) 1fr;
+}
+
+.lookup-hint {
+  color: #65717d;
+  font-weight: 600;
+}
+
+.lookup-hint.success {
+  color: #15803d;
 }
 
 .warranty-form-grid {
