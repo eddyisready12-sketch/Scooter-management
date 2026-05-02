@@ -349,6 +349,45 @@ export function App() {
     }
   }
 
+  async function checkScootersWithRdw(scootersToCheck: Scooter[]) {
+    const withLicensePlate = scootersToCheck.filter((scooter) => scooter.licensePlate?.trim());
+    const skipped = scootersToCheck.length - withLicensePlate.length;
+    const updatedScooters: Scooter[] = [];
+    const failed: string[] = [];
+
+    for (const scooter of withLicensePlate) {
+      try {
+        const rdwData = await fetchRdwRegistration(scooter.licensePlate ?? '');
+        updatedScooters.push(normalizeRegistrationStatus({
+          ...scooter,
+          firstRegistrationDate: rdwData.firstRegistrationDate || scooter.firstRegistrationDate,
+          lastRegistrationDate: rdwData.lastRegistrationDate || scooter.lastRegistrationDate,
+          ownerCount: rdwData.ownerCount ?? scooter.ownerCount,
+          emissionClass: rdwData.emissionClass || scooter.emissionClass,
+        }));
+      } catch {
+        failed.push(scooter.licensePlate ?? scooter.frameNumber);
+      }
+    }
+
+    if (updatedScooters.length > 0) {
+      const byId = new Map(updatedScooters.map((scooter) => [scooter.id, scooter]));
+      setData((current) => ({
+        ...current,
+        scooters: current.scooters.map((scooter) => byId.get(scooter.id) ?? scooter),
+      }));
+      setSelectedScooter((current) => (current ? byId.get(current.id) ?? current : current));
+      await upsertScooters(updatedScooters);
+    }
+
+    const parts = [`${updatedScooters.length} voertuigen bijgewerkt via RDW`];
+    if (skipped) parts.push(`${skipped} zonder kenteken overgeslagen`);
+    if (failed.length) parts.push(`${failed.length} mislukt`);
+    const message = `${parts.join(', ')}.`;
+    setCsvMessage(message);
+    return message;
+  }
+
   function addWarranty(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -409,7 +448,7 @@ export function App() {
         </header>
 
         <section className="content">
-          {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} />}
+          {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'containers' && <Containers data={data} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries batteries={data.batteries} scooters={data.scooters} />}
@@ -449,7 +488,7 @@ function LoginScreen({ onLogin, supabaseEnabled }: { onLogin: () => void; supaba
   );
 }
 
-function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelect, statusFilter, setStatusFilter }: {
+function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelect, statusFilter, setStatusFilter, onBulkRdwCheck }: {
   data: AppData;
   onImport: (target: ImportTarget, status: ImportScooterStatus, event: ChangeEvent<HTMLInputElement>) => void;
   message: string;
@@ -459,6 +498,7 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
   onSelect: (scooter: Scooter) => void;
   statusFilter: ScooterStatus | 'all';
   setStatusFilter: (status: ScooterStatus | 'all') => void;
+  onBulkRdwCheck: (scooters: Scooter[]) => Promise<string>;
 }) {
   const [importTarget, setImportTarget] = useState<ImportTarget>('scooters');
   const [importStatus, setImportStatus] = useState<ImportScooterStatus>('file');
@@ -524,21 +564,25 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
         setQuery={setQuery}
         onSelect={onSelect}
         title={statusFilter === 'all' ? 'Beschikbare scooters' : `Scooters: ${statusFilter} (${scooters.length})`}
+        onBulkRdwCheck={statusFilter === 'Verkocht dealer' ? onBulkRdwCheck : undefined}
       />
     </>
   );
 }
 
-function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'Beschikbare scooters' }: {
+function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'Beschikbare scooters', onBulkRdwCheck }: {
   scooters: Scooter[];
   dealers: Dealer[];
   query: string;
   setQuery: (value: string) => void;
   onSelect: (scooter: Scooter) => void;
   title?: string;
+  onBulkRdwCheck?: (scooters: Scooter[]) => Promise<string>;
 }) {
   const [pageSize, setPageSize] = useState<number | 'all'>(20);
   const [page, setPage] = useState(1);
+  const [rdwChecking, setRdwChecking] = useState(false);
+  const [rdwCheckMessage, setRdwCheckMessage] = useState('');
   const [columnFilters, setColumnFilters] = useState({
     model: '',
     frame: '',
@@ -578,9 +622,31 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     setPage(1);
   }
 
+  async function handleBulkRdwCheck() {
+    if (!onBulkRdwCheck) return;
+    setRdwChecking(true);
+    setRdwCheckMessage('');
+    try {
+      const message = await onBulkRdwCheck(filteredRows);
+      setRdwCheckMessage(message);
+    } catch (error) {
+      setRdwCheckMessage(`RDW controle mislukt: ${importErrorMessage(error)}`);
+    } finally {
+      setRdwChecking(false);
+    }
+  }
+
   return (
     <section className="panel">
-      <div className="panel-title"><Bike size={16} /> {title}</div>
+      <div className="panel-title">
+        <span className="panel-title-label"><Bike size={16} /> {title}</span>
+        {onBulkRdwCheck && (
+          <button className="secondary-button panel-title-action" disabled={rdwChecking || filteredRows.length === 0} onClick={handleBulkRdwCheck}>
+            <RefreshCw size={15} /> {rdwChecking ? 'RDW check bezig...' : 'Check voertuigen bij RDW'}
+          </button>
+        )}
+      </div>
+      {rdwCheckMessage && <div className="inline-notice">{rdwCheckMessage}</div>}
       <div className="table-toolbar">
         <div className="button-group"><button>CSV</button><button>Excel</button><button>PDF</button><button>Print</button></div>
         <div className="table-controls">

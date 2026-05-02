@@ -166,6 +166,25 @@ h2 {
   font-weight: 600;
 }
 
+.panel-title-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.panel-title-action {
+  margin-left: auto;
+}
+
+.inline-notice {
+  margin: 12px 14px 0;
+  padding: 10px 12px;
+  border: 1px solid #9fc8ff;
+  border-radius: 4px;
+  background: #eaf3ff;
+  color: #005cb8;
+}
+
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(170px, 1fr));
