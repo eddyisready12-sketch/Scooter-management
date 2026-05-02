@@ -1222,7 +1222,7 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
               <select name="scooterFrame" required value={selectedFrame} onChange={(event) => handleMaintenanceScooterChange(event.target.value)}>
                 {data.scooters.map((scooter) => (
                   <option value={scooter.frameNumber} key={scooter.id}>
-                    {scooter.frameNumber} - {scooter.licensePlate || 'geen kenteken'}
+                    {scooter.model} - {scooter.licensePlate || scooter.frameNumber}
                   </option>
                 ))}
               </select>
