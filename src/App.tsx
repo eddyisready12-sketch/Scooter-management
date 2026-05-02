@@ -875,7 +875,7 @@ function Dealers({ dealers, scooters, onImport, onAddDealer, onUpdateDealer, mes
       <SearchPanel query="" setQuery={() => undefined} />
       <div className="two-col">
         <DealerTablePanel dealers={sortedDealers} onSelect={setSelectedDealer} />
-        <ListPanel title="In consignatie" items={dealers.map((dealer) => `${scooters.filter((s) => s.dealerId === dealer.id && s.status === 'In consignatie').length} bij ${dealer.company} (${dealer.city})`)} />
+        <ConsignmentDealerPanel dealers={sortedDealers} scooters={scooters} onSelect={setSelectedDealer} />
       </div>
       {showAddDealer && (
         <div className="modal-backdrop" onMouseDown={() => setShowAddDealer(false)}>
@@ -909,6 +909,7 @@ function Dealers({ dealers, scooters, onImport, onAddDealer, onUpdateDealer, mes
       {selectedDealer && (
         <DealerDetailModal
           dealer={selectedDealer}
+          scooters={scooters}
           onClose={() => setSelectedDealer(null)}
           onUpdate={async (dealer) => {
             await onUpdateDealer(dealer);
@@ -948,8 +949,28 @@ function DealerTablePanel({ dealers, onSelect }: { dealers: Dealer[]; onSelect: 
   );
 }
 
-function DealerDetailModal({ dealer, onClose, onUpdate }: { dealer: Dealer; onClose: () => void; onUpdate: (dealer: Dealer) => Promise<void> }) {
+function ConsignmentDealerPanel({ dealers, scooters, onSelect }: { dealers: Dealer[]; scooters: Scooter[]; onSelect: (dealer: Dealer) => void }) {
+  return (
+    <section className="panel list-panel">
+      <div className="panel-title"><UsersRound size={16} /> In consignatie</div>
+      {dealers.length === 0 ? (
+        <p className="empty">N.V.T.</p>
+      ) : dealers.map((dealer) => {
+        const count = scooters.filter((scooter) => scooter.dealerId === dealer.id && scooter.status === 'In consignatie').length;
+        return (
+          <button className={`simple-row clickable-row ${dealer.active === false ? 'muted-row' : ''}`} key={dealer.id} onClick={() => onSelect(dealer)}>
+            <span>{count} bij {dealer.company || dealer.name} ({dealer.city || '-'})</span>
+            <Plus size={14} />
+          </button>
+        );
+      })}
+    </section>
+  );
+}
+
+function DealerDetailModal({ dealer, scooters, onClose, onUpdate }: { dealer: Dealer; scooters: Scooter[]; onClose: () => void; onUpdate: (dealer: Dealer) => Promise<void> }) {
   const isActive = dealer.active !== false;
+  const consignmentScooters = scooters.filter((scooter) => scooter.dealerId === dealer.id && scooter.status === 'In consignatie');
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <section className="modal-card dealer-detail-modal" onMouseDown={(event) => event.stopPropagation()}>
@@ -979,6 +1000,18 @@ function DealerDetailModal({ dealer, onClose, onUpdate }: { dealer: Dealer; onCl
             {isActive ? 'Zet niet actief' : 'Zet actief'}
           </button>
         </div>
+        <section className="dealer-scooter-overview">
+          <h3>In consignatie ({consignmentScooters.length})</h3>
+          {consignmentScooters.length === 0 ? (
+            <p className="empty">Geen scooters in consignatie.</p>
+          ) : consignmentScooters.map((scooter) => (
+            <div className="dealer-scooter-row" key={scooter.id}>
+              <strong>{scooter.frameNumber}</strong>
+              <span>{scooter.model} - {scooter.color} - {scooter.speed}</span>
+              <small>{scooter.licensePlate || 'Geen kenteken'}</small>
+            </div>
+          ))}
+        </section>
       </section>
     </div>
   );

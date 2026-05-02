@@ -571,6 +571,24 @@ tbody tr:hover {
   border-bottom: 1px solid #dce1e6;
 }
 
+.clickable-row {
+  width: calc(100% - 28px);
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  background: transparent;
+  color: #17202a;
+  text-align: left;
+}
+
+.clickable-row:hover {
+  background: #f3f8ff;
+}
+
+.muted-row {
+  color: #8b98a5;
+}
+
 .battery-layout {
   align-items: start;
 }
@@ -754,6 +772,29 @@ tbody tr:hover {
 .dealer-detail-list dt,
 .dealer-detail-list dd {
   min-height: 42px;
+}
+
+.dealer-scooter-overview {
+  border-top: 1px solid #dce1e6;
+  padding: 16px 20px 22px;
+}
+
+.dealer-scooter-overview h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.dealer-scooter-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr auto;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #dce1e6;
+}
+
+.dealer-scooter-row span,
+.dealer-scooter-row small {
+  color: #65717d;
 }
 
 .modal-backdrop {
