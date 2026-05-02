@@ -1136,6 +1136,7 @@ function Maintenance({ data, addMaintenance }: { data: AppData; addMaintenance: 
               </select>
             </label>
             <label>Onderhoudsdatum<input name="serviceDate" type="date" required /></label>
+            <label>Kenteken<input name="licensePlate" placeholder="bijv. FVZ16T" /></label>
             <label>Type onderhoud<input name="serviceType" placeholder="bijv. 500 km beurt" required /></label>
             <label>Kilometerstand<input name="mileage" inputMode="numeric" /></label>
             <label>Volgende onderhoudsdatum<input name="nextServiceDate" type="date" /></label>
