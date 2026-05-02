@@ -190,6 +190,7 @@ export function App() {
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [csvMessage, setCsvMessage] = useState('');
   const [dealerImportMessage, setDealerImportMessage] = useState('');
+  const [maintenanceMessage, setMaintenanceMessage] = useState('');
   const [statusFilter, setStatusFilter] = useState<ScooterStatus | 'all'>('all');
 
   useEffect(() => {
@@ -439,24 +440,29 @@ export function App() {
     const form = new FormData(formElement);
     const scooterFrame = String(form.get('scooterFrame'));
     const scooter = data.scooters.find((item) => item.frameNumber === scooterFrame);
+    const licensePlate = String(form.get('licensePlate') ?? '').trim();
+    const mileage = String(form.get('mileage') ?? '').trim();
+    const nextServiceDate = String(form.get('nextServiceDate') ?? '').trim();
+    const notes = String(form.get('notes') ?? '').trim();
     const record: MaintenanceRecord = {
       id: `maintenance-${Date.now()}`,
       scooterFrame,
-      licensePlate: scooter?.licensePlate || String(form.get('licensePlate') ?? ''),
+      licensePlate: licensePlate || scooter?.licensePlate || '',
       serviceDate: String(form.get('serviceDate')),
       serviceType: String(form.get('serviceType')),
-      mileage: String(form.get('mileage') ?? ''),
-      nextServiceDate: String(form.get('nextServiceDate') ?? ''),
+      ...(mileage ? { mileage } : {}),
+      ...(nextServiceDate ? { nextServiceDate } : {}),
       status: String(form.get('status')) as MaintenanceRecord['status'],
-      notes: String(form.get('notes') ?? ''),
+      notes,
     };
-    setData((current) => ({ ...current, maintenance: [record, ...current.maintenance] }));
     try {
       await upsertMaintenanceRecords([record]);
+      setData((current) => ({ ...current, maintenance: [record, ...current.maintenance] }));
+      setMaintenanceMessage(`Onderhoud opgeslagen voor ${record.licensePlate || record.scooterFrame}.`);
+      formElement.reset();
     } catch (error) {
-      setCsvMessage(`Onderhoud opslaan mislukt: ${importErrorMessage(error)}`);
+      setMaintenanceMessage(`Onderhoud opslaan mislukt: ${importErrorMessage(error)}`);
     }
-    formElement.reset();
   }
 
   if (!loggedIn) {
@@ -504,7 +510,7 @@ export function App() {
           {view === 'batteries' && <Batteries batteries={data.batteries} scooters={data.scooters} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} />}
-          {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} />}
+          {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
           {view === 'search' && <GlobalSearch data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
         </section>
       </main>
@@ -1093,7 +1099,7 @@ function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: F
   );
 }
 
-function Maintenance({ data, addMaintenance }: { data: AppData; addMaintenance: (event: FormEvent<HTMLFormElement>) => void }) {
+function Maintenance({ data, addMaintenance, message }: { data: AppData; addMaintenance: (event: FormEvent<HTMLFormElement>) => void; message: string }) {
   const sortedMaintenance = [...data.maintenance].sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
   const [selectedFrame, setSelectedFrame] = useState(data.scooters[0]?.frameNumber ?? '');
   const [maintenanceLicensePlate, setMaintenanceLicensePlate] = useState(data.scooters[0]?.licensePlate ?? '');
@@ -1123,6 +1129,7 @@ function Maintenance({ data, addMaintenance }: { data: AppData; addMaintenance: 
           <span>{data.maintenance.length} onderhoudsregels geregistreerd</span>
         </div>
       </div>
+      {message && <div className="notice">{message}</div>}
       <div className="two-col maintenance-layout">
         <section className="panel">
           <div className="panel-title"><ClipboardList size={16} /> Scooter onderhoud</div>
