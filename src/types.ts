@@ -97,4 +97,5 @@ export type CsvScooterRow = {
   container?: string;
   licensePlate?: string;
   batteryNumber?: string;
+  invoiceNumber?: string;
 };

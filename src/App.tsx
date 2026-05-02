@@ -88,6 +88,7 @@ export function App() {
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [csvMessage, setCsvMessage] = useState('');
   const [dealerImportMessage, setDealerImportMessage] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ScooterStatus | 'all'>('all');
 
   useEffect(() => {
     let mounted = true;
@@ -111,13 +112,13 @@ export function App() {
 
   const filteredScooters = useMemo(() => {
     const needle = query.toLowerCase().trim();
-    if (!needle) return data.scooters;
     return data.scooters.filter((scooter) =>
-      [scooter.frameNumber, scooter.engineNumber, scooter.model, scooter.color, scooter.status, scooter.licensePlate, dealerName(data.dealers, scooter.dealerId)]
+      (statusFilter === 'all' || scooter.status === statusFilter) &&
+      (!needle || [scooter.frameNumber, scooter.engineNumber, scooter.model, scooter.color, scooter.status, scooter.licensePlate, scooter.invoiceNumber, dealerName(data.dealers, scooter.dealerId)]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle)),
+        .some((value) => String(value).toLowerCase().includes(needle))),
     );
-  }, [data.dealers, data.scooters, query]);
+  }, [data.dealers, data.scooters, query, statusFilter]);
 
   async function importScooterFile(file: File, statusOverride?: ScooterStatus) {
     try {
@@ -127,7 +128,7 @@ export function App() {
         return;
       }
 
-      const nextScooters = csvRowsToScooters(rows, data.scooters, statusOverride);
+      const nextScooters = csvRowsToScooters(rows, data.scooters, statusOverride, data.dealers);
       const importedFrames = new Set(rows.map((row) => row.frameNumber).filter(Boolean));
       const importedScooters = nextScooters.filter((scooter) => importedFrames.has(scooter.frameNumber));
 
@@ -255,7 +256,7 @@ export function App() {
         </header>
 
         <section className="content">
-          {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
+          {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} />}
           {view === 'containers' && <Containers data={data} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries batteries={data.batteries} scooters={data.scooters} />}
@@ -295,7 +296,7 @@ function LoginScreen({ onLogin, supabaseEnabled }: { onLogin: () => void; supaba
   );
 }
 
-function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelect }: {
+function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelect, statusFilter, setStatusFilter }: {
   data: AppData;
   onImport: (target: ImportTarget, status: ImportScooterStatus, event: ChangeEvent<HTMLInputElement>) => void;
   message: string;
@@ -303,6 +304,8 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
   setQuery: (value: string) => void;
   scooters: Scooter[];
   onSelect: (scooter: Scooter) => void;
+  statusFilter: ScooterStatus | 'all';
+  setStatusFilter: (status: ScooterStatus | 'all') => void;
 }) {
   const [importTarget, setImportTarget] = useState<ImportTarget>('scooters');
   const [importStatus, setImportStatus] = useState<ImportScooterStatus>('file');
@@ -345,34 +348,52 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
       {message && <div className="notice">{message}</div>}
       <div className="stat-grid">
         {cards.map(({ label, icon: Icon }) => (
-          <div className="stat-card" key={label}>
+          <button
+            className={`stat-card stat-button ${statusFilter === label ? 'selected' : ''}`}
+            key={label}
+            onClick={() => setStatusFilter(statusFilter === label ? 'all' : label)}
+          >
             <div className={`stat-icon ${statusColor[label]}`}><Icon size={24} /></div>
             <div><span>{label}</span><strong>{countByStatus(data.scooters, label)}</strong></div>
-          </div>
+          </button>
         ))}
       </div>
-      <ScooterTable scooters={scooters.slice(0, 20)} dealers={data.dealers} query={query} setQuery={setQuery} onSelect={onSelect} />
+      {statusFilter !== 'all' && (
+        <div className="filter-notice">
+          Gefilterd op <strong>{statusFilter}</strong>
+          <button onClick={() => setStatusFilter('all')}>Toon alles</button>
+        </div>
+      )}
+      <ScooterTable
+        scooters={scooters.slice(0, 20)}
+        dealers={data.dealers}
+        query={query}
+        setQuery={setQuery}
+        onSelect={onSelect}
+        title={statusFilter === 'all' ? 'Beschikbare scooters' : `Scooters: ${statusFilter} (${scooters.length})`}
+      />
     </>
   );
 }
 
-function ScooterTable({ scooters, dealers, query, setQuery, onSelect }: {
+function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'Beschikbare scooters' }: {
   scooters: Scooter[];
   dealers: Dealer[];
   query: string;
   setQuery: (value: string) => void;
   onSelect: (scooter: Scooter) => void;
+  title?: string;
 }) {
   return (
     <section className="panel">
-      <div className="panel-title"><Bike size={16} /> Beschikbare scooters</div>
+      <div className="panel-title"><Bike size={16} /> {title}</div>
       <div className="table-toolbar">
         <div className="button-group"><button>CSV</button><button>Excel</button><button>PDF</button><button>Print</button></div>
         <label>Search: <input value={query} onChange={(event) => setQuery(event.target.value)} /></label>
       </div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Model</th><th>Frame #</th><th>Kleur</th><th>Kenteken</th><th>Snelheid</th><th>Status</th><th>Dealer</th></tr></thead>
+          <thead><tr><th>Model</th><th>Frame #</th><th>Kleur</th><th>Kenteken</th><th>Snelheid</th><th>Status</th><th>Dealer</th><th>Factuur</th></tr></thead>
           <tbody>
             {scooters.map((scooter) => (
               <tr key={scooter.id} onClick={() => onSelect(scooter)}>
@@ -383,6 +404,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect }: {
                 <td>{scooter.speed}</td>
                 <td>{scooter.status}</td>
                 <td>{dealerName(dealers, scooter.dealerId) || '-'}</td>
+                <td>{scooter.invoiceNumber || '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -585,6 +607,7 @@ function ScooterDrawer({ scooter, dealers, warranties, onClose, onUpdate }: { sc
               <dt>Merk</dt><dd>{scooter.brand}</dd>
               <dt>Model</dt><dd>{scooter.model}</dd>
               <dt>Kleur</dt><dd>{scooter.color}</dd>
+              <dt>Factuur</dt><dd>{scooter.invoiceNumber || '-'}</dd>
             </dl>
           </section>
           <section className="panel drawer-edit-card">

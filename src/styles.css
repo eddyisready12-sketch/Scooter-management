@@ -181,6 +181,18 @@ h2 {
   padding: 10px;
 }
 
+.stat-button {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+}
+
+.stat-button:hover,
+.stat-button.selected {
+  border-color: #0075ff;
+  box-shadow: 0 0 0 2px rgba(0, 117, 255, 0.14);
+}
+
 .stat-card span {
   display: block;
   color: #0075ff;
@@ -379,6 +391,28 @@ tbody tr:hover {
   padding: 10px 12px;
   border-radius: 5px;
   margin-bottom: 12px;
+}
+
+.filter-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #c8d7e6;
+  background: #fff;
+  border-radius: 6px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  color: #2f3a45;
+}
+
+.filter-notice button {
+  border: 1px solid #c8d1da;
+  border-radius: 4px;
+  background: #fff;
+  min-height: 32px;
+  padding: 0 10px;
+  color: #0075ff;
 }
 
 .two-col,

@@ -18,6 +18,10 @@ function normalizeHeader(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+function normalizeValue(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 function normalizeStatus(value: string): ScooterStatus {
   const status = value.toLowerCase();
   if (status.includes('dealer')) return 'Verkocht dealer';
@@ -41,6 +45,7 @@ function normalizeRows(rows: Record<string, unknown>[]): CsvScooterRow[] {
     container: pick(row, ['container', 'container number', 'containernummer', 'container nr']),
     licensePlate: pick(row, ['kenteken', 'license plate', 'nummerplaat']),
     batteryNumber: pick(row, ['accu', 'battery', 'batteryNumber', 'accunummer', 'accu nummer']),
+    invoiceNumber: pick(row, ['factuur', 'factuur nummer', 'factuurnummer', 'invoice', 'invoice number', 'invoicenumber']),
   })).filter((row) => row.frameNumber);
 }
 
@@ -117,12 +122,23 @@ export function parseDealerImport(file: File): Promise<Dealer[]> {
   return readCsvRows(file).then(normalizeDealerRows);
 }
 
-export function csvRowsToScooters(rows: CsvScooterRow[], existing: Scooter[], statusOverride?: ScooterStatus): Scooter[] {
+function findDealerId(dealers: Dealer[], dealerName?: string) {
+  if (!dealerName) return undefined;
+  const needle = normalizeValue(dealerName);
+  return dealers.find((dealer) =>
+    [dealer.company, dealer.name, dealer.email]
+      .filter(Boolean)
+      .some((value) => normalizeValue(value).includes(needle) || needle.includes(normalizeValue(value))),
+  )?.id;
+}
+
+export function csvRowsToScooters(rows: CsvScooterRow[], existing: Scooter[], statusOverride?: ScooterStatus, dealers: Dealer[] = []): Scooter[] {
   const byFrame = new Map(existing.map((scooter) => [scooter.frameNumber, scooter]));
 
   rows.forEach((row) => {
     if (!row.frameNumber) return;
     const previous = byFrame.get(row.frameNumber);
+    const importedDealerId = findDealerId(dealers, row.dealer);
     byFrame.set(row.frameNumber, {
       id: previous?.id ?? `scooter-${row.frameNumber.replace(/[^a-z0-9]/gi, '').toLowerCase()}`,
       frameNumber: row.frameNumber,
@@ -132,11 +148,11 @@ export function csvRowsToScooters(rows: CsvScooterRow[], existing: Scooter[], st
       color: row.color || previous?.color || 'MATT BLACK',
       speed: row.speed || previous?.speed || '45km/h',
       status: statusOverride || row.status || previous?.status || 'Beschikbaar',
-      dealerId: previous?.dealerId,
+      dealerId: importedDealerId || previous?.dealerId,
       containerId: previous?.containerId,
       licensePlate: row.licensePlate || previous?.licensePlate,
       batteryNumber: row.batteryNumber || previous?.batteryNumber,
-      invoiceNumber: previous?.invoiceNumber,
+      invoiceNumber: row.invoiceNumber || previous?.invoiceNumber,
       arrivedAt: previous?.arrivedAt,
       deliveredAt: previous?.deliveredAt,
       soldAt: previous?.soldAt,
