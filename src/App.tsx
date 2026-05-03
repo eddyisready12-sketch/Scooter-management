@@ -32,7 +32,7 @@ import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseS
 import { loadSupabaseData, subscribeToSupabase, supabase, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertMaintenanceRecords, upsertScooters, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
 
-type View = 'dashboard' | 'containers' | 'scooters' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
+type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
 
@@ -40,6 +40,7 @@ const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'containers', label: 'Containers', icon: Boxes },
   { id: 'scooters', label: 'Scooters', icon: Bike },
+  { id: 'sales', label: 'Verkoop', icon: CircleDollarSign },
   { id: 'batteries', label: "Accu's", icon: BatteryCharging },
   { id: 'dealers', label: 'Dealers', icon: UsersRound },
   { id: 'warranty', label: 'Warranty parts', icon: ShieldCheck },
@@ -832,6 +833,7 @@ export function App() {
           {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} onImport={addContainerImport} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
+          {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
@@ -940,7 +942,6 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
           <button onClick={() => setStatusFilter('all')}>Toon alles</button>
         </div>
       )}
-      <SalesDashboard scooters={data.scooters} dealers={data.dealers} />
       <ScooterTable
         scooters={scooters}
         dealers={data.dealers}
@@ -950,6 +951,20 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
         title={statusFilter === 'all' ? 'Beschikbare scooters' : `Scooters: ${statusFilter} (${scooters.length})`}
         onBulkRdwCheck={statusFilter === 'Verkocht dealer' || statusFilter === 'Verkocht klant' ? onBulkRdwCheck : undefined}
       />
+    </>
+  );
+}
+
+function SalesPage({ scooters, dealers }: { scooters: Scooter[]; dealers: Dealer[] }) {
+  return (
+    <>
+      <div className="page-title-row">
+        <div>
+          <h1>Verkoop</h1>
+          <span>Analyse per jaar, model en dealer</span>
+        </div>
+      </div>
+      <SalesDashboard scooters={scooters} dealers={dealers} />
     </>
   );
 }
