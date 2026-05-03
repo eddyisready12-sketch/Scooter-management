@@ -1885,24 +1885,30 @@ function ContainerListPanel({ title, containers, scooters, green = false }: { ti
                 {containerScooters.length === 0 ? (
                   <p className="empty">Geen scooters gekoppeld.</p>
                 ) : (
-                  <>
-                    <div className="container-scooter-header">
-                      <span>Frame</span>
-                      <span>Model</span>
-                      <span>Kleur</span>
-                      <span>Snelheid</span>
-                      <span>Status</span>
-                    </div>
-                    {containerScooters.map((scooter) => (
-                      <div className="container-scooter-line" key={scooter.id}>
-                        <strong>{scooter.frameNumber}</strong>
-                        <span>{scooter.model || '-'}</span>
-                        <span>{scooter.color || '-'}</span>
-                        <span>{scooter.speed || '-'}</span>
-                        <small className="status-pill compact">{scooter.status}</small>
-                      </div>
-                    ))}
-                  </>
+                  <div className="container-scooter-table-wrap">
+                    <table className="container-scooter-table">
+                      <thead>
+                        <tr>
+                          <th>Frame</th>
+                          <th>Model</th>
+                          <th>Kleur</th>
+                          <th>Snelheid</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {containerScooters.map((scooter) => (
+                          <tr key={scooter.id}>
+                            <td><strong>{scooter.frameNumber}</strong></td>
+                            <td>{scooter.model || '-'}</td>
+                            <td>{scooter.color || '-'}</td>
+                            <td>{scooter.speed || '-'}</td>
+                            <td><span className="status-pill compact">{scooter.status}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             )}
