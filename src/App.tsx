@@ -2181,12 +2181,11 @@ function ScooterDrawer({ scooter, dealers, warranties, maintenance, onClose, onU
               <dt>Merk</dt><dd>{scooter.brand}</dd>
               <dt>Model</dt><dd>{scooter.model}</dd>
               <dt>Kleur</dt><dd>{scooter.color}</dd>
+              <dt>Snelheid</dt><dd>{scooter.speed}</dd>
               <dt>Kenteken</dt><dd>{scooter.licensePlate || '-'}</dd>
-              <dt>Emissie</dt><dd>{scooter.emissionClass || '-'}</dd>
-              <dt>Type</dt><dd>{scooter.rdwType || '-'}</dd>
-              <dt>Typegoedkeuringsnummer</dt><dd>{scooter.rdwTypeApprovalNumber || '-'}</dd>
-              <dt>Variant</dt><dd>{scooter.rdwVariant || '-'}</dd>
-              <dt>Uitvoering</dt><dd>{scooter.rdwExecution || '-'}</dd>
+              <dt>Factuur</dt><dd>{scooter.invoiceNumber || '-'}</dd>
+              <dt>Status</dt><dd>{scooter.status}</dd>
+              <dt>Dealer</dt><dd>{dealerName(dealers, scooter.dealerId) || '-'}</dd>
             </dl>
           </section>
           <section className="panel drawer-edit-card">
@@ -2198,10 +2197,6 @@ function ScooterDrawer({ scooter, dealers, warranties, maintenance, onClose, onU
               <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{Object.keys(statusColor).map((status) => <option key={status}>{status}</option>)}</select></label>
               <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value })}><option value="">Geen dealer</option>{dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
               <label>Factuur<input value={draft.invoiceNumber ?? ''} onChange={(e) => setDraft({ ...draft, invoiceNumber: e.target.value })} /></label>
-              <label>Eerste toelating<input type="date" value={draft.firstAdmissionDate ?? ''} onChange={(e) => setDraft({ ...draft, firstAdmissionDate: e.target.value })} /></label>
-              <label>Eerste eigenaar<input type="date" value={draft.firstRegistrationDate ?? ''} onChange={(e) => setDraft({ ...draft, firstRegistrationDate: e.target.value })} /></label>
-              <label>Laatste tenaamstelling<input type="date" value={draft.lastRegistrationDate ?? ''} onChange={(e) => setDraft({ ...draft, lastRegistrationDate: e.target.value })} /></label>
-              <label>Emissie<input value={draft.emissionClass ?? ''} onChange={(e) => setDraft({ ...draft, emissionClass: e.target.value })} /></label>
             </div>
             <div className="drawer-actions">
               <button className="primary-button" onClick={() => onUpdate(draft)}>Verander gegevens</button>
@@ -2212,10 +2207,7 @@ function ScooterDrawer({ scooter, dealers, warranties, maintenance, onClose, onU
             {rdwMessage && <p className="drawer-note">{rdwMessage}</p>}
           </section>
         </div>
-        <div className="two-col">
-          <section className="panel drawer-info-panel"><div className="panel-title"><UserRound size={16} /> Dealer</div><p>{dealerName(dealers, scooter.dealerId) || 'Nog geen dealer geselecteerd'}</p></section>
-          <section className="panel drawer-info-panel"><div className="panel-title"><ShieldCheck size={16} /> Warranty</div>{warranties.length ? warranties.map((w) => <p key={w.id}>{w.partName} - {w.status}</p>) : <p>Geen warranty claims</p>}</section>
-        </div>
+        <section className="panel drawer-info-panel"><div className="panel-title"><ShieldCheck size={16} /> Warranty</div>{warranties.length ? warranties.map((w) => <p key={w.id}>{w.claimNumber || w.id} - {w.partName} - {w.status}</p>) : <p>Geen warranty claims</p>}</section>
         <section className="panel drawer-info-panel">
           <div className="panel-title"><ClipboardList size={16} /> Onderhoud</div>
           {maintenance.length ? maintenance.map((record) => (
@@ -2224,12 +2216,16 @@ function ScooterDrawer({ scooter, dealers, warranties, maintenance, onClose, onU
         </section>
         <section className="panel drawer-info-panel"><div className="panel-title"><FileText size={16} /> Documenten</div><p>Nog geen documenten toegevoegd</p></section>
         <section className="panel drawer-info-panel rdw-panel">
-          <div className="panel-title"><ShieldCheck size={16} /> RDW tenaamstelling</div>
+          <div className="panel-title"><ShieldCheck size={16} /> RDW voertuiggegevens</div>
           <dl className="detail-list rdw-list">
             <dt>Eerste toelating</dt><dd>{formatDate(scooter.firstAdmissionDate)}</dd>
             <dt>Eerste eigenaar</dt><dd>{formatDate(scooter.firstRegistrationDate)}</dd>
             <dt>Laatste tenaamstelling</dt><dd>{formatDate(scooter.lastRegistrationDate)}</dd>
             <dt>Emissie</dt><dd>{scooter.emissionClass || '-'}</dd>
+            <dt>Type</dt><dd>{scooter.rdwType || '-'}</dd>
+            <dt>Typegoedkeuringsnummer</dt><dd>{scooter.rdwTypeApprovalNumber || '-'}</dd>
+            <dt>Variant</dt><dd>{scooter.rdwVariant || '-'}</dd>
+            <dt>Uitvoering</dt><dd>{scooter.rdwExecution || '-'}</dd>
             <dt>Ouderdom</dt><dd>{formatVehicleAge(scooter.firstAdmissionDate)}</dd>
             <dt>Status</dt><dd>{registrationComplete ? <span className="registration-badge"><CheckCircle2 size={16} /> Tenaamgesteld</span> : 'Nog niet compleet'}</dd>
           </dl>
