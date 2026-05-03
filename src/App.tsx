@@ -1730,6 +1730,7 @@ function DealerDetailModal({ dealer, scooters, onClose, onUpdate }: { dealer: De
 
 function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppData; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<void>; updateWarranty: (warranty: WarrantyPart) => Promise<void>; message: string }) {
   const [selectedFrame, setSelectedFrame] = useState(data.scooters[0]?.frameNumber ?? '');
+  const [selectedClaim, setSelectedClaim] = useState<WarrantyPart | null>(null);
   const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame) ?? data.scooters[0];
   const [licensePlate, setLicensePlate] = useState(selectedScooter?.licensePlate ?? '');
   const [selectedDealerId, setSelectedDealerId] = useState(selectedScooter?.dealerId ?? data.dealers[0]?.id ?? '');
@@ -1770,11 +1771,11 @@ function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppDat
           ) : data.warranties.map((claim) => (
             <div className="claim-row" key={claim.id}>
               {warrantyStatusIcon(claim.status)}
-              <div>
+              <button type="button" className="claim-row-main" onClick={() => setSelectedClaim(claim)}>
                 <strong>{claim.claimNumber || claim.id} - {claim.partName}</strong>
                 <span>{claim.scooterFrame} - {claim.licensePlate || 'geen kenteken'} - {claim.partNumber}</span>
                 <small>{claim.mileage || '0'} km - ouderdom {claim.age || '-'}</small>
-              </div>
+              </button>
               <label className="compact-select-label">
                 Status
                 <select value={claim.status} onChange={(event) => updateWarranty({ ...claim, status: event.target.value as WarrantyPart['status'] })}>
@@ -1812,7 +1813,45 @@ function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppDat
           <button className="primary-button">Toevoegen</button>
         </form>
       </div>
+      {selectedClaim && (
+        <WarrantyDetailModal
+          claim={selectedClaim}
+          scooter={data.scooters.find((scooter) => scooter.frameNumber === selectedClaim.scooterFrame)}
+          dealer={data.dealers.find((dealer) => dealer.id === selectedClaim.dealerId)}
+          onClose={() => setSelectedClaim(null)}
+        />
+      )}
     </>
+  );
+}
+
+function WarrantyDetailModal({ claim, scooter, dealer, onClose }: { claim: WarrantyPart; scooter?: Scooter; dealer?: Dealer; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <section className="modal-card warranty-detail-modal" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <span>Warranty claim</span>
+            <h2>{claim.claimNumber || claim.id}</h2>
+          </div>
+          <button type="button" onClick={onClose}>Close</button>
+        </div>
+        <dl className="dealer-detail-list">
+          <dt>Status</dt><dd>{claim.status}</dd>
+          <dt>Onderdeel</dt><dd>{claim.partName}</dd>
+          <dt>Part nummer</dt><dd>{claim.partNumber || '-'}</dd>
+          <dt>Kenteken</dt><dd>{claim.licensePlate || scooter?.licensePlate || '-'}</dd>
+          <dt>Framenummer</dt><dd>{claim.scooterFrame}</dd>
+          <dt>Scooter</dt><dd>{scooter ? `${scooter.model} - ${scooter.color} - ${scooter.speed}` : '-'}</dd>
+          <dt>Dealer</dt><dd>{dealer?.company || '-'}</dd>
+          <dt>Kilometerstand</dt><dd>{claim.mileage || '-'}</dd>
+          <dt>Ouderdom</dt><dd>{claim.age || '-'}</dd>
+          <dt>Claimdatum</dt><dd>{formatDate(claim.claimDate)}</dd>
+          <dt>Garantie tot</dt><dd>{formatDate(claim.warrantyUntil)}</dd>
+          <dt>Notities</dt><dd>{claim.notes || '-'}</dd>
+        </dl>
+      </section>
+    </div>
   );
 }
 

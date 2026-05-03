@@ -1432,13 +1432,24 @@ dd {
   justify-content: flex-start;
 }
 
-.claim-row div {
+.claim-row-main {
   display: grid;
   flex: 1;
   gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.claim-row span:not(.status-pill),
+.claim-row-main:hover strong {
+  color: #0075ff;
+}
+
+.claim-row-main span,
 .claim-row small {
   color: #65717d;
 }
