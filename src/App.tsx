@@ -885,30 +885,42 @@ function Containers({ data }: { data: AppData }) {
           <span>{data.containers.length} containers geregistreerd</span>
         </div>
         <div className="header-actions">
-          <button className="secondary-button"><Upload size={16} /> Importeren</button>
           <button className="primary-button"><Plus size={16} /> Container</button>
         </div>
       </div>
-      <div className="container-summary-grid">
-        <section className="panel container-summary-card">
-          <span>Totaal containers</span>
-          <strong>{data.containers.length}</strong>
-          <small>{containerScooters.length} scooters gekoppeld</small>
-        </section>
-        <section className="panel container-summary-card">
-          <span>Nog niet aangekomen</span>
-          <strong>{pending.length}</strong>
-          <small>{inTransit.length} onderweg, {origin.length} herkomstland</small>
-        </section>
-        <section className="panel container-summary-card">
-          <span>Aangekomen</span>
-          <strong>{arrived.length}</strong>
-          <small>Meest recent bovenaan</small>
-        </section>
-      </div>
-      <div className="container-status-grid">
-        <ListPanel title="Containers nog niet aangekomen" items={pending.map((c) => `${c.number} - ${c.invoiceNumber}`)} />
-        <ListPanel title="Meest recent aangekomen containers" items={arrived.map((c) => `${c.number} - ${c.invoiceNumber}`)} green />
+      <section className="panel container-command-panel">
+        <div>
+          <span>Container import</span>
+          <strong>Nieuwe zending toevoegen</strong>
+          <small>Importeer containerregels of voeg handmatig een container toe om scooters per zending te volgen.</small>
+        </div>
+        <div className="container-command-actions">
+          <button className="secondary-button"><Upload size={16} /> Container importeren</button>
+          <button className="primary-button"><Plus size={16} /> Container toevoegen</button>
+        </div>
+      </section>
+      <div className="container-overview-grid">
+        <div className="container-summary-grid">
+          <section className="panel container-summary-card">
+            <span>Totaal</span>
+            <strong>{data.containers.length}</strong>
+            <small>{containerScooters.length} scooters gekoppeld</small>
+          </section>
+          <section className="panel container-summary-card">
+            <span>Nog onderweg</span>
+            <strong>{pending.length}</strong>
+            <small>{inTransit.length} onderweg, {origin.length} herkomstland</small>
+          </section>
+          <section className="panel container-summary-card">
+            <span>Aangekomen</span>
+            <strong>{arrived.length}</strong>
+            <small>Meest recent bovenaan</small>
+          </section>
+        </div>
+        <div className="container-status-grid">
+          <ListPanel title="Containers nog niet aangekomen" items={pending.map((c) => `${c.number} - ${c.invoiceNumber}`)} />
+          <ListPanel title="Meest recent aangekomen containers" items={arrived.map((c) => `${c.number} - ${c.invoiceNumber}`)} green />
+        </div>
       </div>
       <div className="section-heading">
         <div>

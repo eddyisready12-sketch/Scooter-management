@@ -550,17 +550,53 @@ tbody tr:hover {
   gap: 14px;
 }
 
+.container-command-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+  margin-bottom: 14px;
+}
+
+.container-command-panel > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.container-command-panel span,
+.container-command-panel small {
+  color: #65717d;
+}
+
+.container-command-panel strong {
+  font-size: 18px;
+}
+
+.container-command-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.container-overview-grid {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
 .container-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
-  margin-bottom: 14px;
 }
 
 .container-summary-card {
   display: grid;
   gap: 4px;
   padding: 16px;
+  border-left: 4px solid #0075ff;
 }
 
 .container-summary-card span,
@@ -578,7 +614,6 @@ tbody tr:hover {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-  margin-bottom: 28px;
 }
 
 .section-heading {
@@ -1376,6 +1411,7 @@ dd {
   .container-grid,
   .container-summary-grid,
   .container-status-grid,
+  .container-overview-grid,
   .drawer-grid,
   .search-grid {
     grid-template-columns: 1fr;
@@ -1468,6 +1504,15 @@ dd {
   .container-empty-state {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .container-command-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .container-command-actions {
+    justify-content: stretch;
   }
 
   .dealer-table-header,
