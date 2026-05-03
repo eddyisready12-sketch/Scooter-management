@@ -1274,6 +1274,108 @@ tbody tr:hover {
 
 .container-card {
   padding-bottom: 16px;
+  overflow: hidden;
+}
+
+.container-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 14px;
+  border: 1px solid #dce1e6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.container-card-metric {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+  background: #fff;
+  border-right: 1px solid #dce1e6;
+}
+
+.container-card-metric:last-child {
+  border-right: 0;
+}
+
+.container-card-metric span {
+  color: #65717d;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.container-card-metric strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.container-card-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+.container-card-status-column {
+  min-width: 0;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #dce1e6;
+  border-radius: 6px;
+}
+
+.container-card-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f6f8fa;
+  border-bottom: 1px solid #dce1e6;
+  font-weight: 800;
+}
+
+.container-card-status-header strong {
+  min-width: 28px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e8eef5;
+  text-align: center;
+}
+
+.container-card-scooter-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.container-card-scooter-row {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #dce1e6;
+}
+
+.container-card-scooter-row:last-child {
+  border-bottom: 0;
+}
+
+.container-card-scooter-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.container-card-scooter-row span,
+.container-card-scooter-row small {
+  color: #65717d;
+  line-height: 1.35;
+}
+
+.container-card-empty {
+  margin: 0;
+  padding: 14px 12px;
+  color: #65717d;
 }
 
 dl {
@@ -1613,6 +1715,19 @@ dd {
 
   .import-controls select {
     width: 100%;
+  }
+
+  .container-card-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .container-card-metric {
+    border-right: 0;
+    border-bottom: 1px solid #dce1e6;
+  }
+
+  .container-card-metric:last-child {
+    border-bottom: 0;
   }
 
   .topbar {

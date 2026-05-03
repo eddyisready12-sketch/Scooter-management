@@ -1097,23 +1097,56 @@ function Containers({ data, message, onImport }: { data: AppData; message: strin
 }
 
 function ContainerCard({ container, scooters, dealers }: { container: Container; scooters: Scooter[]; dealers: Dealer[] }) {
+  const baseStatuses = ['Beschikbaar', 'In consignatie', 'Verkocht dealer', 'Verkocht klant', 'Nog onderweg', 'Af te leveren', 'In optie'] as ScooterStatus[];
+  const statuses = baseStatuses.filter((status) => scooters.some((scooter) => scooter.status === status));
+
   return (
     <section className="panel container-card">
       <div className="panel-title"><Boxes size={16} /> {container.number}</div>
-      <dl>
-        <dt>Invoice number</dt><dd>{container.invoiceNumber}</dd>
-        <dt>Seal number</dt><dd>{container.sealNumber}</dd>
-        <dt>Status</dt><dd className="green-text">{container.status}</dd>
-        <dt>Arrived</dt><dd>{formatDate(container.arrivedAt)}</dd>
-        <dt>Total scooters</dt><dd>{scooters.length}</dd>
-      </dl>
-      <div className="lane-columns">
-        {(['Beschikbaar', 'In consignatie', 'Verkocht klant'] as ScooterStatus[]).map((status) => (
-          <div key={status}>
-            <strong>{status}</strong>
-            {scooters.filter((s) => s.status === status).slice(0, 4).map((s) => <p key={s.id}>{s.frameNumber} {s.model}<span>{dealerName(dealers, s.dealerId)}</span></p>)}
-          </div>
-        ))}
+      <div className="container-card-metrics">
+        <div className="container-card-metric">
+          <span>Invoice</span>
+          <strong>{container.invoiceNumber || '-'}</strong>
+        </div>
+        <div className="container-card-metric">
+          <span>Seal</span>
+          <strong>{container.sealNumber || '-'}</strong>
+        </div>
+        <div className="container-card-metric">
+          <span>Status</span>
+          <strong className="green-text">{container.status || '-'}</strong>
+        </div>
+        <div className="container-card-metric">
+          <span>Arrived</span>
+          <strong>{formatDate(container.arrivedAt)}</strong>
+        </div>
+        <div className="container-card-metric">
+          <span>Scooters</span>
+          <strong>{scooters.length}</strong>
+        </div>
+      </div>
+      <div className="container-card-status-grid">
+        {(statuses.length ? statuses : ['Beschikbaar']).map((status) => {
+          const statusScooters = scooters.filter((scooter) => scooter.status === status);
+
+          return (
+            <section className="container-card-status-column" key={status}>
+              <div className="container-card-status-header">
+                <span>{status}</span>
+                <strong>{statusScooters.length}</strong>
+              </div>
+              <div className="container-card-scooter-list">
+                {statusScooters.length ? statusScooters.map((scooter) => (
+                  <div className="container-card-scooter-row" key={scooter.id}>
+                    <strong>{scooter.frameNumber}</strong>
+                    <span>{scooter.model || '-'} - {scooter.color || '-'} - {scooter.speed || '-'}</span>
+                    <small>{dealerName(dealers, scooter.dealerId) || '-'}</small>
+                  </div>
+                )) : <p className="container-card-empty">Geen scooters</p>}
+              </div>
+            </section>
+          );
+        })}
       </div>
     </section>
   );
