@@ -1177,6 +1177,13 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
   const [dealerFilter, setDealerFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
   const [selectedBucket, setSelectedBucket] = useState<{ year: string; model: string } | null>(null);
+  const soldScootersForYear = scooters.filter((scooter) =>
+    scooter.status === 'Verkocht klant' &&
+    (yearFilter === 'all' || salesYearForScooter(scooter) === yearFilter),
+  );
+  const availableDealers = dealers
+    .filter((dealer) => soldScootersForYear.some((scooter) => scooter.dealerId === dealer.id))
+    .sort((a, b) => (a.company || a.name).localeCompare(b.company || b.name, 'nl', { sensitivity: 'base' }));
   const soldScooters = scooters.filter((scooter) =>
     scooter.status === 'Verkocht klant' &&
     (dealerFilter === 'all' || scooter.dealerId === dealerFilter) &&
@@ -1211,6 +1218,12 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
       .sort((a, b) => (a.firstRegistrationDate || '').localeCompare(b.firstRegistrationDate || '') || a.frameNumber.localeCompare(b.frameNumber))
     : [];
 
+  useEffect(() => {
+    if (dealerFilter !== 'all' && !availableDealers.some((dealer) => dealer.id === dealerFilter)) {
+      setDealerFilter('all');
+    }
+  }, [availableDealers, dealerFilter]);
+
   return (
     <section className="panel sales-dashboard">
       <div className="panel-title">
@@ -1226,7 +1239,7 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
           Dealer
           <select value={dealerFilter} onChange={(event) => setDealerFilter(event.target.value)}>
             <option value="all">Alle dealers</option>
-            {dealers.map((dealer) => <option key={dealer.id} value={dealer.id}>{dealer.company || dealer.name}</option>)}
+            {availableDealers.map((dealer) => <option key={dealer.id} value={dealer.id}>{dealer.company || dealer.name}</option>)}
           </select>
         </label>
       </div>
