@@ -1874,20 +1874,36 @@ function ContainerListPanel({ title, containers, scooters, green = false }: { ti
         return (
           <div className="container-list-item" key={container.id}>
             <button className={green ? 'green-row container-toggle-row' : 'simple-row container-toggle-row'} onClick={() => setOpenContainerId(isOpen ? null : container.id)}>
-              <span>{container.number} - {container.invoiceNumber}</span>
+              <span>
+                <strong>{container.number}</strong>
+                <small>{container.invoiceNumber} - {formatDate(container.arrivedAt || container.eta)}</small>
+              </span>
               <span className="container-row-meta">{containerScooters.length} scooters {isOpen ? '-' : '+'}</span>
             </button>
             {isOpen && (
               <div className="container-scooter-list">
                 {containerScooters.length === 0 ? (
                   <p className="empty">Geen scooters gekoppeld.</p>
-                ) : containerScooters.map((scooter) => (
-                  <div className="container-scooter-line" key={scooter.id}>
-                    <strong>{scooter.frameNumber}</strong>
-                    <span>{scooter.model} - {scooter.color || '-'} - {scooter.speed || '-'}</span>
-                    <small>{scooter.status}</small>
-                  </div>
-                ))}
+                ) : (
+                  <>
+                    <div className="container-scooter-header">
+                      <span>Frame</span>
+                      <span>Model</span>
+                      <span>Kleur</span>
+                      <span>Snelheid</span>
+                      <span>Status</span>
+                    </div>
+                    {containerScooters.map((scooter) => (
+                      <div className="container-scooter-line" key={scooter.id}>
+                        <strong>{scooter.frameNumber}</strong>
+                        <span>{scooter.model || '-'}</span>
+                        <span>{scooter.color || '-'}</span>
+                        <span>{scooter.speed || '-'}</span>
+                        <small className="status-pill compact">{scooter.status}</small>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>

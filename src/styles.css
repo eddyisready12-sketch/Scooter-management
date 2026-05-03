@@ -898,8 +898,19 @@ tbody tr:hover {
 
 .container-toggle-row {
   width: calc(100% - 28px);
-  min-height: 42px;
+  min-height: 50px;
   text-align: left;
+}
+
+.container-toggle-row > span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.container-toggle-row small {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.82;
 }
 
 .container-row-meta {
@@ -916,11 +927,25 @@ tbody tr:hover {
   background: #fff;
 }
 
+.container-scooter-header,
 .container-scooter-line {
   display: grid;
-  grid-template-columns: minmax(160px, 1.1fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(170px, 1.2fr) minmax(95px, 0.7fr) minmax(120px, 0.9fr) minmax(80px, 0.5fr) minmax(120px, 0.7fr);
   gap: 10px;
   align-items: center;
+}
+
+.container-scooter-header {
+  border-bottom: 1px solid #dce1e6;
+  background: #f6f8fa;
+  color: #65717d;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 9px 12px;
+  text-transform: uppercase;
+}
+
+.container-scooter-line {
   padding: 10px 12px;
   border-bottom: 1px solid #dce1e6;
 }
@@ -932,6 +957,13 @@ tbody tr:hover {
 .container-scooter-line span,
 .container-scooter-line small {
   color: #65717d;
+}
+
+.status-pill.compact {
+  justify-self: start;
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
 }
 
 .record-row {
