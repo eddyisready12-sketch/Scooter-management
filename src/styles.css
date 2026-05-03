@@ -896,6 +896,44 @@ tbody tr:hover {
   font-weight: 700;
 }
 
+.container-toggle-row {
+  width: calc(100% - 28px);
+  min-height: 42px;
+  text-align: left;
+}
+
+.container-row-meta {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.88;
+}
+
+.container-scooter-list {
+  margin: 0 14px 12px;
+  border: 1px solid #dce1e6;
+  border-top: 0;
+  border-radius: 0 0 4px 4px;
+  background: #fff;
+}
+
+.container-scooter-line {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.1fr) minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #dce1e6;
+}
+
+.container-scooter-line:last-child {
+  border-bottom: 0;
+}
+
+.container-scooter-line span,
+.container-scooter-line small {
+  color: #65717d;
+}
+
 .record-row {
   width: calc(100% - 28px);
   border-left: 0;

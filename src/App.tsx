@@ -1025,8 +1025,8 @@ function Containers({ data, message, onImport }: { data: AppData; message: strin
           </section>
         </div>
         <div className="container-status-grid">
-          <ListPanel title="Containers nog niet aangekomen" items={pending.map((c) => `${c.number} - ${c.invoiceNumber}`)} />
-          <ListPanel title="Meest recent aangekomen containers" items={arrived.map((c) => `${c.number} - ${c.invoiceNumber}`)} green />
+          <ContainerListPanel title="Containers nog niet aangekomen" containers={pending} scooters={data.scooters} />
+          <ContainerListPanel title="Meest recent aangekomen containers" containers={arrived} scooters={data.scooters} green />
         </div>
       </div>
       <div className="section-heading">
@@ -1859,6 +1859,40 @@ function ListPanel({ title, items, green = false }: { title: string; items: stri
     <section className="panel list-panel">
       <div className="panel-title"><UsersRound size={16} /> {title}</div>
       {items.length === 0 ? <p className="empty">N.V.T.</p> : items.map((item) => <div className={green ? 'green-row' : 'simple-row'} key={item}>{item}<Plus size={14} /></div>)}
+    </section>
+  );
+}
+
+function ContainerListPanel({ title, containers, scooters, green = false }: { title: string; containers: Container[]; scooters: Scooter[]; green?: boolean }) {
+  const [openContainerId, setOpenContainerId] = useState<string | null>(containers[0]?.id ?? null);
+  return (
+    <section className="panel list-panel">
+      <div className="panel-title"><Boxes size={16} /> {title}</div>
+      {containers.length === 0 ? <p className="empty">N.V.T.</p> : containers.map((container) => {
+        const containerScooters = scooters.filter((scooter) => scooter.containerId === container.id);
+        const isOpen = openContainerId === container.id;
+        return (
+          <div className="container-list-item" key={container.id}>
+            <button className={green ? 'green-row container-toggle-row' : 'simple-row container-toggle-row'} onClick={() => setOpenContainerId(isOpen ? null : container.id)}>
+              <span>{container.number} - {container.invoiceNumber}</span>
+              <span className="container-row-meta">{containerScooters.length} scooters {isOpen ? '-' : '+'}</span>
+            </button>
+            {isOpen && (
+              <div className="container-scooter-list">
+                {containerScooters.length === 0 ? (
+                  <p className="empty">Geen scooters gekoppeld.</p>
+                ) : containerScooters.map((scooter) => (
+                  <div className="container-scooter-line" key={scooter.id}>
+                    <strong>{scooter.frameNumber}</strong>
+                    <span>{scooter.model} - {scooter.color || '-'} - {scooter.speed || '-'}</span>
+                    <small>{scooter.status}</small>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </section>
   );
 }
