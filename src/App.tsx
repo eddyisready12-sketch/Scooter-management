@@ -466,10 +466,13 @@ export function App() {
     event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
+    const importMode = String(form.get('importMode') ?? 'create');
     const invoiceNumber = String(form.get('invoiceNumber') ?? '').trim();
     const number = String(form.get('containerNumber') ?? '').trim();
     const sealNumber = String(form.get('sealNumber') ?? '').trim();
     const eta = String(form.get('eta') ?? '').trim();
+    const arrivedAtInput = String(form.get('arrivedAt') ?? '').trim();
+    const arrivedAt = arrivedAtInput ? new Date(arrivedAtInput).toISOString() : '';
     const content = String(form.get('content') ?? '').trim();
     if (!invoiceNumber || !number || !sealNumber || !content) {
       setCsvMessage('Container import mislukt: vul invoice, container, seal en container content in.');
@@ -480,8 +483,9 @@ export function App() {
       number,
       invoiceNumber,
       sealNumber,
-      status: eta ? 'Onderweg' : 'In land van herkomst',
+      status: arrivedAt ? 'Aangekomen' : eta ? 'Onderweg' : 'In land van herkomst',
       eta,
+      ...(arrivedAt ? { arrivedAt } : {}),
     };
     const scooters = parseContainerScooterRows(content, container.id);
     if (scooters.length === 0) {
@@ -491,15 +495,43 @@ export function App() {
 
     try {
       await upsertContainers([container]);
-      await upsertScooters(scooters);
-      setData((current) => {
-        const containers = new Map(current.containers.map((item) => [item.id, item]));
-        containers.set(container.id, container);
-        const scooterMap = new Map(current.scooters.map((item) => [item.id, item]));
-        scooters.forEach((scooter) => scooterMap.set(scooter.id, scooter));
-        return { ...current, containers: [...containers.values()], scooters: [...scooterMap.values()] };
-      });
-      setCsvMessage(`${scooters.length} scooters geimporteerd in container ${container.number}.`);
+      if (importMode === 'update-existing') {
+        const existingByFrame = new Map(data.scooters.map((scooter) => [normalizeLookup(scooter.frameNumber), scooter]));
+        const updates: Scooter[] = scooters
+          .flatMap((imported) => {
+            const existing = existingByFrame.get(normalizeLookup(imported.frameNumber));
+            if (!existing) return [];
+            const update: Scooter = {
+              ...existing,
+              engineNumber: existing.engineNumber?.trim() ? existing.engineNumber : imported.engineNumber,
+              containerId: existing.containerId || container.id,
+              arrivedAt: existing.arrivedAt || container.arrivedAt,
+              model: existing.model || imported.model,
+              color: existing.color || imported.color,
+              speed: existing.speed || imported.speed,
+            };
+            return [update];
+          });
+        const missing = scooters.length - updates.length;
+        if (updates.length > 0) await upsertScooters(updates);
+        setData((current) => {
+          const containers = new Map(current.containers.map((item) => [item.id, item]));
+          containers.set(container.id, container);
+          const updatesById = new Map(updates.map((scooter) => [scooter.id, scooter]));
+          return { ...current, containers: [...containers.values()], scooters: current.scooters.map((scooter) => updatesById.get(scooter.id) ?? scooter) };
+        });
+        setCsvMessage(`${updates.length} bestaande scooters bijgewerkt voor container ${container.number}.${missing ? ` ${missing} framenummers niet gevonden.` : ''}`);
+      } else {
+        await upsertScooters(scooters);
+        setData((current) => {
+          const containers = new Map(current.containers.map((item) => [item.id, item]));
+          containers.set(container.id, container);
+          const scooterMap = new Map(current.scooters.map((item) => [item.id, item]));
+          scooters.forEach((scooter) => scooterMap.set(scooter.id, scooter));
+          return { ...current, containers: [...containers.values()], scooters: [...scooterMap.values()] };
+        });
+        setCsvMessage(`${scooters.length} scooters geimporteerd in container ${container.number}.`);
+      }
       formElement.reset();
     } catch (error) {
       setCsvMessage(`Container import mislukt: ${importErrorMessage(error)}`);
@@ -1036,12 +1068,19 @@ function Containers({ data, message, onImport }: { data: AppData; message: strin
             </div>
             <div className="container-import-form">
               <div className="form-grid">
+                <label>Import modus
+                  <select name="importMode" defaultValue="update-existing">
+                    <option value="update-existing">Bestaande scooters bijwerken</option>
+                    <option value="create">Nieuwe scooters importeren</option>
+                  </select>
+                </label>
                 <label>Type<select name="type" defaultValue="Scooters"><option>Scooters</option></select></label>
                 <label>Merk<select name="brand" defaultValue="RSO"><option>RSO</option></select></label>
                 <label>Invoice number<input name="invoiceNumber" placeholder="2017WL7864" required /></label>
                 <label>Container number<input name="containerNumber" placeholder="EISU8034307" required /></label>
                 <label>Seal number<input name="sealNumber" placeholder="EMCLX55227" required /></label>
                 <label>Verwachte leverdatum<input name="eta" type="date" /></label>
+                <label>Aankomstdatum<input name="arrivedAt" type="datetime-local" /></label>
               </div>
               <label className="container-content-field">
                 Container content
