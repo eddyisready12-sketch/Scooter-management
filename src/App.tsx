@@ -162,10 +162,18 @@ function nextWarrantyClaimNumber(warranties: WarrantyPart[]) {
 }
 
 function salesYearForScooter(scooter: Scooter) {
-  const date = scooter.soldAt || scooter.firstRegistrationDate || scooter.lastRegistrationDate || scooter.deliveredAt || scooter.arrivedAt;
-  if (!date) return 'Onbekend';
-  const parsed = new Date(date);
+  if (!scooter.firstRegistrationDate) return 'Onbekend';
+  const parsed = new Date(scooter.firstRegistrationDate);
   return Number.isNaN(parsed.getTime()) ? 'Onbekend' : String(parsed.getFullYear());
+}
+
+function normalizeSalesModel(model?: string) {
+  const value = (model || 'Onbekend').trim();
+  const normalized = value.toUpperCase().replace(/\s+/g, ' ');
+  if (normalized === 'S9') return 'SPEEDY';
+  if (normalized.includes('TY50QT-5E') || normalized.includes('TY50QT-5D') || normalized.includes('TY50QT-K') || normalized === 'SENSE') return 'SENSE';
+  if (normalized.includes('TY2000DQT-28C') || normalized === 'E-S5') return 'E-S5';
+  return value;
 }
 
 function warrantyStatusIcon(status: WarrantyPart['status']) {
@@ -971,15 +979,26 @@ function SalesPage({ scooters, dealers }: { scooters: Scooter[]; dealers: Dealer
 
 function SalesDashboard({ scooters, dealers }: { scooters: Scooter[]; dealers: Dealer[] }) {
   const [dealerFilter, setDealerFilter] = useState('all');
+  const [yearFilter, setYearFilter] = useState('all');
   const soldScooters = scooters.filter((scooter) =>
-    (scooter.status === 'Verkocht klant' || scooter.status === 'Verkocht dealer') &&
-    (dealerFilter === 'all' || scooter.dealerId === dealerFilter),
+    scooter.status === 'Verkocht klant' &&
+    (dealerFilter === 'all' || scooter.dealerId === dealerFilter) &&
+    (yearFilter === 'all' || salesYearForScooter(scooter) === yearFilter),
   );
+  const yearOptions = Array.from(new Set(scooters
+    .filter((scooter) => scooter.status === 'Verkocht klant')
+    .map(salesYearForScooter)))
+    .sort((a, b) => {
+      if (a === 'Onbekend') return 1;
+      if (b === 'Onbekend') return -1;
+      return b.localeCompare(a);
+    });
   const rows = Array.from(soldScooters.reduce((map, scooter) => {
-    const key = `${salesYearForScooter(scooter)}|${scooter.model || 'Onbekend'}`;
+    const model = normalizeSalesModel(scooter.model);
+    const key = `${salesYearForScooter(scooter)}|${model}`;
     const current = map.get(key) ?? {
       year: salesYearForScooter(scooter),
-      model: scooter.model || 'Onbekend',
+      model,
       count: 0,
     };
     map.set(key, { ...current, count: current.count + 1 });
@@ -995,6 +1014,13 @@ function SalesDashboard({ scooters, dealers }: { scooters: Scooter[]; dealers: D
       <div className="panel-title">
         <span className="panel-title-label"><CircleDollarSign size={16} /> Verkoop dashboard</span>
         <label className="panel-title-filter">
+          Jaar
+          <select value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
+            <option value="all">Alle jaren</option>
+            {yearOptions.map((year) => <option key={year} value={year}>{year}</option>)}
+          </select>
+        </label>
+        <label className="panel-title-filter">
           Dealer
           <select value={dealerFilter} onChange={(event) => setDealerFilter(event.target.value)}>
             <option value="all">Alle dealers</option>
@@ -1004,8 +1030,8 @@ function SalesDashboard({ scooters, dealers }: { scooters: Scooter[]; dealers: D
       </div>
       <div className="sales-summary">
         <div><span>Verkocht totaal</span><strong>{soldScooters.length}</strong></div>
-        <div><span>Modellen</span><strong>{new Set(soldScooters.map((scooter) => scooter.model)).size}</strong></div>
-        <div><span>Dealerfilter</span><strong>{dealerFilter === 'all' ? 'Alle' : dealerName(dealers, dealerFilter)}</strong></div>
+        <div><span>Modellen</span><strong>{new Set(soldScooters.map((scooter) => normalizeSalesModel(scooter.model))).size}</strong></div>
+        <div><span>Filters</span><strong>{yearFilter === 'all' ? 'Alle jaren' : yearFilter} / {dealerFilter === 'all' ? 'Alle dealers' : dealerName(dealers, dealerFilter)}</strong></div>
       </div>
       <div className="table-wrap sales-table-wrap">
         <table className="sales-table">
