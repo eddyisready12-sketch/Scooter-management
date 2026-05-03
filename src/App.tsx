@@ -66,6 +66,8 @@ const maintenancePackages = {
   },
 } as const;
 
+const warrantyStatuses: WarrantyPart['status'][] = ['Open', 'In behandeling', 'Goedgekeurd', 'Afgewezen', 'Vervangen'];
+
 function countByStatus(scooters: Scooter[], status: ScooterStatus) {
   return scooters.filter((scooter) => scooter.status === status).length;
 }
@@ -142,6 +144,18 @@ function isPastInputDate(value?: string) {
   if (!value) return false;
   const end = new Date(`${value}T23:59:59`);
   return !Number.isNaN(end.getTime()) && end < new Date();
+}
+
+function nextWarrantyClaimNumber(warranties: WarrantyPart[]) {
+  const currentYear = new Date().getFullYear();
+  const prefix = `W-${currentYear}-`;
+  const next = warranties.reduce((highest, warranty) => {
+    const number = warranty.claimNumber?.startsWith(prefix)
+      ? Number(warranty.claimNumber.slice(prefix.length))
+      : 0;
+    return Number.isFinite(number) ? Math.max(highest, number) : highest;
+  }, 0) + 1;
+  return `${prefix}${String(next).padStart(4, '0')}`;
 }
 
 function importErrorMessage(error: unknown) {
@@ -598,6 +612,7 @@ export function App() {
     const warrantyUntil = String(form.get('warrantyUntil') ?? '') || addMonthsToInputDate(registrationDate);
     const record: WarrantyPart = {
       id: `w-${Date.now()}`,
+      claimNumber: nextWarrantyClaimNumber(data.warranties),
       scooterFrame: scooter?.frameNumber || submittedFrame,
       licensePlate: submittedPlate || scooter?.licensePlate || '',
       partName: String(form.get('partName')),
@@ -606,7 +621,7 @@ export function App() {
       age: String(form.get('age')) || formatVehicleAge(registrationDate),
       claimDate: String(form.get('claimDate')),
       warrantyUntil,
-      status: 'Open',
+      status: String(form.get('status') ?? 'Open') as WarrantyPart['status'],
       dealerId: String(form.get('dealerId')) || scooter?.dealerId,
       notes: String(form.get('notes')),
     };
@@ -617,6 +632,19 @@ export function App() {
       formElement.reset();
     } catch (error) {
       setWarrantyMessage(`Garantie opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
+  async function updateWarranty(warranty: WarrantyPart) {
+    try {
+      await upsertWarrantyParts([warranty]);
+      setData((current) => ({
+        ...current,
+        warranties: current.warranties.map((item) => (item.id === warranty.id ? warranty : item)),
+      }));
+      setWarrantyMessage(`Garantieclaim ${warranty.claimNumber || warranty.id} is bijgewerkt.`);
+    } catch (error) {
+      setWarrantyMessage(`Garantieclaim bijwerken mislukt: ${importErrorMessage(error)}`);
     }
   }
 
@@ -784,7 +812,7 @@ export function App() {
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
-          {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} message={warrantyMessage} />}
+          {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
           {view === 'search' && <GlobalSearch data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
         </section>
@@ -1691,7 +1719,7 @@ function DealerDetailModal({ dealer, scooters, onClose, onUpdate }: { dealer: De
   );
 }
 
-function Warranty({ data, addWarranty, message }: { data: AppData; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<void>; message: string }) {
+function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppData; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<void>; updateWarranty: (warranty: WarrantyPart) => Promise<void>; message: string }) {
   const [selectedFrame, setSelectedFrame] = useState(data.scooters[0]?.frameNumber ?? '');
   const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame) ?? data.scooters[0];
   const [licensePlate, setLicensePlate] = useState(selectedScooter?.licensePlate ?? '');
@@ -1733,11 +1761,16 @@ function Warranty({ data, addWarranty, message }: { data: AppData; addWarranty: 
           ) : data.warranties.map((claim) => (
             <div className="claim-row" key={claim.id}>
               <div>
-                <strong>{claim.partName}</strong>
+                <strong>{claim.claimNumber || claim.id} - {claim.partName}</strong>
                 <span>{claim.scooterFrame} - {claim.licensePlate || 'geen kenteken'} - {claim.partNumber}</span>
                 <small>{claim.mileage || '0'} km - ouderdom {claim.age || '-'}</small>
               </div>
-              <span className="status-pill">{claim.status}</span>
+              <label className="compact-select-label">
+                Status
+                <select value={claim.status} onChange={(event) => updateWarranty({ ...claim, status: event.target.value as WarrantyPart['status'] })}>
+                  {warrantyStatuses.map((status) => <option key={status}>{status}</option>)}
+                </select>
+              </label>
               <small>Warranty until {formatDate(claim.warrantyUntil)}</small>
             </div>
           ))}
@@ -1753,6 +1786,7 @@ function Warranty({ data, addWarranty, message }: { data: AppData; addWarranty: 
             <label>Part name<input name="partName" required /></label>
             <label>Part number<input name="partNumber" required /></label>
             <label>Claim date<input name="claimDate" type="date" required /></label>
+            <label>Status<select name="status" defaultValue="Open">{warrantyStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
             <label>Garantie tot<input name="warrantyUntil" type="date" value={warrantyUntil} readOnly required /></label>
             <label className="wide-field">Notes<textarea name="notes" /></label>
           </div>

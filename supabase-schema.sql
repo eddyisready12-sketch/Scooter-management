@@ -73,6 +73,7 @@ create table if not exists battery_models (
 
 create table if not exists warranty_parts (
   id text primary key,
+  "claimNumber" text,
   "scooterFrame" text references scooters("frameNumber"),
   "licensePlate" text,
   "partName" text not null,
@@ -87,6 +88,7 @@ create table if not exists warranty_parts (
 );
 
 alter table warranty_parts add column if not exists age text;
+alter table warranty_parts add column if not exists "claimNumber" text;
 alter table warranty_parts add column if not exists "licensePlate" text;
 alter table warranty_parts add column if not exists mileage text;
 alter table warranty_parts add column if not exists "partNumber" text;

@@ -84,6 +84,7 @@ export type BatteryModel = {
 
 export type WarrantyPart = {
   id: string;
+  claimNumber?: string;
   scooterFrame: string;
   licensePlate?: string;
   partName: string;
