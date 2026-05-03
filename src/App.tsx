@@ -183,6 +183,12 @@ function normalizeLookup(value: string) {
   return value.replace(/[^a-z0-9]/gi, '').toUpperCase();
 }
 
+function containerSortTime(container: Container) {
+  const date = container.arrivedAt || container.eta;
+  const time = date ? new Date(date).getTime() : 0;
+  return Number.isNaN(time) ? 0 : time;
+}
+
 function parseContainerScooterRows(content: string, containerId: string): Scooter[] {
   return content
     .split(/\r?\n/)
@@ -1080,8 +1086,9 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
 
 function Containers({ data, message, onImport }: { data: AppData; message: string; onImport: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   const [showImport, setShowImport] = useState(false);
-  const pending = data.containers.filter((container) => container.status !== 'Aangekomen');
-  const arrived = data.containers.filter((container) => container.status === 'Aangekomen');
+  const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
+  const pending = sortedContainers.filter((container) => container.status !== 'Aangekomen');
+  const arrived = sortedContainers.filter((container) => container.status === 'Aangekomen');
   const inTransit = data.containers.filter((container) => container.status === 'Onderweg');
   const origin = data.containers.filter((container) => container.status === 'In land van herkomst');
   const containerScooters = data.scooters.filter((scooter) => scooter.containerId);
@@ -1144,7 +1151,7 @@ function Containers({ data, message, onImport }: { data: AppData; message: strin
         </section>
       ) : (
         <div className="container-grid">
-          {data.containers.map((container) => <ContainerCard key={container.id} container={container} scooters={data.scooters.filter((s) => s.containerId === container.id)} dealers={data.dealers} />)}
+          {sortedContainers.map((container) => <ContainerCard key={container.id} container={container} scooters={data.scooters.filter((s) => s.containerId === container.id)} dealers={data.dealers} />)}
         </div>
       )}
       {showImport && (
