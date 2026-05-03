@@ -139,6 +139,7 @@ export type CsvScooterRow = {
   status?: ScooterStatus;
   dealer?: string;
   container?: string;
+  containerId?: string;
   arrivedAt?: string;
   licensePlate?: string;
   batteryNumber?: string;

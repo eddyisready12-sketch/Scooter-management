@@ -26,6 +26,11 @@ function stableId(prefix: string, value: string) {
   return `${prefix}-${value.replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
 }
 
+function containerIdForImport(container: string, arrivedAt?: string) {
+  const dateKey = arrivedAt ? arrivedAt.slice(0, 10) : '';
+  return stableId('container', [container, dateKey].filter(Boolean).join('-'));
+}
+
 function parseImportDate(value: string) {
   const clean = value.trim();
   if (!clean) return '';
@@ -63,20 +68,26 @@ function normalizeStatus(value: string): ScooterStatus {
 }
 
 function normalizeRows(rows: Record<string, unknown>[]): CsvScooterRow[] {
-  return rows.map((row) => ({
-    model: pick(row, ['model', 'type', 'artikel', 'product', 'scooter model']),
-    frameNumber: pick(row, ['frameNumber', 'frame nummer', 'frame #', 'frame', 'vin', 'chassis', 'chassisnummer', 'framenr', 'vin nummer']),
-    engineNumber: pick(row, ['engineNumber', 'engine nummer', 'motor nummer', 'engine', 'motornummer', 'motornr']),
-    color: pick(row, ['kleur', 'color', 'colour', 'kleurcode']),
-    speed: pick(row, ['snelheid', 'speed', 'kmh', 'km/h']),
-    status: normalizeStatus(pick(row, ['status'])),
-    dealer: pick(row, ['dealer']),
-    container: pick(row, ['container', 'container number', 'containernummer', 'container nr']),
-    arrivedAt: parseImportDate(pick(row, ['date arrived', 'datearrived', 'aankomstdatum', 'arrived', 'arrived at'])),
-    licensePlate: pick(row, ['kenteken', 'license plate', 'nummerplaat']),
-    batteryNumber: pick(row, ['accu', 'battery', 'batteryNumber', 'accunummer', 'accu nummer']),
-    invoiceNumber: pick(row, ['factuur', 'factuur nummer', 'factuurnummer', 'invoice', 'invoice number', 'invoicenumber']),
-  })).filter((row) => row.frameNumber);
+  return rows.map((row) => {
+    const container = pick(row, ['container', 'container number', 'containernummer', 'container nr']);
+    const arrivedAt = parseImportDate(pick(row, ['date arrived', 'datearrived', 'aankomstdatum', 'arrived', 'arrived at']));
+
+    return {
+      model: pick(row, ['model', 'type', 'artikel', 'product', 'scooter model']),
+      frameNumber: pick(row, ['frameNumber', 'frame nummer', 'frame #', 'frame', 'vin', 'chassis', 'chassisnummer', 'framenr', 'vin nummer']),
+      engineNumber: pick(row, ['engineNumber', 'engine nummer', 'motor nummer', 'engine', 'motornummer', 'motornr']),
+      color: pick(row, ['kleur', 'color', 'colour', 'kleurcode']),
+      speed: pick(row, ['snelheid', 'speed', 'kmh', 'km/h']),
+      status: normalizeStatus(pick(row, ['status'])),
+      dealer: pick(row, ['dealer']),
+      container,
+      containerId: container ? containerIdForImport(container, arrivedAt) : '',
+      arrivedAt,
+      licensePlate: pick(row, ['kenteken', 'license plate', 'nummerplaat']),
+      batteryNumber: pick(row, ['accu', 'battery', 'batteryNumber', 'accunummer', 'accu nummer']),
+      invoiceNumber: pick(row, ['factuur', 'factuur nummer', 'factuurnummer', 'invoice', 'invoice number', 'invoicenumber']),
+    };
+  }).filter((row) => row.frameNumber);
 }
 
 function normalizeDealerRows(rows: Record<string, unknown>[]): Dealer[] {
@@ -219,7 +230,7 @@ export function csvRowsToScooters(rows: CsvScooterRow[], existing: Scooter[], st
       speed: row.speed || previous?.speed || '45km/h',
       status: statusOverride || row.status || previous?.status || 'Beschikbaar',
       dealerId: importedDealerId || previous?.dealerId,
-      containerId: row.container ? stableId('container', row.container) : previous?.containerId,
+      containerId: row.containerId || previous?.containerId,
       licensePlate: row.licensePlate || previous?.licensePlate,
       batteryNumber: row.batteryNumber || previous?.batteryNumber,
       invoiceNumber: row.invoiceNumber || previous?.invoiceNumber,

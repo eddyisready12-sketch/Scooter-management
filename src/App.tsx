@@ -186,8 +186,8 @@ function containersFromScooterRows(rows: CsvScooterRow[], existingContainers: Co
   rows.forEach((row) => {
     const number = row.container?.trim();
     if (!number) return;
-    const id = stableId('container', number);
-    const existing = byNumber.get(normalizeLookup(number)) ?? byId.get(id);
+    const id = row.containerId || stableId('container', number);
+    const existing = byId.get(id) ?? byNumber.get(normalizeLookup(number));
     const arrivedAt = row.arrivedAt || existing?.arrivedAt || '';
     imported.set(id, {
       id,
