@@ -113,5 +113,14 @@ export async function upsertWarrantyParts(warranties: WarrantyPart[]) {
     .from('warranty_parts')
     .upsert(warranties);
 
+  if (error && error.message.includes("'age' column")) {
+    const withoutAge = warranties.map(({ age, ...warranty }) => warranty);
+    const { error: retryError } = await supabase
+      .from('warranty_parts')
+      .upsert(withoutAge);
+    if (retryError) throw retryError;
+    return;
+  }
+
   if (error) throw error;
 }

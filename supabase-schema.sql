@@ -86,6 +86,8 @@ create table if not exists warranty_parts (
   notes text
 );
 
+alter table warranty_parts add column if not exists age text;
+
 create table if not exists maintenance_records (
   id text primary key,
   "scooterFrame" text references scooters("frameNumber"),
