@@ -87,6 +87,10 @@ create table if not exists warranty_parts (
 );
 
 alter table warranty_parts add column if not exists age text;
+alter table warranty_parts add column if not exists "licensePlate" text;
+alter table warranty_parts add column if not exists mileage text;
+alter table warranty_parts add column if not exists "partNumber" text;
+alter table warranty_parts add column if not exists notes text;
 
 create table if not exists maintenance_records (
   id text primary key,

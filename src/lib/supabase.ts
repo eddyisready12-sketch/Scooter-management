@@ -109,18 +109,25 @@ export async function upsertBatteries(batteries: Battery[]) {
 export async function upsertWarrantyParts(warranties: WarrantyPart[]) {
   if (!supabase || warranties.length === 0) return;
 
-  const { error } = await supabase
-    .from('warranty_parts')
-    .upsert(warranties);
+  let payload = warranties.map((warranty) => ({ ...warranty }) as Record<string, unknown>);
+  const removedColumns = new Set<string>();
 
-  if (error && error.message.includes("'age' column")) {
-    const withoutAge = warranties.map(({ age, ...warranty }) => warranty);
-    const { error: retryError } = await supabase
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await supabase
       .from('warranty_parts')
-      .upsert(withoutAge);
-    if (retryError) throw retryError;
-    return;
+      .upsert(payload);
+
+    if (!error) return;
+
+    const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
+    if (!missingColumn || removedColumns.has(missingColumn)) throw error;
+
+    removedColumns.add(missingColumn);
+    payload = payload.map((record) => {
+      const { [missingColumn]: _removed, ...rest } = record;
+      return rest;
+    });
   }
 
-  if (error) throw error;
+  throw new Error('Warranty opslaan mislukt: Supabase schema mist meerdere warranty kolommen.');
 }
