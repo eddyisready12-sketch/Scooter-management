@@ -994,9 +994,6 @@ function Containers({ data, message, onImport }: { data: AppData; message: strin
           <h1>Containers</h1>
           <span>{data.containers.length} containers geregistreerd</span>
         </div>
-        <div className="header-actions">
-          <button className="primary-button"><Plus size={16} /> Container</button>
-        </div>
       </div>
       {message && <div className="notice">{message}</div>}
       <section className="panel container-command-panel">
@@ -1006,8 +1003,7 @@ function Containers({ data, message, onImport }: { data: AppData; message: strin
           <small>Importeer containerregels of voeg handmatig een container toe om scooters per zending te volgen.</small>
         </div>
         <div className="container-command-actions">
-          <button className="secondary-button" onClick={() => setShowImport(true)}><Upload size={16} /> Container importeren</button>
-          <button className="primary-button"><Plus size={16} /> Container toevoegen</button>
+          <button className="primary-button" onClick={() => setShowImport(true)}><Upload size={16} /> Container importeren</button>
         </div>
       </section>
       <div className="container-overview-grid">
