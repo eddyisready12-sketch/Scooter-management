@@ -28,7 +28,7 @@ import {
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport } from './lib/csv';
 import { loadSupabaseData, subscribeToSupabase, supabase, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertMaintenanceRecords, upsertScooters } from './lib/supabase';
-import type { AppData, Battery, BatteryModel, Container, Dealer, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
+import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'dealers';
@@ -178,6 +178,31 @@ function parseContainerScooterRows(content: string, containerId: string): Scoote
     .filter((scooter): scooter is Scooter => scooter !== null);
 }
 
+function containersFromScooterRows(rows: CsvScooterRow[], existingContainers: Container[]) {
+  const byNumber = new Map(existingContainers.map((container) => [normalizeLookup(container.number), container]));
+  const byId = new Map(existingContainers.map((container) => [container.id, container]));
+  const imported = new Map<string, Container>();
+
+  rows.forEach((row) => {
+    const number = row.container?.trim();
+    if (!number) return;
+    const id = stableId('container', number);
+    const existing = byNumber.get(normalizeLookup(number)) ?? byId.get(id);
+    const arrivedAt = row.arrivedAt || existing?.arrivedAt || '';
+    imported.set(id, {
+      id,
+      number,
+      invoiceNumber: existing?.invoiceNumber || '',
+      sealNumber: existing?.sealNumber || '',
+      status: arrivedAt ? 'Aangekomen' : existing?.status || 'In land van herkomst',
+      eta: existing?.eta || (arrivedAt ? arrivedAt.slice(0, 10) : ''),
+      ...(arrivedAt ? { arrivedAt } : {}),
+    });
+  });
+
+  return Array.from(imported.values());
+}
+
 async function fetchRdwRegistration(licensePlate: string) {
   const normalizedPlate = licensePlate.replace(/[^a-z0-9]/gi, '').toUpperCase();
   if (!normalizedPlate) throw new Error('Vul eerst een kenteken in.');
@@ -282,16 +307,23 @@ export function App() {
 
       const autoDealers = dealerRowsFromScooterRows(rows, data.dealers);
       const dealersForImport = [...data.dealers, ...autoDealers];
+      const importedContainers = containersFromScooterRows(rows, data.containers);
       const nextScooters = csvRowsToScooters(rows, data.scooters, statusOverride, dealersForImport);
       const importedFrames = new Set(rows.map((row) => row.frameNumber).filter(Boolean));
       const importedScooters = nextScooters.filter((scooter) => importedFrames.has(scooter.frameNumber));
 
-      setData((current) => ({ ...current, dealers: dealersForImport, scooters: nextScooters }));
+      setData((current) => {
+        const containers = new Map(current.containers.map((container) => [container.id, container]));
+        importedContainers.forEach((container) => containers.set(container.id, container));
+        return { ...current, containers: Array.from(containers.values()), dealers: dealersForImport, scooters: nextScooters };
+      });
       await upsertDealers(autoDealers);
+      await upsertContainers(importedContainers);
       await upsertScooters(importedScooters);
       const targetStatus = statusOverride ? ` met status ${statusOverride}` : '';
       const dealerMessage = autoDealers.length ? ` ${autoDealers.length} ontbrekende dealers automatisch toegevoegd.` : '';
-      setCsvMessage(`${rows.length} scooterregels geimporteerd naar het Scooters voorraadblok${targetStatus} uit ${file.name}.${dealerMessage}`);
+      const containerMessage = importedContainers.length ? ` ${importedContainers.length} containers gekoppeld/bijgewerkt.` : '';
+      setCsvMessage(`${rows.length} scooterregels geimporteerd naar het Scooters voorraadblok${targetStatus} uit ${file.name}.${dealerMessage}${containerMessage}`);
     } catch (error) {
       setCsvMessage(`Import mislukt: ${importErrorMessage(error)}`);
     }
