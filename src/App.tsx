@@ -267,6 +267,20 @@ function normalizeLookup(value: string) {
   return value.replace(/[^a-z0-9]/gi, '').toUpperCase();
 }
 
+function normalizeSpeedValue(value?: string) {
+  if (!value) return '';
+  const match = value.match(/\d{2,3}/);
+  return match?.[0] ?? value.trim();
+}
+
+function speedOptionsFromScooters(scooters: Scooter[]) {
+  return Array.from(new Set(
+    scooters
+      .map((scooter) => normalizeSpeedValue(scooter.speed))
+      .filter(Boolean),
+  )).sort((a, b) => Number(a) - Number(b) || a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+}
+
 function filterScootersForPanel(scooters: Scooter[], query: string, searchField: SearchField, filters: ScooterPanelFilters) {
   const needle = query.toLowerCase().trim();
   return scooters.filter((scooter) => {
@@ -278,7 +292,7 @@ function filterScootersForPanel(scooters: Scooter[], query: string, searchField:
 
     return (
       (!needle || selectedFieldValue.toLowerCase().includes(needle)) &&
-      (!filters.speed || scooter.speed === filters.speed) &&
+      (!filters.speed || normalizeSpeedValue(scooter.speed) === filters.speed) &&
       (!filters.model || scooter.model === filters.model) &&
       (!filters.color || scooter.color === filters.color) &&
       (!filters.status || scooter.status === filters.status)
@@ -1341,14 +1355,14 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
       scooter.frameNumber.toLowerCase().includes(columnFilters.frame.toLowerCase()) &&
       scooter.color.toLowerCase().includes(columnFilters.color.toLowerCase()) &&
       (scooter.licensePlate || '').toLowerCase().includes(columnFilters.licensePlate.toLowerCase()) &&
-      (!columnFilters.speed || scooter.speed === columnFilters.speed) &&
+      (!columnFilters.speed || normalizeSpeedValue(scooter.speed) === columnFilters.speed) &&
       (!columnFilters.status || scooter.status === columnFilters.status) &&
       dealer.toLowerCase().includes(columnFilters.dealer.toLowerCase()) &&
       (scooter.invoiceNumber || '').toLowerCase().includes(columnFilters.invoice.toLowerCase()) &&
       (!columnFilters.registration || (columnFilters.registration === 'complete' ? registrationComplete : !registrationComplete))
     );
   });
-  const speedOptions = Array.from(new Set(scooters.map((scooter) => scooter.speed).filter(Boolean))).sort();
+  const speedOptions = speedOptionsFromScooters(scooters);
   const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const visibleScooters = pageSize === 'all'
@@ -1423,7 +1437,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
                 <td><button className="link-button">{scooter.frameNumber}</button></td>
                 <td>{scooter.color}</td>
                 <td>{scooter.licensePlate || '-'}</td>
-                <td>{scooter.speed}</td>
+                <td>{normalizeSpeedValue(scooter.speed) || '-'}</td>
                 <td>{scooter.status}</td>
                 <td>{dealerName(dealers, scooter.dealerId) || '-'}</td>
                 <td>{scooter.invoiceNumber || '-'}</td>
@@ -1649,7 +1663,7 @@ function Scooters({ data, query, setQuery, scooters, onSelect }: { data: AppData
             {visibleScooters.filter((s) => s.status === status).slice(0, 5).map((scooter) => (
               <button key={scooter.id} className="record-row" onClick={() => onSelect(scooter)}>
                 <span>{scooter.frameNumber}</span>
-                {scooter.model} {scooter.color} {scooter.speed}
+                {scooter.model} {scooter.color} {normalizeSpeedValue(scooter.speed)}
                 <strong>{dealerName(data.dealers, scooter.dealerId)}</strong>
               </button>
             ))}
@@ -2104,7 +2118,7 @@ function DealerDetailModal({ dealer, scooters, onClose, onUpdate }: { dealer: De
           ) : consignmentScooters.map((scooter) => (
             <div className="dealer-scooter-row" key={scooter.id}>
               <strong>{scooter.frameNumber}</strong>
-              <span>{scooter.model} - {scooter.color} - {scooter.speed}</span>
+              <span>{scooter.model} - {scooter.color} - {normalizeSpeedValue(scooter.speed)}</span>
               <small>{scooter.licensePlate || 'Geen kenteken'}</small>
             </div>
           ))}
@@ -2228,7 +2242,7 @@ function WarrantyDetailModal({ claim, scooter, dealer, onClose }: { claim: Warra
           <dt>Part nummer</dt><dd>{claim.partNumber || '-'}</dd>
           <dt>Kenteken</dt><dd>{claim.licensePlate || scooter?.licensePlate || '-'}</dd>
           <dt>Framenummer</dt><dd>{claim.scooterFrame}</dd>
-          <dt>Scooter</dt><dd>{scooter ? `${scooter.model} - ${scooter.color} - ${scooter.speed}` : '-'}</dd>
+          <dt>Scooter</dt><dd>{scooter ? `${scooter.model} - ${scooter.color} - ${normalizeSpeedValue(scooter.speed)}` : '-'}</dd>
           <dt>Dealer</dt><dd>{dealer?.company || '-'}</dd>
           <dt>Kilometerstand</dt><dd>{claim.mileage || '-'}</dd>
           <dt>Ouderdom</dt><dd>{claim.age || '-'}</dd>
@@ -2300,7 +2314,7 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
               <dt>Framenummer</dt><dd>{historyScooter.frameNumber}</dd>
               <dt>Model</dt><dd>{historyScooter.model}</dd>
               <dt>Kleur</dt><dd>{historyScooter.color}</dd>
-              <dt>Snelheid</dt><dd>{historyScooter.speed}</dd>
+              <dt>Snelheid</dt><dd>{normalizeSpeedValue(historyScooter.speed)}</dd>
               <dt>Status</dt><dd>{historyScooter.status}</dd>
               <dt>RDW</dt><dd>{formatDate(historyScooter.firstAdmissionDate)} - {historyScooter.emissionClass || '-'}</dd>
             </dl>
@@ -2408,7 +2422,7 @@ function MaintenanceDetailModal({ record, scooter, onClose }: { record: Maintena
         <dl className="dealer-detail-list">
           <dt>Kenteken</dt><dd>{record.licensePlate || scooter?.licensePlate || '-'}</dd>
           <dt>Framenummer</dt><dd>{record.scooterFrame}</dd>
-          <dt>Scooter</dt><dd>{scooter ? `${scooter.model} - ${scooter.color} - ${scooter.speed}` : '-'}</dd>
+          <dt>Scooter</dt><dd>{scooter ? `${scooter.model} - ${scooter.color} - ${normalizeSpeedValue(scooter.speed)}` : '-'}</dd>
           <dt>Pakket</dt><dd>{record.servicePackage || '-'}</dd>
           <dt>Type onderhoud</dt><dd>{record.serviceType}</dd>
           <dt>Onderhoudsdatum</dt><dd>{formatDate(record.serviceDate)}</dd>
@@ -2471,7 +2485,7 @@ function SearchPanel({
   panelFilters: ScooterPanelFilters;
   setPanelFilters: (value: ScooterPanelFilters) => void;
 }) {
-  const speedOptions = Array.from(new Set(scooters.map((scooter) => scooter.speed).filter(Boolean))).sort();
+  const speedOptions = speedOptionsFromScooters(scooters);
   const modelOptions = Array.from(new Set(scooters.map((scooter) => scooter.model).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const colorOptions = Array.from(new Set(scooters.map((scooter) => scooter.color).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const statusOptions = Array.from(new Set(scooters.map((scooter) => scooter.status).filter(Boolean)));
@@ -2570,7 +2584,7 @@ function ContainerListPanel({ title, containers, scooters, green = false }: { ti
                             <td><strong>{scooter.frameNumber}</strong></td>
                             <td>{scooter.model || '-'}</td>
                             <td>{scooter.color || '-'}</td>
-                            <td>{scooter.speed || '-'}</td>
+                            <td>{normalizeSpeedValue(scooter.speed) || '-'}</td>
                             <td><span className="status-pill compact">{scooter.status}</span></td>
                           </tr>
                         ))}
@@ -2638,7 +2652,7 @@ function ScooterDrawer({ scooter, dealers, warranties, maintenance, onClose, onU
               <dt>Merk</dt><dd>{scooter.brand}</dd>
               <dt>Model</dt><dd>{scooter.model}</dd>
               <dt>Kleur</dt><dd>{scooter.color}</dd>
-              <dt>Snelheid</dt><dd>{scooter.speed}</dd>
+              <dt>Snelheid</dt><dd>{normalizeSpeedValue(scooter.speed)}</dd>
               <dt>Kenteken</dt><dd>{scooter.licensePlate || '-'}</dd>
               <dt>Factuur</dt><dd>{scooter.invoiceNumber || '-'}</dd>
               <dt>Status</dt><dd>{scooter.status}</dd>
