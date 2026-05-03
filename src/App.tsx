@@ -154,7 +154,7 @@ function parseContainerScooterRows(content: string, containerId: string): Scoote
     .map((line): Scooter | null => {
       const columns = line.includes('\t') ? line.split('\t') : line.split(/\s{2,}/);
       const compactColumns = columns.map((column) => column.trim()).filter(Boolean);
-      const numericFirstColumn = /^\d+$/.test(compactColumns[0] ?? '');
+      const numericFirstColumn = /^[\d/]+$/.test(compactColumns[0] ?? '');
       const values = numericFirstColumn ? compactColumns.slice(1) : compactColumns;
       const fallback = line.split(/\s+/);
       const model = values[0] ?? fallback[1] ?? '';
