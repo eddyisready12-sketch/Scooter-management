@@ -160,6 +160,13 @@ function nextWarrantyClaimNumber(warranties: WarrantyPart[]) {
   return `${prefix}${String(next).padStart(4, '0')}`;
 }
 
+function salesYearForScooter(scooter: Scooter) {
+  const date = scooter.soldAt || scooter.firstRegistrationDate || scooter.lastRegistrationDate || scooter.deliveredAt || scooter.arrivedAt;
+  if (!date) return 'Onbekend';
+  const parsed = new Date(date);
+  return Number.isNaN(parsed.getTime()) ? 'Onbekend' : String(parsed.getFullYear());
+}
+
 function warrantyStatusIcon(status: WarrantyPart['status']) {
   if (status === 'Afgehandeld' || status === 'Goedgekeurd') return <CheckCircle2 className="warranty-status-icon success" size={20} aria-label={status} />;
   if (status === 'In behandeling') return <Timer className="warranty-status-icon pending" size={20} aria-label={status} />;
@@ -933,6 +940,7 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
           <button onClick={() => setStatusFilter('all')}>Toon alles</button>
         </div>
       )}
+      <SalesDashboard scooters={data.scooters} dealers={data.dealers} />
       <ScooterTable
         scooters={scooters}
         dealers={data.dealers}
@@ -943,6 +951,66 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
         onBulkRdwCheck={statusFilter === 'Verkocht dealer' || statusFilter === 'Verkocht klant' ? onBulkRdwCheck : undefined}
       />
     </>
+  );
+}
+
+function SalesDashboard({ scooters, dealers }: { scooters: Scooter[]; dealers: Dealer[] }) {
+  const [dealerFilter, setDealerFilter] = useState('all');
+  const soldScooters = scooters.filter((scooter) =>
+    (scooter.status === 'Verkocht klant' || scooter.status === 'Verkocht dealer') &&
+    (dealerFilter === 'all' || scooter.dealerId === dealerFilter),
+  );
+  const rows = Array.from(soldScooters.reduce((map, scooter) => {
+    const key = `${salesYearForScooter(scooter)}|${scooter.model || 'Onbekend'}`;
+    const current = map.get(key) ?? {
+      year: salesYearForScooter(scooter),
+      model: scooter.model || 'Onbekend',
+      count: 0,
+    };
+    map.set(key, { ...current, count: current.count + 1 });
+    return map;
+  }, new Map<string, { year: string; model: string; count: number }>()).values()).sort((a, b) => {
+    if (a.year === 'Onbekend') return 1;
+    if (b.year === 'Onbekend') return -1;
+    return b.year.localeCompare(a.year) || b.count - a.count || a.model.localeCompare(b.model);
+  });
+
+  return (
+    <section className="panel sales-dashboard">
+      <div className="panel-title">
+        <span className="panel-title-label"><CircleDollarSign size={16} /> Verkoop dashboard</span>
+        <label className="panel-title-filter">
+          Dealer
+          <select value={dealerFilter} onChange={(event) => setDealerFilter(event.target.value)}>
+            <option value="all">Alle dealers</option>
+            {dealers.map((dealer) => <option key={dealer.id} value={dealer.id}>{dealer.company || dealer.name}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="sales-summary">
+        <div><span>Verkocht totaal</span><strong>{soldScooters.length}</strong></div>
+        <div><span>Modellen</span><strong>{new Set(soldScooters.map((scooter) => scooter.model)).size}</strong></div>
+        <div><span>Dealerfilter</span><strong>{dealerFilter === 'all' ? 'Alle' : dealerName(dealers, dealerFilter)}</strong></div>
+      </div>
+      <div className="table-wrap sales-table-wrap">
+        <table className="sales-table">
+          <thead>
+            <tr><th>Jaar</th><th>Model</th><th>Aantal</th></tr>
+          </thead>
+          <tbody>
+            {rows.length ? rows.map((row) => (
+              <tr key={`${row.year}-${row.model}`}>
+                <td>{row.year}</td>
+                <td>{row.model}</td>
+                <td><strong>{row.count}</strong></td>
+              </tr>
+            )) : (
+              <tr><td colSpan={3}>Geen verkoopdata gevonden.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

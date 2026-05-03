@@ -555,6 +555,66 @@ tbody tr:hover {
   color: #0075ff;
 }
 
+.sales-dashboard {
+  margin-bottom: 14px;
+}
+
+.panel-title-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  color: #65717d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.panel-title-filter select {
+  min-height: 32px;
+  min-width: 220px;
+}
+
+.sales-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-bottom: 1px solid #dce1e6;
+}
+
+.sales-summary div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px 16px;
+  border-right: 1px solid #dce1e6;
+}
+
+.sales-summary div:last-child {
+  border-right: 0;
+}
+
+.sales-summary span {
+  color: #65717d;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sales-summary strong {
+  overflow-wrap: anywhere;
+  font-size: 22px;
+}
+
+.sales-table-wrap {
+  margin: 0;
+}
+
+.sales-table th:last-child,
+.sales-table td:last-child {
+  width: 120px;
+  text-align: right;
+}
+
 .two-col,
 .container-grid {
   display: grid;
@@ -1775,6 +1835,30 @@ dd {
 
   .import-controls select {
     width: 100%;
+  }
+
+  .panel-title-filter {
+    align-items: stretch;
+    flex-direction: column;
+    margin-left: 0;
+  }
+
+  .panel-title-filter select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .sales-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .sales-summary div {
+    border-right: 0;
+    border-bottom: 1px solid #dce1e6;
+  }
+
+  .sales-summary div:last-child {
+    border-bottom: 0;
   }
 
   .container-card-metrics {
