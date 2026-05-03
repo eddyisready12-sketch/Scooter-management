@@ -615,6 +615,52 @@ tbody tr:hover {
   text-align: right;
 }
 
+.clickable-sales-row {
+  cursor: pointer;
+}
+
+.clickable-sales-row:hover td,
+.clickable-sales-row.selected td {
+  background: #eaf4ff;
+}
+
+.sales-detail {
+  border-top: 1px solid #dce1e6;
+  padding: 14px;
+}
+
+.sales-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sales-detail-header div {
+  display: grid;
+  gap: 3px;
+}
+
+.sales-detail-header span {
+  color: #65717d;
+  font-size: 13px;
+}
+
+.sales-detail-table-wrap {
+  padding: 0;
+}
+
+.sales-detail-table th:nth-child(1),
+.sales-detail-table td:nth-child(1) {
+  width: 28%;
+}
+
+.sales-detail-table th:nth-child(5),
+.sales-detail-table td:nth-child(5) {
+  text-align: right;
+}
+
 .two-col,
 .container-grid {
   display: grid;

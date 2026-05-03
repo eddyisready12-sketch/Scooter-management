@@ -841,7 +841,7 @@ export function App() {
           {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} onImport={addContainerImport} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
-          {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} />}
+          {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
@@ -963,7 +963,7 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
   );
 }
 
-function SalesPage({ scooters, dealers }: { scooters: Scooter[]; dealers: Dealer[] }) {
+function SalesPage({ scooters, dealers, onSelect }: { scooters: Scooter[]; dealers: Dealer[]; onSelect: (scooter: Scooter) => void }) {
   return (
     <>
       <div className="page-title-row">
@@ -972,14 +972,15 @@ function SalesPage({ scooters, dealers }: { scooters: Scooter[]; dealers: Dealer
           <span>Analyse per jaar, model en dealer</span>
         </div>
       </div>
-      <SalesDashboard scooters={scooters} dealers={dealers} />
+      <SalesDashboard scooters={scooters} dealers={dealers} onSelect={onSelect} />
     </>
   );
 }
 
-function SalesDashboard({ scooters, dealers }: { scooters: Scooter[]; dealers: Dealer[] }) {
+function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; dealers: Dealer[]; onSelect: (scooter: Scooter) => void }) {
   const [dealerFilter, setDealerFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
+  const [selectedBucket, setSelectedBucket] = useState<{ year: string; model: string } | null>(null);
   const soldScooters = scooters.filter((scooter) =>
     scooter.status === 'Verkocht klant' &&
     (dealerFilter === 'all' || scooter.dealerId === dealerFilter) &&
@@ -1008,6 +1009,11 @@ function SalesDashboard({ scooters, dealers }: { scooters: Scooter[]; dealers: D
     if (b.year === 'Onbekend') return -1;
     return b.year.localeCompare(a.year) || b.count - a.count || a.model.localeCompare(b.model);
   });
+  const bucketScooters = selectedBucket
+    ? soldScooters
+      .filter((scooter) => salesYearForScooter(scooter) === selectedBucket.year && normalizeSalesModel(scooter.model) === selectedBucket.model)
+      .sort((a, b) => (a.firstRegistrationDate || '').localeCompare(b.firstRegistrationDate || '') || a.frameNumber.localeCompare(b.frameNumber))
+    : [];
 
   return (
     <section className="panel sales-dashboard">
@@ -1040,9 +1046,13 @@ function SalesDashboard({ scooters, dealers }: { scooters: Scooter[]; dealers: D
           </thead>
           <tbody>
             {rows.length ? rows.map((row) => (
-              <tr key={`${row.year}-${row.model}`}>
+              <tr
+                className={`clickable-sales-row ${selectedBucket?.year === row.year && selectedBucket?.model === row.model ? 'selected' : ''}`}
+                key={`${row.year}-${row.model}`}
+                onClick={() => setSelectedBucket({ year: row.year, model: row.model })}
+              >
                 <td>{row.year}</td>
-                <td>{row.model}</td>
+                <td><button className="link-button" type="button">{row.model}</button></td>
                 <td><strong>{row.count}</strong></td>
               </tr>
             )) : (
@@ -1051,6 +1061,41 @@ function SalesDashboard({ scooters, dealers }: { scooters: Scooter[]; dealers: D
           </tbody>
         </table>
       </div>
+      {selectedBucket && (
+        <div className="sales-detail">
+          <div className="sales-detail-header">
+            <div>
+              <strong>{selectedBucket.model}</strong>
+              <span>{selectedBucket.year} - {bucketScooters.length} scooters</span>
+            </div>
+            <button className="secondary-button" type="button" onClick={() => setSelectedBucket(null)}>Sluiten</button>
+          </div>
+          <div className="table-wrap sales-detail-table-wrap">
+            <table className="sales-detail-table">
+              <thead>
+                <tr>
+                  <th>Frame #</th>
+                  <th>Kenteken</th>
+                  <th>Dealer</th>
+                  <th>Eerste tenaamstelling</th>
+                  <th>Factuur</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bucketScooters.map((scooter) => (
+                  <tr className="clickable-sales-row" key={scooter.id} onClick={() => onSelect(scooter)}>
+                    <td><button className="link-button" type="button">{scooter.frameNumber}</button></td>
+                    <td>{scooter.licensePlate || '-'}</td>
+                    <td>{dealerName(dealers, scooter.dealerId) || '-'}</td>
+                    <td>{formatDate(scooter.firstRegistrationDate)}</td>
+                    <td>{scooter.invoiceNumber || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
