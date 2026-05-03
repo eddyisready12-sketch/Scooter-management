@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, Container, Dealer, MaintenanceRecord, Scooter } from '../types';
+import type { AppData, Battery, BatteryModel, Container, Dealer, MaintenanceRecord, Scooter, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -102,6 +102,16 @@ export async function upsertBatteries(batteries: Battery[]) {
   const { error } = await supabase
     .from('batteries')
     .upsert(batteries);
+
+  if (error) throw error;
+}
+
+export async function upsertWarrantyParts(warranties: WarrantyPart[]) {
+  if (!supabase || warranties.length === 0) return;
+
+  const { error } = await supabase
+    .from('warranty_parts')
+    .upsert(warranties);
 
   if (error) throw error;
 }

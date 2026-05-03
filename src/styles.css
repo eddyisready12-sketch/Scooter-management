@@ -185,6 +185,18 @@ h2 {
   color: #005cb8;
 }
 
+.inline-notice.success-notice {
+  border-color: #9bd7ad;
+  background: #ecf9ef;
+  color: #0d6c2f;
+}
+
+.inline-notice.warning-notice {
+  border-color: #ffc266;
+  background: #fff5e6;
+  color: #8a4b00;
+}
+
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(170px, 1fr));

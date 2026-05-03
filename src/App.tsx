@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport } from './lib/csv';
-import { loadSupabaseData, subscribeToSupabase, supabase, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertMaintenanceRecords, upsertScooters } from './lib/supabase';
+import { loadSupabaseData, subscribeToSupabase, supabase, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertMaintenanceRecords, upsertScooters, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
@@ -127,6 +127,21 @@ function formatVehicleAge(firstAdmissionDate?: string) {
   }
 
   return `${years} jaar, ${months} maanden, ${days} dagen`;
+}
+
+function addMonthsToInputDate(value?: string, months = 24) {
+  if (!value) return '';
+  const start = new Date(value);
+  if (Number.isNaN(start.getTime())) return '';
+  const result = new Date(start);
+  result.setMonth(result.getMonth() + months);
+  return result.toISOString().slice(0, 10);
+}
+
+function isPastInputDate(value?: string) {
+  if (!value) return false;
+  const end = new Date(`${value}T23:59:59`);
+  return !Number.isNaN(end.getTime()) && end < new Date();
 }
 
 function importErrorMessage(error: unknown) {
@@ -570,24 +585,31 @@ export function App() {
     }
   }
 
-  function addWarranty(event: FormEvent<HTMLFormElement>) {
+  async function addWarranty(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const submittedFrame = String(form.get('scooterFrame') ?? '');
+    const submittedPlate = String(form.get('licensePlate') ?? '').trim();
+    const scooter = data.scooters.find((item) => normalizeLookup(item.licensePlate ?? '') === normalizeLookup(submittedPlate)) ??
+      data.scooters.find((item) => item.frameNumber === submittedFrame);
+    const registrationDate = scooter?.firstRegistrationDate || scooter?.firstAdmissionDate;
+    const warrantyUntil = String(form.get('warrantyUntil') ?? '') || addMonthsToInputDate(registrationDate);
     const record: WarrantyPart = {
       id: `w-${Date.now()}`,
-      scooterFrame: String(form.get('scooterFrame')),
-      licensePlate: String(form.get('licensePlate')),
+      scooterFrame: scooter?.frameNumber || submittedFrame,
+      licensePlate: submittedPlate || scooter?.licensePlate || '',
       partName: String(form.get('partName')),
       partNumber: String(form.get('partNumber')),
       mileage: String(form.get('mileage')),
-      age: String(form.get('age')),
+      age: String(form.get('age')) || formatVehicleAge(registrationDate),
       claimDate: String(form.get('claimDate')),
-      warrantyUntil: String(form.get('warrantyUntil')),
+      warrantyUntil,
       status: 'Open',
-      dealerId: String(form.get('dealerId')),
+      dealerId: String(form.get('dealerId')) || scooter?.dealerId,
       notes: String(form.get('notes')),
     };
     setData((current) => ({ ...current, warranties: [record, ...current.warranties] }));
+    await upsertWarrantyParts([record]);
     event.currentTarget.reset();
   }
 
@@ -1662,7 +1684,31 @@ function DealerDetailModal({ dealer, scooters, onClose, onUpdate }: { dealer: De
   );
 }
 
-function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: FormEvent<HTMLFormElement>) => void }) {
+function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+  const [selectedFrame, setSelectedFrame] = useState(data.scooters[0]?.frameNumber ?? '');
+  const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame) ?? data.scooters[0];
+  const [licensePlate, setLicensePlate] = useState(selectedScooter?.licensePlate ?? '');
+  const [selectedDealerId, setSelectedDealerId] = useState(selectedScooter?.dealerId ?? data.dealers[0]?.id ?? '');
+  const registrationDate = selectedScooter?.firstRegistrationDate || selectedScooter?.firstAdmissionDate;
+  const calculatedAge = formatVehicleAge(registrationDate);
+  const warrantyUntil = addMonthsToInputDate(registrationDate);
+  const warrantyExpired = isPastInputDate(warrantyUntil);
+
+  function handleScooterChange(frameNumber: string) {
+    const scooter = data.scooters.find((item) => item.frameNumber === frameNumber);
+    setSelectedFrame(frameNumber);
+    setLicensePlate(scooter?.licensePlate ?? '');
+    setSelectedDealerId(scooter?.dealerId ?? data.dealers[0]?.id ?? '');
+  }
+
+  function handleLicensePlateChange(value: string) {
+    setLicensePlate(value);
+    const scooter = data.scooters.find((item) => normalizeLookup(item.licensePlate ?? '') === normalizeLookup(value));
+    if (!scooter) return;
+    setSelectedFrame(scooter.frameNumber);
+    setSelectedDealerId(scooter.dealerId ?? data.dealers[0]?.id ?? '');
+  }
+
   return (
     <>
       <div className="page-title-row">
@@ -1691,17 +1737,26 @@ function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: F
         <form className="panel form-panel" onSubmit={addWarranty}>
           <div className="panel-title"><ClipboardList size={16} /> Nieuw warranty part</div>
           <div className="form-grid warranty-form-grid">
-            <label>Scooter<select name="scooterFrame">{data.scooters.map((s) => <option key={s.id}>{s.frameNumber}</option>)}</select></label>
-            <label>Dealer<select name="dealerId">{data.dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
-            <label>Kenteken<input name="licensePlate" /></label>
+            <label>Scooter<select name="scooterFrame" value={selectedScooter?.frameNumber ?? ''} onChange={(event) => handleScooterChange(event.target.value)}>{data.scooters.map((s) => <option key={s.id} value={s.frameNumber}>{s.frameNumber}</option>)}</select></label>
+            <label>Dealer<select name="dealerId" value={selectedDealerId} onChange={(event) => setSelectedDealerId(event.target.value)}>{data.dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
+            <label>Kenteken<input name="licensePlate" value={licensePlate} onChange={(event) => handleLicensePlateChange(event.target.value)} /></label>
             <label>Kilometerstand<input name="mileage" inputMode="numeric" /></label>
-            <label>Ouderdom<input name="age" placeholder="bijv. 14 maanden" /></label>
+            <label>Ouderdom<input name="age" value={calculatedAge === '-' ? '' : calculatedAge} readOnly placeholder="Eerste tenaamstelling ontbreekt" /></label>
             <label>Part name<input name="partName" required /></label>
             <label>Part number<input name="partNumber" required /></label>
             <label>Claim date<input name="claimDate" type="date" required /></label>
-            <label>Warranty until<input name="warrantyUntil" type="date" required /></label>
+            <label>Garantie tot<input name="warrantyUntil" type="date" value={warrantyUntil} readOnly required /></label>
             <label className="wide-field">Notes<textarea name="notes" /></label>
           </div>
+          {warrantyUntil ? (
+            <p className={warrantyExpired ? 'inline-notice warning-notice' : 'inline-notice success-notice'}>
+              {warrantyExpired
+                ? `Garantie verlopen op ${formatDate(warrantyUntil)}.`
+                : `Garantie geldig tot ${formatDate(warrantyUntil)} op basis van 24 maanden na eerste tenaamstelling.`}
+            </p>
+          ) : (
+            <p className="inline-notice warning-notice">Geen eerste tenaamstelling bekend. Haal eerst RDW data op via de scooterkaart.</p>
+          )}
           <button className="primary-button">Toevoegen</button>
         </form>
       </div>
