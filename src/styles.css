@@ -1133,6 +1133,46 @@ tbody tr:hover {
   line-height: 1.45;
 }
 
+.container-import-modal {
+  width: min(920px, calc(100vw - 32px));
+}
+
+.container-import-form {
+  display: grid;
+  gap: 6px;
+}
+
+.container-content-field {
+  display: grid;
+  gap: 8px;
+  padding: 0 16px 18px;
+  font-weight: 700;
+}
+
+.container-content-field span {
+  color: #65717d;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.container-content-field code {
+  display: block;
+  overflow-x: auto;
+  border: 1px solid #dce1e6;
+  border-radius: 4px;
+  background: #f6f8fa;
+  padding: 10px;
+  color: #17202a;
+  font-size: 12px;
+  white-space: pre;
+}
+
+.container-content-field textarea {
+  min-height: 210px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  line-height: 1.45;
+}
+
 .import-row {
   display: flex;
   justify-content: space-between;

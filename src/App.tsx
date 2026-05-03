@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport } from './lib/csv';
-import { loadSupabaseData, subscribeToSupabase, supabase, upsertBatteries, upsertBatteryModels, upsertDealers, upsertMaintenanceRecords, upsertScooters } from './lib/supabase';
+import { loadSupabaseData, subscribeToSupabase, supabase, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertMaintenanceRecords, upsertScooters } from './lib/supabase';
 import type { AppData, Battery, BatteryModel, Container, Dealer, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
@@ -143,6 +143,39 @@ function stableId(prefix: string, value: string) {
 
 function normalizeLookup(value: string) {
   return value.replace(/[^a-z0-9]/gi, '').toUpperCase();
+}
+
+function parseContainerScooterRows(content: string, containerId: string): Scooter[] {
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^ctn\s*no/i.test(line) && !/^model\s+/i.test(line))
+    .map((line): Scooter | null => {
+      const columns = line.includes('\t') ? line.split('\t') : line.split(/\s{2,}/);
+      const compactColumns = columns.map((column) => column.trim()).filter(Boolean);
+      const numericFirstColumn = /^\d+$/.test(compactColumns[0] ?? '');
+      const values = numericFirstColumn ? compactColumns.slice(1) : compactColumns;
+      const fallback = line.split(/\s+/);
+      const model = values[0] ?? fallback[1] ?? '';
+      const frameNumber = values[1] ?? fallback.find((value) => /^L[A-Z0-9]{8,}/i.test(value)) ?? '';
+      const engineNumber = values[2] ?? '';
+      const color = values.length >= 5 ? values[values.length - 2] : '';
+      const speed = values.length >= 5 ? values[values.length - 1] : '';
+      if (!frameNumber) return null;
+      return {
+        id: stableId('scooter', frameNumber),
+        frameNumber,
+        engineNumber,
+        brand: 'RSO' as const,
+        model,
+        color,
+        speed,
+        status: 'Nog onderweg' as const,
+        containerId,
+      };
+    })
+    .filter((scooter): scooter is Scooter => scooter !== null);
 }
 
 async function fetchRdwRegistration(licensePlate: string) {
@@ -429,6 +462,50 @@ export function App() {
     return message;
   }
 
+  async function addContainerImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const invoiceNumber = String(form.get('invoiceNumber') ?? '').trim();
+    const number = String(form.get('containerNumber') ?? '').trim();
+    const sealNumber = String(form.get('sealNumber') ?? '').trim();
+    const eta = String(form.get('eta') ?? '').trim();
+    const content = String(form.get('content') ?? '').trim();
+    if (!invoiceNumber || !number || !sealNumber || !content) {
+      setCsvMessage('Container import mislukt: vul invoice, container, seal en container content in.');
+      return;
+    }
+    const container: Container = {
+      id: stableId('container', number),
+      number,
+      invoiceNumber,
+      sealNumber,
+      status: eta ? 'Onderweg' : 'In land van herkomst',
+      eta,
+    };
+    const scooters = parseContainerScooterRows(content, container.id);
+    if (scooters.length === 0) {
+      setCsvMessage('Container import mislukt: geen scooterregels gevonden in de geplakte content.');
+      return;
+    }
+
+    try {
+      await upsertContainers([container]);
+      await upsertScooters(scooters);
+      setData((current) => {
+        const containers = new Map(current.containers.map((item) => [item.id, item]));
+        containers.set(container.id, container);
+        const scooterMap = new Map(current.scooters.map((item) => [item.id, item]));
+        scooters.forEach((scooter) => scooterMap.set(scooter.id, scooter));
+        return { ...current, containers: [...containers.values()], scooters: [...scooterMap.values()] };
+      });
+      setCsvMessage(`${scooters.length} scooters geimporteerd in container ${container.number}.`);
+      formElement.reset();
+    } catch (error) {
+      setCsvMessage(`Container import mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   function addWarranty(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -610,7 +687,7 @@ export function App() {
 
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
-          {view === 'containers' && <Containers data={data} />}
+          {view === 'containers' && <Containers data={data} message={csvMessage} onImport={addContainerImport} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
@@ -871,7 +948,8 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
   );
 }
 
-function Containers({ data }: { data: AppData }) {
+function Containers({ data, message, onImport }: { data: AppData; message: string; onImport: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+  const [showImport, setShowImport] = useState(false);
   const pending = data.containers.filter((container) => container.status !== 'Aangekomen');
   const arrived = data.containers.filter((container) => container.status === 'Aangekomen');
   const inTransit = data.containers.filter((container) => container.status === 'Onderweg');
@@ -888,6 +966,7 @@ function Containers({ data }: { data: AppData }) {
           <button className="primary-button"><Plus size={16} /> Container</button>
         </div>
       </div>
+      {message && <div className="notice">{message}</div>}
       <section className="panel container-command-panel">
         <div>
           <span>Container import</span>
@@ -895,7 +974,7 @@ function Containers({ data }: { data: AppData }) {
           <small>Importeer containerregels of voeg handmatig een container toe om scooters per zending te volgen.</small>
         </div>
         <div className="container-command-actions">
-          <button className="secondary-button"><Upload size={16} /> Container importeren</button>
+          <button className="secondary-button" onClick={() => setShowImport(true)}><Upload size={16} /> Container importeren</button>
           <button className="primary-button"><Plus size={16} /> Container toevoegen</button>
         </div>
       </section>
@@ -935,11 +1014,47 @@ function Containers({ data }: { data: AppData }) {
             <strong>Nog geen containers</strong>
             <span>Importeer of voeg een container toe om scooters per zending te groeperen.</span>
           </div>
-          <button className="secondary-button"><Upload size={16} /> Container importeren</button>
+          <button className="secondary-button" onClick={() => setShowImport(true)}><Upload size={16} /> Container importeren</button>
         </section>
       ) : (
         <div className="container-grid">
           {data.containers.map((container) => <ContainerCard key={container.id} container={container} scooters={data.scooters.filter((s) => s.containerId === container.id)} dealers={data.dealers} />)}
+        </div>
+      )}
+      {showImport && (
+        <div className="modal-backdrop" onMouseDown={() => setShowImport(false)}>
+          <form className="modal-card container-import-modal" onSubmit={async (event) => {
+            await onImport(event);
+            setShowImport(false);
+          }} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <span>Containers</span>
+                <h2>Container importeren</h2>
+              </div>
+              <button type="button" onClick={() => setShowImport(false)}>Close</button>
+            </div>
+            <div className="container-import-form">
+              <div className="form-grid">
+                <label>Type<select name="type" defaultValue="Scooters"><option>Scooters</option></select></label>
+                <label>Merk<select name="brand" defaultValue="RSO"><option>RSO</option></select></label>
+                <label>Invoice number<input name="invoiceNumber" placeholder="2017WL7864" required /></label>
+                <label>Container number<input name="containerNumber" placeholder="EISU8034307" required /></label>
+                <label>Seal number<input name="sealNumber" placeholder="EMCLX55227" required /></label>
+                <label>Verwachte leverdatum<input name="eta" type="date" /></label>
+              </div>
+              <label className="container-content-field">
+                Container content
+                <span>Plak de kolommen uit Excel inclusief headers en in dezelfde volgorde.</span>
+                <code>CTN NO.  MODEL  FRAME NO.  ENGINE NO.  ENGINE NO.  COLOR  SPEED</code>
+                <textarea name="content" placeholder={'CTN NO.\tMODEL\tFRAME NO.\tENGINE NO.\tENGINE NO.\tCOLOR\tSPEED\n2\tSense (TY50QT-5D)\tLM0CBV5C8M1106518\t1P39QMB\tM07C65288\tZwart\t25km/h'} required />
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="secondary-button" onClick={() => setShowImport(false)}>Annuleren</button>
+              <button className="primary-button">Importeren</button>
+            </div>
+          </form>
         </div>
       )}
     </>
