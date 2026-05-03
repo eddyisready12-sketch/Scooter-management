@@ -35,6 +35,13 @@ import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, 
 type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
+type SearchField = 'frameNumber' | 'engineNumber' | 'licensePlate';
+type ScooterPanelFilters = {
+  speed: string;
+  model: string;
+  color: string;
+  status: string;
+};
 type LoginSession = {
   email: string;
   name: string;
@@ -258,6 +265,25 @@ function clearLoginSession() {
 
 function normalizeLookup(value: string) {
   return value.replace(/[^a-z0-9]/gi, '').toUpperCase();
+}
+
+function filterScootersForPanel(scooters: Scooter[], query: string, searchField: SearchField, filters: ScooterPanelFilters) {
+  const needle = query.toLowerCase().trim();
+  return scooters.filter((scooter) => {
+    const selectedFieldValue = searchField === 'frameNumber'
+      ? scooter.frameNumber
+      : searchField === 'engineNumber'
+        ? scooter.engineNumber
+        : scooter.licensePlate || '';
+
+    return (
+      (!needle || selectedFieldValue.toLowerCase().includes(needle)) &&
+      (!filters.speed || scooter.speed === filters.speed) &&
+      (!filters.model || scooter.model === filters.model) &&
+      (!filters.color || scooter.color === filters.color) &&
+      (!filters.status || scooter.status === filters.status)
+    );
+  });
 }
 
 function containerSortTime(container: Container) {
@@ -1583,21 +1609,38 @@ function ContainerCard({ container, scooters, dealers }: { container: Container;
 
 function Scooters({ data, query, setQuery, scooters, onSelect }: { data: AppData; query: string; setQuery: (value: string) => void; scooters: Scooter[]; onSelect: (scooter: Scooter) => void }) {
   const groups = ['Beschikbaar', 'In optie', 'Af te leveren', 'Nog onderweg', 'In consignatie', 'Verkocht klant', 'Verkocht dealer'] as ScooterStatus[];
+  const [searchField, setSearchField] = useState<SearchField>('frameNumber');
+  const [panelFilters, setPanelFilters] = useState<ScooterPanelFilters>({
+    speed: '',
+    model: '',
+    color: '',
+    status: '',
+  });
+  const visibleScooters = filterScootersForPanel(scooters, query, searchField, panelFilters);
   return (
     <>
       <h1>Scooters</h1>
-      <SearchPanel query={query} setQuery={setQuery} />
+      <SearchPanel
+        scooters={scooters}
+        query={query}
+        setQuery={setQuery}
+        searchField={searchField}
+        setSearchField={setSearchField}
+        panelFilters={panelFilters}
+        setPanelFilters={setPanelFilters}
+      />
       <div className="card-grid">
         {groups.map((status) => (
           <section className="panel compact-list" key={status}>
             <div className="panel-title"><Bike size={16} /> Recent {status.toLowerCase()}</div>
-            {scooters.filter((s) => s.status === status).slice(0, 5).map((scooter) => (
+            {visibleScooters.filter((s) => s.status === status).slice(0, 5).map((scooter) => (
               <button key={scooter.id} className="record-row" onClick={() => onSelect(scooter)}>
                 <span>{scooter.frameNumber}</span>
                 {scooter.model} {scooter.color} {scooter.speed}
                 <strong>{dealerName(data.dealers, scooter.dealerId)}</strong>
               </button>
             ))}
+            {visibleScooters.filter((s) => s.status === status).length === 0 ? <p className="empty">Geen scooters gevonden.</p> : null}
           </section>
         ))}
       </div>
@@ -1914,7 +1957,6 @@ function Dealers({ dealers, scooters, onImport, onAddDealer, onUpdateDealer, mes
         </div>
       </div>
       {message && <div className="notice">{message}</div>}
-      <SearchPanel query="" setQuery={() => undefined} />
       <div className="two-col">
         <DealerTablePanel dealers={sortedDealers} onSelect={setSelectedDealer} />
         <ConsignmentDealerPanel dealers={sortedDealers} scooters={scooters} onSelect={setSelectedDealer} />
@@ -2374,23 +2416,94 @@ function MaintenanceDetailModal({ record, scooter, onClose }: { record: Maintena
 }
 
 function GlobalSearch({ data, query, setQuery, scooters, onSelect }: { data: AppData; query: string; setQuery: (value: string) => void; scooters: Scooter[]; onSelect: (scooter: Scooter) => void }) {
+  const [searchField, setSearchField] = useState<SearchField>('frameNumber');
+  const [panelFilters, setPanelFilters] = useState<ScooterPanelFilters>({
+    speed: '',
+    model: '',
+    color: '',
+    status: '',
+  });
+  const visibleScooters = filterScootersForPanel(scooters, query, searchField, panelFilters);
   return (
     <>
       <h1>Zoeken</h1>
-      <SearchPanel query={query} setQuery={setQuery} />
-      <ScooterTable scooters={scooters} dealers={data.dealers} query={query} setQuery={setQuery} onSelect={onSelect} />
+      <SearchPanel
+        scooters={scooters}
+        query={query}
+        setQuery={setQuery}
+        searchField={searchField}
+        setSearchField={setSearchField}
+        panelFilters={panelFilters}
+        setPanelFilters={setPanelFilters}
+      />
+      <ScooterTable scooters={visibleScooters} dealers={data.dealers} query={query} setQuery={setQuery} onSelect={onSelect} />
     </>
   );
 }
 
-function SearchPanel({ query, setQuery }: { query: string; setQuery: (value: string) => void }) {
+function SearchPanel({
+  scooters,
+  query,
+  setQuery,
+  searchField,
+  setSearchField,
+  panelFilters,
+  setPanelFilters,
+}: {
+  scooters: Scooter[];
+  query: string;
+  setQuery: (value: string) => void;
+  searchField: SearchField;
+  setSearchField: (value: SearchField) => void;
+  panelFilters: ScooterPanelFilters;
+  setPanelFilters: (value: ScooterPanelFilters) => void;
+}) {
+  const speedOptions = Array.from(new Set(scooters.map((scooter) => scooter.speed).filter(Boolean))).sort();
+  const modelOptions = Array.from(new Set(scooters.map((scooter) => scooter.model).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const colorOptions = Array.from(new Set(scooters.map((scooter) => scooter.color).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const statusOptions = Array.from(new Set(scooters.map((scooter) => scooter.status).filter(Boolean)));
+  const placeholder = searchField === 'frameNumber'
+    ? 'Zoek op framenummer'
+    : searchField === 'engineNumber'
+      ? 'Zoek op motornummer'
+      : 'Zoek op kenteken';
+
   return (
     <section className="panel search-panel">
       <div className="panel-title"><Search size={16} /> Zoeken</div>
       <div className="search-grid">
-        <div><strong>Zoek in</strong><label><input type="checkbox" defaultChecked /> Frame nummer</label><label><input type="checkbox" /> Engine nummer</label><label><input type="checkbox" /> Kenteken</label></div>
-        <div><strong>voor</strong><div className="inline-search"><input value={query} onChange={(event) => setQuery(event.target.value)} /><button className="primary-button"><Search size={15} /></button></div></div>
-        <div><strong>met</strong><select><option>Snelheid</option></select><select><option>Model</option></select><select><option>Kleur</option></select><select><option>Status</option></select></div>
+        <div>
+          <strong>Zoek in</strong>
+          <label><input type="checkbox" checked={searchField === 'frameNumber'} onChange={() => setSearchField('frameNumber')} /> Frame nummer</label>
+          <label><input type="checkbox" checked={searchField === 'engineNumber'} onChange={() => setSearchField('engineNumber')} /> Engine nummer</label>
+          <label><input type="checkbox" checked={searchField === 'licensePlate'} onChange={() => setSearchField('licensePlate')} /> Kenteken</label>
+        </div>
+        <div>
+          <strong>voor</strong>
+          <div className="inline-search">
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={placeholder} />
+            <button className="primary-button" type="button" onClick={() => setQuery('')}><Search size={15} /></button>
+          </div>
+        </div>
+        <div>
+          <strong>met</strong>
+          <select value={panelFilters.speed} onChange={(event) => setPanelFilters({ ...panelFilters, speed: event.target.value })}>
+            <option value="">Alle snelheden</option>
+            {speedOptions.map((speed) => <option key={speed} value={speed}>{speed}</option>)}
+          </select>
+          <select value={panelFilters.model} onChange={(event) => setPanelFilters({ ...panelFilters, model: event.target.value })}>
+            <option value="">Alle modellen</option>
+            {modelOptions.map((model) => <option key={model} value={model}>{model}</option>)}
+          </select>
+          <select value={panelFilters.color} onChange={(event) => setPanelFilters({ ...panelFilters, color: event.target.value })}>
+            <option value="">Alle kleuren</option>
+            {colorOptions.map((color) => <option key={color} value={color}>{color}</option>)}
+          </select>
+          <select value={panelFilters.status} onChange={(event) => setPanelFilters({ ...panelFilters, status: event.target.value })}>
+            <option value="">Alle statussen</option>
+            {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+        </div>
       </div>
     </section>
   );
