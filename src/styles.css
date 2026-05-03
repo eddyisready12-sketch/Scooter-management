@@ -1637,6 +1637,26 @@ dd {
   margin: 6px 0 0;
 }
 
+.remember-login {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #2f3a45;
+  font-weight: 600;
+}
+
+.remember-login input {
+  min-height: 0;
+}
+
+.login-error {
+  border: 1px solid #f2a3a3;
+  border-radius: 4px;
+  background: #fff1f1;
+  color: #a40000;
+  padding: 9px 10px;
+}
+
 .drawer-backdrop {
   position: fixed;
   inset: 0;

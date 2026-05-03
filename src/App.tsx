@@ -35,6 +35,14 @@ import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, 
 type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
+type LoginSession = {
+  email: string;
+  name: string;
+  loggedInAt: number;
+  expiresAt?: number;
+};
+
+const loginStorageKey = 'rso-admin-session';
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -195,6 +203,59 @@ function stableId(prefix: string, value: string) {
   return `${prefix}-${value.replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
 }
 
+function loginNameFromEmail(email: string) {
+  const localPart = email.split('@')[0] || 'Gebruiker';
+  return localPart
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ') || 'Gebruiker';
+}
+
+function createLoginSession(email: string, remember: boolean): LoginSession {
+  return {
+    email,
+    name: loginNameFromEmail(email),
+    loggedInAt: Date.now(),
+    ...(remember ? { expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 30 } : {}),
+  };
+}
+
+function readStoredLoginSession(): LoginSession | null {
+  if (typeof window === 'undefined') return null;
+
+  const raw = window.localStorage.getItem(loginStorageKey) ?? window.sessionStorage.getItem(loginStorageKey);
+  if (!raw) return null;
+
+  try {
+    const session = JSON.parse(raw) as LoginSession;
+    if (!session.email || (session.expiresAt && session.expiresAt < Date.now())) {
+      window.localStorage.removeItem(loginStorageKey);
+      window.sessionStorage.removeItem(loginStorageKey);
+      return null;
+    }
+    return session;
+  } catch {
+    window.localStorage.removeItem(loginStorageKey);
+    window.sessionStorage.removeItem(loginStorageKey);
+    return null;
+  }
+}
+
+function storeLoginSession(session: LoginSession, remember: boolean) {
+  if (typeof window === 'undefined') return;
+  const storage = remember ? window.localStorage : window.sessionStorage;
+  window.localStorage.removeItem(loginStorageKey);
+  window.sessionStorage.removeItem(loginStorageKey);
+  storage.setItem(loginStorageKey, JSON.stringify(session));
+}
+
+function clearLoginSession() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(loginStorageKey);
+  window.sessionStorage.removeItem(loginStorageKey);
+}
+
 function normalizeLookup(value: string) {
   return value.replace(/[^a-z0-9]/gi, '').toUpperCase();
 }
@@ -316,7 +377,7 @@ async function fetchRdwRegistration(licensePlate: string) {
 }
 
 export function App() {
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [loginSession, setLoginSession] = useState<LoginSession | null>(() => readStoredLoginSession());
   const [view, setView] = useState<View>('dashboard');
   const [data, setData] = useState<AppData>(demoData);
   const [query, setQuery] = useState('');
@@ -799,8 +860,19 @@ export function App() {
     }
   }
 
-  if (!loggedIn) {
-    return <LoginScreen onLogin={() => setLoggedIn(true)} supabaseEnabled={Boolean(supabase)} />;
+  function handleLogin(email: string, remember: boolean) {
+    const session = createLoginSession(email, remember);
+    storeLoginSession(session, remember);
+    setLoginSession(session);
+  }
+
+  function handleLogout() {
+    clearLoginSession();
+    setLoginSession(null);
+  }
+
+  if (!loginSession) {
+    return <LoginScreen onLogin={handleLogin} supabaseEnabled={Boolean(supabase)} />;
   }
 
   return (
@@ -830,8 +902,8 @@ export function App() {
           </button>
           <div className="topbar-actions">
             <span className={supabase ? 'live-pill online' : 'live-pill'}><DatabaseZap size={14} /> {supabase ? 'Supabase live' : 'Local demo'}</span>
-            <span>Rob</span>
-            <button className="icon-button" aria-label="Log out" onClick={() => setLoggedIn(false)}>
+            <span>{loginSession.name}</span>
+            <button className="icon-button" aria-label="Log out" onClick={handleLogout}>
               <LogOut size={17} />
             </button>
           </div>
@@ -864,18 +936,37 @@ export function App() {
   );
 }
 
-function LoginScreen({ onLogin, supabaseEnabled }: { onLogin: () => void; supabaseEnabled: boolean }) {
+function LoginScreen({ onLogin, supabaseEnabled }: { onLogin: (email: string, remember: boolean) => void; supabaseEnabled: boolean }) {
+  const [error, setError] = useState('');
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get('email') ?? '').trim();
+    const password = String(form.get('password') ?? '').trim();
+    const remember = form.get('remember') === 'on';
+
+    if (!email || !password) {
+      setError('Vul je e-mailadres en wachtwoord in.');
+      return;
+    }
+
+    onLogin(email, remember);
+  }
+
   return (
     <div className="login-page">
-      <form className="login-card" onSubmit={(event) => { event.preventDefault(); onLogin(); }}>
+      <form className="login-card" onSubmit={handleSubmit}>
         <div className="login-logo">RSO</div>
         <h1>Scooter Management</h1>
         <label>Email</label>
-        <input type="email" defaultValue="rob@rso-scooters.nl" />
+        <input name="email" type="email" defaultValue="rob@rso-scooters.nl" autoComplete="email" />
         <label>Password</label>
-        <input type="password" defaultValue="demo" />
+        <input name="password" type="password" defaultValue="demo" autoComplete="current-password" />
+        <label className="remember-login"><input name="remember" type="checkbox" defaultChecked /> Ingelogd blijven op dit apparaat</label>
+        {error && <p className="login-error">{error}</p>}
         <button className="primary-button" type="submit"><Lock size={16} /> Login</button>
-        <p>{supabaseEnabled ? 'Auth can be connected to Supabase.' : 'Demo login active. Add Supabase keys for production auth.'}</p>
+        <p>{supabaseEnabled ? 'Je sessie blijft bewaard na refresh. Supabase Auth kan later als extra beveiligingslaag worden aangesloten.' : 'Demo login actief. De sessie blijft bewaard in deze browser.'}</p>
       </form>
     </div>
   );
