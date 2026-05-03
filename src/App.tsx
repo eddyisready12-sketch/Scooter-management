@@ -280,6 +280,7 @@ export function App() {
   const [dealerImportMessage, setDealerImportMessage] = useState('');
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
   const [batteryMessage, setBatteryMessage] = useState('');
+  const [warrantyMessage, setWarrantyMessage] = useState('');
   const [statusFilter, setStatusFilter] = useState<ScooterStatus | 'all'>('all');
 
   useEffect(() => {
@@ -587,7 +588,8 @@ export function App() {
 
   async function addWarranty(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const submittedFrame = String(form.get('scooterFrame') ?? '');
     const submittedPlate = String(form.get('licensePlate') ?? '').trim();
     const scooter = data.scooters.find((item) => normalizeLookup(item.licensePlate ?? '') === normalizeLookup(submittedPlate)) ??
@@ -608,9 +610,14 @@ export function App() {
       dealerId: String(form.get('dealerId')) || scooter?.dealerId,
       notes: String(form.get('notes')),
     };
-    setData((current) => ({ ...current, warranties: [record, ...current.warranties] }));
-    await upsertWarrantyParts([record]);
-    event.currentTarget.reset();
+    try {
+      await upsertWarrantyParts([record]);
+      setData((current) => ({ ...current, warranties: [record, ...current.warranties] }));
+      setWarrantyMessage(`Garantieclaim opgeslagen voor ${record.licensePlate || record.scooterFrame}.`);
+      formElement.reset();
+    } catch (error) {
+      setWarrantyMessage(`Garantie opslaan mislukt: ${importErrorMessage(error)}`);
+    }
   }
 
   async function addMaintenance(event: FormEvent<HTMLFormElement>) {
@@ -777,7 +784,7 @@ export function App() {
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
-          {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} />}
+          {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} message={warrantyMessage} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
           {view === 'search' && <GlobalSearch data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
         </section>
@@ -1684,7 +1691,7 @@ function DealerDetailModal({ dealer, scooters, onClose, onUpdate }: { dealer: De
   );
 }
 
-function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+function Warranty({ data, addWarranty, message }: { data: AppData; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<void>; message: string }) {
   const [selectedFrame, setSelectedFrame] = useState(data.scooters[0]?.frameNumber ?? '');
   const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame) ?? data.scooters[0];
   const [licensePlate, setLicensePlate] = useState(selectedScooter?.licensePlate ?? '');
@@ -1717,6 +1724,7 @@ function Warranty({ data, addWarranty }: { data: AppData; addWarranty: (event: F
           <span>{data.warranties.length} claims geregistreerd</span>
         </div>
       </div>
+      {message && <div className="notice">{message}</div>}
       <div className="two-col warranty-layout">
         <section className="panel">
           <div className="panel-title"><ShieldCheck size={16} /> Warranty claims</div>

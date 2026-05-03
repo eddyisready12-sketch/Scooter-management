@@ -121,6 +121,7 @@ alter table dealers enable row level security;
 alter table scooters enable row level security;
 alter table batteries enable row level security;
 alter table battery_models enable row level security;
+alter table warranty_parts enable row level security;
 alter table maintenance_records enable row level security;
 
 create policy "Allow public read dealers"
@@ -194,6 +195,25 @@ with check (true);
 
 create policy "Allow public update battery models"
 on battery_models
+for update
+to anon
+using (true)
+with check (true);
+
+create policy "Allow public read warranty parts"
+on warranty_parts
+for select
+to anon
+using (true);
+
+create policy "Allow public insert warranty parts"
+on warranty_parts
+for insert
+to anon
+with check (true);
+
+create policy "Allow public update warranty parts"
+on warranty_parts
 for update
 to anon
 using (true)
