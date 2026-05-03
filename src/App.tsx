@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport } from './lib/csv';
-import { loadSupabaseData, subscribeToSupabase, supabase, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertMaintenanceRecords, upsertScooters, upsertWarrantyParts } from './lib/supabase';
+import { getAuthSession, loadSupabaseData, onAuthSessionChange, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertMaintenanceRecords, upsertScooters, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
@@ -377,7 +377,8 @@ async function fetchRdwRegistration(licensePlate: string) {
 }
 
 export function App() {
-  const [loginSession, setLoginSession] = useState<LoginSession | null>(() => readStoredLoginSession());
+  const [loginSession, setLoginSession] = useState<LoginSession | null>(() => (supabase ? null : readStoredLoginSession()));
+  const [authLoading, setAuthLoading] = useState(Boolean(supabase));
   const [view, setView] = useState<View>('dashboard');
   const [data, setData] = useState<AppData>(demoData);
   const [query, setQuery] = useState('');
@@ -403,6 +404,35 @@ export function App() {
     }
     void hydrate();
     const unsubscribe = subscribeToSupabase(() => void hydrate());
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) return undefined;
+
+    let mounted = true;
+    async function syncAuthSession() {
+      try {
+        const session = await getAuthSession();
+        if (!mounted) return;
+        setLoginSession(session?.user.email
+          ? {
+            email: session.user.email,
+            name: loginNameFromEmail(session.user.email),
+            loggedInAt: session.user.created_at ? new Date(session.user.created_at).getTime() : Date.now(),
+            expiresAt: session.expires_at ? session.expires_at * 1000 : undefined,
+          }
+          : null);
+      } finally {
+        if (mounted) setAuthLoading(false);
+      }
+    }
+
+    void syncAuthSession();
+    const unsubscribe = onAuthSessionChange(() => void syncAuthSession());
     return () => {
       mounted = false;
       unsubscribe();
@@ -860,15 +890,43 @@ export function App() {
     }
   }
 
-  function handleLogin(email: string, remember: boolean) {
-    const session = createLoginSession(email, remember);
-    storeLoginSession(session, remember);
-    setLoginSession(session);
+  async function handleLogin(email: string, password: string, mode: 'login' | 'signup', remember: boolean) {
+    if (supabase) {
+      const authSession = mode === 'signup'
+        ? await signUpWithPassword(email, password)
+        : await signInWithPassword(email, password);
+      if (!authSession?.user.email) {
+        throw new Error('Account aangemaakt. Controleer eventueel je e-mail om het account te bevestigen.');
+      }
+      setLoginSession({
+        email: authSession.user.email,
+        name: loginNameFromEmail(authSession.user.email),
+        loggedInAt: Date.now(),
+        expiresAt: authSession.expires_at ? authSession.expires_at * 1000 : undefined,
+      });
+    } else {
+      const session = createLoginSession(email, remember);
+      storeLoginSession(session, remember);
+      setLoginSession(session);
+    }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
     clearLoginSession();
+    await signOut();
     setLoginSession(null);
+  }
+
+  if (authLoading) {
+    return (
+      <div className="login-page">
+        <div className="login-card">
+          <div className="login-logo">RSO</div>
+          <h1>Scooter Management</h1>
+          <p>Sessie controleren...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!loginSession) {
@@ -936,10 +994,12 @@ export function App() {
   );
 }
 
-function LoginScreen({ onLogin, supabaseEnabled }: { onLogin: (email: string, remember: boolean) => void; supabaseEnabled: boolean }) {
+function LoginScreen({ onLogin, supabaseEnabled }: { onLogin: (email: string, password: string, mode: 'login' | 'signup', remember: boolean) => Promise<void>; supabaseEnabled: boolean }) {
   const [error, setError] = useState('');
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const email = String(form.get('email') ?? '').trim();
@@ -951,22 +1011,41 @@ function LoginScreen({ onLogin, supabaseEnabled }: { onLogin: (email: string, re
       return;
     }
 
-    onLogin(email, remember);
+    if (supabaseEnabled && password.length < 6) {
+      setError('Gebruik minimaal 6 tekens voor het wachtwoord.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      await onLogin(email, password, mode, remember);
+    } catch (loginError) {
+      setError(importErrorMessage(loginError));
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={handleSubmit}>
         <div className="login-logo">RSO</div>
-        <h1>Scooter Management</h1>
+        <h1>{mode === 'login' ? 'Inloggen' : 'Account aanmaken'}</h1>
+        <div className="login-mode-toggle">
+          <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setError(''); }}>Login</button>
+          <button type="button" className={mode === 'signup' ? 'active' : ''} onClick={() => { setMode('signup'); setError(''); }}>Nieuw account</button>
+        </div>
         <label>Email</label>
         <input name="email" type="email" defaultValue="rob@rso-scooters.nl" autoComplete="email" />
         <label>Password</label>
-        <input name="password" type="password" defaultValue="demo" autoComplete="current-password" />
+        <input name="password" type="password" defaultValue={supabaseEnabled ? '' : 'demo'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
         <label className="remember-login"><input name="remember" type="checkbox" defaultChecked /> Ingelogd blijven op dit apparaat</label>
         {error && <p className="login-error">{error}</p>}
-        <button className="primary-button" type="submit"><Lock size={16} /> Login</button>
-        <p>{supabaseEnabled ? 'Je sessie blijft bewaard na refresh. Supabase Auth kan later als extra beveiligingslaag worden aangesloten.' : 'Demo login actief. De sessie blijft bewaard in deze browser.'}</p>
+        <button className="primary-button" type="submit" disabled={loading}>
+          <Lock size={16} /> {loading ? 'Even wachten...' : mode === 'login' ? 'Login' : 'Account aanmaken'}
+        </button>
+        <p>{supabaseEnabled ? 'Gebruikersaccounts lopen via Supabase Auth. Na refresh blijft je sessie automatisch actief.' : 'Demo login actief. Configureer Supabase om echte gebruikersaccounts te gebruiken.'}</p>
       </form>
     </div>
   );

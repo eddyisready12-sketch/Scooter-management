@@ -8,6 +8,39 @@ export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
+export async function getAuthSession() {
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session;
+}
+
+export function onAuthSessionChange(onChange: () => void) {
+  if (!supabase) return () => undefined;
+  const { data } = supabase.auth.onAuthStateChange(() => onChange());
+  return () => data.subscription.unsubscribe();
+}
+
+export async function signInWithPassword(email: string, password: string) {
+  if (!supabase) throw new Error('Supabase Auth is niet geconfigureerd.');
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data.session;
+}
+
+export async function signUpWithPassword(email: string, password: string) {
+  if (!supabase) throw new Error('Supabase Auth is niet geconfigureerd.');
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw error;
+  return data.session;
+}
+
+export async function signOut() {
+  if (!supabase) return;
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
 const tableMap: Record<keyof AppData, string> = {
   scooters: 'scooters',
   containers: 'containers',
