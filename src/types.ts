@@ -93,7 +93,7 @@ export type WarrantyPart = {
   age?: string;
   claimDate: string;
   warrantyUntil: string;
-  status: 'Open' | 'In behandeling' | 'Goedgekeurd' | 'Afgewezen' | 'Vervangen';
+  status: 'Open' | 'In behandeling' | 'Goedgekeurd' | 'Afgewezen' | 'Vervangen' | 'Afgehandeld';
   dealerId?: string;
   notes: string;
 };

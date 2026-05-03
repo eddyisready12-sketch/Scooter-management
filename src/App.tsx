@@ -20,9 +20,11 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Timer,
   Upload,
   UserRound,
   UsersRound,
+  XCircle,
   Wrench,
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
@@ -66,7 +68,7 @@ const maintenancePackages = {
   },
 } as const;
 
-const warrantyStatuses: WarrantyPart['status'][] = ['Open', 'In behandeling', 'Goedgekeurd', 'Afgewezen', 'Vervangen'];
+const warrantyStatuses: WarrantyPart['status'][] = ['Open', 'In behandeling', 'Goedgekeurd', 'Afgewezen', 'Vervangen', 'Afgehandeld'];
 
 function countByStatus(scooters: Scooter[], status: ScooterStatus) {
   return scooters.filter((scooter) => scooter.status === status).length;
@@ -156,6 +158,13 @@ function nextWarrantyClaimNumber(warranties: WarrantyPart[]) {
     return Number.isFinite(number) ? Math.max(highest, number) : highest;
   }, 0) + 1;
   return `${prefix}${String(next).padStart(4, '0')}`;
+}
+
+function warrantyStatusIcon(status: WarrantyPart['status']) {
+  if (status === 'Afgehandeld' || status === 'Goedgekeurd') return <CheckCircle2 className="warranty-status-icon success" size={20} aria-label={status} />;
+  if (status === 'In behandeling') return <Timer className="warranty-status-icon pending" size={20} aria-label={status} />;
+  if (status === 'Afgewezen') return <XCircle className="warranty-status-icon danger" size={20} aria-label={status} />;
+  return <ShieldCheck className="warranty-status-icon neutral" size={20} aria-label={status} />;
 }
 
 function importErrorMessage(error: unknown) {
@@ -1760,6 +1769,7 @@ function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppDat
             <div className="empty-state inline"><ShieldCheck size={22} /><strong>Nog geen warranty claims</strong><span>Nieuwe claims verschijnen hier zodra je ze toevoegt.</span></div>
           ) : data.warranties.map((claim) => (
             <div className="claim-row" key={claim.id}>
+              {warrantyStatusIcon(claim.status)}
               <div>
                 <strong>{claim.claimNumber || claim.id} - {claim.partName}</strong>
                 <span>{claim.scooterFrame} - {claim.licensePlate || 'geen kenteken'} - {claim.partNumber}</span>

@@ -1429,15 +1429,38 @@ dd {
 
 .claim-row {
   align-items: flex-start;
+  justify-content: flex-start;
 }
 
 .claim-row div {
   display: grid;
+  flex: 1;
   gap: 4px;
 }
 
 .claim-row span:not(.status-pill),
 .claim-row small {
+  color: #65717d;
+}
+
+.warranty-status-icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.warranty-status-icon.success {
+  color: #18a546;
+}
+
+.warranty-status-icon.pending {
+  color: #d99a00;
+}
+
+.warranty-status-icon.danger {
+  color: #d64545;
+}
+
+.warranty-status-icon.neutral {
   color: #65717d;
 }
 
