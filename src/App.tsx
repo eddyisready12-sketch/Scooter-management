@@ -1105,7 +1105,7 @@ function LoginScreen({ onLogin, supabaseEnabled }: { onLogin: (email: string, pa
           <button type="button" className={mode === 'signup' ? 'active' : ''} onClick={() => { setMode('signup'); setError(''); }}>Nieuw account</button>
         </div>
         <label>Email</label>
-        <input name="email" type="email" defaultValue="rob@rso-scooters.nl" autoComplete="email" />
+        <input name="email" type="email" defaultValue="" autoComplete="email" />
         <label>Password</label>
         <input name="password" type="password" defaultValue={supabaseEnabled ? '' : 'demo'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
         <label className="remember-login"><input name="remember" type="checkbox" defaultChecked /> Ingelogd blijven op dit apparaat</label>
