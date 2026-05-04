@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, Container, Dealer, MaintenanceRecord, Scooter, WarrantyPart } from '../types';
+import type { AppData, Battery, BatteryModel, Container, Dealer, DocumentRecord, MaintenanceRecord, Scooter, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -7,6 +7,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undef
 export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
+const scooterDocumentsBucket = 'scooter-documents';
 
 export async function getAuthSession() {
   if (!supabase) return null;
@@ -163,4 +164,33 @@ export async function upsertWarrantyParts(warranties: WarrantyPart[]) {
   }
 
   throw new Error('Warranty opslaan mislukt: Supabase schema mist meerdere warranty kolommen.');
+}
+
+export async function upsertDocuments(documents: DocumentRecord[]) {
+  if (!supabase || documents.length === 0) return;
+
+  const { error } = await supabase
+    .from('documents')
+    .upsert(documents);
+
+  if (error) throw error;
+}
+
+export async function uploadScooterDocument(file: File, scooterFrame: string) {
+  if (!supabase) throw new Error('Supabase Storage is niet geconfigureerd.');
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+  const storagePath = `${scooterFrame}/${Date.now()}-${safeName}`;
+  const { error } = await supabase.storage.from(scooterDocumentsBucket).upload(storagePath, file, {
+    upsert: false,
+    contentType: file.type || undefined,
+  });
+  if (error) throw error;
+  return storagePath;
+}
+
+export async function createScooterDocumentUrl(storagePath: string) {
+  if (!supabase) throw new Error('Supabase Storage is niet geconfigureerd.');
+  const { data, error } = await supabase.storage.from(scooterDocumentsBucket).createSignedUrl(storagePath, 60);
+  if (error) throw error;
+  return data.signedUrl;
 }

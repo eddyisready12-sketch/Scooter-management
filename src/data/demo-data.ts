@@ -73,6 +73,6 @@ export const demoData: AppData = {
     { id: 'm1', scooterFrame: scooters[2].frameNumber, licensePlate: scooters[2].licensePlate, servicePackage: 'Kleine onderhoudsbeurt', serviceDate: '2026-04-12', serviceType: 'Aflevercontrole', mileage: '12', nextServiceDate: '2026-10-12', status: 'Uitgevoerd', checklist: ['Bandenspanningscheck', 'Verlichtingscheck'], notes: 'Controle voor aflevering.' },
   ],
   documents: [
-    { id: 'doc1', scooterFrame: scooters[0].frameNumber, type: 'COC', fileName: 'coc-coral-878.pdf', note: 'Uploaded after arrival inspection.' },
+    { id: 'doc1', scooterFrame: scooters[0].frameNumber, type: 'CVO', fileName: 'coc-coral-878.pdf', note: 'Uploaded after arrival inspection.', storagePath: `${scooters[0].frameNumber}/coc-coral-878.pdf`, mimeType: 'application/pdf', uploadedAt: '2026-04-26T10:14:00' },
   ],
 };

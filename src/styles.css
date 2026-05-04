@@ -1813,6 +1813,41 @@ dd {
   color: #2f3a45;
 }
 
+.document-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #dce1e6;
+}
+
+.document-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.document-row span,
+.document-row small {
+  color: #65717d;
+}
+
+.document-upload-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid #dce1e6;
+}
+
+.document-upload-form label {
+  display: grid;
+  gap: 6px;
+  color: #1c2732;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .rdw-panel {
   margin-top: 14px;
 }
@@ -1975,6 +2010,10 @@ dd {
 
   .lane-columns,
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .document-upload-form {
     grid-template-columns: 1fr;
   }
 

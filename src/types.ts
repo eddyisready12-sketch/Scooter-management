@@ -115,9 +115,13 @@ export type MaintenanceRecord = {
 export type DocumentRecord = {
   id: string;
   scooterFrame: string;
-  type: 'Invoice' | 'COC' | 'Warranty' | 'Photo' | 'Other';
+  type: 'CVO' | 'Overschrijving' | 'Vrijwaringsbewijs' | 'Tijdelijk document' | 'Factuur' | 'Overig';
   fileName: string;
   note: string;
+  storagePath?: string;
+  mimeType?: string;
+  fileSize?: number;
+  uploadedAt?: string;
 };
 
 export type AppData = {

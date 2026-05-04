@@ -29,8 +29,8 @@ import {
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport } from './lib/csv';
-import { getAuthSession, loadSupabaseData, onAuthSessionChange, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertMaintenanceRecords, upsertScooters, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
+import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertScooters, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'dealers';
@@ -845,6 +845,31 @@ export function App() {
     }
   }
 
+  async function addDocument(scooterFrame: string, type: DocumentRecord['type'], note: string, file: File) {
+    if (!file) throw new Error('Selecteer eerst een bestand.');
+    const storagePath = await uploadScooterDocument(file, scooterFrame);
+    const document: DocumentRecord = {
+      id: `document-${Date.now()}`,
+      scooterFrame,
+      type,
+      fileName: file.name,
+      note,
+      storagePath,
+      mimeType: file.type || undefined,
+      fileSize: file.size,
+      uploadedAt: new Date().toISOString(),
+    };
+    await upsertDocuments([document]);
+    setData((current) => ({ ...current, documents: [document, ...current.documents] }));
+    return document;
+  }
+
+  async function openDocument(document: DocumentRecord) {
+    if (!document.storagePath) throw new Error('Dit document heeft nog geen opslagpad.');
+    const signedUrl = await createScooterDocumentUrl(document.storagePath);
+    window.open(signedUrl, '_blank', 'noopener,noreferrer');
+  }
+
   async function addBatteryModel(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
@@ -1026,8 +1051,11 @@ export function App() {
           dealers={data.dealers}
           warranties={data.warranties.filter((warranty) => warranty.scooterFrame === selectedScooter.frameNumber)}
           maintenance={data.maintenance.filter((record) => record.scooterFrame === selectedScooter.frameNumber)}
+          documents={data.documents.filter((document) => document.scooterFrame === selectedScooter.frameNumber)}
           onClose={() => setSelectedScooter(null)}
           onUpdate={updateScooter}
+          onAddDocument={addDocument}
+          onOpenDocument={openDocument}
         />
       )}
     </div>
@@ -2601,10 +2629,32 @@ function ContainerListPanel({ title, containers, scooters, green = false }: { ti
   );
 }
 
-function ScooterDrawer({ scooter, dealers, warranties, maintenance, onClose, onUpdate }: { scooter: Scooter; dealers: Dealer[]; warranties: WarrantyPart[]; maintenance: MaintenanceRecord[]; onClose: () => void; onUpdate: (scooter: Scooter) => void | Promise<void> }) {
+function ScooterDrawer({
+  scooter,
+  dealers,
+  warranties,
+  maintenance,
+  documents,
+  onClose,
+  onUpdate,
+  onAddDocument,
+  onOpenDocument,
+}: {
+  scooter: Scooter;
+  dealers: Dealer[];
+  warranties: WarrantyPart[];
+  maintenance: MaintenanceRecord[];
+  documents: DocumentRecord[];
+  onClose: () => void;
+  onUpdate: (scooter: Scooter) => void | Promise<void>;
+  onAddDocument: (scooterFrame: string, type: DocumentRecord['type'], note: string, file: File) => Promise<DocumentRecord>;
+  onOpenDocument: (document: DocumentRecord) => Promise<void>;
+}) {
   const [draft, setDraft] = useState(scooter);
   const [rdwLoading, setRdwLoading] = useState(false);
   const [rdwMessage, setRdwMessage] = useState('');
+  const [documentMessage, setDocumentMessage] = useState('');
+  const [documentUploading, setDocumentUploading] = useState(false);
   const registrationComplete = isRegistrationComplete(scooter);
 
   async function handleRdwFetch() {
@@ -2630,6 +2680,40 @@ function ScooterDrawer({ scooter, dealers, warranties, maintenance, onClose, onU
       setRdwMessage(`RDW ophalen mislukt: ${importErrorMessage(error)}`);
     } finally {
       setRdwLoading(false);
+    }
+  }
+
+  async function handleDocumentSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const file = form.get('file');
+    const type = String(form.get('type') ?? 'Overig') as DocumentRecord['type'];
+    const note = String(form.get('note') ?? '').trim();
+
+    if (!(file instanceof File) || file.size === 0) {
+      setDocumentMessage('Kies eerst een bestand om te uploaden.');
+      return;
+    }
+
+    setDocumentUploading(true);
+    setDocumentMessage('');
+    try {
+      await onAddDocument(scooter.frameNumber, type, note, file);
+      setDocumentMessage(`${file.name} is toegevoegd bij ${scooter.frameNumber}.`);
+      formElement.reset();
+    } catch (error) {
+      setDocumentMessage(`Document upload mislukt: ${importErrorMessage(error)}`);
+    } finally {
+      setDocumentUploading(false);
+    }
+  }
+
+  async function handleOpenDocument(document: DocumentRecord) {
+    try {
+      await onOpenDocument(document);
+    } catch (error) {
+      setDocumentMessage(`Document openen mislukt: ${importErrorMessage(error)}`);
     }
   }
 
@@ -2685,7 +2769,41 @@ function ScooterDrawer({ scooter, dealers, warranties, maintenance, onClose, onU
             <p key={record.id}>{formatDate(record.serviceDate)} - {record.serviceType} - {record.status}</p>
           )) : <p>Geen onderhoud geregistreerd</p>}
         </section>
-        <section className="panel drawer-info-panel"><div className="panel-title"><FileText size={16} /> Documenten</div><p>Nog geen documenten toegevoegd</p></section>
+        <section className="panel drawer-info-panel">
+          <div className="panel-title"><FileText size={16} /> Documenten</div>
+          {documents.length ? documents.map((document) => (
+            <div className="document-row" key={document.id}>
+              <div>
+                <strong>{document.fileName}</strong>
+                <span>{document.type}{document.uploadedAt ? ` - ${formatDate(document.uploadedAt)}` : ''}</span>
+                <small>{document.note || 'Geen notitie'}</small>
+              </div>
+              <button className="secondary-button" type="button" onClick={() => void handleOpenDocument(document)}>Openen</button>
+            </div>
+          )) : <p>Nog geen documenten toegevoegd</p>}
+          <form className="document-upload-form" onSubmit={handleDocumentSubmit}>
+            <label>Type bestand
+              <select name="type" defaultValue="Overig">
+                <option value="CVO">CVO</option>
+                <option value="Overschrijving">Overschrijving</option>
+                <option value="Vrijwaringsbewijs">Vrijwaringsbewijs</option>
+                <option value="Tijdelijk document">Tijdelijk document</option>
+                <option value="Factuur">Factuur</option>
+                <option value="Overig">Overig</option>
+              </select>
+            </label>
+            <label>Selecteer bestand
+              <input name="file" type="file" />
+            </label>
+            <label className="wide-field">Notitie
+              <textarea name="note" placeholder="Bijvoorbeeld: klantfactuur of foto bij aflevering" />
+            </label>
+            <button className="primary-button" type="submit" disabled={documentUploading}>
+              <Upload size={16} /> {documentUploading ? 'Uploaden...' : 'Document toevoegen'}
+            </button>
+          </form>
+          {documentMessage ? <p className="drawer-note">{documentMessage}</p> : null}
+        </section>
         <section className="panel drawer-info-panel rdw-panel">
           <div className="panel-title"><ShieldCheck size={16} /> RDW voertuiggegevens</div>
           <dl className="detail-list rdw-list">
