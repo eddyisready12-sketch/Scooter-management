@@ -169,11 +169,27 @@ export async function upsertWarrantyParts(warranties: WarrantyPart[]) {
 export async function upsertDocuments(documents: DocumentRecord[]) {
   if (!supabase || documents.length === 0) return;
 
-  const { error } = await supabase
-    .from('documents')
-    .upsert(documents);
+  let payload = documents.map((document) => ({ ...document }) as Record<string, unknown>);
+  const removedColumns = new Set<string>();
 
-  if (error) throw error;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await supabase
+      .from('documents')
+      .upsert(payload);
+
+    if (!error) return;
+
+    const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
+    if (!missingColumn || removedColumns.has(missingColumn)) throw error;
+
+    removedColumns.add(missingColumn);
+    payload = payload.map((record) => {
+      const { [missingColumn]: _removed, ...rest } = record;
+      return rest;
+    });
+  }
+
+  throw new Error('Document opslaan mislukt: Supabase schema mist meerdere document kolommen.');
 }
 
 export async function uploadScooterDocument(file: File, scooterFrame: string) {
