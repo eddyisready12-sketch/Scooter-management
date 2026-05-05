@@ -1188,15 +1188,17 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
           <button onClick={() => setStatusFilter('all')}>Toon alles</button>
         </div>
       )}
-      <ScooterTable
-        scooters={scooters}
-        dealers={data.dealers}
-        query={query}
-        setQuery={setQuery}
-        onSelect={onSelect}
-        title={statusFilter === 'all' ? 'Beschikbare scooters' : `Scooters: ${statusFilter} (${scooters.length})`}
-        onBulkRdwCheck={statusFilter === 'Verkocht dealer' || statusFilter === 'Verkocht klant' ? onBulkRdwCheck : undefined}
-      />
+      {statusFilter !== 'all' && (
+        <ScooterTable
+          scooters={scooters}
+          dealers={data.dealers}
+          query={query}
+          setQuery={setQuery}
+          onSelect={onSelect}
+          title={`Scooters: ${statusFilter} (${scooters.length})`}
+          onBulkRdwCheck={statusFilter === 'Verkocht dealer' || statusFilter === 'Verkocht klant' ? onBulkRdwCheck : undefined}
+        />
+      )}
     </>
   );
 }
@@ -1398,9 +1400,99 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     : filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize);
   const firstEntry = filteredRows.length === 0 ? 0 : pageSize === 'all' ? 1 : (safePage - 1) * pageSize + 1;
   const lastEntry = pageSize === 'all' ? filteredRows.length : Math.min(safePage * pageSize, filteredRows.length);
+
+  const exportRows = filteredRows.map((scooter) => ({
+    Model: scooter.model,
+    'Frame #': scooter.frameNumber,
+    Kleur: scooter.color,
+    Kenteken: scooter.licensePlate || '-',
+    Snelheid: normalizeSpeedValue(scooter.speed) || '-',
+    Status: scooter.status,
+    Dealer: dealerName(dealers, scooter.dealerId) || '-',
+    Factuur: scooter.invoiceNumber || '-',
+    Tenaam: isRegistrationComplete(scooter) ? 'Ja' : 'Nee',
+  }));
+
   function setColumnFilter(key: keyof typeof columnFilters, value: string) {
     setColumnFilters((current) => ({ ...current, [key]: value }));
     setPage(1);
+  }
+
+  function csvEscape(value: string) {
+    if (value.includes('"') || value.includes(',') || value.includes('\n')) {
+      return `"${value.replace(/"/g, '""')}"`;
+    }
+    return value;
+  }
+
+  function downloadTextFile(filename: string, content: string, mimeType: string) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportCsv() {
+    if (exportRows.length === 0) return;
+    const headers = Object.keys(exportRows[0]);
+    const lines = [
+      headers.join(','),
+      ...exportRows.map((row) => headers.map((header) => csvEscape(String(row[header as keyof typeof row] ?? ''))).join(',')),
+    ];
+    downloadTextFile(`${title.replace(/[^\w-]+/g, '_').toLowerCase() || 'scooters'}.csv`, lines.join('\n'), 'text/csv;charset=utf-8;');
+  }
+
+  async function exportExcel() {
+    if (exportRows.length === 0) return;
+    const XLSX = await import('xlsx');
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Scooters');
+    XLSX.writeFile(workbook, `${title.replace(/[^\w-]+/g, '_').toLowerCase() || 'scooters'}.xlsx`);
+  }
+
+  function openPrintView(mode: 'print' | 'pdf') {
+    if (exportRows.length === 0) return;
+    const headers = Object.keys(exportRows[0]);
+    const rowsHtml = exportRows.map((row) => (
+      `<tr>${headers.map((header) => `<td>${String(row[header as keyof typeof row] ?? '-')}</td>`).join('')}</tr>`
+    )).join('');
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=800');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
+            h1 { margin: 0 0 16px; font-size: 24px; }
+            p { margin: 0 0 20px; color: #475569; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; vertical-align: top; }
+            th { background: #f8fafc; }
+          </style>
+        </head>
+        <body>
+          <h1>${title}</h1>
+          <p>${exportRows.length} scooters in export</p>
+          <table>
+            <thead><tr>${headers.map((header) => `<th>${header}</th>`).join('')}</tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      if (mode === 'pdf') {
+        printWindow.close();
+      }
+    }, 250);
   }
 
   async function handleBulkRdwCheck() {
@@ -1429,7 +1521,12 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
       </div>
       {rdwCheckMessage && <div className="inline-notice">{rdwCheckMessage}</div>}
       <div className="table-toolbar">
-        <div className="button-group"><button>CSV</button><button>Excel</button><button>PDF</button><button>Print</button></div>
+        <div className="button-group">
+          <button type="button" disabled={exportRows.length === 0} onClick={exportCsv}>CSV</button>
+          <button type="button" disabled={exportRows.length === 0} onClick={exportExcel}>Excel</button>
+          <button type="button" disabled={exportRows.length === 0} onClick={() => openPrintView('pdf')}>PDF</button>
+          <button type="button" disabled={exportRows.length === 0} onClick={() => openPrintView('print')}>Print</button>
+        </div>
         <div className="table-controls">
           <label>Rows:
             <select value={pageSize} onChange={(event) => { setPageSize(event.target.value === 'all' ? 'all' : Number(event.target.value)); setPage(1); }}>
