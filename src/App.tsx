@@ -2574,7 +2574,7 @@ function ListPanel({ title, items, green = false }: { title: string; items: stri
 }
 
 function ContainerListPanel({ title, containers, scooters, green = false }: { title: string; containers: Container[]; scooters: Scooter[]; green?: boolean }) {
-  const [openContainerId, setOpenContainerId] = useState<string | null>(containers[0]?.id ?? null);
+  const [openContainerId, setOpenContainerId] = useState<string | null>(null);
   return (
     <section className="panel list-panel">
       <div className="panel-title"><Boxes size={16} /> {title}</div>
