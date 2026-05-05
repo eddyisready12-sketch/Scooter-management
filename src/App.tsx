@@ -1279,14 +1279,22 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
     const current = map.get(key) ?? {
       year: salesYearForScooter(scooter),
       model,
-      count: 0,
+      snorCount: 0,
+      bromCount: 0,
+      totalCount: 0,
     };
-    map.set(key, { ...current, count: current.count + 1 });
+    const speed = normalizeSpeedValue(scooter.speed);
+    map.set(key, {
+      ...current,
+      snorCount: current.snorCount + (speed === '25' ? 1 : 0),
+      bromCount: current.bromCount + (speed === '45' ? 1 : 0),
+      totalCount: current.totalCount + 1,
+    });
     return map;
-  }, new Map<string, { year: string; model: string; count: number }>()).values()).sort((a, b) => {
+  }, new Map<string, { year: string; model: string; snorCount: number; bromCount: number; totalCount: number }>()).values()).sort((a, b) => {
     if (a.year === 'Onbekend') return 1;
     if (b.year === 'Onbekend') return -1;
-    return b.year.localeCompare(a.year) || b.count - a.count || a.model.localeCompare(b.model);
+    return b.year.localeCompare(a.year) || b.totalCount - a.totalCount || a.model.localeCompare(b.model);
   });
   const bucketScooters = selectedBucket
     ? soldScooters
@@ -1327,7 +1335,7 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
       <div className="table-wrap sales-table-wrap">
         <table className="sales-table">
           <thead>
-            <tr><th>Jaar</th><th>Model</th><th>Aantal</th></tr>
+            <tr><th>Jaar</th><th>Model</th><th>Snorscooter (25)</th><th>Bromscooter (45)</th><th>Totaal</th></tr>
           </thead>
           <tbody>
             {rows.length ? rows.map((row) => (
@@ -1338,10 +1346,12 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
               >
                 <td>{row.year}</td>
                 <td><button className="link-button" type="button">{row.model}</button></td>
-                <td><strong>{row.count}</strong></td>
+                <td>{row.snorCount}</td>
+                <td>{row.bromCount}</td>
+                <td><strong>{row.totalCount}</strong></td>
               </tr>
             )) : (
-              <tr><td colSpan={3}>Geen verkoopdata gevonden.</td></tr>
+              <tr><td colSpan={5}>Geen verkoopdata gevonden.</td></tr>
             )}
           </tbody>
         </table>
