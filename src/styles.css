@@ -504,6 +504,34 @@ tbody tr:hover {
   margin-bottom: 12px;
 }
 
+.notice-details {
+  margin-top: 10px;
+}
+
+.notice-details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.notice-detail-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.notice-detail-list code {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  font-size: 12px;
+}
+
 .empty-state {
   display: grid;
   place-items: center;

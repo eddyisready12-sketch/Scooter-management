@@ -426,11 +426,17 @@ export function App() {
   const [query, setQuery] = useState('');
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [csvMessage, setCsvMessage] = useState('');
+  const [csvMessageDetails, setCsvMessageDetails] = useState<string[]>([]);
   const [dealerImportMessage, setDealerImportMessage] = useState('');
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
   const [batteryMessage, setBatteryMessage] = useState('');
   const [warrantyMessage, setWarrantyMessage] = useState('');
   const [statusFilter, setStatusFilter] = useState<ScooterStatus | 'all'>('all');
+
+  function showCsvMessage(message: string, details: string[] = []) {
+    setCsvMessage(message);
+    setCsvMessageDetails(details);
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -441,7 +447,7 @@ export function App() {
           setData((current) => ({ ...current, ...remote }));
         }
       } catch {
-        setCsvMessage('Supabase kon niet laden, demo data blijft actief.');
+        showCsvMessage('Supabase kon niet laden, demo data blijft actief.');
       }
     }
     void hydrate();
@@ -495,7 +501,7 @@ export function App() {
     try {
       const rows = await parseScooterImport(file);
       if (rows.length === 0) {
-        setCsvMessage(`Geen scooters gevonden in ${file.name}. Controleer of er een kolom Frame #, VIN of Chassis aanwezig is.`);
+        showCsvMessage(`Geen scooters gevonden in ${file.name}. Controleer of er een kolom Frame #, VIN of Chassis aanwezig is.`);
         return;
       }
 
@@ -517,9 +523,9 @@ export function App() {
       const targetStatus = statusOverride ? ` met status ${statusOverride}` : '';
       const dealerMessage = autoDealers.length ? ` ${autoDealers.length} ontbrekende dealers automatisch toegevoegd.` : '';
       const containerMessage = importedContainers.length ? ` ${importedContainers.length} containers gekoppeld/bijgewerkt.` : '';
-      setCsvMessage(`${rows.length} scooterregels geimporteerd naar het Scooters voorraadblok${targetStatus} uit ${file.name}.${dealerMessage}${containerMessage}`);
+      showCsvMessage(`${rows.length} scooterregels geimporteerd naar het Scooters voorraadblok${targetStatus} uit ${file.name}.${dealerMessage}${containerMessage}`);
     } catch (error) {
-      setCsvMessage(`Import mislukt: ${importErrorMessage(error)}`);
+      showCsvMessage(`Import mislukt: ${importErrorMessage(error)}`);
     }
   }
 
@@ -528,7 +534,7 @@ export function App() {
       const dealers = await parseDealerImport(file);
       if (dealers.length === 0) {
         const message = `Geen dealers gevonden in ${file.name}. Controleer kolommen zoals Bedrijfsnaam, Dealer, Email of Telefoon.`;
-        if (showDashboardMessage) setCsvMessage(message);
+        if (showDashboardMessage) showCsvMessage(message);
         setDealerImportMessage(message);
         return;
       }
@@ -540,11 +546,11 @@ export function App() {
       });
       await upsertDealers(dealers);
       const message = `${dealers.length} dealers geimporteerd naar het Dealers blok uit ${file.name}.`;
-      if (showDashboardMessage) setCsvMessage(message);
+      if (showDashboardMessage) showCsvMessage(message);
       setDealerImportMessage(message);
     } catch (error) {
       const message = `Dealer import mislukt: ${importErrorMessage(error)}`;
-      if (showDashboardMessage) setCsvMessage(message);
+      if (showDashboardMessage) showCsvMessage(message);
       setDealerImportMessage(message);
     }
   }
@@ -624,11 +630,11 @@ export function App() {
     setSelectedScooter(normalized);
     try {
       await upsertScooters([normalized]);
-      setCsvMessage(isRegistrationComplete(normalized)
+      showCsvMessage(isRegistrationComplete(normalized)
         ? `${normalized.frameNumber} is tenaamgesteld en automatisch naar Verkocht klant gezet.`
         : `${normalized.frameNumber} is bijgewerkt.`);
     } catch (error) {
-      setCsvMessage(`Scooter opslaan mislukt: ${importErrorMessage(error)}`);
+      showCsvMessage(`Scooter opslaan mislukt: ${importErrorMessage(error)}`);
     }
   }
 
@@ -684,7 +690,7 @@ export function App() {
     if (skipped) parts.push(`${skipped} zonder kenteken overgeslagen`);
     if (failed.length) parts.push(`${failed.length} mislukt`);
     const message = `${parts.join(', ')}.`;
-    setCsvMessage(message);
+    showCsvMessage(message);
     return message;
   }
 
@@ -701,7 +707,7 @@ export function App() {
     const arrivedAt = arrivedAtInput ? new Date(arrivedAtInput).toISOString() : '';
     const content = String(form.get('content') ?? '').trim();
     if (!invoiceNumber || !number || !sealNumber || !content) {
-      setCsvMessage('Container import mislukt: vul invoice, container, seal en container content in.');
+      showCsvMessage('Container import mislukt: vul invoice, container, seal en container content in.');
       return;
     }
     const container: Container = {
@@ -715,7 +721,7 @@ export function App() {
     };
     const scooters = parseContainerScooterRows(content, container.id);
     if (scooters.length === 0) {
-      setCsvMessage('Container import mislukt: geen scooterregels gevonden in de geplakte content.');
+      showCsvMessage('Container import mislukt: geen scooterregels gevonden in de geplakte content.');
       return;
     }
 
@@ -723,22 +729,25 @@ export function App() {
       await upsertContainers([container]);
       if (importMode === 'update-existing') {
         const existingByFrame = new Map(data.scooters.map((scooter) => [normalizeLookup(scooter.frameNumber), scooter]));
-        const updates: Scooter[] = scooters
-          .flatMap((imported) => {
-            const existing = existingByFrame.get(normalizeLookup(imported.frameNumber));
-            if (!existing) return [];
-            const update: Scooter = {
-              ...existing,
-              engineNumber: existing.engineNumber?.trim() ? existing.engineNumber : imported.engineNumber,
-              containerId: existing.containerId || container.id,
-              arrivedAt: existing.arrivedAt || container.arrivedAt,
-              model: existing.model || imported.model,
-              color: existing.color || imported.color,
-              speed: existing.speed || imported.speed,
-            };
-            return [update];
-          });
-        const missing = scooters.length - updates.length;
+        const missingFrames: string[] = [];
+        const updates: Scooter[] = scooters.flatMap((imported) => {
+          const existing = existingByFrame.get(normalizeLookup(imported.frameNumber));
+          if (!existing) {
+            missingFrames.push(imported.frameNumber);
+            return [];
+          }
+          const update: Scooter = {
+            ...existing,
+            engineNumber: existing.engineNumber?.trim() ? existing.engineNumber : imported.engineNumber,
+            containerId: existing.containerId || container.id,
+            arrivedAt: existing.arrivedAt || container.arrivedAt,
+            model: existing.model || imported.model,
+            color: existing.color || imported.color,
+            speed: existing.speed || imported.speed,
+          };
+          return [update];
+        });
+        const missing = missingFrames.length;
         if (updates.length > 0) await upsertScooters(updates);
         setData((current) => {
           const containers = new Map(current.containers.map((item) => [item.id, item]));
@@ -746,7 +755,10 @@ export function App() {
           const updatesById = new Map(updates.map((scooter) => [scooter.id, scooter]));
           return { ...current, containers: [...containers.values()], scooters: current.scooters.map((scooter) => updatesById.get(scooter.id) ?? scooter) };
         });
-        setCsvMessage(`${updates.length} bestaande scooters bijgewerkt voor container ${container.number}.${missing ? ` ${missing} framenummers niet gevonden.` : ''}`);
+        showCsvMessage(
+          `${updates.length} bestaande scooters bijgewerkt voor container ${container.number}.${missing ? ` ${missing} framenummers niet gevonden.` : ''}`,
+          missingFrames,
+        );
       } else {
         await upsertScooters(scooters);
         setData((current) => {
@@ -756,11 +768,11 @@ export function App() {
           scooters.forEach((scooter) => scooterMap.set(scooter.id, scooter));
           return { ...current, containers: [...containers.values()], scooters: [...scooterMap.values()] };
         });
-        setCsvMessage(`${scooters.length} scooters geimporteerd in container ${container.number}.`);
+        showCsvMessage(`${scooters.length} scooters geimporteerd in container ${container.number}.`);
       }
       formElement.reset();
     } catch (error) {
-      setCsvMessage(`Container import mislukt: ${importErrorMessage(error)}`);
+      showCsvMessage(`Container import mislukt: ${importErrorMessage(error)}`);
     }
   }
 
@@ -1035,8 +1047,8 @@ export function App() {
         </header>
 
         <section className="content">
-          {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
-          {view === 'containers' && <Containers data={data} message={csvMessage} onImport={addContainerImport} />}
+          {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
+          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
@@ -1121,10 +1133,28 @@ function LoginScreen({ onLogin, supabaseEnabled }: { onLogin: (email: string, pa
   );
 }
 
-function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelect, statusFilter, setStatusFilter, onBulkRdwCheck }: {
+function ExpandableNotice({ message, details }: { message: string; details?: string[] }) {
+  if (!message) return null;
+  return (
+    <div className="notice">
+      <span>{message}</span>
+      {details && details.length > 0 && (
+        <details className="notice-details">
+          <summary>Toon framenummers ({details.length})</summary>
+          <div className="notice-detail-list">
+            {details.map((detail) => <code key={detail}>{detail}</code>)}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function Dashboard({ data, onImport, message, messageDetails, query, setQuery, scooters, onSelect, statusFilter, setStatusFilter, onBulkRdwCheck }: {
   data: AppData;
   onImport: (target: ImportTarget, status: ImportScooterStatus, event: ChangeEvent<HTMLInputElement>) => void;
   message: string;
+  messageDetails: string[];
   query: string;
   setQuery: (value: string) => void;
   scooters: Scooter[];
@@ -1171,7 +1201,7 @@ function Dashboard({ data, onImport, message, query, setQuery, scooters, onSelec
           <label className="upload-button"><Upload size={16} /> CSV / Excel importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={(event) => onImport(importTarget, importStatus, event)} /></label>
         </div>
       </div>
-      {message && <div className="notice">{message}</div>}
+      <ExpandableNotice message={message} details={messageDetails} />
       <div className="stat-grid">
         {cards.map(({ label, icon: Icon }) => (
           <button
@@ -1588,7 +1618,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
   );
 }
 
-function Containers({ data, message, onImport }: { data: AppData; message: string; onImport: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+function Containers({ data, message, messageDetails, onImport }: { data: AppData; message: string; messageDetails: string[]; onImport: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   const [showImport, setShowImport] = useState(false);
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const pending = sortedContainers.filter((container) => container.status !== 'Aangekomen');
@@ -1604,7 +1634,7 @@ function Containers({ data, message, onImport }: { data: AppData; message: strin
           <span>{data.containers.length} containers geregistreerd</span>
         </div>
       </div>
-      {message && <div className="notice">{message}</div>}
+      <ExpandableNotice message={message} details={messageDetails} />
       <section className="panel container-command-panel">
         <div>
           <span>Container import</span>
@@ -2922,3 +2952,4 @@ function ScooterDrawer({
     </div>
   );
 }
+
