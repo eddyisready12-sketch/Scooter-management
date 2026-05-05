@@ -316,7 +316,9 @@ function parseContainerScooterRows(content: string, containerId: string): Scoote
       const columns = line.includes('\t') ? line.split('\t') : line.split(/\s{2,}/);
       const compactColumns = columns.map((column) => column.trim()).filter(Boolean);
       const numericFirstColumn = /^[\d/]+$/.test(compactColumns[0] ?? '');
-      const values = numericFirstColumn ? compactColumns.slice(1) : compactColumns;
+      const indexedFirstColumn = /^[A-Z]?\d+-\d+$/i.test(compactColumns[0] ?? '');
+      const hasLeadingIndexColumn = compactColumns.length >= 6 && (numericFirstColumn || indexedFirstColumn);
+      const values = hasLeadingIndexColumn ? compactColumns.slice(1) : compactColumns;
       const fallback = line.split(/\s+/);
       const model = values[0] ?? fallback[1] ?? '';
       const frameNumber = values[1] ?? fallback.find((value) => /^L[A-Z0-9]{8,}/i.test(value)) ?? '';
