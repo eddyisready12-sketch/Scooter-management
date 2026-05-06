@@ -204,6 +204,48 @@ h2 {
   margin-bottom: 14px;
 }
 
+.dashboard-registered-panel {
+  margin-bottom: 16px;
+}
+
+.dashboard-registered-list {
+  display: grid;
+}
+
+.dashboard-registered-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) minmax(180px, 1fr) minmax(180px, 1fr) 140px;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid #dce1e6;
+  background: transparent;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.dashboard-registered-row:first-child {
+  border-top: 0;
+}
+
+.dashboard-registered-row:hover {
+  background: #f8fbff;
+}
+
+.dashboard-registered-row strong {
+  color: #0f172a;
+}
+
+.dashboard-registered-row span,
+.dashboard-registered-row small {
+  color: #5a6773;
+}
+
+.dashboard-registered-row small {
+  text-align: right;
+}
+
 .stat-card {
   display: flex;
   gap: 12px;
@@ -1972,6 +2014,15 @@ dd {
   .battery-groups,
   .battery-side {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-registered-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .dashboard-registered-row small {
+    text-align: left;
   }
 }
 

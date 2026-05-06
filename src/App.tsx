@@ -1197,6 +1197,14 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
     { label: 'In consignatie', icon: BriefcaseBusiness },
     { label: 'In optie', icon: CalendarDays },
   ];
+  const latestRegisteredScooters = [...data.scooters]
+    .filter((scooter) => isRegistrationComplete(scooter))
+    .sort((a, b) => {
+      const aDate = new Date(a.lastRegistrationDate || a.firstRegistrationDate || a.firstAdmissionDate || 0).getTime();
+      const bDate = new Date(b.lastRegistrationDate || b.firstRegistrationDate || b.firstAdmissionDate || 0).getTime();
+      return bDate - aDate || a.frameNumber.localeCompare(b.frameNumber);
+    })
+    .slice(0, 10);
   return (
     <>
       <div className="page-title-row">
@@ -1237,6 +1245,30 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
           </button>
         ))}
       </div>
+      <section className="panel dashboard-registered-panel">
+        <div className="panel-title">
+          <span className="panel-title-label"><CheckCircle2 size={16} /> Laatste 10 tenaamgestelde scooters</span>
+        </div>
+        {latestRegisteredScooters.length ? (
+          <div className="dashboard-registered-list">
+            {latestRegisteredScooters.map((scooter) => (
+              <button
+                key={scooter.id}
+                type="button"
+                className="dashboard-registered-row"
+                onClick={() => onSelect(scooter)}
+              >
+                <strong>{scooter.frameNumber}</strong>
+                <span>{normalizeSalesModel(scooter.model)} - {scooter.licensePlate || '-'}</span>
+                <span>{dealerName(data.dealers, scooter.dealerId) || 'Geen dealer'}</span>
+                <small>{formatDate(scooter.lastRegistrationDate || scooter.firstRegistrationDate || scooter.firstAdmissionDate)}</small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="empty">Nog geen tenaamgestelde scooters gevonden.</p>
+        )}
+      </section>
       {statusFilter !== 'all' && (
         <div className="filter-notice">
           Gefilterd op <strong>{statusFilter}</strong>
