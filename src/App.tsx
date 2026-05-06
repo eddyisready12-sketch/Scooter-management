@@ -401,6 +401,7 @@ async function fetchRdwRegistration(licensePlate: string) {
     datum_eerste_tenaamstelling_in_nederland_dt?: string;
     datum_eerste_toelating?: string;
     datum_eerste_toelating_dt?: string;
+    maximale_constructiesnelheid?: string;
     afwijkende_maximum_snelheid?: string;
     maximum_snelheid?: string;
     type?: string;
@@ -424,6 +425,7 @@ async function fetchRdwRegistration(licensePlate: string) {
     firstRegistrationDate: rdwDateToInputDate(record.datum_eerste_tenaamstelling_in_nederland_dt || record.datum_eerste_tenaamstelling_in_nederland),
     lastRegistrationDate: rdwDateToInputDate(record.datum_tenaamstelling_dt || record.datum_tenaamstelling),
     speed: normalizeRdwSpeedValue(
+      record.maximale_constructiesnelheid,
       fuelRecord?.maximum_snelheid_voertuig,
       fuelRecord?.maximumconstructiesnelheid,
       fuelRecord?.maximum_constructiesnelheid,
