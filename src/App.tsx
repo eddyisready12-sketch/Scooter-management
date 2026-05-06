@@ -1265,7 +1265,8 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
                 onClick={() => onSelect(scooter)}
               >
                 <strong>{scooter.frameNumber}</strong>
-                <span>{normalizeSalesModel(scooter.model)} - {scooter.licensePlate || '-'}</span>
+                <span>{normalizeSalesModel(scooter.model)}</span>
+                <span>{scooter.licensePlate || '-'}</span>
                 <span>{dealerName(data.dealers, scooter.dealerId) || 'Geen dealer'}</span>
                 <small>{formatDate(scooter.firstRegistrationDate)}</small>
               </button>
