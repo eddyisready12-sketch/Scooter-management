@@ -1485,6 +1485,11 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     invoice: '',
     registration: '',
   });
+  const dealerOptions = Array.from(new Set(
+    scooters
+      .map((scooter) => dealerName(dealers, scooter.dealerId))
+      .filter(Boolean),
+  )).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const filteredRows = scooters.filter((scooter) => {
     const dealer = dealerName(dealers, scooter.dealerId);
     const registrationComplete = isRegistrationComplete(scooter);
@@ -1495,7 +1500,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
       (scooter.licensePlate || '').toLowerCase().includes(columnFilters.licensePlate.toLowerCase()) &&
       (!columnFilters.speed || normalizeSpeedValue(scooter.speed) === columnFilters.speed) &&
       (!columnFilters.status || scooter.status === columnFilters.status) &&
-      dealer.toLowerCase().includes(columnFilters.dealer.toLowerCase()) &&
+      (!columnFilters.dealer || dealer === columnFilters.dealer) &&
       (scooter.invoiceNumber || '').toLowerCase().includes(columnFilters.invoice.toLowerCase()) &&
       (!columnFilters.registration || (columnFilters.registration === 'complete' ? registrationComplete : !registrationComplete))
     );
@@ -1658,7 +1663,12 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
               <th><input value={columnFilters.licensePlate} onChange={(event) => setColumnFilter('licensePlate', event.target.value)} aria-label="Filter kenteken" /></th>
               <th><select value={columnFilters.speed} onChange={(event) => setColumnFilter('speed', event.target.value)} aria-label="Filter snelheid"><option value="">Alle</option>{speedOptions.map((speed) => <option value={speed} key={speed}>{speed}</option>)}</select></th>
               <th><select value={columnFilters.status} onChange={(event) => setColumnFilter('status', event.target.value)} aria-label="Filter status"><option value="">Alle</option>{Object.keys(statusColor).map((status) => <option value={status} key={status}>{status}</option>)}</select></th>
-              <th><input value={columnFilters.dealer} onChange={(event) => setColumnFilter('dealer', event.target.value)} aria-label="Filter dealer" /></th>
+              <th>
+                <select value={columnFilters.dealer} onChange={(event) => setColumnFilter('dealer', event.target.value)} aria-label="Filter dealer">
+                  <option value="">Alle</option>
+                  {dealerOptions.map((dealer) => <option value={dealer} key={dealer}>{dealer}</option>)}
+                </select>
+              </th>
               <th><input value={columnFilters.invoice} onChange={(event) => setColumnFilter('invoice', event.target.value)} aria-label="Filter factuur" /></th>
               <th><select value={columnFilters.registration} onChange={(event) => setColumnFilter('registration', event.target.value)} aria-label="Filter tenaamstelling"><option value="">Alle</option><option value="complete">Compleet</option><option value="missing">Mist data</option></select></th>
             </tr>
