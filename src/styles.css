@@ -637,10 +637,36 @@ tbody tr:hover {
   margin: 0;
 }
 
-.sales-table th:last-child,
-.sales-table td:last-child {
+.sales-table th:nth-child(1),
+.sales-table td:nth-child(1) {
+  width: 110px;
+}
+
+.sales-table th:nth-child(2),
+.sales-table td:nth-child(2) {
+  width: 260px;
+}
+
+.sales-table th:nth-child(3),
+.sales-table td:nth-child(3),
+.sales-table th:nth-child(4),
+.sales-table td:nth-child(4) {
+  width: 260px;
+}
+
+.sales-table th:nth-child(5),
+.sales-table td:nth-child(5) {
   width: 120px;
   text-align: right;
+}
+
+.sales-metric-cell {
+  white-space: nowrap;
+  padding-left: 22px !important;
+}
+
+.sales-total-cell {
+  padding-right: 18px !important;
 }
 
 .clickable-sales-row {

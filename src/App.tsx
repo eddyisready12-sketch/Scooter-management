@@ -1253,6 +1253,11 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
   const [dealerFilter, setDealerFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
   const [selectedBucket, setSelectedBucket] = useState<{ year: string; model: string } | null>(null);
+  function formatShare(count: number, total: number) {
+    if (total === 0) return `${count} (0%)`;
+    const percentage = ((count / total) * 100).toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    return `${count} (${percentage}%)`;
+  }
   const soldScootersForYear = scooters.filter((scooter) =>
     scooter.status === 'Verkocht klant' &&
     (yearFilter === 'all' || salesYearForScooter(scooter) === yearFilter),
@@ -1346,9 +1351,9 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
               >
                 <td>{row.year}</td>
                 <td><button className="link-button" type="button">{row.model}</button></td>
-                <td>{row.snorCount}</td>
-                <td>{row.bromCount}</td>
-                <td><strong>{row.totalCount}</strong></td>
+                <td className="sales-metric-cell">{formatShare(row.snorCount, row.totalCount)}</td>
+                <td className="sales-metric-cell">{formatShare(row.bromCount, row.totalCount)}</td>
+                <td className="sales-total-cell"><strong>{row.totalCount}</strong></td>
               </tr>
             )) : (
               <tr><td colSpan={5}>Geen verkoopdata gevonden.</td></tr>
