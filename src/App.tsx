@@ -273,6 +273,14 @@ function normalizeSpeedValue(value?: string) {
   return match?.[0] ?? value.trim();
 }
 
+function normalizeRdwSpeedValue(...values: Array<string | undefined>) {
+  for (const value of values) {
+    const normalized = normalizeSpeedValue(value);
+    if (normalized) return normalized;
+  }
+  return '';
+}
+
 function speedOptionsFromScooters(scooters: Scooter[]) {
   return Array.from(new Set(
     scooters
@@ -393,6 +401,8 @@ async function fetchRdwRegistration(licensePlate: string) {
     datum_eerste_tenaamstelling_in_nederland_dt?: string;
     datum_eerste_toelating?: string;
     datum_eerste_toelating_dt?: string;
+    afwijkende_maximum_snelheid?: string;
+    maximum_snelheid?: string;
     type?: string;
     typegoedkeuringsnummer?: string;
     variant?: string;
@@ -401,6 +411,9 @@ async function fetchRdwRegistration(licensePlate: string) {
   const fuelRows = await fuelResponse.json() as Array<{
     uitlaatemissieniveau?: string;
     milieuklasse_eg_goedkeuring_licht?: string;
+    maximum_snelheid_voertuig?: string;
+    maximumconstructiesnelheid?: string;
+    maximum_constructiesnelheid?: string;
   }>;
   const record = vehicleRows[0];
   if (!record) throw new Error(`Geen RDW data gevonden voor kenteken ${normalizedPlate}.`);
@@ -410,6 +423,13 @@ async function fetchRdwRegistration(licensePlate: string) {
     firstAdmissionDate: rdwDateToInputDate(record.datum_eerste_toelating_dt || record.datum_eerste_toelating),
     firstRegistrationDate: rdwDateToInputDate(record.datum_eerste_tenaamstelling_in_nederland_dt || record.datum_eerste_tenaamstelling_in_nederland),
     lastRegistrationDate: rdwDateToInputDate(record.datum_tenaamstelling_dt || record.datum_tenaamstelling),
+    speed: normalizeRdwSpeedValue(
+      fuelRecord?.maximum_snelheid_voertuig,
+      fuelRecord?.maximumconstructiesnelheid,
+      fuelRecord?.maximum_constructiesnelheid,
+      record.afwijkende_maximum_snelheid,
+      record.maximum_snelheid,
+    ),
     emissionClass: fuelRecord?.uitlaatemissieniveau || fuelRecord?.milieuklasse_eg_goedkeuring_licht || '',
     rdwType: record.type || '',
     rdwTypeApprovalNumber: record.typegoedkeuringsnummer || '',
@@ -662,6 +682,7 @@ export function App() {
         const rdwData = await fetchRdwRegistration(scooter.licensePlate ?? '');
         updatedScooters.push(normalizeRegistrationStatus({
           ...scooter,
+          speed: rdwData.speed || scooter.speed,
           firstAdmissionDate: rdwData.firstAdmissionDate || scooter.firstAdmissionDate,
           firstRegistrationDate: rdwData.firstRegistrationDate || scooter.firstRegistrationDate,
           lastRegistrationDate: rdwData.lastRegistrationDate || scooter.lastRegistrationDate,
@@ -2808,6 +2829,7 @@ function ScooterDrawer({
       const rdwData = await fetchRdwRegistration(draft.licensePlate ?? '');
       const nextDraft = {
         ...draft,
+        speed: rdwData.speed || draft.speed,
         firstAdmissionDate: rdwData.firstAdmissionDate || draft.firstAdmissionDate,
         firstRegistrationDate: rdwData.firstRegistrationDate || draft.firstRegistrationDate,
         lastRegistrationDate: rdwData.lastRegistrationDate || draft.lastRegistrationDate,
