@@ -242,3 +242,34 @@ export function csvRowsToScooters(rows: CsvScooterRow[], existing: Scooter[], st
 
   return Array.from(byFrame.values());
 }
+
+export function updateScootersFromRows(rows: CsvScooterRow[], existing: Scooter[]) {
+  const byFrame = new Map(existing.map((scooter) => [normalizeValue(scooter.frameNumber), scooter]));
+  const updated = new Map(existing.map((scooter) => [scooter.id, scooter]));
+  const missingFrameNumbers: string[] = [];
+  const touchedFrames = new Set<string>();
+
+  rows.forEach((row) => {
+    if (!row.frameNumber) return;
+    const frameKey = normalizeValue(row.frameNumber);
+    const previous = byFrame.get(frameKey);
+    if (!previous) {
+      missingFrameNumbers.push(row.frameNumber);
+      return;
+    }
+
+    touchedFrames.add(previous.frameNumber);
+    updated.set(previous.id, {
+      ...previous,
+      engineNumber: row.engineNumber || previous.engineNumber,
+      containerId: row.containerId || previous.containerId,
+      arrivedAt: row.arrivedAt || previous.arrivedAt,
+    });
+  });
+
+  return {
+    scooters: Array.from(updated.values()),
+    updatedFrames: Array.from(touchedFrames),
+    missingFrameNumbers,
+  };
+}

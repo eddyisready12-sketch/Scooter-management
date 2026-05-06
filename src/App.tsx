@@ -28,12 +28,12 @@ import {
   Wrench,
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
-import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport } from './lib/csv';
+import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
 import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertScooters, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
-type ImportTarget = 'scooters' | 'dealers';
+type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
 type SearchField = 'frameNumber' | 'engineNumber' | 'licensePlate';
 type ScooterPanelFilters = {
@@ -551,6 +551,44 @@ export function App() {
     }
   }
 
+  async function updateScooterFile(file: File) {
+    try {
+      const rows = await parseScooterImport(file);
+      if (rows.length === 0) {
+        showCsvMessage(`Geen scooters gevonden in ${file.name}. Controleer of er een kolom Frame #, VIN of Chassis aanwezig is.`);
+        return;
+      }
+
+      const importedContainers = containersFromScooterRows(rows, data.containers);
+      const { scooters: nextScooters, updatedFrames, missingFrameNumbers } = updateScootersFromRows(rows, data.scooters);
+      const touchedFrameSet = new Set(updatedFrames);
+      const updatedScooters = nextScooters.filter((scooter) => touchedFrameSet.has(scooter.frameNumber));
+
+      setData((current) => {
+        const containers = new Map(current.containers.map((container) => [container.id, container]));
+        importedContainers.forEach((container) => containers.set(container.id, container));
+        return { ...current, containers: Array.from(containers.values()), scooters: nextScooters };
+      });
+
+      await upsertContainers(importedContainers);
+      await upsertScooters(updatedScooters);
+
+      const containerMessage = importedContainers.length
+        ? ` ${importedContainers.length} containers gekoppeld/aangemaakt.`
+        : '';
+      const missingMessage = missingFrameNumbers.length
+        ? ` ${missingFrameNumbers.length} framenummers niet gevonden.`
+        : '';
+
+      showCsvMessage(
+        `${updatedFrames.length} scooters bijgewerkt op framenummer uit ${file.name}.${containerMessage}${missingMessage}`,
+        missingFrameNumbers,
+      );
+    } catch (error) {
+      showCsvMessage(`Bijwerken mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   async function importDealerFile(file: File, showDashboardMessage = false) {
     try {
       const dealers = await parseDealerImport(file);
@@ -583,6 +621,8 @@ export function App() {
     try {
       if (target === 'dealers') {
         await importDealerFile(file, true);
+      } else if (target === 'scooterUpdates') {
+        await updateScooterFile(file);
       } else {
         await importScooterFile(file, status === 'file' ? undefined : status);
       }
@@ -1218,6 +1258,7 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
             Import naar
             <select value={importTarget} onChange={(event) => setImportTarget(event.target.value as ImportTarget)}>
               <option value="scooters">Scooters voorraadblok</option>
+              <option value="scooterUpdates">Scooters bijwerken (framenummer)</option>
               <option value="dealers">Dealers blok</option>
             </select>
           </label>
