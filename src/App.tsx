@@ -2362,7 +2362,9 @@ function DealerDetailModal({ dealer, scooters, onClose, onUpdate }: { dealer: De
           ) : consignmentScooters.map((scooter) => (
             <div className="dealer-scooter-row" key={scooter.id}>
               <strong>{scooter.frameNumber}</strong>
-              <span>{scooter.model} - {scooter.color} - {normalizeSpeedValue(scooter.speed)}</span>
+              <span>{scooter.model}</span>
+              <span>{scooter.color}</span>
+              <span>{normalizeSpeedValue(scooter.speed) || '-'}</span>
               <small>{scooter.licensePlate || 'Geen kenteken'}</small>
             </div>
           ))}

@@ -1400,15 +1400,24 @@ tbody tr:hover {
 
 .dealer-scooter-row {
   display: grid;
-  grid-template-columns: 1.2fr 1fr auto;
-  gap: 10px;
+  grid-template-columns: minmax(190px, 1.3fr) minmax(110px, 0.8fr) minmax(140px, 1fr) 70px minmax(120px, 0.9fr);
+  gap: 12px;
+  align-items: center;
   padding: 10px 0;
   border-bottom: 1px solid #dce1e6;
+}
+
+.dealer-scooter-row strong {
+  color: #0f172a;
 }
 
 .dealer-scooter-row span,
 .dealer-scooter-row small {
   color: #65717d;
+}
+
+.dealer-scooter-row small {
+  text-align: right;
 }
 
 .modal-backdrop {
