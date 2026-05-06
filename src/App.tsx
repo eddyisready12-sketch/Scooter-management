@@ -1351,8 +1351,8 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
               >
                 <td>{row.year}</td>
                 <td><button className="link-button" type="button">{row.model}</button></td>
-                <td className="sales-metric-cell">{formatShare(row.snorCount, row.totalCount)}</td>
-                <td className="sales-metric-cell">{formatShare(row.bromCount, row.totalCount)}</td>
+                <td className="sales-metric-cell"><span>{formatShare(row.snorCount, row.totalCount)}</span></td>
+                <td className="sales-metric-cell"><span>{formatShare(row.bromCount, row.totalCount)}</span></td>
                 <td className="sales-total-cell"><strong>{row.totalCount}</strong></td>
               </tr>
             )) : (
