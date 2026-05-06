@@ -1200,8 +1200,8 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
   const latestRegisteredScooters = [...data.scooters]
     .filter((scooter) => isRegistrationComplete(scooter))
     .sort((a, b) => {
-      const aDate = new Date(a.lastRegistrationDate || a.firstRegistrationDate || a.firstAdmissionDate || 0).getTime();
-      const bDate = new Date(b.lastRegistrationDate || b.firstRegistrationDate || b.firstAdmissionDate || 0).getTime();
+      const aDate = new Date(a.firstRegistrationDate || 0).getTime();
+      const bDate = new Date(b.firstRegistrationDate || 0).getTime();
       return bDate - aDate || a.frameNumber.localeCompare(b.frameNumber);
     })
     .slice(0, 10);
@@ -1261,7 +1261,7 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
                 <strong>{scooter.frameNumber}</strong>
                 <span>{normalizeSalesModel(scooter.model)} - {scooter.licensePlate || '-'}</span>
                 <span>{dealerName(data.dealers, scooter.dealerId) || 'Geen dealer'}</span>
-                <small>{formatDate(scooter.lastRegistrationDate || scooter.firstRegistrationDate || scooter.firstAdmissionDate)}</small>
+                <small>{formatDate(scooter.firstRegistrationDate)}</small>
               </button>
             ))}
           </div>
