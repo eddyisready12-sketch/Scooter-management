@@ -208,8 +208,26 @@ h2 {
   margin-bottom: 16px;
 }
 
+.dashboard-registered-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  background: transparent;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.dashboard-registered-toggle > span:last-child {
+  color: #5a6773;
+  font-weight: 700;
+}
+
 .dashboard-registered-list {
   display: grid;
+  border-top: 1px solid #dce1e6;
 }
 
 .dashboard-registered-row {

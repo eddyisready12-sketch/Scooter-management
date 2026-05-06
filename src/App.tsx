@@ -1188,6 +1188,7 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
 }) {
   const [importTarget, setImportTarget] = useState<ImportTarget>('scooters');
   const [importStatus, setImportStatus] = useState<ImportScooterStatus>('file');
+  const [showLatestRegistered, setShowLatestRegistered] = useState(false);
   const cards: Array<{ label: ScooterStatus; icon: typeof Bike }> = [
     { label: 'Beschikbaar', icon: Bike },
     { label: 'Verkocht dealer', icon: Wrench },
@@ -1246,10 +1247,15 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
         ))}
       </div>
       <section className="panel dashboard-registered-panel">
-        <div className="panel-title">
+        <button
+          type="button"
+          className="dashboard-registered-toggle"
+          onClick={() => setShowLatestRegistered((current) => !current)}
+        >
           <span className="panel-title-label"><CheckCircle2 size={16} /> Laatste 10 tenaamgestelde scooters</span>
-        </div>
-        {latestRegisteredScooters.length ? (
+          <span>{latestRegisteredScooters.length} scooters {showLatestRegistered ? '-' : '+'}</span>
+        </button>
+        {showLatestRegistered && latestRegisteredScooters.length ? (
           <div className="dashboard-registered-list">
             {latestRegisteredScooters.map((scooter) => (
               <button
@@ -1265,9 +1271,9 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
               </button>
             ))}
           </div>
-        ) : (
+        ) : showLatestRegistered ? (
           <p className="empty">Nog geen tenaamgestelde scooters gevonden.</p>
-        )}
+        ) : null}
       </section>
       {statusFilter !== 'all' && (
         <div className="filter-notice">
