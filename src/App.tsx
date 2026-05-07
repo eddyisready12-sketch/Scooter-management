@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertScooters, upsertWarrantyParts } from './lib/supabase';
+import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertScooters, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
@@ -941,10 +941,35 @@ export function App() {
     return document;
   }
 
+  async function resolveDocumentRecord(document: DocumentRecord) {
+    const storagePath = await resolveScooterDocumentPath(document);
+    if (storagePath === document.storagePath) return document;
+
+    const updatedDocument = { ...document, storagePath };
+    await upsertDocuments([updatedDocument]);
+    setData((current) => ({
+      ...current,
+      documents: current.documents.map((item) => item.id === document.id ? updatedDocument : item),
+    }));
+    return updatedDocument;
+  }
+
   async function openDocument(document: DocumentRecord) {
-    if (!document.storagePath) throw new Error('Dit document heeft nog geen opslagpad.');
-    const signedUrl = await createScooterDocumentUrl(document.storagePath);
+    const resolvedDocument = await resolveDocumentRecord(document);
+    const signedUrl = await createScooterDocumentUrl(resolvedDocument.storagePath!);
     window.open(signedUrl, '_blank', 'noopener,noreferrer');
+  }
+
+  async function downloadDocument(document: DocumentRecord) {
+    const resolvedDocument = await resolveDocumentRecord(document);
+    const signedUrl = await createScooterDocumentUrl(resolvedDocument.storagePath!);
+    const anchor = window.document.createElement('a');
+    anchor.href = signedUrl;
+    anchor.download = resolvedDocument.fileName;
+    anchor.rel = 'noopener noreferrer';
+    window.document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
   }
 
   async function addBatteryModel(event: FormEvent<HTMLFormElement>) {
@@ -1133,6 +1158,7 @@ export function App() {
           onUpdate={updateScooter}
           onAddDocument={addDocument}
           onOpenDocument={openDocument}
+          onDownloadDocument={downloadDocument}
         />
       )}
     </div>
@@ -2916,6 +2942,7 @@ function ScooterDrawer({
   onUpdate,
   onAddDocument,
   onOpenDocument,
+  onDownloadDocument,
 }: {
   scooter: Scooter;
   dealers: Dealer[];
@@ -2926,6 +2953,7 @@ function ScooterDrawer({
   onUpdate: (scooter: Scooter) => void | Promise<void>;
   onAddDocument: (scooterFrame: string, type: DocumentRecord['type'], note: string, file: File) => Promise<DocumentRecord>;
   onOpenDocument: (document: DocumentRecord) => Promise<void>;
+  onDownloadDocument: (document: DocumentRecord) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(scooter);
   const [rdwLoading, setRdwLoading] = useState(false);
@@ -2995,6 +3023,14 @@ function ScooterDrawer({
     }
   }
 
+  async function handleDownloadDocument(document: DocumentRecord) {
+    try {
+      await onDownloadDocument(document);
+    } catch (error) {
+      setDocumentMessage(`Document downloaden mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   return (
     <div className="drawer-backdrop" onMouseDown={onClose}>
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
@@ -3056,7 +3092,10 @@ function ScooterDrawer({
                 <span>{document.type}{document.uploadedAt ? ` - ${formatDate(document.uploadedAt)}` : ''}</span>
                 <small>{document.note || 'Geen notitie'}</small>
               </div>
-              <button className="secondary-button" type="button" onClick={() => void handleOpenDocument(document)}>Openen</button>
+              <div className="document-row-actions">
+                <button className="secondary-button" type="button" onClick={() => void handleOpenDocument(document)}>Openen</button>
+                <button className="secondary-button" type="button" onClick={() => void handleDownloadDocument(document)}>Downloaden</button>
+              </div>
             </div>
           )) : <p>Nog geen documenten toegevoegd</p>}
           <form className="document-upload-form" onSubmit={handleDocumentSubmit}>

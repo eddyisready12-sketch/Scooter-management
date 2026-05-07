@@ -1977,6 +1977,12 @@ dd {
   gap: 4px;
 }
 
+.document-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .document-row span,
 .document-row small {
   color: #65717d;

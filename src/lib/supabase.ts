@@ -210,3 +210,33 @@ export async function createScooterDocumentUrl(storagePath: string) {
   if (error) throw error;
   return data.signedUrl;
 }
+
+export async function resolveScooterDocumentPath(document: DocumentRecord) {
+  if (!supabase) throw new Error('Supabase Storage is niet geconfigureerd.');
+  if (document.storagePath) return document.storagePath;
+
+  const targetName = document.fileName.trim();
+  if (!targetName) throw new Error('Dit document mist een bestandsnaam.');
+
+  const { data: frameFiles, error: frameError } = await supabase
+    .storage
+    .from(scooterDocumentsBucket)
+    .list(document.scooterFrame, { limit: 100, search: targetName });
+
+  if (frameError) throw frameError;
+
+  const frameMatch = frameFiles?.find((file) => file.name === targetName);
+  if (frameMatch) return `${document.scooterFrame}/${frameMatch.name}`;
+
+  const { data: rootFiles, error: rootError } = await supabase
+    .storage
+    .from(scooterDocumentsBucket)
+    .list('', { limit: 100, search: targetName });
+
+  if (rootError) throw rootError;
+
+  const rootMatch = rootFiles?.find((file) => file.name === targetName);
+  if (rootMatch) return rootMatch.name;
+
+  throw new Error('Bestand niet gevonden in Supabase Storage.');
+}
