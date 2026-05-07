@@ -9,6 +9,14 @@ export const supabase = supabaseUrl && supabaseAnonKey
   : null;
 const scooterDocumentsBucket = 'scooter-documents';
 
+function normalizeDocumentFileName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^\d+-/, '')
+    .replace(/[^a-z0-9.]+/g, '');
+}
+
 export async function getAuthSession() {
   if (!supabase) return null;
   const { data, error } = await supabase.auth.getSession();
@@ -217,26 +225,25 @@ export async function resolveScooterDocumentPath(document: DocumentRecord) {
 
   const targetName = document.fileName.trim();
   if (!targetName) throw new Error('Dit document mist een bestandsnaam.');
+  const normalizedTarget = normalizeDocumentFileName(targetName);
 
   const { data: frameFiles, error: frameError } = await supabase
     .storage
     .from(scooterDocumentsBucket)
-    .list(document.scooterFrame, { limit: 100, search: targetName });
+    .list(document.scooterFrame, { limit: 100 });
 
   if (frameError) throw frameError;
 
-  const frameMatch = frameFiles?.find((file) => file.name === targetName);
+  const frameMatch = frameFiles?.find((file) => {
+    const normalizedStored = normalizeDocumentFileName(file.name);
+    return (
+      file.name === targetName ||
+      normalizedStored === normalizedTarget ||
+      normalizedStored.endsWith(normalizedTarget) ||
+      normalizedTarget.endsWith(normalizedStored)
+    );
+  });
   if (frameMatch) return `${document.scooterFrame}/${frameMatch.name}`;
-
-  const { data: rootFiles, error: rootError } = await supabase
-    .storage
-    .from(scooterDocumentsBucket)
-    .list('', { limit: 100, search: targetName });
-
-  if (rootError) throw rootError;
-
-  const rootMatch = rootFiles?.find((file) => file.name === targetName);
-  if (rootMatch) return rootMatch.name;
 
   throw new Error('Bestand niet gevonden in Supabase Storage.');
 }
