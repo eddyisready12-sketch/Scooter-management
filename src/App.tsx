@@ -1111,7 +1111,7 @@ export function App() {
 
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
-          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} />}
+          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
@@ -1746,7 +1746,19 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
   );
 }
 
-function Containers({ data, message, messageDetails, onImport }: { data: AppData; message: string; messageDetails: string[]; onImport: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+function Containers({
+  data,
+  message,
+  messageDetails,
+  onImport,
+  onSelect,
+}: {
+  data: AppData;
+  message: string;
+  messageDetails: string[];
+  onImport: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onSelect: (scooter: Scooter) => void;
+}) {
   const [showImport, setShowImport] = useState(false);
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const pending = sortedContainers.filter((container) => container.status !== 'Aangekomen');
@@ -1786,6 +1798,7 @@ function Containers({ data, message, messageDetails, onImport }: { data: AppData
             containers={pending}
             scooters={data.scooters}
             dealers={data.dealers}
+            onSelect={onSelect}
             green
             emptyMessage="Geen containers onderweg."
           />
@@ -1794,6 +1807,7 @@ function Containers({ data, message, messageDetails, onImport }: { data: AppData
             containers={arrived}
             scooters={data.scooters}
             dealers={data.dealers}
+            onSelect={onSelect}
             green
             emptyMessage="Geen aangekomen containers."
           />
@@ -1846,13 +1860,24 @@ function Containers({ data, message, messageDetails, onImport }: { data: AppData
   );
 }
 
-function ContainerAvailabilityBoard({ container, scooters, dealers }: { container: Container; scooters: Scooter[]; dealers: Dealer[] }) {
+function ContainerAvailabilityBoard({
+  container,
+  scooters,
+  dealers,
+  onSelect,
+}: {
+  container: Container;
+  scooters: Scooter[];
+  dealers: Dealer[];
+  onSelect: (scooter: Scooter) => void;
+}) {
   const groups: Array<{ status: ScooterStatus; label: string }> = [
     { status: 'Beschikbaar', label: 'Beschikbaar' },
     { status: 'In consignatie', label: 'In consignatie' },
     { status: 'Verkocht dealer', label: 'Verkocht dealer' },
     { status: 'Verkocht klant', label: 'Verkocht klant' },
   ];
+  const [openStatus, setOpenStatus] = useState<ScooterStatus | null>(groups[0].status);
 
   return (
     <div className="container-availability-board">
@@ -1881,21 +1906,36 @@ function ContainerAvailabilityBoard({ container, scooters, dealers }: { containe
       <div className="container-card-status-grid container-card-status-grid-wide">
         {groups.map(({ status, label }) => {
           const statusScooters = scooters.filter((scooter) => scooter.status === status);
+          const isOpen = openStatus === status;
           return (
             <section className="container-card-status-column" key={status}>
-              <div className="container-card-status-header">
+              <button
+                type="button"
+                className="container-card-status-header container-card-status-toggle"
+                onClick={() => setOpenStatus(isOpen ? null : status)}
+              >
                 <span>{label}</span>
-                <strong>{statusScooters.length}</strong>
-              </div>
-              <div className="container-card-scooter-list">
-                {statusScooters.length ? statusScooters.map((scooter) => (
-                  <div className="container-card-scooter-row" key={scooter.id}>
-                    <strong>{scooter.frameNumber}</strong>
-                    <span>{scooter.model || '-'} - {scooter.color || '-'} - {normalizeSpeedValue(scooter.speed) || '-'}</span>
-                    <small>{dealerName(dealers, scooter.dealerId) || '-'}</small>
-                  </div>
-                )) : <p className="container-card-empty">Geen scooters</p>}
-              </div>
+                <div className="container-card-status-meta">
+                  <strong>{statusScooters.length}</strong>
+                  <small>{isOpen ? '-' : '+'}</small>
+                </div>
+              </button>
+              {isOpen && (
+                <div className="container-card-scooter-list">
+                  {statusScooters.length ? statusScooters.map((scooter) => (
+                    <button
+                      type="button"
+                      className="container-card-scooter-row"
+                      key={scooter.id}
+                      onClick={() => onSelect(scooter)}
+                    >
+                      <strong>{scooter.frameNumber}</strong>
+                      <span>{scooter.model || '-'} - {scooter.color || '-'} - {normalizeSpeedValue(scooter.speed) || '-'}</span>
+                      <small>{dealerName(dealers, scooter.dealerId) || '-'}</small>
+                    </button>
+                  )) : <p className="container-card-empty">Geen scooters</p>}
+                </div>
+              )}
             </section>
           );
         })}
@@ -2822,6 +2862,7 @@ function ContainerListPanel({
   containers,
   scooters,
   dealers,
+  onSelect,
   green = false,
   emptyMessage = 'N.V.T.',
 }: {
@@ -2829,6 +2870,7 @@ function ContainerListPanel({
   containers: Container[];
   scooters: Scooter[];
   dealers: Dealer[];
+  onSelect: (scooter: Scooter) => void;
   green?: boolean;
   emptyMessage?: string;
 }) {
@@ -2850,7 +2892,7 @@ function ContainerListPanel({
             </button>
             {isOpen && (
               <div className="container-expanded-content">
-                <ContainerAvailabilityBoard container={container} scooters={containerScooters} dealers={dealers} />
+                <ContainerAvailabilityBoard container={container} scooters={containerScooters} dealers={dealers} onSelect={onSelect} />
               </div>
             )}
           </div>

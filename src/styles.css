@@ -1552,7 +1552,7 @@ tbody tr:hover {
 }
 
 .container-card-status-grid-wide {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   padding: 0;
 }
 
@@ -1575,12 +1575,31 @@ tbody tr:hover {
   font-weight: 800;
 }
 
+.container-card-status-toggle {
+  width: 100%;
+  border: 0;
+  text-align: left;
+}
+
+.container-card-status-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
 .container-card-status-header strong {
   min-width: 28px;
   padding: 2px 8px;
   border-radius: 999px;
   background: #e8eef5;
   text-align: center;
+}
+
+.container-card-status-meta small {
+  color: #65717d;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .container-card-scooter-list {
@@ -1591,12 +1610,23 @@ tbody tr:hover {
 .container-card-scooter-row {
   display: grid;
   gap: 4px;
+  width: 100%;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
   padding: 10px 12px;
   border-bottom: 1px solid #dce1e6;
+  background: #fff;
+  color: #17202a;
+  text-align: left;
 }
 
 .container-card-scooter-row:last-child {
   border-bottom: 0;
+}
+
+.container-card-scooter-row:hover {
+  background: #f3f8ff;
 }
 
 .container-card-scooter-row strong {
