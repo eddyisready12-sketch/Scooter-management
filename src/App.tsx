@@ -58,7 +58,7 @@ const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'sales', label: 'Verkoop', icon: CircleDollarSign },
   { id: 'batteries', label: "Accu's", icon: BatteryCharging },
   { id: 'dealers', label: 'Dealers', icon: UsersRound },
-  { id: 'warranty', label: 'Warranty parts', icon: ShieldCheck },
+  { id: 'warranty', label: 'Garantie claims', icon: ShieldCheck },
   { id: 'maintenance', label: 'Onderhoud', icon: ClipboardList },
   { id: 'search', label: 'Zoeken', icon: Search },
 ];
@@ -2441,11 +2441,11 @@ function DealerDetailModal({ dealer, scooters, onClose, onUpdate }: { dealer: De
 }
 
 function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppData; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<void>; updateWarranty: (warranty: WarrantyPart) => Promise<void>; message: string }) {
-  const [selectedFrame, setSelectedFrame] = useState(data.scooters[0]?.frameNumber ?? '');
+  const [selectedFrame, setSelectedFrame] = useState('');
   const [selectedClaim, setSelectedClaim] = useState<WarrantyPart | null>(null);
-  const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame) ?? data.scooters[0];
-  const [licensePlate, setLicensePlate] = useState(selectedScooter?.licensePlate ?? '');
-  const [selectedDealerId, setSelectedDealerId] = useState(selectedScooter?.dealerId ?? data.dealers[0]?.id ?? '');
+  const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame);
+  const [licensePlate, setLicensePlate] = useState('');
+  const [selectedDealerId, setSelectedDealerId] = useState('');
   const registrationDate = selectedScooter?.firstRegistrationDate || selectedScooter?.firstAdmissionDate;
   const calculatedAge = formatVehicleAge(registrationDate);
   const warrantyUntil = addMonthsToInputDate(registrationDate);
@@ -2455,29 +2455,33 @@ function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppDat
     const scooter = data.scooters.find((item) => item.frameNumber === frameNumber);
     setSelectedFrame(frameNumber);
     setLicensePlate(scooter?.licensePlate ?? '');
-    setSelectedDealerId(scooter?.dealerId ?? data.dealers[0]?.id ?? '');
+    setSelectedDealerId(scooter?.dealerId ?? '');
   }
 
   function handleLicensePlateChange(value: string) {
     setLicensePlate(value);
     const scooter = data.scooters.find((item) => normalizeLookup(item.licensePlate ?? '') === normalizeLookup(value));
-    if (!scooter) return;
+    if (!scooter) {
+      setSelectedFrame('');
+      setSelectedDealerId('');
+      return;
+    }
     setSelectedFrame(scooter.frameNumber);
-    setSelectedDealerId(scooter.dealerId ?? data.dealers[0]?.id ?? '');
+    setSelectedDealerId(scooter.dealerId ?? '');
   }
 
   return (
     <>
       <div className="page-title-row">
         <div>
-          <h1>Warranty parts</h1>
+          <h1>Garantie claims</h1>
           <span>{data.warranties.length} claims geregistreerd</span>
         </div>
       </div>
       {message && <div className="notice">{message}</div>}
       <div className="two-col warranty-layout">
         <section className="panel">
-          <div className="panel-title"><ShieldCheck size={16} /> Warranty claims</div>
+          <div className="panel-title"><ShieldCheck size={16} /> Garantie claims</div>
           {data.warranties.length === 0 ? (
             <div className="empty-state inline"><ShieldCheck size={22} /><strong>Nog geen warranty claims</strong><span>Nieuwe claims verschijnen hier zodra je ze toevoegt.</span></div>
           ) : data.warranties.map((claim) => (
@@ -2499,10 +2503,10 @@ function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppDat
           ))}
         </section>
         <form className="panel form-panel" onSubmit={addWarranty}>
-          <div className="panel-title"><ClipboardList size={16} /> Nieuw warranty part</div>
+          <div className="panel-title"><ClipboardList size={16} /> Nieuwe garantieaanvraag</div>
           <div className="form-grid warranty-form-grid">
-            <label>Scooter<select name="scooterFrame" value={selectedScooter?.frameNumber ?? ''} onChange={(event) => handleScooterChange(event.target.value)}>{data.scooters.map((s) => <option key={s.id} value={s.frameNumber}>{s.frameNumber}</option>)}</select></label>
-            <label>Dealer<select name="dealerId" value={selectedDealerId} onChange={(event) => setSelectedDealerId(event.target.value)}>{data.dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
+            <label>Scooter<select name="scooterFrame" value={selectedFrame} onChange={(event) => handleScooterChange(event.target.value)}><option value="">Selecteer...</option>{data.scooters.map((s) => <option key={s.id} value={s.frameNumber}>{s.frameNumber}</option>)}</select></label>
+            <label>Dealer<select name="dealerId" value={selectedDealerId} onChange={(event) => setSelectedDealerId(event.target.value)}><option value="">Selecteer...</option>{data.dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
             <label>Kenteken<input name="licensePlate" value={licensePlate} onChange={(event) => handleLicensePlateChange(event.target.value)} /></label>
             <label>Kilometerstand<input name="mileage" inputMode="numeric" /></label>
             <label>Ouderdom<input name="age" value={calculatedAge === '-' ? '' : calculatedAge} readOnly placeholder="Eerste tenaamstelling ontbreekt" /></label>
@@ -2543,7 +2547,7 @@ function WarrantyDetailModal({ claim, scooter, dealer, onClose }: { claim: Warra
       <section className="modal-card warranty-detail-modal" onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <span>Warranty claim</span>
+            <span>Garantieclaim</span>
             <h2>{claim.claimNumber || claim.id}</h2>
           </div>
           <button type="button" onClick={onClose}>Close</button>
