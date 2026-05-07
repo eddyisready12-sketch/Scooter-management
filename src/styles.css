@@ -801,6 +801,11 @@ tbody tr:hover {
   gap: 14px;
 }
 
+.container-stack {
+  display: grid;
+  gap: 14px;
+}
+
 .container-command-panel {
   display: flex;
   align-items: center;
@@ -829,54 +834,6 @@ tbody tr:hover {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
-}
-
-.container-overview-grid {
-  display: grid;
-  gap: 14px;
-  margin-bottom: 28px;
-}
-
-.container-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.container-summary-card {
-  display: grid;
-  gap: 4px;
-  padding: 16px;
-  border-left: 4px solid #0075ff;
-}
-
-.container-summary-card span,
-.container-summary-card small,
-.section-heading span {
-  color: #65717d;
-}
-
-.container-summary-card strong {
-  font-size: 28px;
-  line-height: 1.1;
-}
-
-.container-status-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.section-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  margin: 10px 0 12px;
-}
-
-.section-heading h2 {
-  margin: 0 0 4px;
 }
 
 .container-empty-state {
@@ -1176,6 +1133,14 @@ tbody tr:hover {
   border-top: 0;
   border-radius: 0 0 4px 4px;
   background: #fff;
+}
+
+.container-expanded-content {
+  margin: 0 14px 14px;
+  border: 1px solid #dce1e6;
+  border-top: 0;
+  border-radius: 0 0 6px 6px;
+  background: #f8fbff;
 }
 
 .container-scooter-table-wrap {
@@ -1537,6 +1502,10 @@ tbody tr:hover {
   overflow: hidden;
 }
 
+.container-availability-board {
+  padding: 14px;
+}
+
 .container-card-metrics {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1544,6 +1513,10 @@ tbody tr:hover {
   border: 1px solid #dce1e6;
   border-radius: 6px;
   overflow: hidden;
+}
+
+.container-card-metrics-inline {
+  margin: 0 0 14px;
 }
 
 .container-card-metric {
@@ -1576,6 +1549,11 @@ tbody tr:hover {
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 12px;
   padding: 0 14px 14px;
+}
+
+.container-card-status-grid-wide {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 0;
 }
 
 .container-card-status-column {
@@ -2030,9 +2008,6 @@ dd {
   .card-grid,
   .two-col,
   .container-grid,
-  .container-summary-grid,
-  .container-status-grid,
-  .container-overview-grid,
   .drawer-grid,
   .search-grid {
     grid-template-columns: 1fr;
@@ -2138,7 +2113,8 @@ dd {
     border-bottom: 0;
   }
 
-  .container-card-metrics {
+  .container-card-metrics,
+  .container-card-status-grid-wide {
     grid-template-columns: 1fr;
   }
 

@@ -1751,9 +1751,6 @@ function Containers({ data, message, messageDetails, onImport }: { data: AppData
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const pending = sortedContainers.filter((container) => container.status !== 'Aangekomen');
   const arrived = sortedContainers.filter((container) => container.status === 'Aangekomen');
-  const inTransit = data.containers.filter((container) => container.status === 'Onderweg');
-  const origin = data.containers.filter((container) => container.status === 'In land van herkomst');
-  const containerScooters = data.scooters.filter((scooter) => scooter.containerId);
   return (
     <>
       <div className="page-title-row">
@@ -1773,35 +1770,6 @@ function Containers({ data, message, messageDetails, onImport }: { data: AppData
           <button className="primary-button" onClick={() => setShowImport(true)}><Upload size={16} /> Container importeren</button>
         </div>
       </section>
-      <div className="container-overview-grid">
-        <div className="container-summary-grid">
-          <section className="panel container-summary-card">
-            <span>Totaal</span>
-            <strong>{data.containers.length}</strong>
-            <small>{containerScooters.length} scooters gekoppeld</small>
-          </section>
-          <section className="panel container-summary-card">
-            <span>Nog onderweg</span>
-            <strong>{pending.length}</strong>
-            <small>{inTransit.length} onderweg, {origin.length} herkomstland</small>
-          </section>
-          <section className="panel container-summary-card">
-            <span>Aangekomen</span>
-            <strong>{arrived.length}</strong>
-            <small>Meest recent bovenaan</small>
-          </section>
-        </div>
-        <div className="container-status-grid">
-          <ContainerListPanel title="Containers nog niet aangekomen" containers={pending} scooters={data.scooters} />
-          <ContainerListPanel title="Meest recent aangekomen containers" containers={arrived} scooters={data.scooters} green />
-        </div>
-      </div>
-      <div className="section-heading">
-        <div>
-          <h2>Scooters per container</h2>
-          <span>Bekijk per zending welke scooters beschikbaar, in consignatie of verkocht zijn.</span>
-        </div>
-      </div>
       {data.containers.length === 0 ? (
         <section className="panel container-empty-state">
           <div className="empty-icon"><Boxes size={26} /></div>
@@ -1812,8 +1780,23 @@ function Containers({ data, message, messageDetails, onImport }: { data: AppData
           <button className="secondary-button" onClick={() => setShowImport(true)}><Upload size={16} /> Container importeren</button>
         </section>
       ) : (
-        <div className="container-grid">
-          {sortedContainers.map((container) => <ContainerCard key={container.id} container={container} scooters={data.scooters.filter((s) => s.containerId === container.id)} dealers={data.dealers} />)}
+        <div className="container-stack">
+          <ContainerListPanel
+            title={`Containers onderweg (${pending.length})`}
+            containers={pending}
+            scooters={data.scooters}
+            dealers={data.dealers}
+            green
+            emptyMessage="Geen containers onderweg."
+          />
+          <ContainerListPanel
+            title={`Aangekomen containers (${arrived.length})`}
+            containers={arrived}
+            scooters={data.scooters}
+            dealers={data.dealers}
+            green
+            emptyMessage="Geen aangekomen containers."
+          />
         </div>
       )}
       {showImport && (
@@ -1863,14 +1846,17 @@ function Containers({ data, message, messageDetails, onImport }: { data: AppData
   );
 }
 
-function ContainerCard({ container, scooters, dealers }: { container: Container; scooters: Scooter[]; dealers: Dealer[] }) {
-  const baseStatuses = ['Beschikbaar', 'In consignatie', 'Verkocht dealer', 'Verkocht klant', 'Nog onderweg', 'Af te leveren', 'In optie'] as ScooterStatus[];
-  const statuses = baseStatuses.filter((status) => scooters.some((scooter) => scooter.status === status));
+function ContainerAvailabilityBoard({ container, scooters, dealers }: { container: Container; scooters: Scooter[]; dealers: Dealer[] }) {
+  const groups: Array<{ status: ScooterStatus; label: string }> = [
+    { status: 'Beschikbaar', label: 'Beschikbaar' },
+    { status: 'In consignatie', label: 'In consignatie' },
+    { status: 'Verkocht dealer', label: 'Verkocht dealer' },
+    { status: 'Verkocht klant', label: 'Verkocht klant' },
+  ];
 
   return (
-    <section className="panel container-card">
-      <div className="panel-title"><Boxes size={16} /> {container.number}</div>
-      <div className="container-card-metrics">
+    <div className="container-availability-board">
+      <div className="container-card-metrics container-card-metrics-inline">
         <div className="container-card-metric">
           <span>Invoice</span>
           <strong>{container.invoiceNumber || '-'}</strong>
@@ -1884,29 +1870,28 @@ function ContainerCard({ container, scooters, dealers }: { container: Container;
           <strong className="green-text">{container.status || '-'}</strong>
         </div>
         <div className="container-card-metric">
-          <span>Arrived</span>
-          <strong>{formatDate(container.arrivedAt)}</strong>
+          <span>Aangekomen</span>
+          <strong>{formatDate(container.arrivedAt || container.eta)}</strong>
         </div>
         <div className="container-card-metric">
           <span>Scooters</span>
           <strong>{scooters.length}</strong>
         </div>
       </div>
-      <div className="container-card-status-grid">
-        {(statuses.length ? statuses : ['Beschikbaar']).map((status) => {
+      <div className="container-card-status-grid container-card-status-grid-wide">
+        {groups.map(({ status, label }) => {
           const statusScooters = scooters.filter((scooter) => scooter.status === status);
-
           return (
             <section className="container-card-status-column" key={status}>
               <div className="container-card-status-header">
-                <span>{status}</span>
+                <span>{label}</span>
                 <strong>{statusScooters.length}</strong>
               </div>
               <div className="container-card-scooter-list">
                 {statusScooters.length ? statusScooters.map((scooter) => (
                   <div className="container-card-scooter-row" key={scooter.id}>
                     <strong>{scooter.frameNumber}</strong>
-                    <span>{scooter.model || '-'} - {scooter.color || '-'} - {scooter.speed || '-'}</span>
+                    <span>{scooter.model || '-'} - {scooter.color || '-'} - {normalizeSpeedValue(scooter.speed) || '-'}</span>
                     <small>{dealerName(dealers, scooter.dealerId) || '-'}</small>
                   </div>
                 )) : <p className="container-card-empty">Geen scooters</p>}
@@ -1915,7 +1900,7 @@ function ContainerCard({ container, scooters, dealers }: { container: Container;
           );
         })}
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -2832,12 +2817,26 @@ function ListPanel({ title, items, green = false }: { title: string; items: stri
   );
 }
 
-function ContainerListPanel({ title, containers, scooters, green = false }: { title: string; containers: Container[]; scooters: Scooter[]; green?: boolean }) {
+function ContainerListPanel({
+  title,
+  containers,
+  scooters,
+  dealers,
+  green = false,
+  emptyMessage = 'N.V.T.',
+}: {
+  title: string;
+  containers: Container[];
+  scooters: Scooter[];
+  dealers: Dealer[];
+  green?: boolean;
+  emptyMessage?: string;
+}) {
   const [openContainerId, setOpenContainerId] = useState<string | null>(null);
   return (
     <section className="panel list-panel">
       <div className="panel-title"><Boxes size={16} /> {title}</div>
-      {containers.length === 0 ? <p className="empty">N.V.T.</p> : containers.map((container) => {
+      {containers.length === 0 ? <p className="empty">{emptyMessage}</p> : containers.map((container) => {
         const containerScooters = scooters.filter((scooter) => scooter.containerId === container.id);
         const isOpen = openContainerId === container.id;
         return (
@@ -2850,35 +2849,8 @@ function ContainerListPanel({ title, containers, scooters, green = false }: { ti
               <span className="container-row-meta">{containerScooters.length} scooters {isOpen ? '-' : '+'}</span>
             </button>
             {isOpen && (
-              <div className="container-scooter-list">
-                {containerScooters.length === 0 ? (
-                  <p className="empty">Geen scooters gekoppeld.</p>
-                ) : (
-                  <div className="container-scooter-table-wrap">
-                    <table className="container-scooter-table">
-                      <thead>
-                        <tr>
-                          <th>Frame</th>
-                          <th>Model</th>
-                          <th>Kleur</th>
-                          <th>Snelheid</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {containerScooters.map((scooter) => (
-                          <tr key={scooter.id}>
-                            <td><strong>{scooter.frameNumber}</strong></td>
-                            <td>{scooter.model || '-'}</td>
-                            <td>{scooter.color || '-'}</td>
-                            <td>{normalizeSpeedValue(scooter.speed) || '-'}</td>
-                            <td><span className="status-pill compact">{scooter.status}</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+              <div className="container-expanded-content">
+                <ContainerAvailabilityBoard container={container} scooters={containerScooters} dealers={dealers} />
               </div>
             )}
           </div>
