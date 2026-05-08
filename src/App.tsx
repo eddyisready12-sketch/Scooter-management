@@ -1,10 +1,13 @@
 import { ChangeEvent, FormEvent, Fragment, useEffect, useMemo, useState } from 'react';
 import {
+  ArrowUpDown,
   BatteryCharging,
   Bike,
   Boxes,
   BriefcaseBusiness,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
   CircleDollarSign,
   ClipboardList,
@@ -2503,7 +2506,22 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
   const [groupFilter, setGroupFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('');
-  const [sortBy, setSortBy] = useState('code-asc');
+  const [sortField, setSortField] = useState<'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate'>('code');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  function handleSort(field: 'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate') {
+    if (sortField === field) {
+      setSortDirection((current) => current === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    setSortField(field);
+    setSortDirection('asc');
+  }
+
+  function renderSortIcon(field: 'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate') {
+    if (sortField !== field) return <ArrowUpDown size={14} />;
+    return sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
+  }
 
   const articleGroups = Array.from(new Set(products.map((product) => product.articleGroup).filter(Boolean) as string[]))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
@@ -2538,27 +2556,33 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
       const costA = parsePriceForSort(a.costPrice);
       const costB = parsePriceForSort(b.costPrice);
 
-      switch (sortBy) {
-        case 'code-desc':
-          return codeB.localeCompare(codeA, 'nl', { sensitivity: 'base', numeric: true });
-        case 'description-asc':
-          return descriptionA.localeCompare(descriptionB, 'nl', { sensitivity: 'base', numeric: true });
-        case 'description-desc':
-          return descriptionB.localeCompare(descriptionA, 'nl', { sensitivity: 'base', numeric: true });
-        case 'sale-desc':
-          return (Number.isFinite(saleB) ? saleB : -Infinity) - (Number.isFinite(saleA) ? saleA : -Infinity);
-        case 'sale-asc':
-          return (Number.isFinite(saleA) ? saleA : Infinity) - (Number.isFinite(saleB) ? saleB : Infinity);
-        case 'cost-desc':
-          return (Number.isFinite(costB) ? costB : -Infinity) - (Number.isFinite(costA) ? costA : -Infinity);
-        case 'cost-asc':
-          return (Number.isFinite(costA) ? costA : Infinity) - (Number.isFinite(costB) ? costB : Infinity);
-        case 'code-asc':
+      const direction = sortDirection === 'asc' ? 1 : -1;
+
+      switch (sortField) {
+        case 'description':
+          return descriptionA.localeCompare(descriptionB, 'nl', { sensitivity: 'base', numeric: true }) * direction;
+        case 'salePrice': {
+          const left = Number.isFinite(saleA) ? saleA : (sortDirection === 'asc' ? Infinity : -Infinity);
+          const right = Number.isFinite(saleB) ? saleB : (sortDirection === 'asc' ? Infinity : -Infinity);
+          return (left - right) * direction;
+        }
+        case 'costPrice': {
+          const left = Number.isFinite(costA) ? costA : (sortDirection === 'asc' ? Infinity : -Infinity);
+          const right = Number.isFinite(costB) ? costB : (sortDirection === 'asc' ? Infinity : -Infinity);
+          return (left - right) * direction;
+        }
+        case 'articleGroup':
+          return (a.articleGroup || '').localeCompare(b.articleGroup || '', 'nl', { sensitivity: 'base', numeric: true }) * direction;
+        case 'stock':
+          return (a.stock || '').localeCompare(b.stock || '', 'nl', { sensitivity: 'base', numeric: true }) * direction;
+        case 'startDate':
+          return ((a.startDate ? new Date(a.startDate).getTime() : 0) - (b.startDate ? new Date(b.startDate).getTime() : 0)) * direction;
+        case 'code':
         default:
-          return codeA.localeCompare(codeB, 'nl', { sensitivity: 'base', numeric: true });
+          return codeA.localeCompare(codeB, 'nl', { sensitivity: 'base', numeric: true }) * direction;
       }
     });
-  }, [products, query, groupFilter, supplierFilter, stockFilter, sortBy]);
+  }, [products, query, groupFilter, supplierFilter, stockFilter, sortField, sortDirection]);
 
   return (
     <>
@@ -2591,16 +2615,6 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
           <select value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}>
             <option value="">Alle voorraadwaardes</option>
             {stockValues.map((stock) => <option key={stock} value={stock}>{stock}</option>)}
-          </select>
-          <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
-            <option value="code-asc">Code A-Z</option>
-            <option value="code-desc">Code Z-A</option>
-            <option value="description-asc">Omschrijving A-Z</option>
-            <option value="description-desc">Omschrijving Z-A</option>
-            <option value="sale-desc">Verkoopprijs hoog-laag</option>
-            <option value="sale-asc">Verkoopprijs laag-hoog</option>
-            <option value="cost-desc">Kostprijs hoog-laag</option>
-            <option value="cost-asc">Kostprijs laag-hoog</option>
           </select>
         </div>
       </section>
@@ -2635,16 +2649,44 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
             <table className="inventory-table product-table">
               <thead>
                 <tr>
-                  <th>Code</th>
-                  <th>Omschrijving</th>
+                  <th>
+                    <button type="button" className="column-sort-button" onClick={() => handleSort('code')}>
+                      Code {renderSortIcon('code')}
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="column-sort-button" onClick={() => handleSort('description')}>
+                      Omschrijving {renderSortIcon('description')}
+                    </button>
+                  </th>
                   <th>Barcode</th>
                   <th>Batch</th>
-                  <th>Verkoopprijs</th>
-                  <th>Kostprijs</th>
+                  <th>
+                    <button type="button" className="column-sort-button" onClick={() => handleSort('salePrice')}>
+                      Verkoopprijs {renderSortIcon('salePrice')}
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="column-sort-button" onClick={() => handleSort('costPrice')}>
+                      Kostprijs {renderSortIcon('costPrice')}
+                    </button>
+                  </th>
                   <th>Webwinkel</th>
-                  <th>Artikelgroep</th>
-                  <th>Voorraad</th>
-                  <th>Begindatum</th>
+                  <th>
+                    <button type="button" className="column-sort-button" onClick={() => handleSort('articleGroup')}>
+                      Artikelgroep {renderSortIcon('articleGroup')}
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="column-sort-button" onClick={() => handleSort('stock')}>
+                      Voorraad {renderSortIcon('stock')}
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className="column-sort-button" onClick={() => handleSort('startDate')}>
+                      Begindatum {renderSortIcon('startDate')}
+                    </button>
+                  </th>
                   <th>Einddatum</th>
                   <th>Hoofdleverancier</th>
                   <th>Land van herkomst</th>

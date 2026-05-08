@@ -1009,6 +1009,21 @@ tbody tr:hover {
   vertical-align: top;
 }
 
+.column-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font-weight: 700;
+}
+
+.column-sort-button:hover {
+  color: #0075ff;
+}
+
 .product-table th:nth-child(1),
 .product-table td:nth-child(1) {
   width: 120px;
