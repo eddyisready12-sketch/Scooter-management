@@ -429,6 +429,13 @@ function formatPriceValue(value?: string) {
   }).format(amount);
 }
 
+function parsePriceForSort(value?: string) {
+  if (!value) return Number.NaN;
+  const normalized = value.trim().replace(/\.(?=\d{3}(?:\D|$))/g, '').replace(',', '.');
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : Number.NaN;
+}
+
 function speedOptionsFromScooters(scooters: Scooter[]) {
   return Array.from(new Set(
     scooters
@@ -2496,6 +2503,7 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
   const [groupFilter, setGroupFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('');
+  const [sortBy, setSortBy] = useState('code-asc');
 
   const articleGroups = Array.from(new Set(products.map((product) => product.articleGroup).filter(Boolean) as string[]))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
@@ -2521,11 +2529,36 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
         && (!supplierFilter || product.supplier === supplierFilter)
         && (!stockFilter || product.stock === stockFilter);
     }).sort((a, b) => {
-      const left = (a.code || a.description || '').trim();
-      const right = (b.code || b.description || '').trim();
-      return left.localeCompare(right, 'nl', { sensitivity: 'base', numeric: true });
+      const codeA = (a.code || '').trim();
+      const codeB = (b.code || '').trim();
+      const descriptionA = (a.description || '').trim();
+      const descriptionB = (b.description || '').trim();
+      const saleA = parsePriceForSort(a.salePrice);
+      const saleB = parsePriceForSort(b.salePrice);
+      const costA = parsePriceForSort(a.costPrice);
+      const costB = parsePriceForSort(b.costPrice);
+
+      switch (sortBy) {
+        case 'code-desc':
+          return codeB.localeCompare(codeA, 'nl', { sensitivity: 'base', numeric: true });
+        case 'description-asc':
+          return descriptionA.localeCompare(descriptionB, 'nl', { sensitivity: 'base', numeric: true });
+        case 'description-desc':
+          return descriptionB.localeCompare(descriptionA, 'nl', { sensitivity: 'base', numeric: true });
+        case 'sale-desc':
+          return (Number.isFinite(saleB) ? saleB : -Infinity) - (Number.isFinite(saleA) ? saleA : -Infinity);
+        case 'sale-asc':
+          return (Number.isFinite(saleA) ? saleA : Infinity) - (Number.isFinite(saleB) ? saleB : Infinity);
+        case 'cost-desc':
+          return (Number.isFinite(costB) ? costB : -Infinity) - (Number.isFinite(costA) ? costA : -Infinity);
+        case 'cost-asc':
+          return (Number.isFinite(costA) ? costA : Infinity) - (Number.isFinite(costB) ? costB : Infinity);
+        case 'code-asc':
+        default:
+          return codeA.localeCompare(codeB, 'nl', { sensitivity: 'base', numeric: true });
+      }
     });
-  }, [products, query, groupFilter, supplierFilter, stockFilter]);
+  }, [products, query, groupFilter, supplierFilter, stockFilter, sortBy]);
 
   return (
     <>
@@ -2558,6 +2591,16 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
           <select value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}>
             <option value="">Alle voorraadwaardes</option>
             {stockValues.map((stock) => <option key={stock} value={stock}>{stock}</option>)}
+          </select>
+          <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+            <option value="code-asc">Code A-Z</option>
+            <option value="code-desc">Code Z-A</option>
+            <option value="description-asc">Omschrijving A-Z</option>
+            <option value="description-desc">Omschrijving Z-A</option>
+            <option value="sale-desc">Verkoopprijs hoog-laag</option>
+            <option value="sale-asc">Verkoopprijs laag-hoog</option>
+            <option value="cost-desc">Kostprijs hoog-laag</option>
+            <option value="cost-asc">Kostprijs laag-hoog</option>
           </select>
         </div>
       </section>
