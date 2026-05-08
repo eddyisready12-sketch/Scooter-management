@@ -89,6 +89,12 @@ export type WarrantyPart = {
   licensePlate?: string;
   partName: string;
   partNumber: string;
+  partPrice?: string;
+  claimItems?: Array<{
+    partName: string;
+    partNumber?: string;
+    partPrice?: string;
+  }>;
   mileage?: string;
   age?: string;
   claimDate: string;

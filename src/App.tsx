@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, Fragment, useEffect, useMemo, useState } from 'react';
 import {
   BatteryCharging,
   Bike,
@@ -174,6 +174,50 @@ function nextWarrantyClaimNumber(warranties: WarrantyPart[]) {
     return Number.isFinite(number) ? Math.max(highest, number) : highest;
   }, 0) + 1;
   return `${prefix}${String(next).padStart(4, '0')}`;
+}
+
+function parseCurrencyInput(value?: string) {
+  if (!value) return '';
+  const normalized = value
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/€/g, '')
+    .replace(/\.(?=\d{3}(?:\D|$))/g, '')
+    .replace(',', '.');
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount)) return '';
+  return amount.toFixed(2);
+}
+
+function formatCurrency(value?: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return '-';
+  return new Intl.NumberFormat('nl-NL', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(parsed);
+}
+
+function warrantyItemsForClaim(claim: WarrantyPart) {
+  if (claim.claimItems?.length) {
+    return claim.claimItems.filter((item) => item.partName?.trim());
+  }
+  if (!claim.partName?.trim()) return [];
+  return [{
+    partName: claim.partName,
+    partNumber: claim.partNumber,
+    partPrice: claim.partPrice,
+  }];
+}
+
+function warrantyTotalPrice(claim: WarrantyPart) {
+  const total = warrantyItemsForClaim(claim).reduce((sum, item) => {
+    const amount = Number(item.partPrice);
+    return Number.isFinite(amount) ? sum + amount : sum;
+  }, 0);
+  return total > 0 ? total.toFixed(2) : '';
 }
 
 function salesYearForScooter(scooter: Scooter) {
@@ -849,13 +893,34 @@ export function App() {
       data.scooters.find((item) => item.frameNumber === submittedFrame);
     const registrationDate = scooter?.firstRegistrationDate || scooter?.firstAdmissionDate;
     const warrantyUntil = String(form.get('warrantyUntil') ?? '') || addMonthsToInputDate(registrationDate);
+    const submittedItems = (() => {
+      try {
+        return JSON.parse(String(form.get('claimItemsJson') ?? '[]')) as Array<{ partName?: string; partNumber?: string; partPrice?: string }>;
+      } catch {
+        return [];
+      }
+    })();
+    const claimItems = submittedItems
+      .map((item) => ({
+        partName: String(item.partName ?? '').trim(),
+        ...(String(item.partNumber ?? '').trim() ? { partNumber: String(item.partNumber ?? '').trim() } : {}),
+        ...(parseCurrencyInput(String(item.partPrice ?? '')) ? { partPrice: parseCurrencyInput(String(item.partPrice ?? '')) } : {}),
+      }))
+      .filter((item) => item.partName);
+    const primaryItem = claimItems[0];
+    if (!primaryItem) {
+      setWarrantyMessage('Voeg minimaal 1 onderdeel toe aan de garantieclaim.');
+      return false;
+    }
     const record: WarrantyPart = {
       id: `w-${Date.now()}`,
       claimNumber: nextWarrantyClaimNumber(data.warranties),
       scooterFrame: scooter?.frameNumber || submittedFrame,
       licensePlate: submittedPlate || scooter?.licensePlate || '',
-      partName: String(form.get('partName')),
-      partNumber: String(form.get('partNumber')),
+      partName: primaryItem.partName,
+      partNumber: primaryItem.partNumber ?? '',
+      ...(primaryItem.partPrice ? { partPrice: primaryItem.partPrice } : {}),
+      claimItems,
       mileage: String(form.get('mileage')),
       age: String(form.get('age')) || formatVehicleAge(registrationDate),
       claimDate: String(form.get('claimDate')),
@@ -869,8 +934,10 @@ export function App() {
       setData((current) => ({ ...current, warranties: [record, ...current.warranties] }));
       setWarrantyMessage(`Garantieclaim opgeslagen voor ${record.licensePlate || record.scooterFrame}.`);
       formElement.reset();
+      return true;
     } catch (error) {
       setWarrantyMessage(`Garantie opslaan mislukt: ${importErrorMessage(error)}`);
+      return false;
     }
   }
 
@@ -2466,12 +2533,15 @@ function DealerDetailModal({ dealer, scooters, onClose, onUpdate }: { dealer: De
   );
 }
 
-function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppData; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<void>; updateWarranty: (warranty: WarrantyPart) => Promise<void>; message: string }) {
+function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppData; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<boolean>; updateWarranty: (warranty: WarrantyPart) => Promise<void>; message: string }) {
   const [selectedFrame, setSelectedFrame] = useState('');
   const [selectedClaim, setSelectedClaim] = useState<WarrantyPart | null>(null);
   const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame);
   const [licensePlate, setLicensePlate] = useState('');
   const [selectedDealerId, setSelectedDealerId] = useState('');
+  const [claimItems, setClaimItems] = useState<Array<{ partName: string; partNumber: string; partPrice: string }>>([
+    { partName: '', partNumber: '', partPrice: '' },
+  ]);
   const registrationDate = selectedScooter?.firstRegistrationDate || selectedScooter?.firstAdmissionDate;
   const calculatedAge = formatVehicleAge(registrationDate);
   const warrantyUntil = addMonthsToInputDate(registrationDate);
@@ -2496,6 +2566,33 @@ function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppDat
     setSelectedDealerId(scooter.dealerId ?? '');
   }
 
+  function updateClaimItem(index: number, field: 'partName' | 'partNumber' | 'partPrice', value: string) {
+    setClaimItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)));
+  }
+
+  function addClaimItemRow() {
+    setClaimItems((current) => [...current, { partName: '', partNumber: '', partPrice: '' }]);
+  }
+
+  function removeClaimItemRow(index: number) {
+    setClaimItems((current) => current.length === 1 ? [{ partName: '', partNumber: '', partPrice: '' }] : current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  async function handleWarrantySubmit(event: FormEvent<HTMLFormElement>) {
+    const saved = await addWarranty(event);
+    if (!saved) return;
+    setSelectedFrame('');
+    setLicensePlate('');
+    setSelectedDealerId('');
+    setClaimItems([{ partName: '', partNumber: '', partPrice: '' }]);
+  }
+
+  const claimItemsPayload = JSON.stringify(claimItems);
+  const claimItemsTotal = claimItems.reduce((sum, item) => {
+    const amount = Number(parseCurrencyInput(item.partPrice));
+    return Number.isFinite(amount) ? sum + amount : sum;
+  }, 0);
+
   return (
     <>
       <div className="page-title-row">
@@ -2509,13 +2606,14 @@ function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppDat
         <section className="panel">
           <div className="panel-title"><ShieldCheck size={16} /> Garantie claims</div>
           {data.warranties.length === 0 ? (
-            <div className="empty-state inline"><ShieldCheck size={22} /><strong>Nog geen warranty claims</strong><span>Nieuwe claims verschijnen hier zodra je ze toevoegt.</span></div>
+            <div className="empty-state inline"><ShieldCheck size={22} /><strong>Nog geen garantieclaims</strong><span>Nieuwe claims verschijnen hier zodra je ze toevoegt.</span></div>
           ) : data.warranties.map((claim) => (
             <div className="claim-row" key={claim.id}>
               {warrantyStatusIcon(claim.status)}
               <button type="button" className="claim-row-main" onClick={() => setSelectedClaim(claim)}>
                 <strong>{claim.claimNumber || claim.id} - {claim.partName}</strong>
-                <span>{claim.scooterFrame} - {claim.licensePlate || 'geen kenteken'} - {claim.partNumber}</span>
+                <span>{claim.scooterFrame} - {claim.licensePlate || 'geen kenteken'} - {claim.partNumber || '-'}</span>
+                <small>{warrantyItemsForClaim(claim).length} onderdeel{warrantyItemsForClaim(claim).length === 1 ? '' : 'en'} - totaal {formatCurrency(warrantyTotalPrice(claim))}</small>
                 <small>{claim.mileage || '0'} km - ouderdom {claim.age || '-'}</small>
               </button>
               <label className="compact-select-label">
@@ -2524,11 +2622,11 @@ function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppDat
                   {warrantyStatuses.map((status) => <option key={status}>{status}</option>)}
                 </select>
               </label>
-              <small>Warranty until {formatDate(claim.warrantyUntil)}</small>
+              <small>Garantie tot {formatDate(claim.warrantyUntil)}</small>
             </div>
           ))}
         </section>
-        <form className="panel form-panel" onSubmit={addWarranty}>
+        <form className="panel form-panel" onSubmit={handleWarrantySubmit}>
           <div className="panel-title"><ClipboardList size={16} /> Nieuwe garantieaanvraag</div>
           <div className="form-grid warranty-form-grid">
             <label>Scooter<select name="scooterFrame" value={selectedFrame} onChange={(event) => handleScooterChange(event.target.value)}><option value="">Selecteer...</option>{data.scooters.map((s) => <option key={s.id} value={s.frameNumber}>{s.frameNumber}</option>)}</select></label>
@@ -2536,11 +2634,34 @@ function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppDat
             <label>Kenteken<input name="licensePlate" value={licensePlate} onChange={(event) => handleLicensePlateChange(event.target.value)} /></label>
             <label>Kilometerstand<input name="mileage" inputMode="numeric" /></label>
             <label>Ouderdom<input name="age" value={calculatedAge === '-' ? '' : calculatedAge} readOnly placeholder="Eerste tenaamstelling ontbreekt" /></label>
-            <label>Part name<input name="partName" required /></label>
-            <label>Part number<input name="partNumber" required /></label>
             <label>Claim date<input name="claimDate" type="date" required /></label>
             <label>Status<select name="status" defaultValue="Open">{warrantyStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
             <label>Garantie tot<input name="warrantyUntil" type="date" value={warrantyUntil} readOnly required /></label>
+            <input type="hidden" name="claimItemsJson" value={claimItemsPayload} readOnly />
+            <div className="wide-field warranty-items-panel">
+              <div className="warranty-items-header">
+                <strong>Onderdelen</strong>
+                <button type="button" className="secondary-button" onClick={addClaimItemRow}>
+                  <Plus size={14} /> Onderdeel toevoegen
+                </button>
+              </div>
+              <div className="warranty-items-list">
+                {claimItems.map((item, index) => (
+                  <div className="warranty-item-row" key={`claim-item-${index}`}>
+                    <label>Onderdeel<input value={item.partName} onChange={(event) => updateClaimItem(index, 'partName', event.target.value)} required={index === 0} placeholder="Bijv. schokbrekerset achter" /></label>
+                    <label>Part nummer<input value={item.partNumber} onChange={(event) => updateClaimItem(index, 'partNumber', event.target.value)} placeholder="Bijv. 2507001526" /></label>
+                    <label>Prijs onderdeel<input value={item.partPrice} onChange={(event) => updateClaimItem(index, 'partPrice', event.target.value)} inputMode="decimal" placeholder="Bijv. 89,95" /></label>
+                    <button type="button" className="icon-button danger-button" onClick={() => removeClaimItemRow(index)} aria-label={`Onderdeel ${index + 1} verwijderen`}>
+                      <XCircle size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="warranty-items-summary">
+                <span>{claimItems.filter((item) => item.partName.trim()).length} onderdeel{claimItems.filter((item) => item.partName.trim()).length === 1 ? '' : 'en'}</span>
+                <strong>Totaal: {formatCurrency(claimItemsTotal ? claimItemsTotal.toFixed(2) : '')}</strong>
+              </div>
+            </div>
             <label className="wide-field">Notes<textarea name="notes" /></label>
           </div>
           {warrantyUntil ? (
@@ -2580,8 +2701,9 @@ function WarrantyDetailModal({ claim, scooter, dealer, onClose }: { claim: Warra
         </div>
         <dl className="dealer-detail-list">
           <dt>Status</dt><dd>{claim.status}</dd>
-          <dt>Onderdeel</dt><dd>{claim.partName}</dd>
+          <dt>Primair onderdeel</dt><dd>{claim.partName}</dd>
           <dt>Part nummer</dt><dd>{claim.partNumber || '-'}</dd>
+          <dt>Totale onderdelenprijs</dt><dd>{formatCurrency(warrantyTotalPrice(claim))}</dd>
           <dt>Kenteken</dt><dd>{claim.licensePlate || scooter?.licensePlate || '-'}</dd>
           <dt>Framenummer</dt><dd>{claim.scooterFrame}</dd>
           <dt>Scooter</dt><dd>{scooter ? `${scooter.model} - ${scooter.color} - ${normalizeSpeedValue(scooter.speed)}` : '-'}</dd>
@@ -2592,6 +2714,21 @@ function WarrantyDetailModal({ claim, scooter, dealer, onClose }: { claim: Warra
           <dt>Garantie tot</dt><dd>{formatDate(claim.warrantyUntil)}</dd>
           <dt>Notities</dt><dd>{claim.notes || '-'}</dd>
         </dl>
+        <section className="warranty-detail-items">
+          <h3>Onderdelen in deze claim</h3>
+          <div className="warranty-detail-item-table">
+            <div className="warranty-detail-item-head">Onderdeel</div>
+            <div className="warranty-detail-item-head">Part nummer</div>
+            <div className="warranty-detail-item-head">Prijs</div>
+            {warrantyItemsForClaim(claim).map((item, index) => (
+              <Fragment key={`${claim.id}-item-${index}`}>
+                <div>{item.partName}</div>
+                <div>{item.partNumber || '-'}</div>
+                <div>{formatCurrency(item.partPrice)}</div>
+              </Fragment>
+            ))}
+          </div>
+        </section>
       </section>
     </div>
   );
