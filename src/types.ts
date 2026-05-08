@@ -82,6 +82,24 @@ export type BatteryModel = {
   minDischargeVoltage: string;
 };
 
+export type Product = {
+  id: string;
+  code: string;
+  description: string;
+  barcode?: string;
+  batch?: string;
+  salePrice?: string;
+  costPrice?: string;
+  webshop?: boolean;
+  articleGroup?: string;
+  stock?: string;
+  startDate?: string;
+  endDate?: string;
+  supplier?: string;
+  countryOfOrigin?: string;
+  imageUrl?: string;
+};
+
 export type WarrantyPart = {
   id: string;
   claimNumber?: string;
@@ -134,6 +152,7 @@ export type AppData = {
   scooters: Scooter[];
   containers: Container[];
   dealers: Dealer[];
+  products: Product[];
   batteries: Battery[];
   batteryModels: BatteryModel[];
   warranties: WarrantyPart[];

@@ -30,11 +30,11 @@ import {
 } from 'lucide-react';
 import Dymo from 'dymo-connect';
 import { demoData } from './data/demo-data';
-import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertScooters, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Scooter, ScooterStatus, WarrantyPart } from './types';
+import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
+import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Product, Scooter, ScooterStatus, WarrantyPart } from './types';
 
-type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'dealers' | 'warranty' | 'maintenance' | 'search';
+type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'products' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
 type SearchField = 'frameNumber' | 'engineNumber' | 'licensePlate';
@@ -59,6 +59,7 @@ const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'scooters', label: 'Scooters', icon: Bike },
   { id: 'sales', label: 'Verkoop', icon: CircleDollarSign },
   { id: 'batteries', label: "Accu's", icon: BatteryCharging },
+  { id: 'products', label: 'Producten', icon: BriefcaseBusiness },
   { id: 'dealers', label: 'Dealers', icon: UsersRound },
   { id: 'warranty', label: 'Garantie claims', icon: ShieldCheck },
   { id: 'maintenance', label: 'Onderhoud', icon: ClipboardList },
@@ -415,6 +416,19 @@ function normalizeRdwSpeedValue(...values: Array<string | undefined>) {
   return '';
 }
 
+function formatPriceValue(value?: string) {
+  if (!value) return '-';
+  const normalized = value.replace(',', '.');
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount)) return value;
+  return new Intl.NumberFormat('nl-NL', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(amount);
+}
+
 function speedOptionsFromScooters(scooters: Scooter[]) {
   return Array.from(new Set(
     scooters
@@ -584,6 +598,7 @@ export function App() {
   const [csvMessage, setCsvMessage] = useState('');
   const [csvMessageDetails, setCsvMessageDetails] = useState<string[]>([]);
   const [dealerImportMessage, setDealerImportMessage] = useState('');
+  const [productMessage, setProductMessage] = useState('');
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
   const [batteryMessage, setBatteryMessage] = useState('');
   const [warrantyMessage, setWarrantyMessage] = useState('');
@@ -770,6 +785,29 @@ export function App() {
     if (!file) return;
     try {
       await importDealerFile(file);
+    } finally {
+      event.target.value = '';
+    }
+  }
+
+  async function handleProductImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const products = await parseProductImport(file);
+      if (products.length === 0) {
+        setProductMessage(`Geen producten gevonden in ${file.name}. Controleer kolommen zoals Code, Omschrijving, Barcode of Artikelgroep.`);
+        return;
+      }
+      setData((current) => {
+        const byId = new Map(current.products.map((product) => [product.id, product]));
+        products.forEach((product) => byId.set(product.id, product));
+        return { ...current, products: Array.from(byId.values()) };
+      });
+      await upsertProducts(products);
+      setProductMessage(`${products.length} producten geimporteerd uit ${file.name}.`);
+    } catch (error) {
+      setProductMessage(`Product import mislukt: ${importErrorMessage(error)}`);
     } finally {
       event.target.value = '';
     }
@@ -1297,6 +1335,7 @@ export function App() {
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
+          {view === 'products' && <ProductsPage products={data.products} onImport={handleProductImport} message={productMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
@@ -2449,6 +2488,149 @@ function BatteryDetailModal({ battery, batteryModels, dealers, scooters, onClose
         </section>
       </div>
     </div>
+  );
+}
+
+function ProductsPage({ products, onImport, message }: { products: Product[]; onImport: (event: ChangeEvent<HTMLInputElement>) => Promise<void>; message: string }) {
+  const [query, setQuery] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [stockFilter, setStockFilter] = useState('');
+
+  const articleGroups = Array.from(new Set(products.map((product) => product.articleGroup).filter(Boolean) as string[]))
+    .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const suppliers = Array.from(new Set(products.map((product) => product.supplier).filter(Boolean) as string[]))
+    .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const stockValues = Array.from(new Set(products.map((product) => product.stock).filter(Boolean) as string[]))
+    .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+
+  const visibleProducts = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return products.filter((product) => {
+      const inQuery = !needle || [
+        product.code,
+        product.description,
+        product.barcode,
+        product.batch,
+        product.articleGroup,
+        product.supplier,
+      ].some((value) => value?.toLowerCase().includes(needle));
+
+      return inQuery
+        && (!groupFilter || product.articleGroup === groupFilter)
+        && (!supplierFilter || product.supplier === supplierFilter)
+        && (!stockFilter || product.stock === stockFilter);
+    }).sort((a, b) => {
+      const left = (a.code || a.description || '').trim();
+      const right = (b.code || b.description || '').trim();
+      return left.localeCompare(right, 'nl', { sensitivity: 'base', numeric: true });
+    });
+  }, [products, query, groupFilter, supplierFilter, stockFilter]);
+
+  return (
+    <>
+      <div className="page-title-row">
+        <div>
+          <h1>Producten</h1>
+          <span>{products.length} producten geregistreerd</span>
+        </div>
+        <label className="upload-button"><Upload size={16} /> Producten importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={(event) => void onImport(event)} /></label>
+      </div>
+      {message && <div className="notice">{message}</div>}
+      <section className="panel maintenance-search">
+        <div className="panel-title"><BriefcaseBusiness size={16} /> Productcatalogus</div>
+        <div className="product-intro">
+          <div>
+            <strong>Artikelen centraal beheren</strong>
+            <span>Importeer jullie complete onderdelenlijst. Afbeeldingen kunnen we daarna per product toevoegen en later koppelen aan scooters, garantieclaims en onderhoud.</span>
+          </div>
+        </div>
+        <div className="product-toolbar">
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek op code, omschrijving, barcode of leverancier" />
+          <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
+            <option value="">Alle artikelgroepen</option>
+            {articleGroups.map((group) => <option key={group} value={group}>{group}</option>)}
+          </select>
+          <select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}>
+            <option value="">Alle leveranciers</option>
+            {suppliers.map((supplier) => <option key={supplier} value={supplier}>{supplier}</option>)}
+          </select>
+          <select value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}>
+            <option value="">Alle voorraadwaardes</option>
+            {stockValues.map((stock) => <option key={stock} value={stock}>{stock}</option>)}
+          </select>
+        </div>
+      </section>
+      <section className="stats-row product-stats">
+        <article className="stat-card">
+          <span>Totaal</span>
+          <strong>{products.length}</strong>
+          <small>Volledige productcatalogus</small>
+        </article>
+        <article className="stat-card">
+          <span>Zichtbaar</span>
+          <strong>{visibleProducts.length}</strong>
+          <small>Na huidige filters</small>
+        </article>
+        <article className="stat-card">
+          <span>Webshop</span>
+          <strong>{products.filter((product) => product.webshop).length}</strong>
+          <small>Gemarkeerd voor webwinkel</small>
+        </article>
+        <article className="stat-card">
+          <span>Leveranciers</span>
+          <strong>{suppliers.length}</strong>
+          <small>Unieke hoofdleveranciers</small>
+        </article>
+      </section>
+      <section className="panel table-panel">
+        <div className="panel-title"><FileText size={16} /> Artikelen</div>
+        {visibleProducts.length === 0 ? (
+          <div className="empty-state inline"><BriefcaseBusiness size={22} /><strong>Geen producten gevonden</strong><span>Importeer een Excel/CSV of pas je filters aan.</span></div>
+        ) : (
+          <div className="table-scroll">
+            <table className="inventory-table product-table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Omschrijving</th>
+                  <th>Barcode</th>
+                  <th>Batch</th>
+                  <th>Verkoopprijs</th>
+                  <th>Kostprijs</th>
+                  <th>Webwinkel</th>
+                  <th>Artikelgroep</th>
+                  <th>Voorraad</th>
+                  <th>Begindatum</th>
+                  <th>Einddatum</th>
+                  <th>Hoofdleverancier</th>
+                  <th>Land van herkomst</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleProducts.map((product) => (
+                  <tr key={product.id}>
+                    <td>{product.code || '-'}</td>
+                    <td>{product.description || '-'}</td>
+                    <td>{product.barcode || '-'}</td>
+                    <td>{product.batch || '-'}</td>
+                    <td>{formatPriceValue(product.salePrice)}</td>
+                    <td>{formatPriceValue(product.costPrice)}</td>
+                    <td>{product.webshop ? 'Ja' : '-'}</td>
+                    <td>{product.articleGroup || '-'}</td>
+                    <td>{product.stock || '-'}</td>
+                    <td>{formatDate(product.startDate)}</td>
+                    <td>{formatDate(product.endDate)}</td>
+                    <td>{product.supplier || '-'}</td>
+                    <td>{product.countryOfOrigin || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
   );
 }
 

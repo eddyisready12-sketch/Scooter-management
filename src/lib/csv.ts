@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import type { CsvScooterRow, Dealer, Scooter, ScooterStatus } from '../types';
+import type { CsvScooterRow, Dealer, Product, Scooter, ScooterStatus } from '../types';
 
 const statusFallback: ScooterStatus = 'Beschikbaar';
 
@@ -165,6 +165,50 @@ export function parseDealerImport(file: File): Promise<Dealer[]> {
     return readExcelRows(file, ['bedrijf', 'bedrijfsnaam', 'company', 'dealer', 'dealernaam', 'email', 'telefoon']).then(normalizeDealerRows);
   }
   return readCsvRows(file).then(normalizeDealerRows);
+}
+
+function normalizeProductRows(rows: Record<string, unknown>[]): Product[] {
+  return rows.map((row) => {
+    const code = pick(row, ['code', 'artikelcode', 'productcode', 'item code']);
+    const description = pick(row, ['omschrijving', 'description', 'artikel', 'product', 'naam']);
+    const barcode = pick(row, ['barcode', 'ean', 'ean code']);
+    const batch = pick(row, ['batch', 'partij', 'batchnummer', 'batch nummer']);
+    const salePrice = pick(row, ['verkoopprijs', 'sale price', 'sales price', 'price']);
+    const costPrice = pick(row, ['kostprijs', 'cost price', 'purchase price']);
+    const webshopRaw = pick(row, ['webwinkel', 'webshop', 'online']);
+    const articleGroup = pick(row, ['artikelgroep', 'article group', 'groep', 'group']);
+    const stock = pick(row, ['voorraad', 'stock', 'inventory']);
+    const startDate = parseImportDate(pick(row, ['begindatum', 'startdatum', 'start date']));
+    const endDate = parseImportDate(pick(row, ['einddatum', 'enddatum', 'end date']));
+    const supplier = pick(row, ['hoofdleverancier', 'leverancier', 'supplier']);
+    const countryOfOrigin = pick(row, ['land van herkomst', 'country of origin', 'origin']);
+    const stableKey = code || barcode || description;
+
+    return {
+      id: `product-${stableKey.replace(/[^a-z0-9]/gi, '').toLowerCase()}`,
+      code,
+      description,
+      ...(barcode ? { barcode } : {}),
+      ...(batch ? { batch } : {}),
+      ...(salePrice ? { salePrice } : {}),
+      ...(costPrice ? { costPrice } : {}),
+      ...(webshopRaw ? { webshop: ['v', 'ja', 'yes', 'true', '1', 'x'].includes(normalizeValue(webshopRaw)) } : {}),
+      ...(articleGroup ? { articleGroup } : {}),
+      ...(stock ? { stock } : {}),
+      ...(startDate ? { startDate } : {}),
+      ...(endDate ? { endDate } : {}),
+      ...(supplier ? { supplier } : {}),
+      ...(countryOfOrigin ? { countryOfOrigin } : {}),
+    };
+  }).filter((product) => product.code || product.description);
+}
+
+export function parseProductImport(file: File): Promise<Product[]> {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (extension === 'xlsx' || extension === 'xls') {
+    return readExcelRows(file, ['code', 'artikelcode', 'omschrijving', 'description', 'barcode']).then(normalizeProductRows);
+  }
+  return readCsvRows(file).then(normalizeProductRows);
 }
 
 function findDealerId(dealers: Dealer[], dealerName?: string) {
