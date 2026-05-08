@@ -17,6 +17,7 @@ import {
   Menu,
   PackagePlus,
   Plus,
+  Printer,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -85,6 +86,7 @@ const maintenancePackages = {
 } as const;
 
 const warrantyStatuses: WarrantyPart['status'][] = ['Open', 'In behandeling', 'Goedgekeurd', 'Afgewezen', 'Vervangen', 'Afgehandeld'];
+const dymoFrameworkUrl = 'https://raw.githubusercontent.com/dymosoftware/dymo-connect-framework/master/dymo.connect.framework.min.js';
 
 function countByStatus(scooters: Scooter[], status: ScooterStatus) {
   return scooters.filter((scooter) => scooter.status === status).length;
@@ -218,6 +220,116 @@ function warrantyTotalPrice(claim: WarrantyPart) {
     return Number.isFinite(amount) ? sum + amount : sum;
   }, 0);
   return total > 0 ? total.toFixed(2) : '';
+}
+
+async function ensureDymoFramework() {
+  if (typeof window === 'undefined') throw new Error('DYMO printen werkt alleen in de browser.');
+
+  const existingFramework = (window as typeof window & {
+    dymo?: { label?: { framework?: Record<string, unknown> } };
+  }).dymo?.label?.framework;
+
+  if (existingFramework) return existingFramework;
+
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = dymoFrameworkUrl;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('DYMO framework kon niet geladen worden.'));
+    document.head.appendChild(script);
+  });
+
+  const framework = (window as typeof window & {
+    dymo?: { label?: { framework?: Record<string, unknown> } };
+  }).dymo?.label?.framework;
+
+  if (!framework) throw new Error('DYMO framework is geladen, maar niet beschikbaar.');
+
+  return framework;
+}
+
+function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>Address</Id>
+  <PaperName>30252 Address</PaperName>
+  <DrawCommands />
+  <ObjectInfo>
+    <AddressObject>
+      <Name>Address</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText />
+      <ShowBarcodeFor9DigitZipOnly>False</ShowBarcodeFor9DigitZipOnly>
+      <BarcodePosition>AboveAddress</BarcodePosition>
+      <LineFonts>
+        <Font Family="Arial" Size="15" Bold="True" Italic="False" Underline="False" Strikeout="False" />
+        <Font Family="Arial" Size="11" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+        <Font Family="Arial" Size="10" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+        <Font Family="Arial" Size="10" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      </LineFonts>
+    </AddressObject>
+    <Bounds X="332" Y="150" Width="4455" Height="1260" />
+  </ObjectInfo>
+</DieCutLabel>`;
+}
+
+async function printScooterDymoLabel(scooter: Scooter, dealerCompany: string) {
+  const framework = await ensureDymoFramework() as {
+    init?: () => void;
+    checkEnvironment?: () => boolean | string | { isBrowserSupported?: boolean; isFrameworkInstalled?: boolean };
+    getPrinters?: () => Array<{ name?: string }>;
+    openLabelXml?: (xml: string) => {
+      setAddressText?: (index: number, value: string) => void;
+      print?: (printerName: string) => void;
+    };
+  };
+
+  framework.init?.();
+  const environment = framework.checkEnvironment?.();
+  if (environment && typeof environment === 'object') {
+    if ('isFrameworkInstalled' in environment && environment.isFrameworkInstalled === false) {
+      throw new Error('DYMO Connect software of webservice is niet actief op deze computer.');
+    }
+    if ('isBrowserSupported' in environment && environment.isBrowserSupported === false) {
+      throw new Error('Deze browser ondersteunt de DYMO webservice niet.');
+    }
+  }
+
+  const printers = framework.getPrinters?.() ?? [];
+  const printer = printers.find((item) => item.name?.includes('LabelWriter 450'))
+    ?? printers.find((item) => item.name?.includes('LabelWriter'))
+    ?? printers[0];
+
+  if (!printer?.name) {
+    throw new Error('Geen DYMO LabelWriter printer gevonden. Controleer of de LabelWriter 450 is aangesloten.');
+  }
+
+  const labelXml = buildDymoScooterLabelXml(scooter, dealerCompany);
+  const label = framework.openLabelXml?.(labelXml);
+  if (!label?.print) throw new Error('DYMO label kon niet opgebouwd worden.');
+
+  const addressText = [
+    scooter.frameNumber,
+    scooter.licensePlate?.trim() || 'Geen kenteken',
+    `${scooter.model} - ${normalizeSpeedValue(scooter.speed)}`,
+    dealerCompany || scooter.color || '',
+  ].filter(Boolean).join('\n');
+
+  label.setAddressText?.(0, addressText);
+  label.print(printer.name);
+  return printer.name;
 }
 
 function salesYearForScooter(scooter: Scooter) {
@@ -3095,6 +3207,8 @@ function ScooterDrawer({
   const [draft, setDraft] = useState(scooter);
   const [rdwLoading, setRdwLoading] = useState(false);
   const [rdwMessage, setRdwMessage] = useState('');
+  const [dymoPrinting, setDymoPrinting] = useState(false);
+  const [dymoMessage, setDymoMessage] = useState('');
   const [documentMessage, setDocumentMessage] = useState('');
   const [documentUploading, setDocumentUploading] = useState(false);
   const registrationComplete = isRegistrationComplete(scooter);
@@ -3168,6 +3282,19 @@ function ScooterDrawer({
     }
   }
 
+  async function handleDymoPrint() {
+    setDymoPrinting(true);
+    setDymoMessage('');
+    try {
+      const printerName = await printScooterDymoLabel(draft, dealerName(dealers, draft.dealerId) || '');
+      setDymoMessage(`Label verstuurd naar ${printerName}.`);
+    } catch (error) {
+      setDymoMessage(`DYMO print mislukt: ${importErrorMessage(error)}`);
+    } finally {
+      setDymoPrinting(false);
+    }
+  }
+
   return (
     <div className="drawer-backdrop" onMouseDown={onClose}>
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
@@ -3209,8 +3336,12 @@ function ScooterDrawer({
               <button className="secondary-button" disabled={rdwLoading} onClick={handleRdwFetch}>
                 <RefreshCw size={15} /> {rdwLoading ? 'RDW ophalen...' : 'Haal RDW data op'}
               </button>
+              <button className="secondary-button" disabled={dymoPrinting} onClick={handleDymoPrint}>
+                <Printer size={15} /> {dymoPrinting ? 'Label printen...' : 'Print Dymo label'}
+              </button>
             </div>
             {rdwMessage && <p className="drawer-note">{rdwMessage}</p>}
+            {dymoMessage && <p className="drawer-note">{dymoMessage}</p>}
           </section>
         </div>
         <section className="panel drawer-info-panel"><div className="panel-title"><ShieldCheck size={16} /> Warranty</div>{warranties.length ? warranties.map((w) => <p key={w.id}>{w.claimNumber || w.id} - {w.partName} - {w.status}</p>) : <p>Geen warranty claims</p>}</section>
