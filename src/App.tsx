@@ -2506,6 +2506,11 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
   const [groupFilter, setGroupFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('');
+  const [codeFilter, setCodeFilter] = useState('');
+  const [descriptionFilter, setDescriptionFilter] = useState('');
+  const [barcodeFilter, setBarcodeFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | 'all'>(25);
   const [sortField, setSortField] = useState<'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate'>('code');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -2532,6 +2537,9 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
 
   const visibleProducts = useMemo(() => {
     const needle = query.trim().toLowerCase();
+    const codeNeedle = codeFilter.trim().toLowerCase();
+    const descriptionNeedle = descriptionFilter.trim().toLowerCase();
+    const barcodeNeedle = barcodeFilter.trim().toLowerCase();
     return products.filter((product) => {
       const inQuery = !needle || [
         product.code,
@@ -2543,6 +2551,9 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
       ].some((value) => value?.toLowerCase().includes(needle));
 
       return inQuery
+        && (!codeNeedle || product.code?.toLowerCase().includes(codeNeedle))
+        && (!descriptionNeedle || product.description?.toLowerCase().includes(descriptionNeedle))
+        && (!barcodeNeedle || product.barcode?.toLowerCase().includes(barcodeNeedle))
         && (!groupFilter || product.articleGroup === groupFilter)
         && (!supplierFilter || product.supplier === supplierFilter)
         && (!stockFilter || product.stock === stockFilter);
@@ -2582,7 +2593,15 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
           return codeA.localeCompare(codeB, 'nl', { sensitivity: 'base', numeric: true }) * direction;
       }
     });
-  }, [products, query, groupFilter, supplierFilter, stockFilter, sortField, sortDirection]);
+  }, [products, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, sortField, sortDirection]);
+
+  const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(visibleProducts.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pagedProducts = pageSize === 'all'
+    ? visibleProducts
+    : visibleProducts.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const firstEntry = visibleProducts.length === 0 ? 0 : pageSize === 'all' ? 1 : (safePage - 1) * pageSize + 1;
+  const lastEntry = pageSize === 'all' ? visibleProducts.length : Math.min(safePage * pageSize, visibleProducts.length);
 
   return (
     <>
@@ -2645,7 +2664,20 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
         {visibleProducts.length === 0 ? (
           <div className="empty-state inline"><BriefcaseBusiness size={22} /><strong>Geen producten gevonden</strong><span>Importeer een Excel/CSV of pas je filters aan.</span></div>
         ) : (
-          <div className="table-scroll">
+          <>
+            <div className="table-toolbar">
+              <div className="table-controls">
+                <label>Rows:
+                  <select value={pageSize} onChange={(event) => { setPageSize(event.target.value === 'all' ? 'all' : Number(event.target.value)); setPage(1); }}>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value="all">Alles</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div className="table-scroll">
             <table className="inventory-table product-table">
               <thead>
                 <tr>
@@ -2691,9 +2723,39 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
                   <th>Hoofdleverancier</th>
                   <th>Land van herkomst</th>
                 </tr>
+                <tr className="filter-row">
+                  <th><input value={codeFilter} onChange={(event) => { setCodeFilter(event.target.value); setPage(1); }} placeholder="Filter code" /></th>
+                  <th><input value={descriptionFilter} onChange={(event) => { setDescriptionFilter(event.target.value); setPage(1); }} placeholder="Filter omschrijving" /></th>
+                  <th><input value={barcodeFilter} onChange={(event) => { setBarcodeFilter(event.target.value); setPage(1); }} placeholder="Filter barcode" /></th>
+                  <th />
+                  <th />
+                  <th />
+                  <th />
+                  <th>
+                    <select value={groupFilter} onChange={(event) => { setGroupFilter(event.target.value); setPage(1); }}>
+                      <option value="">Alle</option>
+                      {articleGroups.map((group) => <option key={group} value={group}>{group}</option>)}
+                    </select>
+                  </th>
+                  <th>
+                    <select value={stockFilter} onChange={(event) => { setStockFilter(event.target.value); setPage(1); }}>
+                      <option value="">Alle</option>
+                      {stockValues.map((stock) => <option key={stock} value={stock}>{stock}</option>)}
+                    </select>
+                  </th>
+                  <th />
+                  <th />
+                  <th>
+                    <select value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); setPage(1); }}>
+                      <option value="">Alle</option>
+                      {suppliers.map((supplier) => <option key={supplier} value={supplier}>{supplier}</option>)}
+                    </select>
+                  </th>
+                  <th />
+                </tr>
               </thead>
               <tbody>
-                {visibleProducts.map((product) => (
+                {pagedProducts.map((product) => (
                   <tr key={product.id}>
                     <td>{product.code || '-'}</td>
                     <td>{product.description || '-'}</td>
@@ -2712,7 +2774,18 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+            <div className="table-footer">
+              <span>Showing {firstEntry} to {lastEntry} of {visibleProducts.length} entries</span>
+              {pageSize !== 'all' && (
+                <div className="pagination">
+                  <button type="button" disabled={safePage <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button>
+                  <span>{safePage} / {totalPages}</span>
+                  <button type="button" disabled={safePage >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Next</button>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </section>
     </>
