@@ -28,6 +28,7 @@ import {
   XCircle,
   Wrench,
 } from 'lucide-react';
+import Dymo from 'dymo-connect';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
 import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertScooters, upsertWarrantyParts } from './lib/supabase';
@@ -86,7 +87,6 @@ const maintenancePackages = {
 } as const;
 
 const warrantyStatuses: WarrantyPart['status'][] = ['Open', 'In behandeling', 'Goedgekeurd', 'Afgewezen', 'Vervangen', 'Afgehandeld'];
-const dymoFrameworkUrl = 'https://raw.githubusercontent.com/dymosoftware/dymo-connect-framework/master/dymo.connect.framework.min.js';
 
 function countByStatus(scooters: Scooter[], status: ScooterStatus) {
   return scooters.filter((scooter) => scooter.status === status).length;
@@ -222,43 +222,38 @@ function warrantyTotalPrice(claim: WarrantyPart) {
   return total > 0 ? total.toFixed(2) : '';
 }
 
-async function ensureDymoFramework() {
-  if (typeof window === 'undefined') throw new Error('DYMO printen werkt alleen in de browser.');
-
-  const existingFramework = (window as typeof window & {
-    dymo?: { label?: { framework?: Record<string, unknown> } };
-  }).dymo?.label?.framework;
-
-  if (existingFramework) return existingFramework;
-
-  await new Promise<void>((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = dymoFrameworkUrl;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('DYMO framework kon niet geladen worden.'));
-    document.head.appendChild(script);
-  });
-
-  const framework = (window as typeof window & {
-    dymo?: { label?: { framework?: Record<string, unknown> } };
-  }).dymo?.label?.framework;
-
-  if (!framework) throw new Error('DYMO framework is geladen, maar niet beschikbaar.');
-
-  return framework;
-}
+type DymoBrowserPrinter = {
+  name: string;
+  model: string;
+  connected: boolean;
+  local: boolean;
+  twinTurbo: boolean;
+};
 
 function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
+  const escaped = [
+    scooter.frameNumber,
+    scooter.licensePlate?.trim() || 'Geen kenteken',
+    `${scooter.model} - ${normalizeSpeedValue(scooter.speed)}`,
+    dealerCompany || scooter.color || '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
   <PaperOrientation>Landscape</PaperOrientation>
-  <Id>Address</Id>
+  <Id>Small30336</Id>
   <PaperName>30252 Address</PaperName>
-  <DrawCommands />
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="5418" Height="1584" Rx="180" Ry="180" />
+  </DrawCommands>
   <ObjectInfo>
-    <AddressObject>
-      <Name>Address</Name>
+    <TextObject>
+      <Name>Text</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
       <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
       <LinkedObjectName />
@@ -268,68 +263,51 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
       <HorizontalAlignment>Left</HorizontalAlignment>
       <VerticalAlignment>Top</VerticalAlignment>
       <TextFitMode>ShrinkToFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
+      <UseFullFontHeight>False</UseFullFontHeight>
       <Verticalized>False</Verticalized>
-      <StyledText />
-      <ShowBarcodeFor9DigitZipOnly>False</ShowBarcodeFor9DigitZipOnly>
-      <BarcodePosition>AboveAddress</BarcodePosition>
-      <LineFonts>
-        <Font Family="Arial" Size="15" Bold="True" Italic="False" Underline="False" Strikeout="False" />
-        <Font Family="Arial" Size="11" Bold="False" Italic="False" Underline="False" Strikeout="False" />
-        <Font Family="Arial" Size="10" Bold="False" Italic="False" Underline="False" Strikeout="False" />
-        <Font Family="Arial" Size="10" Bold="False" Italic="False" Underline="False" Strikeout="False" />
-      </LineFonts>
-    </AddressObject>
-    <Bounds X="332" Y="150" Width="4455" Height="1260" />
+      <StyledText>
+        <Element>
+          <String>${escaped}</String>
+          <Attributes>
+            <Font Family="Arial" Size="12" Bold="True" Italic="False" Underline="False" Strikeout="False" />
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="180" Y="120" Width="5058" Height="1320" />
   </ObjectInfo>
 </DieCutLabel>`;
 }
 
+async function getAvailableDymoPrinter() {
+  const ports = Array.from({ length: 10 }, (_, index) => 41951 + index);
+
+  for (const port of ports) {
+    const dymo = new Dymo({ hostname: '127.0.0.1', port });
+    const result = await dymo.getPrinters();
+    if (!result.success) continue;
+    const printers = result.data as DymoBrowserPrinter[];
+    const printer = printers.find((item) => item.connected && item.name.includes('LabelWriter 450'))
+      ?? printers.find((item) => item.connected && item.name.includes('LabelWriter'))
+      ?? printers.find((item) => item.connected)
+      ?? printers.find((item) => item.name);
+    if (printer?.name) {
+      return { dymo, printerName: printer.name, port };
+    }
+  }
+
+  throw new Error('Geen actieve DYMO Connect webservice of LabelWriter printer gevonden op deze pc.');
+}
+
 async function printScooterDymoLabel(scooter: Scooter, dealerCompany: string) {
-  const framework = await ensureDymoFramework() as {
-    init?: () => void;
-    checkEnvironment?: () => boolean | string | { isBrowserSupported?: boolean; isFrameworkInstalled?: boolean };
-    getPrinters?: () => Array<{ name?: string }>;
-    openLabelXml?: (xml: string) => {
-      setAddressText?: (index: number, value: string) => void;
-      print?: (printerName: string) => void;
-    };
-  };
-
-  framework.init?.();
-  const environment = framework.checkEnvironment?.();
-  if (environment && typeof environment === 'object') {
-    if ('isFrameworkInstalled' in environment && environment.isFrameworkInstalled === false) {
-      throw new Error('DYMO Connect software of webservice is niet actief op deze computer.');
-    }
-    if ('isBrowserSupported' in environment && environment.isBrowserSupported === false) {
-      throw new Error('Deze browser ondersteunt de DYMO webservice niet.');
-    }
-  }
-
-  const printers = framework.getPrinters?.() ?? [];
-  const printer = printers.find((item) => item.name?.includes('LabelWriter 450'))
-    ?? printers.find((item) => item.name?.includes('LabelWriter'))
-    ?? printers[0];
-
-  if (!printer?.name) {
-    throw new Error('Geen DYMO LabelWriter printer gevonden. Controleer of de LabelWriter 450 is aangesloten.');
-  }
-
+  const { dymo, printerName } = await getAvailableDymoPrinter();
   const labelXml = buildDymoScooterLabelXml(scooter, dealerCompany);
-  const label = framework.openLabelXml?.(labelXml);
-  if (!label?.print) throw new Error('DYMO label kon niet opgebouwd worden.');
-
-  const addressText = [
-    scooter.frameNumber,
-    scooter.licensePlate?.trim() || 'Geen kenteken',
-    `${scooter.model} - ${normalizeSpeedValue(scooter.speed)}`,
-    dealerCompany || scooter.color || '',
-  ].filter(Boolean).join('\n');
-
-  label.setAddressText?.(0, addressText);
-  label.print(printer.name);
-  return printer.name;
+  const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Scooter ${scooter.frameNumber}` });
+  if (!printResult.success) {
+    throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
+  }
+  return printerName;
 }
 
 function salesYearForScooter(scooter: Scooter) {
