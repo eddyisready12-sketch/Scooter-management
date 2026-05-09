@@ -1057,13 +1057,14 @@ export function App() {
     const warrantyUntil = String(form.get('warrantyUntil') ?? '') || addMonthsToInputDate(registrationDate);
     const submittedItems = (() => {
       try {
-        return JSON.parse(String(form.get('claimItemsJson') ?? '[]')) as Array<{ partName?: string; partNumber?: string; partPrice?: string }>;
+        return JSON.parse(String(form.get('claimItemsJson') ?? '[]')) as Array<{ productCode?: string; partName?: string; partNumber?: string; partPrice?: string }>;
       } catch {
         return [];
       }
     })();
     const claimItems = submittedItems
       .map((item) => ({
+        ...(String(item.productCode ?? '').trim() ? { productCode: String(item.productCode ?? '').trim() } : {}),
         partName: String(item.partName ?? '').trim(),
         ...(String(item.partNumber ?? '').trim() ? { partNumber: String(item.partNumber ?? '').trim() } : {}),
         ...(parseCurrencyInput(String(item.partPrice ?? '')) ? { partPrice: parseCurrencyInput(String(item.partPrice ?? '')) } : {}),
@@ -1378,7 +1379,7 @@ export function App() {
             />
           )}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
-          {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
+          {view === 'warranty' && <Warranty data={data} products={data.products} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
           {view === 'search' && <GlobalSearch data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
         </section>
@@ -3209,14 +3210,14 @@ function DealerDetailModal({ dealer, scooters, onClose, onUpdate }: { dealer: De
   );
 }
 
-function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppData; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<boolean>; updateWarranty: (warranty: WarrantyPart) => Promise<void>; message: string }) {
+function Warranty({ data, products, addWarranty, updateWarranty, message }: { data: AppData; products: Product[]; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<boolean>; updateWarranty: (warranty: WarrantyPart) => Promise<void>; message: string }) {
   const [selectedFrame, setSelectedFrame] = useState('');
   const [selectedClaim, setSelectedClaim] = useState<WarrantyPart | null>(null);
   const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame);
   const [licensePlate, setLicensePlate] = useState('');
   const [selectedDealerId, setSelectedDealerId] = useState('');
-  const [claimItems, setClaimItems] = useState<Array<{ partName: string; partNumber: string; partPrice: string }>>([
-    { partName: '', partNumber: '', partPrice: '' },
+  const [claimItems, setClaimItems] = useState<Array<{ productCode: string; partName: string; partNumber: string; partPrice: string }>>([
+    { productCode: '', partName: '', partNumber: '', partPrice: '' },
   ]);
   const registrationDate = selectedScooter?.firstRegistrationDate || selectedScooter?.firstAdmissionDate;
   const calculatedAge = formatVehicleAge(registrationDate);
@@ -3242,16 +3243,33 @@ function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppDat
     setSelectedDealerId(scooter.dealerId ?? '');
   }
 
-  function updateClaimItem(index: number, field: 'partName' | 'partNumber' | 'partPrice', value: string) {
+  const sortedProducts = [...products].sort((a, b) => a.description.localeCompare(b.description, 'nl', { sensitivity: 'base' }));
+
+  function updateClaimItem(index: number, field: 'productCode' | 'partName' | 'partNumber' | 'partPrice', value: string) {
     setClaimItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)));
   }
 
+  function applyProductToClaimItem(index: number, code: string) {
+    const selectedProduct = products.find((product) => product.code === code);
+    setClaimItems((current) => current.map((item, itemIndex) => {
+      if (itemIndex !== index) return item;
+      if (!selectedProduct) return { ...item, productCode: code };
+      return {
+        ...item,
+        productCode: code,
+        partName: selectedProduct.description || item.partName,
+        partNumber: selectedProduct.code || item.partNumber,
+        partPrice: parseCurrencyInput(selectedProduct.costPrice || selectedProduct.salePrice || '') || item.partPrice,
+      };
+    }));
+  }
+
   function addClaimItemRow() {
-    setClaimItems((current) => [...current, { partName: '', partNumber: '', partPrice: '' }]);
+    setClaimItems((current) => [...current, { productCode: '', partName: '', partNumber: '', partPrice: '' }]);
   }
 
   function removeClaimItemRow(index: number) {
-    setClaimItems((current) => current.length === 1 ? [{ partName: '', partNumber: '', partPrice: '' }] : current.filter((_, itemIndex) => itemIndex !== index));
+    setClaimItems((current) => current.length === 1 ? [{ productCode: '', partName: '', partNumber: '', partPrice: '' }] : current.filter((_, itemIndex) => itemIndex !== index));
   }
 
   async function handleWarrantySubmit(event: FormEvent<HTMLFormElement>) {
@@ -3260,7 +3278,7 @@ function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppDat
     setSelectedFrame('');
     setLicensePlate('');
     setSelectedDealerId('');
-    setClaimItems([{ partName: '', partNumber: '', partPrice: '' }]);
+    setClaimItems([{ productCode: '', partName: '', partNumber: '', partPrice: '' }]);
   }
 
   const claimItemsPayload = JSON.stringify(claimItems);
@@ -3324,6 +3342,16 @@ function Warranty({ data, addWarranty, updateWarranty, message }: { data: AppDat
               <div className="warranty-items-list">
                 {claimItems.map((item, index) => (
                   <div className="warranty-item-row" key={`claim-item-${index}`}>
+                    <label>Product
+                      <select value={item.productCode} onChange={(event) => applyProductToClaimItem(index, event.target.value)}>
+                        <option value="">Kies uit onderdelen...</option>
+                        {sortedProducts.map((product) => (
+                          <option key={product.id} value={product.code}>
+                            {product.code} - {product.description}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <label>Onderdeel<input value={item.partName} onChange={(event) => updateClaimItem(index, 'partName', event.target.value)} required={index === 0} placeholder="Bijv. schokbrekerset achter" /></label>
                     <label>Part nummer<input value={item.partNumber} onChange={(event) => updateClaimItem(index, 'partNumber', event.target.value)} placeholder="Bijv. 2507001526" /></label>
                     <label>Prijs onderdeel<input value={item.partPrice} onChange={(event) => updateClaimItem(index, 'partPrice', event.target.value)} inputMode="decimal" placeholder="Bijv. 89,95" /></label>

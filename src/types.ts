@@ -109,6 +109,7 @@ export type WarrantyPart = {
   partNumber: string;
   partPrice?: string;
   claimItems?: Array<{
+    productCode?: string;
     partName: string;
     partNumber?: string;
     partPrice?: string;
