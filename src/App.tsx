@@ -266,8 +266,8 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
   const frameLabel = escapeLabelValue(scooter.frameNumber);
   const detailLines = [
     scooter.licensePlate?.trim() || 'Geen kenteken',
-    `${scooter.model} - ${normalizeSpeedValue(scooter.speed)}`,
-    dealerCompany || scooter.color || '',
+    `${scooter.model} - ${scooter.color || '-'}`,
+    dealerCompany || '',
   ]
     .filter(Boolean)
     .join('\n');
