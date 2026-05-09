@@ -3342,22 +3342,27 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
               <div className="warranty-items-list">
                 {claimItems.map((item, index) => (
                   <div className="warranty-item-row" key={`claim-item-${index}`}>
-                    <label>Product
-                      <select value={item.productCode} onChange={(event) => applyProductToClaimItem(index, event.target.value)}>
-                        <option value="">Kies uit onderdelen...</option>
-                        {sortedProducts.map((product) => (
-                          <option key={product.id} value={product.code}>
-                            {product.code} - {product.description}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>Onderdeel<input value={item.partName} onChange={(event) => updateClaimItem(index, 'partName', event.target.value)} required={index === 0} placeholder="Bijv. schokbrekerset achter" /></label>
-                    <label>Part nummer<input value={item.partNumber} onChange={(event) => updateClaimItem(index, 'partNumber', event.target.value)} placeholder="Bijv. 2507001526" /></label>
-                    <label>Prijs onderdeel<input value={item.partPrice} onChange={(event) => updateClaimItem(index, 'partPrice', event.target.value)} inputMode="decimal" placeholder="Bijv. 89,95" /></label>
-                    <button type="button" className="icon-button danger-button" onClick={() => removeClaimItemRow(index)} aria-label={`Onderdeel ${index + 1} verwijderen`}>
-                      <XCircle size={16} />
-                    </button>
+                    <div className="warranty-item-primary">
+                      <label>
+                        Product
+                        <select value={item.productCode} onChange={(event) => applyProductToClaimItem(index, event.target.value)}>
+                          <option value="">Kies uit onderdelen...</option>
+                          {sortedProducts.map((product) => (
+                            <option key={product.id} value={product.code}>
+                              {product.code} - {product.description}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button type="button" className="icon-button danger-button" onClick={() => removeClaimItemRow(index)} aria-label={`Onderdeel ${index + 1} verwijderen`}>
+                        <XCircle size={16} />
+                      </button>
+                    </div>
+                    <div className="warranty-item-secondary">
+                      <label>Onderdeel<input value={item.partName} onChange={(event) => updateClaimItem(index, 'partName', event.target.value)} required={index === 0} placeholder="Bijv. schokbrekerset achter" /></label>
+                      <label>Part nummer<input value={item.partNumber} onChange={(event) => updateClaimItem(index, 'partNumber', event.target.value)} placeholder="Bijv. 2507001526" /></label>
+                      <label>Prijs onderdeel<input value={item.partPrice} onChange={(event) => updateClaimItem(index, 'partPrice', event.target.value)} inputMode="decimal" placeholder="Bijv. 89,95" /></label>
+                    </div>
                   </div>
                 ))}
               </div>

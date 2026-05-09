@@ -1308,13 +1308,28 @@ tbody tr:hover {
 
 .warranty-item-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(180px, 0.7fr) auto;
-  gap: 10px;
-  align-items: end;
+  gap: 12px;
   padding: 12px;
   border: 1px solid #dce1e6;
   border-radius: 6px;
   background: #f8fafc;
+}
+
+.warranty-item-primary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.warranty-item-primary > label {
+  min-width: 0;
+}
+
+.warranty-item-secondary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(180px, 0.9fr) minmax(160px, 0.8fr);
+  gap: 10px;
 }
 
 .warranty-items-summary {
@@ -1332,6 +1347,12 @@ tbody tr:hover {
 .danger-button:hover {
   background: #fff3f3;
   color: #a91d1d;
+}
+
+@media (max-width: 920px) {
+  .warranty-item-secondary {
+    grid-template-columns: 1fr;
+  }
 }
 
 .warranty-detail-items {
