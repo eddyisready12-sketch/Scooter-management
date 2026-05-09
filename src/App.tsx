@@ -256,7 +256,7 @@ const dymo99012Layout = {
   detailsBounds: { x: 180, y: 1160, width: 4686, height: 700 },
 };
 
-function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
+function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
   const escapeLabelValue = (value: string) => value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -264,10 +264,19 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
 
   const barcodeValue = escapeLabelValue(scooter.frameNumber);
   const frameLabel = escapeLabelValue(scooter.frameNumber);
+  const dealerLine = dealer?.company || scooter.color || '';
+  const dealerAddressLine = [
+    dealer?.address?.trim() || '',
+    [dealer?.Postalcode?.trim() || '', dealer?.city?.trim() || ''].filter(Boolean).join(' '),
+  ]
+    .filter(Boolean)
+    .join(', ');
+
   const detailLines = [
     scooter.licensePlate?.trim() || 'Geen kenteken',
     `${scooter.model} - ${scooter.color || '-'}`,
-    dealerCompany || '',
+    dealerLine,
+    dealerAddressLine,
   ]
     .filter(Boolean)
     .join('\n');
@@ -378,9 +387,9 @@ async function getAvailableDymoPrinter() {
   throw new Error('Geen actieve DYMO Connect webservice of LabelWriter printer gevonden op deze pc.');
 }
 
-async function printScooterDymoLabel(scooter: Scooter, dealerCompany: string) {
+async function printScooterDymoLabel(scooter: Scooter, dealer?: Dealer) {
   const { dymo, printerName } = await getAvailableDymoPrinter();
-  const labelXml = buildDymoScooterLabelXml(scooter, dealerCompany);
+  const labelXml = buildDymoScooterLabelXml(scooter, dealer);
   const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Scooter ${scooter.frameNumber}` });
   if (!printResult.success) {
     throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
@@ -4108,7 +4117,7 @@ function ScooterDrawer({
     setDymoPrinting(true);
     setDymoMessage('');
     try {
-      const printerName = await printScooterDymoLabel(draft, dealerName(dealers, draft.dealerId) || '');
+      const printerName = await printScooterDymoLabel(draft, dealers.find((dealer) => dealer.id === draft.dealerId));
       setDymoMessage(`Label verstuurd naar ${printerName}.`);
     } catch (error) {
       setDymoMessage(`DYMO print mislukt: ${importErrorMessage(error)}`);
