@@ -211,6 +211,73 @@ h2 {
   margin-bottom: 14px;
 }
 
+.dashboard-links-panel,
+.dashboard-import-panel {
+  margin-bottom: 14px;
+}
+
+.dashboard-links-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.dashboard-link-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 78px;
+  border: 1px solid #d6dce2;
+  border-radius: 6px;
+  background: #fff;
+  padding: 14px;
+  text-align: left;
+  color: inherit;
+  box-shadow: 0 1px 3px rgba(25, 35, 45, 0.06);
+}
+
+.dashboard-link-tile:hover {
+  border-color: #0075ff;
+  box-shadow: 0 0 0 2px rgba(0, 117, 255, 0.12);
+}
+
+.dashboard-link-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  background: #eef5ff;
+  color: #0075ff;
+}
+
+.dashboard-link-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.dashboard-link-copy strong {
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.dashboard-link-copy small {
+  color: #65717d;
+}
+
+.dashboard-import-body {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.dashboard-import-copy {
+  margin: 0;
+  color: #65717d;
+  font-size: 14px;
+}
+
 .dashboard-registered-panel {
   margin-bottom: 16px;
 }
@@ -501,7 +568,7 @@ tbody tr:hover {
   gap: 10px;
 }
 
-.import-controls > label:first-child {
+.import-controls > label {
   display: grid;
   gap: 6px;
   color: #4f5b66;
@@ -2404,7 +2471,8 @@ dd {
   .two-col,
   .container-grid,
   .drawer-grid,
-  .search-grid {
+  .search-grid,
+  .dashboard-links-grid {
     grid-template-columns: 1fr;
   }
 

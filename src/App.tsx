@@ -1437,7 +1437,7 @@ export function App() {
         </header>
 
         <section className="content">
-          {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
+          {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} onNavigate={setView} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
@@ -1549,7 +1549,7 @@ function ExpandableNotice({ message, details }: { message: string; details?: str
   );
 }
 
-function Dashboard({ data, onImport, message, messageDetails, query, setQuery, scooters, onSelect, statusFilter, setStatusFilter, onBulkRdwCheck }: {
+function Dashboard({ data, onImport, message, messageDetails, query, setQuery, scooters, onSelect, statusFilter, setStatusFilter, onBulkRdwCheck, onNavigate }: {
   data: AppData;
   onImport: (target: ImportTarget, status: ImportScooterStatus, event: ChangeEvent<HTMLInputElement>) => void;
   message: string;
@@ -1561,10 +1561,12 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
   statusFilter: ScooterStatus | 'all';
   setStatusFilter: (status: ScooterStatus | 'all') => void;
   onBulkRdwCheck: (scooters: Scooter[]) => Promise<string>;
+  onNavigate: (view: View) => void;
 }) {
   const [importTarget, setImportTarget] = useState<ImportTarget>('scooters');
   const [importStatus, setImportStatus] = useState<ImportScooterStatus>('file');
   const [showLatestRegistered, setShowLatestRegistered] = useState(false);
+  const dashboardLinks = views.filter(({ id }) => id !== 'dashboard');
   const cards: Array<{ label: ScooterStatus; icon: typeof Bike }> = [
     { label: 'Beschikbaar', icon: Bike },
     { label: 'Verkocht dealer', icon: Wrench },
@@ -1589,28 +1591,24 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
           <h1>Dashboard</h1>
           <span>Totaal voorraad: {data.scooters.length}</span>
         </div>
-        <div className="import-controls">
-          <label>
-            Import naar
-            <select value={importTarget} onChange={(event) => setImportTarget(event.target.value as ImportTarget)}>
-              <option value="scooters">Scooters voorraadblok</option>
-              <option value="scooterUpdates">Scooters bijwerken (framenummer)</option>
-              <option value="dealers">Dealers blok</option>
-            </select>
-          </label>
-          {importTarget === 'scooters' && (
-            <label>
-              Scooter status
-              <select value={importStatus} onChange={(event) => setImportStatus(event.target.value as ImportScooterStatus)}>
-                <option value="file">Status uit bestand</option>
-                {Object.keys(statusColor).map((status) => <option value={status} key={status}>{status}</option>)}
-              </select>
-            </label>
-          )}
-          <label className="upload-button"><Upload size={16} /> CSV / Excel importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={(event) => onImport(importTarget, importStatus, event)} /></label>
-        </div>
       </div>
       <ExpandableNotice message={message} details={messageDetails} />
+      <section className="panel dashboard-links-panel">
+        <div className="panel-title">
+          <span className="panel-title-label"><DatabaseZap size={16} /> Snelkoppelingen</span>
+        </div>
+        <div className="dashboard-links-grid">
+          {dashboardLinks.map(({ id, label, icon: Icon }) => (
+            <button key={id} type="button" className="dashboard-link-tile" onClick={() => onNavigate(id)}>
+              <span className="dashboard-link-icon"><Icon size={20} /></span>
+              <span className="dashboard-link-copy">
+                <strong>{label}</strong>
+                <small>Open {label.toLowerCase()}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
       <div className="stat-grid">
         {cards.map(({ label, icon: Icon }) => (
           <button
@@ -1652,6 +1650,34 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
         ) : showLatestRegistered ? (
           <p className="empty">Nog geen tenaamgestelde scooters gevonden.</p>
         ) : null}
+      </section>
+      <section className="panel dashboard-import-panel">
+        <div className="panel-title">
+          <span className="panel-title-label"><Upload size={16} /> Scooters importeren en bijwerken</span>
+        </div>
+        <div className="dashboard-import-body">
+          <p className="dashboard-import-copy">Werk hier de scooterlijst bij, importeer dealers of zet een nieuwe voorraadbatch in het juiste statusblok.</p>
+          <div className="import-controls">
+            <label>
+              Import naar
+              <select value={importTarget} onChange={(event) => setImportTarget(event.target.value as ImportTarget)}>
+                <option value="scooters">Scooters voorraadblok</option>
+                <option value="scooterUpdates">Scooters bijwerken (framenummer)</option>
+                <option value="dealers">Dealers blok</option>
+              </select>
+            </label>
+            {importTarget === 'scooters' && (
+              <label>
+                Scooter status
+                <select value={importStatus} onChange={(event) => setImportStatus(event.target.value as ImportScooterStatus)}>
+                  <option value="file">Status uit bestand</option>
+                  {Object.keys(statusColor).map((status) => <option value={status} key={status}>{status}</option>)}
+                </select>
+              </label>
+            )}
+            <label className="upload-button"><Upload size={16} /> CSV / Excel importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={(event) => onImport(importTarget, importStatus, event)} /></label>
+          </div>
+        </div>
       </section>
       {statusFilter !== 'all' && (
         <div className="filter-notice">
