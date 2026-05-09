@@ -3213,6 +3213,10 @@ function DealerDetailModal({ dealer, scooters, onClose, onUpdate }: { dealer: De
 function Warranty({ data, products, addWarranty, updateWarranty, message }: { data: AppData; products: Product[]; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<boolean>; updateWarranty: (warranty: WarrantyPart) => Promise<void>; message: string }) {
   const [selectedFrame, setSelectedFrame] = useState('');
   const [selectedClaim, setSelectedClaim] = useState<WarrantyPart | null>(null);
+  const [claimQuery, setClaimQuery] = useState('');
+  const [claimStatusFilter, setClaimStatusFilter] = useState('');
+  const [claimDealerFilter, setClaimDealerFilter] = useState('');
+  const [claimWarrantyFilter, setClaimWarrantyFilter] = useState<'all' | 'active' | 'expired'>('all');
   const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame);
   const [licensePlate, setLicensePlate] = useState('');
   const [selectedDealerId, setSelectedDealerId] = useState('');
@@ -3245,6 +3249,42 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
   }
 
   const sortedProducts = [...products].sort((a, b) => a.description.localeCompare(b.description, 'nl', { sensitivity: 'base' }));
+  const warrantyDealers = useMemo(
+    () => Array.from(new Set(
+      data.warranties
+        .map((claim) => data.dealers.find((dealer) => dealer.id === claim.dealerId)?.company || '')
+        .filter(Boolean),
+    )).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' })),
+    [data.dealers, data.warranties],
+  );
+  const filteredClaims = useMemo(() => {
+    const query = normalizeLookup(claimQuery);
+    return data.warranties.filter((claim) => {
+      const dealerName = data.dealers.find((dealer) => dealer.id === claim.dealerId)?.company || '';
+      const matchesQuery = !query || [
+        claim.claimNumber || '',
+        claim.scooterFrame,
+        claim.licensePlate || '',
+        claim.partName || '',
+        claim.partNumber || '',
+        dealerName,
+      ].some((value) => normalizeLookup(value).includes(query));
+      const matchesStatus = !claimStatusFilter || claim.status === claimStatusFilter;
+      const matchesDealer = !claimDealerFilter || dealerName === claimDealerFilter;
+      const isExpired = Boolean(claim.warrantyUntil) && isPastInputDate(claim.warrantyUntil);
+      const matchesWarranty = claimWarrantyFilter === 'all'
+        ? true
+        : claimWarrantyFilter === 'expired'
+          ? isExpired
+          : !isExpired;
+      return matchesQuery && matchesStatus && matchesDealer && matchesWarranty;
+    });
+  }, [claimDealerFilter, claimQuery, claimStatusFilter, claimWarrantyFilter, data.dealers, data.warranties]);
+  const openClaims = data.warranties.filter((claim) => claim.status === 'Open').length;
+  const processingClaims = data.warranties.filter((claim) => claim.status === 'In behandeling').length;
+  const closedClaims = data.warranties.filter((claim) => claim.status === 'Afgehandeld').length;
+  const expiredClaims = data.warranties.filter((claim) => claim.warrantyUntil && isPastInputDate(claim.warrantyUntil)).length;
+  const totalClaimValue = data.warranties.reduce((sum, claim) => sum + Number(warrantyTotalPrice(claim) || 0), 0);
 
   function updateClaimItem(index: number, field: 'productCode' | 'productLookup' | 'partName' | 'partNumber' | 'partPrice', value: string) {
     setClaimItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)));
@@ -3339,12 +3379,71 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
         </div>
       </div>
       {message && <div className="notice">{message}</div>}
+      <section className="panel">
+        <div className="panel-title"><ShieldCheck size={16} /> Garantie dashboard</div>
+        <div className="warranty-dashboard-toolbar">
+          <input
+            value={claimQuery}
+            onChange={(event) => setClaimQuery(event.target.value)}
+            placeholder="Zoek op claimnummer, framenummer, kenteken, onderdeel of dealer"
+          />
+          <select value={claimStatusFilter} onChange={(event) => setClaimStatusFilter(event.target.value)}>
+            <option value="">Alle statussen</option>
+            {warrantyStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+          <select value={claimDealerFilter} onChange={(event) => setClaimDealerFilter(event.target.value)}>
+            <option value="">Alle dealers</option>
+            {warrantyDealers.map((dealer) => <option key={dealer} value={dealer}>{dealer}</option>)}
+          </select>
+          <select value={claimWarrantyFilter} onChange={(event) => setClaimWarrantyFilter(event.target.value as 'all' | 'active' | 'expired')}>
+            <option value="all">Alle garanties</option>
+            <option value="active">Binnen garantie</option>
+            <option value="expired">Garantie verlopen</option>
+          </select>
+        </div>
+      </section>
+      <section className="stats-row warranty-stats">
+        <article className="stat-card">
+          <span>Totaal claims</span>
+          <strong>{data.warranties.length}</strong>
+          <small>{filteredClaims.length} zichtbaar na filters</small>
+        </article>
+        <article className="stat-card">
+          <span>Open</span>
+          <strong>{openClaims}</strong>
+          <small>Nieuwe aanvragen</small>
+        </article>
+        <article className="stat-card">
+          <span>In behandeling</span>
+          <strong>{processingClaims}</strong>
+          <small>Lopende claims</small>
+        </article>
+        <article className="stat-card">
+          <span>Afgehandeld</span>
+          <strong>{closedClaims}</strong>
+          <small>Afgeronde claims</small>
+        </article>
+        <article className="stat-card">
+          <span>Claimwaarde</span>
+          <strong>{formatCurrency(totalClaimValue ? totalClaimValue.toFixed(2) : '')}</strong>
+          <small>Totaal onderdelenbedrag</small>
+        </article>
+        <article className="stat-card">
+          <span>Verlopen garantie</span>
+          <strong>{expiredClaims}</strong>
+          <small>Claims buiten garantietermijn</small>
+        </article>
+      </section>
       <div className="two-col warranty-layout">
         <section className="panel">
-          <div className="panel-title"><ShieldCheck size={16} /> Garantie claims</div>
-          {data.warranties.length === 0 ? (
-            <div className="empty-state inline"><ShieldCheck size={22} /><strong>Nog geen garantieclaims</strong><span>Nieuwe claims verschijnen hier zodra je ze toevoegt.</span></div>
-          ) : data.warranties.map((claim) => (
+          <div className="panel-title"><ShieldCheck size={16} /> Claimoverzicht</div>
+          {filteredClaims.length === 0 ? (
+            <div className="empty-state inline">
+              <ShieldCheck size={22} />
+              <strong>{data.warranties.length === 0 ? 'Nog geen garantieclaims' : 'Geen claims binnen deze filters'}</strong>
+              <span>{data.warranties.length === 0 ? 'Nieuwe claims verschijnen hier zodra je ze toevoegt.' : 'Pas de filters aan om meer claims te tonen.'}</span>
+            </div>
+          ) : filteredClaims.map((claim) => (
             <div className="claim-row" key={claim.id}>
               {warrantyStatusIcon(claim.status)}
               <button type="button" className="claim-row-main" onClick={() => setSelectedClaim(claim)}>

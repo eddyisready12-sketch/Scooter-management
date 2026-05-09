@@ -1287,6 +1287,17 @@ tbody tr:hover {
   grid-template-columns: 1fr 1fr;
 }
 
+.warranty-dashboard-toolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.3fr) repeat(3, minmax(180px, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.warranty-stats .stat-card strong {
+  font-size: 18px;
+}
+
 .warranty-items-panel {
   display: grid;
   gap: 12px;
@@ -1398,6 +1409,7 @@ tbody tr:hover {
 }
 
 @media (max-width: 920px) {
+  .warranty-dashboard-toolbar,
   .warranty-item-secondary {
     grid-template-columns: 1fr;
   }
