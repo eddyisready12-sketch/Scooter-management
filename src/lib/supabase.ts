@@ -62,14 +62,40 @@ const tableMap: Record<keyof AppData, string> = {
   documents: 'documents',
 };
 
+async function loadAllRows(table: string) {
+  if (!supabase) return [];
+  const pageSize = 1000;
+  const rows: Record<string, unknown>[] = [];
+
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .order('id')
+      .range(offset, offset + pageSize - 1);
+
+    if (error) throw error;
+
+    const batch = data ?? [];
+    rows.push(...batch);
+
+    if (batch.length < pageSize) break;
+  }
+
+  return rows;
+}
+
 export async function loadSupabaseData(): Promise<Partial<AppData>> {
   if (!supabase) return {};
 
   const entries = await Promise.all(
     Object.entries(tableMap).map(async ([key, table]) => {
-      const { data, error } = await supabase.from(table).select('*').order('id');
-      if (error) return null;
-      return [key, data ?? []] as const;
+      try {
+        const data = await loadAllRows(table);
+        return [key, data] as const;
+      } catch {
+        return null;
+      }
     }),
   );
 
