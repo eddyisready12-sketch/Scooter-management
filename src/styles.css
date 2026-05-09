@@ -1030,6 +1030,14 @@ tbody tr:hover {
   color: #0758a8;
 }
 
+.product-row {
+  cursor: pointer;
+}
+
+.product-row:hover td {
+  background: #f4f8fc;
+}
+
 .product-stats .stat-card {
   min-height: 94px;
   align-items: start;
@@ -1227,6 +1235,10 @@ tbody tr:hover {
 .battery-detail-modal {
   width: min(940px, calc(100vw - 32px));
   background: #eef2f6;
+}
+
+.product-detail-modal {
+  width: min(980px, calc(100vw - 32px));
 }
 
 .battery-detail-grid {

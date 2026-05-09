@@ -825,6 +825,19 @@ export function App() {
     }
   }
 
+  async function updateProduct(updatedProduct: Product) {
+    try {
+      setData((current) => ({
+        ...current,
+        products: current.products.map((product) => product.id === updatedProduct.id ? updatedProduct : product),
+      }));
+      await upsertProducts([updatedProduct]);
+      setProductMessage(`Product ${updatedProduct.code} bijgewerkt.`);
+    } catch (error) {
+      setProductMessage(`Product opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   async function addDealer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
@@ -1347,7 +1360,14 @@ export function App() {
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
-          {view === 'products' && <ProductsPage products={data.products} onImport={handleProductImport} message={productMessage} />}
+          {view === 'products' && (
+            <ProductsPage
+              products={data.products}
+              onImport={handleProductImport}
+              onUpdateProduct={updateProduct}
+              message={productMessage}
+            />
+          )}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
@@ -2503,7 +2523,17 @@ function BatteryDetailModal({ battery, batteryModels, dealers, scooters, onClose
   );
 }
 
-function ProductsPage({ products, onImport, message }: { products: Product[]; onImport: (event: ChangeEvent<HTMLInputElement>) => Promise<void>; message: string }) {
+function ProductsPage({
+  products,
+  onImport,
+  onUpdateProduct,
+  message,
+}: {
+  products: Product[];
+  onImport: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  onUpdateProduct: (product: Product) => Promise<void>;
+  message: string;
+}) {
   const [query, setQuery] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
@@ -2518,6 +2548,7 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [importCompanies, setImportCompanies] = useState<string[]>(defaultProductImportCompanies);
   const [newImportCompany, setNewImportCompany] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     try {
@@ -2834,7 +2865,7 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
               </thead>
               <tbody>
                 {pagedProducts.map((product) => (
-                  <tr key={product.id}>
+                  <tr key={product.id} className="product-row" onClick={() => setSelectedProduct(product)}>
                     <td>{product.code || '-'}</td>
                     <td>{product.description || '-'}</td>
                     <td>{product.barcode || '-'}</td>
@@ -2866,7 +2897,149 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
           </>
         )}
       </section>
+      {selectedProduct && (
+        <ProductDetailModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onSave={async (nextProduct) => {
+            await onUpdateProduct(nextProduct);
+            setSelectedProduct(nextProduct);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function ProductDetailModal({
+  product,
+  onClose,
+  onSave,
+}: {
+  product: Product;
+  onClose: () => void;
+  onSave: (product: Product) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState<Product>(product);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setDraft(product);
+  }, [product]);
+
+  async function saveProduct(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await onSave({
+        ...draft,
+        code: draft.code.trim(),
+        description: draft.description.trim(),
+        barcode: draft.barcode?.trim() || undefined,
+        batch: draft.batch?.trim() || undefined,
+        salePrice: draft.salePrice?.trim() || undefined,
+        costPrice: draft.costPrice?.trim() || undefined,
+        articleGroup: draft.articleGroup?.trim() || undefined,
+        stock: draft.stock?.trim() || undefined,
+        startDate: draft.startDate?.trim() || undefined,
+        endDate: draft.endDate?.trim() || undefined,
+        supplier: draft.supplier?.trim() || undefined,
+        countryOfOrigin: draft.countryOfOrigin?.trim() || undefined,
+        imageUrl: draft.imageUrl?.trim() || undefined,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <form className="modal-card product-detail-modal" onMouseDown={(event) => event.stopPropagation()} onSubmit={saveProduct}>
+        <div className="modal-header">
+          <div>
+            <span>Productkaart</span>
+            <h2>{draft.description || draft.code}</h2>
+          </div>
+          <button type="button" onClick={onClose}>Close</button>
+        </div>
+        <div className="battery-detail-grid">
+          <section className="panel detail-card">
+            <dl className="detail-list">
+              <dt>Code</dt><dd>{draft.code || '-'}</dd>
+              <dt>Omschrijving</dt><dd>{draft.description || '-'}</dd>
+              <dt>Barcode</dt><dd>{draft.barcode || '-'}</dd>
+              <dt>Batch</dt><dd>{draft.batch || '-'}</dd>
+              <dt>Artikelgroep</dt><dd>{draft.articleGroup || '-'}</dd>
+              <dt>Leverancier</dt><dd>{draft.supplier || '-'}</dd>
+            </dl>
+          </section>
+          <section className="panel detail-card">
+            <dl className="detail-list">
+              <dt>Verkoopprijs</dt><dd>{formatPriceValue(draft.salePrice)}</dd>
+              <dt>Kostprijs</dt><dd>{formatPriceValue(draft.costPrice)}</dd>
+              <dt>Webwinkel</dt><dd>{draft.webshop ? 'Ja' : 'Nee'}</dd>
+              <dt>Voorraad</dt><dd>{draft.stock || '-'}</dd>
+              <dt>Begindatum</dt><dd>{formatDate(draft.startDate)}</dd>
+              <dt>Land van herkomst</dt><dd>{draft.countryOfOrigin || '-'}</dd>
+            </dl>
+          </section>
+        </div>
+        <section className="panel form-panel">
+          <div className="panel-title"><BriefcaseBusiness size={16} /> Productgegevens wijzigen</div>
+          <div className="form-grid">
+            <label>Code
+              <input value={draft.code} onChange={(event) => setDraft((current) => ({ ...current, code: event.target.value }))} />
+            </label>
+            <label>Barcode
+              <input value={draft.barcode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, barcode: event.target.value }))} />
+            </label>
+            <label>Omschrijving
+              <input value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} />
+            </label>
+            <label>Batch
+              <input value={draft.batch ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batch: event.target.value }))} />
+            </label>
+            <label>Hoofdleverancier
+              <input value={draft.supplier ?? ''} onChange={(event) => setDraft((current) => ({ ...current, supplier: event.target.value }))} placeholder="Bijv. Wenling Import And Export Co., Ltd." />
+            </label>
+            <label>Artikelgroep
+              <input value={draft.articleGroup ?? ''} onChange={(event) => setDraft((current) => ({ ...current, articleGroup: event.target.value }))} />
+            </label>
+            <label>Verkoopprijs
+              <input value={draft.salePrice ?? ''} onChange={(event) => setDraft((current) => ({ ...current, salePrice: event.target.value }))} />
+            </label>
+            <label>Kostprijs
+              <input value={draft.costPrice ?? ''} onChange={(event) => setDraft((current) => ({ ...current, costPrice: event.target.value }))} />
+            </label>
+            <label>Voorraad
+              <input value={draft.stock ?? ''} onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))} />
+            </label>
+            <label>Land van herkomst
+              <input value={draft.countryOfOrigin ?? ''} onChange={(event) => setDraft((current) => ({ ...current, countryOfOrigin: event.target.value }))} />
+            </label>
+            <label>Begindatum
+              <input type="date" value={rdwDateToInputDate(draft.startDate)} onChange={(event) => setDraft((current) => ({ ...current, startDate: event.target.value || undefined }))} />
+            </label>
+            <label>Einddatum
+              <input type="date" value={rdwDateToInputDate(draft.endDate)} onChange={(event) => setDraft((current) => ({ ...current, endDate: event.target.value || undefined }))} />
+            </label>
+            <label>Webwinkel
+              <select value={draft.webshop ? 'ja' : 'nee'} onChange={(event) => setDraft((current) => ({ ...current, webshop: event.target.value === 'ja' }))}>
+                <option value="ja">Ja</option>
+                <option value="nee">Nee</option>
+              </select>
+            </label>
+            <label>Afbeelding URL
+              <input value={draft.imageUrl ?? ''} onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.target.value }))} />
+            </label>
+          </div>
+          <div className="drawer-actions">
+            <button type="button" className="secondary-button" onClick={onClose}>Sluiten</button>
+            <button className="primary-button" type="submit" disabled={saving}>Opslaan</button>
+          </div>
+        </section>
+      </form>
+    </div>
   );
 }
 
