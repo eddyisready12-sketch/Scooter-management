@@ -1437,9 +1437,9 @@ export function App() {
         </header>
 
         <section className="content">
-          {view === 'dashboard' && <Dashboard data={data} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} onNavigate={setView} />}
+          {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
-          {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
+          {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
           {view === 'products' && (
@@ -1549,41 +1549,11 @@ function ExpandableNotice({ message, details }: { message: string; details?: str
   );
 }
 
-function Dashboard({ data, onImport, message, messageDetails, query, setQuery, scooters, onSelect, statusFilter, setStatusFilter, onBulkRdwCheck, onNavigate }: {
+function Dashboard({ data, onNavigate }: {
   data: AppData;
-  onImport: (target: ImportTarget, status: ImportScooterStatus, event: ChangeEvent<HTMLInputElement>) => void;
-  message: string;
-  messageDetails: string[];
-  query: string;
-  setQuery: (value: string) => void;
-  scooters: Scooter[];
-  onSelect: (scooter: Scooter) => void;
-  statusFilter: ScooterStatus | 'all';
-  setStatusFilter: (status: ScooterStatus | 'all') => void;
-  onBulkRdwCheck: (scooters: Scooter[]) => Promise<string>;
   onNavigate: (view: View) => void;
 }) {
-  const [importTarget, setImportTarget] = useState<ImportTarget>('scooters');
-  const [importStatus, setImportStatus] = useState<ImportScooterStatus>('file');
-  const [showLatestRegistered, setShowLatestRegistered] = useState(false);
   const dashboardLinks = views.filter(({ id }) => id !== 'dashboard');
-  const cards: Array<{ label: ScooterStatus; icon: typeof Bike }> = [
-    { label: 'Beschikbaar', icon: Bike },
-    { label: 'Verkocht dealer', icon: Wrench },
-    { label: 'Verkocht klant', icon: Wrench },
-    { label: 'Af te leveren', icon: PackagePlus },
-    { label: 'Nog onderweg', icon: Boxes },
-    { label: 'In consignatie', icon: BriefcaseBusiness },
-    { label: 'In optie', icon: CalendarDays },
-  ];
-  const latestRegisteredScooters = [...data.scooters]
-    .filter((scooter) => isRegistrationComplete(scooter))
-    .sort((a, b) => {
-      const aDate = new Date(a.firstRegistrationDate || 0).getTime();
-      const bDate = new Date(b.firstRegistrationDate || 0).getTime();
-      return bDate - aDate || a.frameNumber.localeCompare(b.frameNumber);
-    })
-    .slice(0, 10);
   return (
     <>
       <div className="page-title-row">
@@ -1592,7 +1562,6 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
           <span>Totaal voorraad: {data.scooters.length}</span>
         </div>
       </div>
-      <ExpandableNotice message={message} details={messageDetails} />
       <section className="panel dashboard-links-panel">
         <div className="panel-title">
           <span className="panel-title-label"><DatabaseZap size={16} /> Snelkoppelingen</span>
@@ -1609,93 +1578,6 @@ function Dashboard({ data, onImport, message, messageDetails, query, setQuery, s
           ))}
         </div>
       </section>
-      <div className="stat-grid">
-        {cards.map(({ label, icon: Icon }) => (
-          <button
-            className={`stat-card stat-button ${statusFilter === label ? 'selected' : ''}`}
-            key={label}
-            onClick={() => setStatusFilter(statusFilter === label ? 'all' : label)}
-          >
-            <div className={`stat-icon ${statusColor[label]}`}><Icon size={24} /></div>
-            <div><span>{label}</span><strong>{countByStatus(data.scooters, label)}</strong></div>
-          </button>
-        ))}
-      </div>
-      <section className="panel dashboard-registered-panel">
-        <button
-          type="button"
-          className="dashboard-registered-toggle"
-          onClick={() => setShowLatestRegistered((current) => !current)}
-        >
-          <span className="panel-title-label"><CheckCircle2 size={16} /> Laatste 10 tenaamgestelde scooters</span>
-          <span>{latestRegisteredScooters.length} scooters {showLatestRegistered ? '-' : '+'}</span>
-        </button>
-        {showLatestRegistered && latestRegisteredScooters.length ? (
-          <div className="dashboard-registered-list">
-            {latestRegisteredScooters.map((scooter) => (
-              <button
-                key={scooter.id}
-                type="button"
-                className="dashboard-registered-row"
-                onClick={() => onSelect(scooter)}
-              >
-                <strong>{scooter.frameNumber}</strong>
-                <span>{normalizeSalesModel(scooter.model)}</span>
-                <span>{scooter.licensePlate || '-'}</span>
-                <span>{dealerName(data.dealers, scooter.dealerId) || 'Geen dealer'}</span>
-                <small>{formatDate(scooter.firstRegistrationDate)}</small>
-              </button>
-            ))}
-          </div>
-        ) : showLatestRegistered ? (
-          <p className="empty">Nog geen tenaamgestelde scooters gevonden.</p>
-        ) : null}
-      </section>
-      <section className="panel dashboard-import-panel">
-        <div className="panel-title">
-          <span className="panel-title-label"><Upload size={16} /> Scooters importeren en bijwerken</span>
-        </div>
-        <div className="dashboard-import-body">
-          <p className="dashboard-import-copy">Werk hier de scooterlijst bij, importeer dealers of zet een nieuwe voorraadbatch in het juiste statusblok.</p>
-          <div className="import-controls">
-            <label>
-              Import naar
-              <select value={importTarget} onChange={(event) => setImportTarget(event.target.value as ImportTarget)}>
-                <option value="scooters">Scooters voorraadblok</option>
-                <option value="scooterUpdates">Scooters bijwerken (framenummer)</option>
-                <option value="dealers">Dealers blok</option>
-              </select>
-            </label>
-            {importTarget === 'scooters' && (
-              <label>
-                Scooter status
-                <select value={importStatus} onChange={(event) => setImportStatus(event.target.value as ImportScooterStatus)}>
-                  <option value="file">Status uit bestand</option>
-                  {Object.keys(statusColor).map((status) => <option value={status} key={status}>{status}</option>)}
-                </select>
-              </label>
-            )}
-            <label className="upload-button"><Upload size={16} /> CSV / Excel importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={(event) => onImport(importTarget, importStatus, event)} /></label>
-          </div>
-        </div>
-      </section>
-      {statusFilter !== 'all' && (
-        <div className="filter-notice">
-          Gefilterd op <strong>{statusFilter}</strong>
-          <button onClick={() => setStatusFilter('all')}>Toon alles</button>
-        </div>
-      )}
-      {statusFilter !== 'all' && (
-        <ScooterTable
-          scooters={scooters}
-          dealers={data.dealers}
-          query={query}
-          setQuery={setQuery}
-          onSelect={onSelect}
-          title={`Scooters: ${statusFilter} (${scooters.length})`}
-          onBulkRdwCheck={statusFilter === 'Verkocht dealer' || statusFilter === 'Verkocht klant' ? onBulkRdwCheck : undefined}
-        />
-      )}
     </>
   );
 }
@@ -2306,7 +2188,19 @@ function ContainerAvailabilityBoard({
   );
 }
 
-function Scooters({ data, query, setQuery, scooters, onSelect }: { data: AppData; query: string; setQuery: (value: string) => void; scooters: Scooter[]; onSelect: (scooter: Scooter) => void }) {
+function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message, messageDetails, statusFilter, setStatusFilter, onBulkRdwCheck }: {
+  data: AppData;
+  query: string;
+  setQuery: (value: string) => void;
+  scooters: Scooter[];
+  onSelect: (scooter: Scooter) => void;
+  onImport: (target: ImportTarget, status: ImportScooterStatus, event: ChangeEvent<HTMLInputElement>) => void;
+  message: string;
+  messageDetails: string[];
+  statusFilter: ScooterStatus | 'all';
+  setStatusFilter: (status: ScooterStatus | 'all') => void;
+  onBulkRdwCheck: (scooters: Scooter[]) => Promise<string>;
+}) {
   const groups = ['Beschikbaar', 'In optie', 'Af te leveren', 'Nog onderweg', 'In consignatie', 'Verkocht klant', 'Verkocht dealer'] as ScooterStatus[];
   const [searchField, setSearchField] = useState<SearchField>('frameNumber');
   const [panelFilters, setPanelFilters] = useState<ScooterPanelFilters>({
@@ -2315,10 +2209,118 @@ function Scooters({ data, query, setQuery, scooters, onSelect }: { data: AppData
     color: '',
     status: '',
   });
+  const [importTarget, setImportTarget] = useState<ImportTarget>('scooters');
+  const [importStatus, setImportStatus] = useState<ImportScooterStatus>('file');
+  const [showLatestRegistered, setShowLatestRegistered] = useState(false);
+  const cards: Array<{ label: ScooterStatus; icon: typeof Bike }> = [
+    { label: 'Beschikbaar', icon: Bike },
+    { label: 'Verkocht dealer', icon: Wrench },
+    { label: 'Verkocht klant', icon: Wrench },
+    { label: 'Af te leveren', icon: PackagePlus },
+    { label: 'Nog onderweg', icon: Boxes },
+    { label: 'In consignatie', icon: BriefcaseBusiness },
+    { label: 'In optie', icon: CalendarDays },
+  ];
+  const latestRegisteredScooters = [...data.scooters]
+    .filter((scooter) => isRegistrationComplete(scooter))
+    .sort((a, b) => {
+      const aDate = new Date(a.firstRegistrationDate || 0).getTime();
+      const bDate = new Date(b.firstRegistrationDate || 0).getTime();
+      return bDate - aDate || a.frameNumber.localeCompare(b.frameNumber);
+    })
+    .slice(0, 10);
   const visibleScooters = filterScootersForPanel(scooters, query, searchField, panelFilters);
   return (
     <>
       <h1>Scooters</h1>
+      <ExpandableNotice message={message} details={messageDetails} />
+      <div className="stat-grid">
+        {cards.map(({ label, icon: Icon }) => (
+          <button
+            className={`stat-card stat-button ${statusFilter === label ? 'selected' : ''}`}
+            key={label}
+            onClick={() => setStatusFilter(statusFilter === label ? 'all' : label)}
+          >
+            <div className={`stat-icon ${statusColor[label]}`}><Icon size={24} /></div>
+            <div><span>{label}</span><strong>{countByStatus(data.scooters, label)}</strong></div>
+          </button>
+        ))}
+      </div>
+      <section className="panel dashboard-registered-panel">
+        <button
+          type="button"
+          className="dashboard-registered-toggle"
+          onClick={() => setShowLatestRegistered((current) => !current)}
+        >
+          <span className="panel-title-label"><CheckCircle2 size={16} /> Laatste 10 tenaamgestelde scooters</span>
+          <span>{latestRegisteredScooters.length} scooters {showLatestRegistered ? '-' : '+'}</span>
+        </button>
+        {showLatestRegistered && latestRegisteredScooters.length ? (
+          <div className="dashboard-registered-list">
+            {latestRegisteredScooters.map((scooter) => (
+              <button
+                key={scooter.id}
+                type="button"
+                className="dashboard-registered-row"
+                onClick={() => onSelect(scooter)}
+              >
+                <strong>{scooter.frameNumber}</strong>
+                <span>{normalizeSalesModel(scooter.model)}</span>
+                <span>{scooter.licensePlate || '-'}</span>
+                <span>{dealerName(data.dealers, scooter.dealerId) || 'Geen dealer'}</span>
+                <small>{formatDate(scooter.firstRegistrationDate)}</small>
+              </button>
+            ))}
+          </div>
+        ) : showLatestRegistered ? (
+          <p className="empty">Nog geen tenaamgestelde scooters gevonden.</p>
+        ) : null}
+      </section>
+      <section className="panel dashboard-import-panel">
+        <div className="panel-title">
+          <span className="panel-title-label"><Upload size={16} /> Scooters importeren en bijwerken</span>
+        </div>
+        <div className="dashboard-import-body">
+          <p className="dashboard-import-copy">Werk hier de scooterlijst bij, importeer dealers of zet een nieuwe voorraadbatch in het juiste statusblok.</p>
+          <div className="import-controls">
+            <label>
+              Import naar
+              <select value={importTarget} onChange={(event) => setImportTarget(event.target.value as ImportTarget)}>
+                <option value="scooters">Scooters voorraadblok</option>
+                <option value="scooterUpdates">Scooters bijwerken (framenummer)</option>
+                <option value="dealers">Dealers blok</option>
+              </select>
+            </label>
+            {importTarget === 'scooters' && (
+              <label>
+                Scooter status
+                <select value={importStatus} onChange={(event) => setImportStatus(event.target.value as ImportScooterStatus)}>
+                  <option value="file">Status uit bestand</option>
+                  {Object.keys(statusColor).map((status) => <option value={status} key={status}>{status}</option>)}
+                </select>
+              </label>
+            )}
+            <label className="upload-button"><Upload size={16} /> CSV / Excel importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={(event) => onImport(importTarget, importStatus, event)} /></label>
+          </div>
+        </div>
+      </section>
+      {statusFilter !== 'all' && (
+        <div className="filter-notice">
+          Gefilterd op <strong>{statusFilter}</strong>
+          <button onClick={() => setStatusFilter('all')}>Toon alles</button>
+        </div>
+      )}
+      {statusFilter !== 'all' && (
+        <ScooterTable
+          scooters={scooters}
+          dealers={data.dealers}
+          query={query}
+          setQuery={setQuery}
+          onSelect={onSelect}
+          title={`Scooters: ${statusFilter} (${scooters.length})`}
+          onBulkRdwCheck={statusFilter === 'Verkocht dealer' || statusFilter === 'Verkocht klant' ? onBulkRdwCheck : undefined}
+        />
+      )}
       <SearchPanel
         scooters={scooters}
         query={query}
