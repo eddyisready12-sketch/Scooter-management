@@ -278,6 +278,50 @@ h2 {
   font-size: 14px;
 }
 
+.scooter-import-tile {
+  align-items: stretch;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.scooter-import-tile-header {
+  display: grid;
+  gap: 4px;
+}
+
+.scooter-import-tile-header > span {
+  color: #0f172a;
+  font-size: 15px;
+  margin: 0;
+}
+
+.scooter-import-tile-header small {
+  color: #65717d;
+}
+
+.scooter-import-tile-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.scooter-import-tile-controls label {
+  display: grid;
+  gap: 4px;
+  color: #4f5b66;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scooter-import-tile-controls select {
+  min-height: 34px;
+  min-width: 0;
+}
+
+.scooter-import-upload {
+  width: 100%;
+}
+
 .dashboard-registered-panel {
   margin-bottom: 16px;
 }
