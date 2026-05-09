@@ -2900,6 +2900,7 @@ function ProductsPage({
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
+          suppliers={suppliers}
           onClose={() => setSelectedProduct(null)}
           onSave={async (nextProduct) => {
             await onUpdateProduct(nextProduct);
@@ -2913,10 +2914,12 @@ function ProductsPage({
 
 function ProductDetailModal({
   product,
+  suppliers,
   onClose,
   onSave,
 }: {
   product: Product;
+  suppliers: string[];
   onClose: () => void;
   onSave: (product: Product) => Promise<void>;
 }) {
@@ -3000,7 +3003,10 @@ function ProductDetailModal({
               <input value={draft.batch ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batch: event.target.value }))} />
             </label>
             <label>Hoofdleverancier
-              <input value={draft.supplier ?? ''} onChange={(event) => setDraft((current) => ({ ...current, supplier: event.target.value }))} placeholder="Bijv. Wenling Import And Export Co., Ltd." />
+              <select value={draft.supplier ?? ''} onChange={(event) => setDraft((current) => ({ ...current, supplier: event.target.value || undefined }))}>
+                <option value="">Geen leverancier</option>
+                {suppliers.map((supplier) => <option key={supplier} value={supplier}>{supplier}</option>)}
+              </select>
             </label>
             <label>Artikelgroep
               <input value={draft.articleGroup ?? ''} onChange={(event) => setDraft((current) => ({ ...current, articleGroup: event.target.value }))} />
