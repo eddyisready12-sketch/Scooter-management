@@ -2769,6 +2769,10 @@ function ProductsPage({
       </section>
       <section className="panel table-panel">
         <div className="panel-title"><FileText size={16} /> Artikelen</div>
+        <div className="product-table-intro">
+          <strong>Klik op een artikel om alle details te bekijken en te wijzigen.</strong>
+          <span>De lijst hieronder laat alleen de belangrijkste cataloguskolommen zien.</span>
+        </div>
         {visibleProducts.length === 0 ? (
           <div className="empty-state inline"><BriefcaseBusiness size={22} /><strong>Geen producten gevonden</strong><span>Importeer een Excel/CSV of pas je filters aan.</span></div>
         ) : (
@@ -2799,8 +2803,6 @@ function ProductsPage({
                       Omschrijving {renderSortIcon('description')}
                     </button>
                   </th>
-                  <th>Barcode</th>
-                  <th>Batch</th>
                   <th>
                     <button type="button" className="column-sort-button" onClick={() => handleSort('salePrice')}>
                       Verkoopprijs {renderSortIcon('salePrice')}
@@ -2812,6 +2814,7 @@ function ProductsPage({
                     </button>
                   </th>
                   <th>Webwinkel</th>
+                  <th>Hoofdleverancier</th>
                   <th>
                     <button type="button" className="column-sort-button" onClick={() => handleSort('articleGroup')}>
                       Artikelgroep {renderSortIcon('articleGroup')}
@@ -2822,45 +2825,6 @@ function ProductsPage({
                       Voorraad {renderSortIcon('stock')}
                     </button>
                   </th>
-                  <th>
-                    <button type="button" className="column-sort-button" onClick={() => handleSort('startDate')}>
-                      Begindatum {renderSortIcon('startDate')}
-                    </button>
-                  </th>
-                  <th>Einddatum</th>
-                  <th>Hoofdleverancier</th>
-                  <th>Land van herkomst</th>
-                </tr>
-                <tr className="filter-row">
-                  <th><input value={codeFilter} onChange={(event) => { setCodeFilter(event.target.value); setPage(1); }} placeholder="Filter code" /></th>
-                  <th><input value={descriptionFilter} onChange={(event) => { setDescriptionFilter(event.target.value); setPage(1); }} placeholder="Filter omschrijving" /></th>
-                  <th><input value={barcodeFilter} onChange={(event) => { setBarcodeFilter(event.target.value); setPage(1); }} placeholder="Filter barcode" /></th>
-                  <th />
-                  <th />
-                  <th />
-                  <th />
-                  <th>
-                    <select value={groupFilter} onChange={(event) => { setGroupFilter(event.target.value); setPage(1); }}>
-                      <option value="">Alle</option>
-                      {articleGroups.map((group) => <option key={group} value={group}>{group}</option>)}
-                    </select>
-                  </th>
-                  <th>
-                    <select value={stockFilter} onChange={(event) => { setStockFilter(event.target.value); setPage(1); }}>
-                      <option value="">Alle</option>
-                      {stockValues.map((stock) => <option key={stock} value={stock}>{stock}</option>)}
-                    </select>
-                  </th>
-                  <th />
-                  <th />
-                  <th>
-                    <select value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); setPage(1); }}>
-                      <option value="">Alle</option>
-                      <option value={missingSupplierValue}>Geen leverancier bekend</option>
-                      {suppliers.map((supplier) => <option key={supplier} value={supplier}>{supplier}</option>)}
-                    </select>
-                  </th>
-                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -2868,17 +2832,12 @@ function ProductsPage({
                   <tr key={product.id} className="product-row" onClick={() => setSelectedProduct(product)}>
                     <td>{product.code || '-'}</td>
                     <td>{product.description || '-'}</td>
-                    <td>{product.barcode || '-'}</td>
-                    <td>{product.batch || '-'}</td>
                     <td>{formatPriceValue(product.salePrice)}</td>
                     <td>{formatPriceValue(product.costPrice)}</td>
                     <td>{product.webshop ? 'Ja' : '-'}</td>
+                    <td>{product.supplier || '-'}</td>
                     <td>{product.articleGroup || '-'}</td>
                     <td>{product.stock || '-'}</td>
-                    <td>{formatDate(product.startDate)}</td>
-                    <td>{formatDate(product.endDate)}</td>
-                    <td>{product.supplier || '-'}</td>
-                    <td>{product.countryOfOrigin || '-'}</td>
                   </tr>
                 ))}
               </tbody>
