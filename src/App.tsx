@@ -109,6 +109,15 @@ function formatDate(value?: string) {
   }).format(new Date(value));
 }
 
+function formatDateOnly(value?: string) {
+  if (!value) return '-';
+  return new Intl.DateTimeFormat('nl-NL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(value));
+}
+
 function rdwDateToInputDate(value?: string) {
   if (!value) return '';
   if (value.includes('T')) return value.slice(0, 10);
@@ -2538,7 +2547,8 @@ function ProductsPage({
   const [groupFilter, setGroupFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('');
-  const [ownImportFilter, setOwnImportFilter] = useState('');
+  const [ownImportOnly, setOwnImportOnly] = useState(false);
+  const [lifecycleFilter, setLifecycleFilter] = useState('');
   const [codeFilter, setCodeFilter] = useState('');
   const [descriptionFilter, setDescriptionFilter] = useState('');
   const [barcodeFilter, setBarcodeFilter] = useState('');
@@ -2600,6 +2610,8 @@ function ProductsPage({
     const barcodeNeedle = barcodeFilter.trim().toLowerCase();
     return products.filter((product) => {
       const supplier = product.supplier?.trim() || '';
+      const isOwnImportProduct = !supplier || importCompanies.some((company) => company.toLowerCase() !== 'blanco' && supplier.toLowerCase().includes(company.toLowerCase()));
+      const hasEndDate = Boolean(product.endDate?.trim());
       const inQuery = !needle || [
         product.code,
         product.description,
@@ -2608,10 +2620,8 @@ function ProductsPage({
         product.articleGroup,
         supplier,
       ].some((value) => value?.toLowerCase().includes(needle));
-      const importMatch = !ownImportFilter
-        || (ownImportFilter === 'Blanco'
-          ? !supplier
-          : supplier.toLowerCase().includes(ownImportFilter.toLowerCase()));
+      const lifecycleMatch = !lifecycleFilter
+        || (lifecycleFilter === 'endOfLife' ? hasEndDate : !hasEndDate);
 
       return inQuery
         && (!codeNeedle || product.code?.toLowerCase().includes(codeNeedle))
@@ -2620,7 +2630,8 @@ function ProductsPage({
         && (!groupFilter || product.articleGroup === groupFilter)
         && (!supplierFilter || (supplierFilter === missingSupplierValue ? !product.supplier?.trim() : product.supplier === supplierFilter))
         && (!stockFilter || product.stock === stockFilter)
-        && importMatch
+        && (!ownImportOnly || isOwnImportProduct)
+        && lifecycleMatch
     }).sort((a, b) => {
       const codeA = (a.code || '').trim();
       const codeB = (b.code || '').trim();
@@ -2657,7 +2668,7 @@ function ProductsPage({
           return codeA.localeCompare(codeB, 'nl', { sensitivity: 'base', numeric: true }) * direction;
       }
     });
-  }, [products, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, ownImportFilter, sortField, sortDirection]);
+  }, [products, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, ownImportOnly, lifecycleFilter, importCompanies, sortField, sortDirection]);
 
   const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(visibleProducts.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -2688,9 +2699,16 @@ function ProductsPage({
         <div className="product-import-groups">
           <div className="product-import-groups-head">
             <strong>Eigen import</strong>
-            <span>Filter op jullie vaste importbedrijven en voeg later nieuwe namen toe.</span>
+            <span>Gebruik één knop om alle eigen importproducten tegelijk te tonen. Bedrijven eronder bepalen wat onder eigen import valt.</span>
           </div>
           <div className="product-import-groups-controls">
+            <button
+              type="button"
+              className={`product-import-tag ${ownImportOnly ? 'active' : ''}`}
+              onClick={() => setOwnImportOnly((current) => !current)}
+            >
+              Eigen import
+            </button>
             <input
               value={newImportCompany}
               onChange={(event) => setNewImportCompany(event.target.value)}
@@ -2713,14 +2731,12 @@ function ProductsPage({
           </div>
           <div className="product-import-tags">
             {importCompanies.map((company) => (
-              <button
+              <span
                 key={company}
-                type="button"
-                className={`product-import-tag ${ownImportFilter === company ? 'active' : ''}`}
-                onClick={() => setOwnImportFilter((current) => current === company ? '' : company)}
+                className="product-import-tag product-import-tag-static"
               >
                 {company}
-              </button>
+              </span>
             ))}
           </div>
         </div>
@@ -2739,9 +2755,10 @@ function ProductsPage({
             <option value="">Alle voorraadwaardes</option>
             {stockValues.map((stock) => <option key={stock} value={stock}>{stock}</option>)}
           </select>
-          <select value={ownImportFilter} onChange={(event) => setOwnImportFilter(event.target.value)}>
-            <option value="">Alle eigen import</option>
-            {importCompanies.map((company) => <option key={company} value={company}>{company}</option>)}
+          <select value={lifecycleFilter} onChange={(event) => setLifecycleFilter(event.target.value)}>
+            <option value="">Alle levenscycli</option>
+            <option value="active">Actief</option>
+            <option value="endOfLife">End of life</option>
           </select>
         </div>
       </section>
@@ -2765,6 +2782,11 @@ function ProductsPage({
           <span>Leveranciers</span>
           <strong>{suppliers.length}</strong>
           <small>Unieke hoofdleveranciers</small>
+        </article>
+        <article className="stat-card">
+          <span>End of life</span>
+          <strong>{products.filter((product) => product.endDate?.trim()).length}</strong>
+          <small>Producten met einddatum</small>
         </article>
       </section>
       <section className="panel table-panel">
@@ -2825,6 +2847,7 @@ function ProductsPage({
                       Voorraad {renderSortIcon('stock')}
                     </button>
                   </th>
+                  <th>Einddatum</th>
                 </tr>
               </thead>
               <tbody>
@@ -2838,6 +2861,7 @@ function ProductsPage({
                     <td>{product.supplier || '-'}</td>
                     <td>{product.articleGroup || '-'}</td>
                     <td>{product.stock || '-'}</td>
+                    <td>{formatDateOnly(product.endDate)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -2941,7 +2965,8 @@ function ProductDetailModal({
               <dt>Kostprijs</dt><dd>{formatPriceValue(draft.costPrice)}</dd>
               <dt>Webwinkel</dt><dd>{draft.webshop ? 'Ja' : 'Nee'}</dd>
               <dt>Voorraad</dt><dd>{draft.stock || '-'}</dd>
-              <dt>Begindatum</dt><dd>{formatDate(draft.startDate)}</dd>
+              <dt>Begindatum</dt><dd>{formatDateOnly(draft.startDate)}</dd>
+              <dt>Einddatum</dt><dd>{formatDateOnly(draft.endDate)}</dd>
               <dt>Land van herkomst</dt><dd>{draft.countryOfOrigin || '-'}</dd>
             </dl>
           </section>

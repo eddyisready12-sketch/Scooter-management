@@ -1030,6 +1030,10 @@ tbody tr:hover {
   color: #0758a8;
 }
 
+.product-import-tag-static {
+  cursor: default;
+}
+
 .product-row {
   cursor: pointer;
 }
