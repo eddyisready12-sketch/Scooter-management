@@ -246,17 +246,21 @@ type DymoBrowserPrinter = {
 };
 
 function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
-  const escaped = [
-    scooter.frameNumber,
+  const escapeLabelValue = (value: string) => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const barcodeValue = escapeLabelValue(scooter.frameNumber);
+  const frameLabel = escapeLabelValue(scooter.frameNumber);
+  const detailLines = [
     scooter.licensePlate?.trim() || 'Geen kenteken',
     `${scooter.model} - ${normalizeSpeedValue(scooter.speed)}`,
     dealerCompany || scooter.color || '',
   ]
     .filter(Boolean)
-    .join('\n')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .join('\n');
+  const escapedDetails = escapeLabelValue(detailLines);
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
@@ -267,8 +271,56 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
     <RoundRectangle X="0" Y="0" Width="5418" Height="1584" Rx="180" Ry="180" />
   </DrawCommands>
   <ObjectInfo>
+    <BarcodeObject>
+      <Name>FrameBarcode</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <Text>${barcodeValue}</Text>
+      <Type>Code128Auto</Type>
+      <Size>Small</Size>
+      <TextPosition>None</TextPosition>
+      <TextFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      <CheckSumFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      <TextEmbedding>None</TextEmbedding>
+      <ECLevel>0</ECLevel>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <QuietZonesPadding Left="0" Top="0" Right="0" Bottom="0" />
+    </BarcodeObject>
+    <Bounds X="180" Y="60" Width="5058" Height="620" />
+  </ObjectInfo>
+  <ObjectInfo>
     <TextObject>
-      <Name>Text</Name>
+      <Name>FrameNumber</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>False</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>${frameLabel}</String>
+          <Attributes>
+            <Font Family="Arial" Size="12" Bold="True" Italic="False" Underline="False" Strikeout="False" />
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="180" Y="700" Width="5058" Height="240" />
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Details</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
       <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
       <LinkedObjectName />
@@ -282,15 +334,15 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String>${escaped}</String>
+          <String>${escapedDetails}</String>
           <Attributes>
-            <Font Family="Arial" Size="12" Bold="True" Italic="False" Underline="False" Strikeout="False" />
+            <Font Family="Arial" Size="9" Bold="True" Italic="False" Underline="False" Strikeout="False" />
             <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="180" Y="120" Width="5058" Height="1320" />
+    <Bounds X="180" Y="980" Width="5058" Height="440" />
   </ObjectInfo>
 </DieCutLabel>`;
 }
