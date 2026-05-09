@@ -969,7 +969,7 @@ tbody tr:hover {
 
 .product-toolbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1.3fr) repeat(4, minmax(180px, 0.8fr));
+  grid-template-columns: minmax(260px, 1.3fr) repeat(5, minmax(180px, 0.8fr));
   gap: 12px;
   padding: 14px 16px 16px;
 }
@@ -977,6 +977,57 @@ tbody tr:hover {
 .product-toolbar input,
 .product-toolbar select {
   width: 100%;
+}
+
+.product-import-groups {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 0;
+}
+
+.product-import-groups-head {
+  display: grid;
+  gap: 4px;
+}
+
+.product-import-groups-head span {
+  color: #65717d;
+  font-size: 14px;
+}
+
+.product-import-groups-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.product-import-groups-controls input {
+  min-width: 260px;
+  flex: 1 1 280px;
+}
+
+.product-import-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.product-import-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid #c8d1da;
+  border-radius: 999px;
+  background: #fff;
+  color: #2f3a45;
+  padding: 0 12px;
+  font-weight: 600;
+}
+
+.product-import-tag.active {
+  border-color: #0075ff;
+  background: #eaf4ff;
+  color: #0758a8;
 }
 
 .product-stats .stat-card {

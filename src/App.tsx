@@ -55,6 +55,8 @@ type LoginSession = {
 };
 
 const loginStorageKey = 'rso-admin-session';
+const productImportCompaniesStorageKey = 'rso-product-import-companies';
+const defaultProductImportCompanies = ['Blanco', 'Everestt', 'JIABIN', 'Wenling', 'mortch motor'];
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -2506,6 +2508,7 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
   const [groupFilter, setGroupFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('');
+  const [ownImportFilter, setOwnImportFilter] = useState('');
   const [codeFilter, setCodeFilter] = useState('');
   const [descriptionFilter, setDescriptionFilter] = useState('');
   const [barcodeFilter, setBarcodeFilter] = useState('');
@@ -2513,6 +2516,29 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
   const [pageSize, setPageSize] = useState<number | 'all'>(25);
   const [sortField, setSortField] = useState<'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate'>('code');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [importCompanies, setImportCompanies] = useState<string[]>(defaultProductImportCompanies);
+  const [newImportCompany, setNewImportCompany] = useState('');
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(productImportCompaniesStorageKey);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) return;
+      const names = parsed
+        .map((value) => String(value).trim())
+        .filter(Boolean);
+      if (names.length) {
+        setImportCompanies(Array.from(new Set(names)));
+      }
+    } catch {
+      // Ignore invalid local preference payloads.
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(productImportCompaniesStorageKey, JSON.stringify(importCompanies));
+  }, [importCompanies]);
 
   function handleSort(field: 'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate') {
     if (sortField === field) {
@@ -2542,14 +2568,19 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
     const descriptionNeedle = descriptionFilter.trim().toLowerCase();
     const barcodeNeedle = barcodeFilter.trim().toLowerCase();
     return products.filter((product) => {
+      const supplier = product.supplier?.trim() || '';
       const inQuery = !needle || [
         product.code,
         product.description,
         product.barcode,
         product.batch,
         product.articleGroup,
-        product.supplier,
+        supplier,
       ].some((value) => value?.toLowerCase().includes(needle));
+      const importMatch = !ownImportFilter
+        || (ownImportFilter === 'Blanco'
+          ? !supplier
+          : supplier.toLowerCase().includes(ownImportFilter.toLowerCase()));
 
       return inQuery
         && (!codeNeedle || product.code?.toLowerCase().includes(codeNeedle))
@@ -2557,7 +2588,8 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
         && (!barcodeNeedle || product.barcode?.toLowerCase().includes(barcodeNeedle))
         && (!groupFilter || product.articleGroup === groupFilter)
         && (!supplierFilter || (supplierFilter === missingSupplierValue ? !product.supplier?.trim() : product.supplier === supplierFilter))
-        && (!stockFilter || product.stock === stockFilter);
+        && (!stockFilter || product.stock === stockFilter)
+        && importMatch
     }).sort((a, b) => {
       const codeA = (a.code || '').trim();
       const codeB = (b.code || '').trim();
@@ -2594,7 +2626,7 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
           return codeA.localeCompare(codeB, 'nl', { sensitivity: 'base', numeric: true }) * direction;
       }
     });
-  }, [products, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, sortField, sortDirection]);
+  }, [products, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, ownImportFilter, sortField, sortDirection]);
 
   const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(visibleProducts.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -2622,6 +2654,45 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
             <span>Importeer jullie complete onderdelenlijst. Afbeeldingen kunnen we daarna per product toevoegen en later koppelen aan scooters, garantieclaims en onderhoud.</span>
           </div>
         </div>
+        <div className="product-import-groups">
+          <div className="product-import-groups-head">
+            <strong>Eigen import</strong>
+            <span>Filter op jullie vaste importbedrijven en voeg later nieuwe namen toe.</span>
+          </div>
+          <div className="product-import-groups-controls">
+            <input
+              value={newImportCompany}
+              onChange={(event) => setNewImportCompany(event.target.value)}
+              placeholder="Nieuw eigen import bedrijf"
+            />
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                const next = newImportCompany.trim();
+                if (!next) return;
+                setImportCompanies((current) =>
+                  Array.from(new Set([...current, next])).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' })),
+                );
+                setNewImportCompany('');
+              }}
+            >
+              <Plus size={16} /> Bedrijf toevoegen
+            </button>
+          </div>
+          <div className="product-import-tags">
+            {importCompanies.map((company) => (
+              <button
+                key={company}
+                type="button"
+                className={`product-import-tag ${ownImportFilter === company ? 'active' : ''}`}
+                onClick={() => setOwnImportFilter((current) => current === company ? '' : company)}
+              >
+                {company}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="product-toolbar">
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek op code, omschrijving, barcode of leverancier" />
           <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
@@ -2636,6 +2707,10 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
           <select value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}>
             <option value="">Alle voorraadwaardes</option>
             {stockValues.map((stock) => <option key={stock} value={stock}>{stock}</option>)}
+          </select>
+          <select value={ownImportFilter} onChange={(event) => setOwnImportFilter(event.target.value)}>
+            <option value="">Alle eigen import</option>
+            {importCompanies.map((company) => <option key={company} value={company}>{company}</option>)}
           </select>
         </div>
       </section>
