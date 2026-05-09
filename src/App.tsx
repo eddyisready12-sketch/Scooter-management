@@ -2610,7 +2610,12 @@ function ProductsPage({
     const barcodeNeedle = barcodeFilter.trim().toLowerCase();
     return products.filter((product) => {
       const supplier = product.supplier?.trim() || '';
-      const isOwnImportProduct = !supplier || importCompanies.some((company) => company.toLowerCase() !== 'blanco' && supplier.toLowerCase().includes(company.toLowerCase()));
+      const normalizedImportCompanies = importCompanies.map((company) => company.trim().toLowerCase()).filter(Boolean);
+      const isOwnImportProduct = normalizedImportCompanies.some((company) =>
+        company === 'blanco'
+          ? !supplier
+          : supplier.toLowerCase().includes(company),
+      );
       const hasEndDate = Boolean(product.endDate?.trim());
       const inQuery = !needle || [
         product.code,
@@ -2699,7 +2704,7 @@ function ProductsPage({
         <div className="product-import-groups">
           <div className="product-import-groups-head">
             <strong>Eigen import</strong>
-            <span>Gebruik één knop om alle eigen importproducten tegelijk te tonen. Bedrijven eronder bepalen wat onder eigen import valt.</span>
+            <span>Deze knop filtert op alle bedrijven hieronder, inclusief blanco leveranciers als `Blanco` in de lijst staat.</span>
           </div>
           <div className="product-import-groups-controls">
             <button
