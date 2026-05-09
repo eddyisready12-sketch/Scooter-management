@@ -3216,9 +3216,10 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
   const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame);
   const [licensePlate, setLicensePlate] = useState('');
   const [selectedDealerId, setSelectedDealerId] = useState('');
-  const [claimItems, setClaimItems] = useState<Array<{ productCode: string; partName: string; partNumber: string; partPrice: string }>>([
-    { productCode: '', partName: '', partNumber: '', partPrice: '' },
+  const [claimItems, setClaimItems] = useState<Array<{ productCode: string; productLookup: string; partName: string; partNumber: string; partPrice: string }>>([
+    { productCode: '', productLookup: '', partName: '', partNumber: '', partPrice: '' },
   ]);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
   const registrationDate = selectedScooter?.firstRegistrationDate || selectedScooter?.firstAdmissionDate;
   const calculatedAge = formatVehicleAge(registrationDate);
   const warrantyUntil = addMonthsToInputDate(registrationDate);
@@ -3245,31 +3246,72 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
 
   const sortedProducts = [...products].sort((a, b) => a.description.localeCompare(b.description, 'nl', { sensitivity: 'base' }));
 
-  function updateClaimItem(index: number, field: 'productCode' | 'partName' | 'partNumber' | 'partPrice', value: string) {
+  function updateClaimItem(index: number, field: 'productCode' | 'productLookup' | 'partName' | 'partNumber' | 'partPrice', value: string) {
     setClaimItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)));
   }
 
-  function applyProductToClaimItem(index: number, code: string) {
+  function productLookupLabel(product: Product) {
+    return `${product.code} - ${product.description}`;
+  }
+
+  function resolveProductFromLookup(value: string) {
+    const normalizedValue = normalizeLookup(value);
+    if (!normalizedValue) return undefined;
+    return products.find((product) => {
+      const codeMatch = normalizeLookup(product.code) === normalizedValue;
+      const descriptionMatch = normalizeLookup(product.description) === normalizedValue;
+      const labelMatch = normalizeLookup(productLookupLabel(product)) === normalizedValue;
+      return codeMatch || descriptionMatch || labelMatch;
+    });
+  }
+
+  function applyProductToClaimItem(index: number, code: string, lookupOverride?: string) {
     const selectedProduct = products.find((product) => product.code === code);
     setClaimItems((current) => current.map((item, itemIndex) => {
       if (itemIndex !== index) return item;
-      if (!selectedProduct) return { ...item, productCode: code };
+      if (!selectedProduct) return { ...item, productCode: code, productLookup: lookupOverride ?? item.productLookup };
       return {
         ...item,
         productCode: code,
+        productLookup: lookupOverride ?? productLookupLabel(selectedProduct),
         partName: selectedProduct.description || item.partName,
         partNumber: selectedProduct.code || item.partNumber,
         partPrice: parseCurrencyInput(selectedProduct.costPrice || selectedProduct.salePrice || '') || item.partPrice,
       };
     }));
+    setActiveSuggestionIndex(null);
+  }
+
+  function handleClaimProductLookupChange(index: number, value: string) {
+    setClaimItems((current) => current.map((item, itemIndex) => (itemIndex === index ? {
+      ...item,
+      productLookup: value,
+      productCode: value.trim() ? item.productCode : '',
+    } : item)));
+    const matchedProduct = resolveProductFromLookup(value);
+    if (matchedProduct) {
+      applyProductToClaimItem(index, matchedProduct.code, productLookupLabel(matchedProduct));
+      return;
+    }
+    setActiveSuggestionIndex(index);
+  }
+
+  function filteredProductSuggestions(item: { productCode: string; productLookup: string; partName: string; partNumber: string; partPrice: string }) {
+    const query = normalizeLookup(item.productLookup);
+    if (!query) return sortedProducts.slice(0, 8);
+    return sortedProducts.filter((product) => {
+      const haystacks = [product.code, product.description, product.barcode ?? '', product.supplier ?? ''];
+      return haystacks.some((entry) => normalizeLookup(entry).includes(query));
+    }).slice(0, 8);
   }
 
   function addClaimItemRow() {
-    setClaimItems((current) => [...current, { productCode: '', partName: '', partNumber: '', partPrice: '' }]);
+    setClaimItems((current) => [...current, { productCode: '', productLookup: '', partName: '', partNumber: '', partPrice: '' }]);
   }
 
   function removeClaimItemRow(index: number) {
-    setClaimItems((current) => current.length === 1 ? [{ productCode: '', partName: '', partNumber: '', partPrice: '' }] : current.filter((_, itemIndex) => itemIndex !== index));
+    setClaimItems((current) => current.length === 1 ? [{ productCode: '', productLookup: '', partName: '', partNumber: '', partPrice: '' }] : current.filter((_, itemIndex) => itemIndex !== index));
+    setActiveSuggestionIndex(null);
   }
 
   async function handleWarrantySubmit(event: FormEvent<HTMLFormElement>) {
@@ -3278,7 +3320,8 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
     setSelectedFrame('');
     setLicensePlate('');
     setSelectedDealerId('');
-    setClaimItems([{ productCode: '', partName: '', partNumber: '', partPrice: '' }]);
+    setClaimItems([{ productCode: '', productLookup: '', partName: '', partNumber: '', partPrice: '' }]);
+    setActiveSuggestionIndex(null);
   }
 
   const claimItemsPayload = JSON.stringify(claimItems);
@@ -3345,14 +3388,34 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
                     <div className="warranty-item-primary">
                       <label>
                         Product
-                        <select value={item.productCode} onChange={(event) => applyProductToClaimItem(index, event.target.value)}>
-                          <option value="">Kies uit onderdelen...</option>
-                          {sortedProducts.map((product) => (
-                            <option key={product.id} value={product.code}>
-                              {product.code} - {product.description}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="suggestion-field">
+                          <input
+                            value={item.productLookup}
+                            onChange={(event) => handleClaimProductLookupChange(index, event.target.value)}
+                            onFocus={() => setActiveSuggestionIndex(index)}
+                            onBlur={() => window.setTimeout(() => setActiveSuggestionIndex((current) => (current === index ? null : current)), 150)}
+                            placeholder="Typ code of omschrijving..."
+                            autoComplete="off"
+                          />
+                          {activeSuggestionIndex === index && filteredProductSuggestions(item).length > 0 && (
+                            <div className="suggestion-list">
+                              {filteredProductSuggestions(item).map((product) => (
+                                <button
+                                  key={product.id}
+                                  type="button"
+                                  className="suggestion-option"
+                                  onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    applyProductToClaimItem(index, product.code, productLookupLabel(product));
+                                  }}
+                                >
+                                  <strong>{product.code}</strong>
+                                  <span>{product.description}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </label>
                       <button type="button" className="icon-button danger-button" onClick={() => removeClaimItemRow(index)} aria-label={`Onderdeel ${index + 1} verwijderen`}>
                         <XCircle size={16} />
