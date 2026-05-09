@@ -245,6 +245,17 @@ type DymoBrowserPrinter = {
   twinTurbo: boolean;
 };
 
+const dymo99012Layout = {
+  // DYMO 99012 / S0722400 compatible large address labels (89 mm x 36 mm).
+  id: 'LargeAddress',
+  paperName: '30321 Large Address',
+  width: 5046,
+  height: 2040,
+  barcodeBounds: { x: 180, y: 80, width: 4686, height: 760 },
+  frameBounds: { x: 180, y: 860, width: 4686, height: 260 },
+  detailsBounds: { x: 180, y: 1160, width: 4686, height: 700 },
+};
+
 function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
   const escapeLabelValue = (value: string) => value
     .replace(/&/g, '&amp;')
@@ -265,10 +276,10 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
   <PaperOrientation>Landscape</PaperOrientation>
-  <Id>Small30336</Id>
-  <PaperName>30252 Address</PaperName>
+  <Id>${dymo99012Layout.id}</Id>
+  <PaperName>${dymo99012Layout.paperName}</PaperName>
   <DrawCommands>
-    <RoundRectangle X="0" Y="0" Width="5418" Height="1584" Rx="180" Ry="180" />
+    <RoundRectangle X="0" Y="0" Width="${dymo99012Layout.width}" Height="${dymo99012Layout.height}" Rx="180" Ry="180" />
   </DrawCommands>
   <ObjectInfo>
     <BarcodeObject>
@@ -290,7 +301,7 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
       <HorizontalAlignment>Center</HorizontalAlignment>
       <QuietZonesPadding Left="0" Top="0" Right="0" Bottom="0" />
     </BarcodeObject>
-    <Bounds X="180" Y="60" Width="5058" Height="620" />
+    <Bounds X="${dymo99012Layout.barcodeBounds.x}" Y="${dymo99012Layout.barcodeBounds.y}" Width="${dymo99012Layout.barcodeBounds.width}" Height="${dymo99012Layout.barcodeBounds.height}" />
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -316,7 +327,7 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="180" Y="700" Width="5058" Height="240" />
+    <Bounds X="${dymo99012Layout.frameBounds.x}" Y="${dymo99012Layout.frameBounds.y}" Width="${dymo99012Layout.frameBounds.width}" Height="${dymo99012Layout.frameBounds.height}" />
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -342,7 +353,7 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealerCompany: string) {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="180" Y="980" Width="5058" Height="440" />
+    <Bounds X="${dymo99012Layout.detailsBounds.x}" Y="${dymo99012Layout.detailsBounds.y}" Width="${dymo99012Layout.detailsBounds.width}" Height="${dymo99012Layout.detailsBounds.height}" />
   </ObjectInfo>
 </DieCutLabel>`;
 }
