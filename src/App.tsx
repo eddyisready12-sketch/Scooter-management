@@ -2534,6 +2534,7 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const stockValues = Array.from(new Set(products.map((product) => product.stock).filter(Boolean) as string[]))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const missingSupplierValue = '__missing_supplier__';
 
   const visibleProducts = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -2555,7 +2556,7 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
         && (!descriptionNeedle || product.description?.toLowerCase().includes(descriptionNeedle))
         && (!barcodeNeedle || product.barcode?.toLowerCase().includes(barcodeNeedle))
         && (!groupFilter || product.articleGroup === groupFilter)
-        && (!supplierFilter || product.supplier === supplierFilter)
+        && (!supplierFilter || (supplierFilter === missingSupplierValue ? !product.supplier?.trim() : product.supplier === supplierFilter))
         && (!stockFilter || product.stock === stockFilter);
     }).sort((a, b) => {
       const codeA = (a.code || '').trim();
@@ -2629,6 +2630,7 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
           </select>
           <select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}>
             <option value="">Alle leveranciers</option>
+            <option value={missingSupplierValue}>Geen leverancier bekend</option>
             {suppliers.map((supplier) => <option key={supplier} value={supplier}>{supplier}</option>)}
           </select>
           <select value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}>
@@ -2748,6 +2750,7 @@ function ProductsPage({ products, onImport, message }: { products: Product[]; on
                   <th>
                     <select value={supplierFilter} onChange={(event) => { setSupplierFilter(event.target.value); setPage(1); }}>
                       <option value="">Alle</option>
+                      <option value={missingSupplierValue}>Geen leverancier bekend</option>
                       {suppliers.map((supplier) => <option key={supplier} value={supplier}>{supplier}</option>)}
                     </select>
                   </th>
