@@ -161,17 +161,52 @@ function createEmptyPackagingLayer(index: number): ProductPackagingLayer {
   return { name: packagingLayerNames[index] };
 }
 
+function toPackagingLayerRecords(value: unknown): Record<string, unknown>[] {
+  const collect = (input: unknown): Record<string, unknown>[] => {
+    if (Array.isArray(input)) {
+      return input.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object');
+    }
+
+    if (typeof input === 'string') {
+      try {
+        return collect(JSON.parse(input));
+      } catch {
+        return [];
+      }
+    }
+
+    if (input && typeof input === 'object') {
+      const record = input as Record<string, unknown>;
+      if (Array.isArray(record.layers)) {
+        return collect(record.layers);
+      }
+      return Object.values(record).filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object');
+    }
+
+    return [];
+  };
+
+  return collect(value);
+}
+
+function readPackagingLayerField(record: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = asOptionalTrimmedString(record[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
 function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
-  const fromStored = Array.isArray(product.packagingLayers) ? product.packagingLayers : [];
-  const storedLayers = fromStored
+  const storedLayers = toPackagingLayerRecords(product.packagingLayers)
     .slice(0, packagingLayerNames.length)
     .map((layer, index) => {
-      const record = layer && typeof layer === 'object' ? layer as Record<string, unknown> : {};
+      const record = layer && typeof layer === 'object' ? (layer as Record<string, unknown>) : {};
       return {
-        name: asOptionalTrimmedString(record.name) || packagingLayerNames[index],
-        material: asOptionalTrimmedString(record.material),
-        recycleCode: asOptionalTrimmedString(record.recycleCode),
-        weightGrams: asOptionalTrimmedString(record.weightGrams),
+        name: readPackagingLayerField(record, ['name', 'layerName', 'title']) || packagingLayerNames[index],
+        material: readPackagingLayerField(record, ['material', 'packagingMaterial', 'packaging_material']),
+        recycleCode: readPackagingLayerField(record, ['recycleCode', 'recycle_code', 'code']),
+        weightGrams: readPackagingLayerField(record, ['weightGrams', 'weight', 'grams']),
       };
     })
     .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
@@ -3522,6 +3557,15 @@ function ProductDetailModal({
                 <div className="product-form-subsection">
                   <h3>Verpakkingslagen</h3>
                   <p className="product-section-hint">Voeg per product tot 5 verpakkingslagen toe. Afvalstromen worden automatisch samengevat op basis van alle gekozen materialen.</p>
+                  <div className="packaging-layer-table-header">
+                    <span>Laag</span>
+                    <span>Verpakkingsmateriaal</span>
+                    <span>Afvalstroom</span>
+                    <span>Recyclecode</span>
+                    <span>Gewicht (g)</span>
+                    <span>Labelicoon</span>
+                    <span className="sr-only">Acties</span>
+                  </div>
                   <div className="packaging-layer-stack">
                     {packagingLayers.map((layer, index) => {
                       const selectedOption = findPackagingMaterialOption(layer.material);
@@ -3531,31 +3575,30 @@ function ProductDetailModal({
                         <div key={`${layer.name ?? packagingLayerNames[index]}-${index}`} className="packaging-layer-card">
                           <div className="packaging-layer-grid">
                             <div className="packaging-layer-name">
-                              <span>Laag</span>
                               <strong>{layer.name ?? packagingLayerNames[index]}</strong>
                             </div>
-                            <label>
-                              <span className="packaging-layer-field-label">Verpakkingsmateriaal</span>
+                            <div className="packaging-layer-field">
+                              <span className="packaging-layer-mobile-label">Verpakkingsmateriaal</span>
                               <select value={layer.material ?? ''} onChange={(event) => applyPackagingMaterial(index, event.target.value)}>
                                 <option value="">Selecteer...</option>
                                 {layer.material && !selectedOption ? <option value={layer.material}>{layer.material}</option> : null}
                                 {packagingMaterialOptions.map((option) => <option key={`${index}-${option.recycleCode}`} value={option.value}>{option.label} ({option.recycleCode})</option>)}
                               </select>
-                            </label>
-                            <label>
-                              <span className="packaging-layer-field-label">Afvalstroom</span>
+                            </div>
+                            <div className="packaging-layer-field">
+                              <span className="packaging-layer-mobile-label">Afvalstroom</span>
                               <input value={layerWasteStream} readOnly />
-                            </label>
-                            <label>
-                              <span className="packaging-layer-field-label">Recyclecode</span>
+                            </div>
+                            <div className="packaging-layer-field">
+                              <span className="packaging-layer-mobile-label">Recyclecode</span>
                               <input value={layer.recycleCode ?? ''} onChange={(event) => updatePackagingLayer(index, { recycleCode: event.target.value || undefined })} />
-                            </label>
-                            <label>
-                              <span className="packaging-layer-field-label">Gewicht (g)</span>
+                            </div>
+                            <div className="packaging-layer-field">
+                              <span className="packaging-layer-mobile-label">Gewicht (g)</span>
                               <input value={layer.weightGrams ?? ''} onChange={(event) => updatePackagingLayer(index, { weightGrams: event.target.value || undefined })} />
-                            </label>
+                            </div>
                             <div className="packaging-layer-preview">
-                              <span className="packaging-layer-field-label">Labelicoon</span>
+                              <span className="packaging-layer-mobile-label">Labelicoon</span>
                               <PackagingMaterialIcon option={selectedOption} compact />
                             </div>
                             <div className="packaging-layer-actions">

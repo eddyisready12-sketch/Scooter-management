@@ -1476,6 +1476,26 @@ tbody tr:hover {
   gap: 14px;
 }
 
+.packaging-layer-table-header {
+  display: grid;
+  grid-template-columns:
+    minmax(120px, 0.45fr)
+    minmax(260px, 1.15fr)
+    minmax(220px, 0.95fr)
+    minmax(160px, 0.75fr)
+    minmax(160px, 0.7fr)
+    minmax(250px, 1fr)
+    auto;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 0 14px;
+  color: #5f6f7f;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .packaging-layer-card {
   border: 1px solid #dce2e8;
   border-radius: 12px;
@@ -1494,23 +1514,23 @@ tbody tr:hover {
     minmax(250px, 1fr)
     auto;
   gap: 12px;
-  align-items: end;
+  align-items: center;
 }
 
-.packaging-layer-grid label {
+.packaging-layer-field {
   display: grid;
   gap: 6px;
-  align-content: end;
+  align-content: center;
 }
 
 .packaging-layer-preview {
   display: grid;
   gap: 6px;
-  align-content: end;
+  align-content: center;
 }
 
-.packaging-layer-field-label {
-  display: block;
+.packaging-layer-mobile-label {
+  display: none;
   font-size: 0.84rem;
   font-weight: 700;
   color: #213547;
@@ -1536,16 +1556,7 @@ tbody tr:hover {
 .packaging-layer-name {
   display: grid;
   gap: 4px;
-  align-content: end;
-  padding-bottom: 6px;
-}
-
-.packaging-layer-name span {
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #5f6f7f;
+  align-content: center;
 }
 
 .packaging-layer-name strong {
@@ -1555,9 +1566,8 @@ tbody tr:hover {
 
 .packaging-layer-actions {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: flex-end;
-  padding-bottom: 6px;
 }
 
 .danger-icon-button {
@@ -1642,6 +1652,18 @@ tbody tr:hover {
 .packaging-layer-card input[readonly] {
   background: #f8fafc;
   color: #334155;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .packaging-material-number {
@@ -2835,8 +2857,17 @@ dd {
   }
 
   .packaging-meta-grid,
+  .packaging-layer-table-header,
   .packaging-layer-grid {
     grid-template-columns: 1fr;
+  }
+
+  .packaging-layer-table-header {
+    display: none;
+  }
+
+  .packaging-layer-mobile-label {
+    display: block;
   }
 
   .product-subsection-header {
