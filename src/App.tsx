@@ -585,7 +585,9 @@ function buildEan13BarcodeBase64(value: string) {
     includetext: true,
     guardwhitespace: true,
     textxalign: 'center',
-    textsize: 12,
+    textsize: 14,
+    textgaps: 2,
+    textyoffset: 4,
     backgroundcolor: 'FFFFFF',
     barcolor: '000000',
     textcolor: '000000',
@@ -785,7 +787,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="220" Y="890" Width="1900" Height="800" />
+    <Bounds X="220" Y="965" Width="1900" Height="820" />
   </ObjectInfo>` : `<ObjectInfo>
     <BarcodeObject>
       <Name>ProductBarcode</Name>
@@ -837,7 +839,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
     </ImageObject>
     <Bounds X="3380" Y="150" Width="1420" Height="420" />
   </ObjectInfo>
-  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2360, y: 1110, width: 980, height: 520, size: 6 })}
+  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2360, y: 1190, width: 980, height: 520, size: 6 })}
   <ObjectInfo>
     <ImageObject>
       <Name>MaterialIcons</Name>
