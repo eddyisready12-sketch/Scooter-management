@@ -57,6 +57,15 @@ type LoginSession = {
 const loginStorageKey = 'rso-admin-session';
 const productImportCompaniesStorageKey = 'rso-product-import-companies';
 const defaultProductImportCompanies = ['Blanco', 'Everestt', 'JIABIN', 'Wenling', 'mortch motor'];
+const packagingMaterialOptions = [
+  { value: 'Karton', label: 'Karton', recycleCode: 'PAP 20', recycleFamily: 'PAP', recycleNumber: '20' },
+  { value: 'Glad karton', label: 'Glad karton', recycleCode: 'PAP 21', recycleFamily: 'PAP', recycleNumber: '21' },
+  { value: 'Papier', label: 'Papier', recycleCode: 'PAP 22', recycleFamily: 'PAP', recycleNumber: '22' },
+  { value: 'LDPE', label: 'LDPE folie', recycleCode: 'LDPE 4', recycleFamily: 'LDPE', recycleNumber: '4' },
+  { value: 'HDPE', label: 'HDPE', recycleCode: 'HDPE 2', recycleFamily: 'HDPE', recycleNumber: '2' },
+  { value: 'PP', label: 'PP', recycleCode: 'PP 5', recycleFamily: 'PP', recycleNumber: '5' },
+  { value: 'PET', label: 'PET', recycleCode: 'PET 1', recycleFamily: 'PET', recycleNumber: '1' },
+] as const;
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -127,6 +136,34 @@ function rdwDateToInputDate(value?: string) {
 
 function dealerName(dealers: Dealer[], dealerId?: string) {
   return dealers.find((dealer) => dealer.id === dealerId)?.company ?? '';
+}
+
+function findPackagingMaterialOption(value?: string) {
+  return packagingMaterialOptions.find((option) => option.value === value);
+}
+
+function PackagingMaterialIcon({ option }: { option?: { label: string; recycleFamily: string; recycleNumber: string; recycleCode: string } }) {
+  if (!option) {
+    return (
+      <div className="packaging-material-preview empty">
+        <span>Geen materiaal geselecteerd</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="packaging-material-preview">
+      <svg viewBox="0 0 96 120" className="packaging-material-symbol" aria-hidden="true">
+        <polygon points="48,8 86,76 10,76" fill="none" stroke="currentColor" strokeWidth="7" strokeLinejoin="round" />
+        <text x="48" y="56" textAnchor="middle" className="packaging-material-number">{option.recycleNumber}</text>
+        <text x="48" y="102" textAnchor="middle" className="packaging-material-code">{option.recycleFamily}</text>
+      </svg>
+      <div className="packaging-material-copy">
+        <strong>{option.label}</strong>
+        <small>{option.recycleCode}</small>
+      </div>
+    </div>
+  );
 }
 
 function isRegistrationComplete(scooter: Scooter) {
@@ -3079,6 +3116,25 @@ function ProductDetailModal({
     }
   }
 
+  function applyPackagingMaterial(which: 'primary' | 'secondary', value: string) {
+    const option = findPackagingMaterialOption(value);
+    setDraft((current) => ({
+      ...current,
+      ...(which === 'primary'
+        ? {
+            packagingMaterialPrimary: value || undefined,
+            packagingRecycleCodePrimary: value ? option?.recycleCode ?? current.packagingRecycleCodePrimary : undefined,
+          }
+        : {
+            packagingMaterialSecondary: value || undefined,
+            packagingRecycleCodeSecondary: value ? option?.recycleCode ?? current.packagingRecycleCodeSecondary : undefined,
+          }),
+    }));
+  }
+
+  const selectedPrimaryPackaging = findPackagingMaterialOption(draft.packagingMaterialPrimary);
+  const selectedSecondaryPackaging = findPackagingMaterialOption(draft.packagingMaterialSecondary);
+
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <form className="modal-card product-detail-modal" onMouseDown={(event) => event.stopPropagation()} onSubmit={saveProduct}>
@@ -3276,11 +3332,29 @@ function ProductDetailModal({
                     <input value={draft.packagingWasteStream ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWasteStream: event.target.value }))} />
                   </label>
                   <label>Primair verpakkingsmateriaal
-                    <input value={draft.packagingMaterialPrimary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingMaterialPrimary: event.target.value }))} />
+                    <select value={draft.packagingMaterialPrimary ?? ''} onChange={(event) => applyPackagingMaterial('primary', event.target.value)}>
+                      <option value="">Selecteer...</option>
+                      {draft.packagingMaterialPrimary && !selectedPrimaryPackaging ? <option value={draft.packagingMaterialPrimary}>{draft.packagingMaterialPrimary}</option> : null}
+                      {packagingMaterialOptions.map((option) => <option key={option.recycleCode} value={option.value}>{option.label} ({option.recycleCode})</option>)}
+                    </select>
                   </label>
                   <label>Secundair verpakkingsmateriaal
-                    <input value={draft.packagingMaterialSecondary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingMaterialSecondary: event.target.value }))} />
+                    <select value={draft.packagingMaterialSecondary ?? ''} onChange={(event) => applyPackagingMaterial('secondary', event.target.value)}>
+                      <option value="">Selecteer...</option>
+                      {draft.packagingMaterialSecondary && !selectedSecondaryPackaging ? <option value={draft.packagingMaterialSecondary}>{draft.packagingMaterialSecondary}</option> : null}
+                      {packagingMaterialOptions.map((option) => <option key={`secondary-${option.recycleCode}`} value={option.value}>{option.label} ({option.recycleCode})</option>)}
+                    </select>
                   </label>
+                </div>
+                <div className="packaging-preview-grid">
+                  <div className="packaging-preview-card">
+                    <span className="packaging-preview-label">Primair labelicoon</span>
+                    <PackagingMaterialIcon option={selectedPrimaryPackaging} />
+                  </div>
+                  <div className="packaging-preview-card">
+                    <span className="packaging-preview-label">Secundair labelicoon</span>
+                    <PackagingMaterialIcon option={selectedSecondaryPackaging} />
+                  </div>
                 </div>
               </div>
               <div className="product-form-subsection">

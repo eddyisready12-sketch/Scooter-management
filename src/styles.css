@@ -1458,6 +1458,81 @@ tbody tr:hover {
   grid-column: 1 / -1;
 }
 
+.packaging-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.packaging-preview-card {
+  border: 1px solid #dce2e8;
+  border-radius: 10px;
+  background: #f9fbfd;
+  padding: 12px 14px;
+}
+
+.packaging-preview-label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5f6f7f;
+}
+
+.packaging-material-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 120px;
+  border: 1px dashed #cfd7df;
+  border-radius: 10px;
+  background: #fff;
+  padding: 12px;
+  color: #1f2937;
+}
+
+.packaging-material-preview.empty {
+  justify-content: center;
+  color: #6b7280;
+  font-size: 0.92rem;
+}
+
+.packaging-material-symbol {
+  width: 88px;
+  height: 110px;
+  flex: 0 0 auto;
+  color: #111827;
+}
+
+.packaging-material-number {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.packaging-material-code {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.packaging-material-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.packaging-material-copy strong {
+  font-size: 1rem;
+  color: #111827;
+}
+
+.packaging-material-copy small {
+  color: #5f6f7f;
+  font-size: 0.9rem;
+}
+
 .battery-detail-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2615,6 +2690,10 @@ dd {
 
   .battery-groups,
   .battery-side {
+    grid-template-columns: 1fr;
+  }
+
+  .packaging-preview-grid {
     grid-template-columns: 1fr;
   }
 
