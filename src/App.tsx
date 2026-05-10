@@ -585,9 +585,9 @@ function buildEan13BarcodeBase64(value: string) {
     includetext: true,
     guardwhitespace: true,
     textxalign: 'center',
-    textsize: 14,
-    textgaps: 2,
-    textyoffset: 4,
+    textsize: 12,
+    textyalign: 'below',
+    textyoffset: -6,
     backgroundcolor: 'FFFFFF',
     barcolor: '000000',
     textcolor: '000000',
@@ -787,7 +787,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="220" Y="965" Width="1900" Height="820" />
+    <Bounds X="220" Y="965" Width="1900" Height="900" />
   </ObjectInfo>` : `<ObjectInfo>
     <BarcodeObject>
       <Name>ProductBarcode</Name>
