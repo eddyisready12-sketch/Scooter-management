@@ -477,6 +477,101 @@ async function imageUrlToBase64(url: string) {
   });
 }
 
+function recycleCodeParts(layer: ProductPackagingLayer, fallbackMaterial?: string) {
+  const recycleCode = layer.recycleCode?.trim();
+  const option = findPackagingMaterialOption(layer.material || fallbackMaterial);
+  const fallbackParts = recycleCode?.match(/^([A-Za-z]+)\s*([0-9]+)?/);
+
+  return {
+    family: option?.recycleFamily || fallbackParts?.[1]?.toUpperCase() || 'PAP',
+    number: option?.recycleNumber || fallbackParts?.[2] || '20',
+  };
+}
+
+function buildMaterialIconsBase64(product: Product) {
+  const layers = normalizePackagingLayers(product)
+    .filter((item) => item.recycleCode?.trim() || item.material?.trim())
+    .slice(0, 2);
+  const iconParts = (layers.length ? layers : [{ material: product.packagingMaterialPrimary, recycleCode: product.packagingRecycleCodePrimary }])
+    .map((layer) => recycleCodeParts(layer, product.packagingMaterialPrimary));
+  const canvas = document.createElement('canvas');
+  canvas.width = 520;
+  canvas.height = 336;
+
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('Materiaal icoon kon niet worden gemaakt voor het productlabel.');
+  }
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  const drawIcon = (centerX: number, family: string, number: string) => {
+    context.save();
+    context.translate(centerX - 150, 0);
+    context.strokeStyle = '#000';
+    context.fillStyle = '#000';
+    context.lineWidth = 16;
+    context.lineJoin = 'round';
+    context.lineCap = 'butt';
+
+    context.beginPath();
+    context.moveTo(95, 94);
+    context.lineTo(132, 30);
+    context.quadraticCurveTo(150, 12, 168, 30);
+    context.lineTo(205, 94);
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(112, 210);
+    context.lineTo(40, 210);
+    context.quadraticCurveTo(15, 205, 28, 182);
+    context.lineTo(66, 116);
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(194, 116);
+    context.lineTo(232, 182);
+    context.quadraticCurveTo(245, 205, 220, 210);
+    context.lineTo(150, 210);
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(110, 208);
+    context.lineTo(154, 184);
+    context.lineTo(154, 232);
+    context.closePath();
+    context.fill();
+
+    context.beginPath();
+    context.moveTo(64, 116);
+    context.lineTo(108, 92);
+    context.lineTo(108, 140);
+    context.closePath();
+    context.fill();
+
+    context.beginPath();
+    context.moveTo(194, 116);
+    context.lineTo(238, 92);
+    context.lineTo(238, 140);
+    context.closePath();
+    context.fill();
+
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.font = 'bold 54px Arial';
+    context.fillText(number, 150, 164);
+    context.font = 'bold 42px Arial';
+    context.fillText(family, 150, 292);
+    context.restore();
+  };
+
+  const centers = iconParts.length > 1 ? [145, 375] : [260];
+  iconParts.forEach((part, index) => drawIcon(centers[index], part.family, part.number));
+
+  const dataUrl = canvas.toDataURL('image/png');
+  return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+}
+
 function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
   const barcodeValue = escapeLabelValue(scooter.frameNumber);
   const frameLabel = escapeLabelValue(scooter.frameNumber);
@@ -583,7 +678,7 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
 </DieCutLabel>`;
 }
 
-function buildDymoProductLabelXml(product: Product, logoBase64: string) {
+function buildDymoProductLabelXml(product: Product, logoBase64: string, materialIconsBase64: string) {
   const barcodeSource = product.barcode?.trim() || product.code.trim();
   if (!barcodeSource) {
     throw new Error('Product heeft geen barcode of code om te printen.');
@@ -603,6 +698,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string) {
   const escapedBatchCode = escapeLabelValue(batchCode);
   const escapedMadeInLine = escapeLabelValue(madeInLine);
   const escapedLogoBase64 = escapeLabelValue(logoBase64);
+  const escapedMaterialIconsBase64 = escapeLabelValue(materialIconsBase64);
 
   const textObject = ({
     name,
@@ -680,7 +776,24 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string) {
     <Bounds X="3500" Y="200" Width="1200" Height="520" />
   </ObjectInfo>
   ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2060, y: 1180, width: 1360, height: 540, size: 8 })}
-  ${textObject({ name: 'RecycleIcon', value: '♻', x: 3530, y: 1180, width: 420, height: 360, size: 28, bold: true, alignment: 'Center' })}
+  <ObjectInfo>
+    <ImageObject>
+      <Name>MaterialIcons</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <Image>${escapedMaterialIconsBase64}</Image>
+      <ScaleMode>Uniform</ScaleMode>
+      <BorderWidth>0</BorderWidth>
+      <BorderColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    <Bounds X="3400" Y="1120" Width="560" Height="460" />
+  </ObjectInfo>
   ${textObject({ name: 'BarcodeHumanText', value: escapedBarcode, x: 300, y: 1720, width: 1540, height: 220, size: 11, alignment: 'Center' })}
   ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4040, y: 1600, width: 760, height: 180, size: 7, alignment: 'Center' })}
   ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4040, y: 1800, width: 760, height: 160, size: 7, alignment: 'Center' })}
@@ -764,7 +877,8 @@ async function printScooterDymoLabel(scooter: Scooter, dealer?: Dealer) {
 async function printProductDymoLabel(product: Product) {
   const { dymo, printerName } = await getAvailableDymoPrinter();
   const logoBase64 = await imageUrlToBase64(rsoLogoUrl);
-  const labelXml = buildDymoProductLabelXml(product, logoBase64);
+  const materialIconsBase64 = buildMaterialIconsBase64(product);
+  const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64);
   const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Product ${product.code || product.description}` });
   if (!printResult.success) {
     throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
