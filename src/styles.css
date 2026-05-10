@@ -1465,6 +1465,51 @@ tbody tr:hover {
   margin-top: 16px;
 }
 
+.packaging-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.packaging-layer-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.packaging-layer-card {
+  border: 1px solid #dce2e8;
+  border-radius: 12px;
+  background: #f9fbfd;
+  padding: 14px;
+}
+
+.packaging-layer-title {
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #5f6f7f;
+}
+
+.packaging-layer-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) minmax(240px, 1fr) minmax(180px, 0.9fr) minmax(150px, 0.7fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.packaging-layer-preview {
+  display: grid;
+  gap: 6px;
+}
+
+.packaging-layer-field-label {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #213547;
+}
+
 .packaging-preview-card {
   border: 1px solid #dce2e8;
   border-radius: 10px;
@@ -1500,11 +1545,21 @@ tbody tr:hover {
   font-size: 0.92rem;
 }
 
+.packaging-material-preview.compact {
+  min-height: 88px;
+  padding: 10px 12px;
+}
+
 .packaging-material-symbol {
   width: 88px;
   height: 110px;
   flex: 0 0 auto;
   color: #111827;
+}
+
+.packaging-material-preview.compact .packaging-material-symbol {
+  width: 72px;
+  height: 90px;
 }
 
 .packaging-material-number {
@@ -2694,6 +2749,11 @@ dd {
   }
 
   .packaging-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .packaging-meta-grid,
+  .packaging-layer-grid {
     grid-template-columns: 1fr;
   }
 

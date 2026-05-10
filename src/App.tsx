@@ -142,17 +142,23 @@ function findPackagingMaterialOption(value?: string) {
   return packagingMaterialOptions.find((option) => option.value === value);
 }
 
-function PackagingMaterialIcon({ option }: { option?: { label: string; recycleFamily: string; recycleNumber: string; recycleCode: string } }) {
+function PackagingMaterialIcon({
+  option,
+  compact = false,
+}: {
+  option?: { label: string; recycleFamily: string; recycleNumber: string; recycleCode: string };
+  compact?: boolean;
+}) {
   if (!option) {
     return (
-      <div className="packaging-material-preview empty">
+      <div className={`packaging-material-preview${compact ? ' compact' : ''} empty`}>
         <span>Geen materiaal geselecteerd</span>
       </div>
     );
   }
 
   return (
-    <div className="packaging-material-preview">
+    <div className={`packaging-material-preview${compact ? ' compact' : ''}`}>
       <svg viewBox="0 0 100 112" className="packaging-material-symbol" aria-hidden="true">
         <g fill="none" stroke="currentColor" strokeWidth="7" strokeLinejoin="round" strokeLinecap="butt">
           <path d="M31.63 31.5 44.78 9.57s5.29-5.12 9.92-.49l12.25 20.78" />
@@ -3330,66 +3336,74 @@ function ProductDetailModal({
               </div>
             </div>
           )}
-          {activeTab === 'packaging' && (
-            <div className="product-section-body">
-              <div className="product-form-subsection">
-                <h3>Materiaal</h3>
-                <div className="form-grid">
-                  <label>Verpakkingseenheid
-                    <input value={draft.packagingUnit ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingUnit: event.target.value }))} />
-                  </label>
-                  <label>Afvalstroom
-                    <input value={draft.packagingWasteStream ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWasteStream: event.target.value }))} />
-                  </label>
-                  <label>Primair verpakkingsmateriaal
-                    <select value={draft.packagingMaterialPrimary ?? ''} onChange={(event) => applyPackagingMaterial('primary', event.target.value)}>
-                      <option value="">Selecteer...</option>
-                      {draft.packagingMaterialPrimary && !selectedPrimaryPackaging ? <option value={draft.packagingMaterialPrimary}>{draft.packagingMaterialPrimary}</option> : null}
-                      {packagingMaterialOptions.map((option) => <option key={option.recycleCode} value={option.value}>{option.label} ({option.recycleCode})</option>)}
-                    </select>
-                  </label>
-                  <label>Secundair verpakkingsmateriaal
-                    <select value={draft.packagingMaterialSecondary ?? ''} onChange={(event) => applyPackagingMaterial('secondary', event.target.value)}>
-                      <option value="">Selecteer...</option>
-                      {draft.packagingMaterialSecondary && !selectedSecondaryPackaging ? <option value={draft.packagingMaterialSecondary}>{draft.packagingMaterialSecondary}</option> : null}
-                      {packagingMaterialOptions.map((option) => <option key={`secondary-${option.recycleCode}`} value={option.value}>{option.label} ({option.recycleCode})</option>)}
-                    </select>
-                  </label>
-                </div>
-                <div className="packaging-preview-grid">
-                  <div className="packaging-preview-card">
-                    <span className="packaging-preview-label">Primair labelicoon</span>
-                    <PackagingMaterialIcon option={selectedPrimaryPackaging} />
-                  </div>
-                  <div className="packaging-preview-card">
-                    <span className="packaging-preview-label">Secundair labelicoon</span>
-                    <PackagingMaterialIcon option={selectedSecondaryPackaging} />
+            {activeTab === 'packaging' && (
+              <div className="product-section-body">
+                <div className="product-form-subsection">
+                  <h3>Verpakking algemeen</h3>
+                  <div className="packaging-meta-grid">
+                    <label>Verpakkingseenheid
+                      <input value={draft.packagingUnit ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingUnit: event.target.value }))} />
+                    </label>
+                    <label>Afvalstroom
+                      <input value={draft.packagingWasteStream ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWasteStream: event.target.value }))} />
+                    </label>
+                    <label>Gewicht totaal verpakking (g)
+                      <input value={draft.packagingWeightTotalGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightTotalGrams: event.target.value }))} />
+                    </label>
                   </div>
                 </div>
-              </div>
-              <div className="product-form-subsection">
-                <h3>Recyclecodes en gewichten</h3>
-                <div className="form-grid">
-                  <label>Recyclecode primair
-                    <input value={draft.packagingRecycleCodePrimary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodePrimary: event.target.value }))} />
-                  </label>
-                  <label>Recyclecode secundair
-                    <input value={draft.packagingRecycleCodeSecondary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodeSecondary: event.target.value }))} />
-                  </label>
-                  <label>Gewicht primaire verpakking (g)
-                    <input value={draft.packagingWeightPrimaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightPrimaryGrams: event.target.value }))} />
-                  </label>
-                  <label>Gewicht secundaire verpakking (g)
-                    <input value={draft.packagingWeightSecondaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightSecondaryGrams: event.target.value }))} />
-                  </label>
-                  <label>Gewicht totaal verpakking (g)
-                    <input value={draft.packagingWeightTotalGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightTotalGrams: event.target.value }))} />
-                  </label>
+                <div className="product-form-subsection">
+                  <h3>Verpakkingslagen</h3>
+                  <div className="packaging-layer-stack">
+                    <div className="packaging-layer-card">
+                      <div className="packaging-layer-title">Primair</div>
+                      <div className="packaging-layer-grid">
+                        <label>Verpakkingsmateriaal
+                          <select value={draft.packagingMaterialPrimary ?? ''} onChange={(event) => applyPackagingMaterial('primary', event.target.value)}>
+                            <option value="">Selecteer...</option>
+                            {draft.packagingMaterialPrimary && !selectedPrimaryPackaging ? <option value={draft.packagingMaterialPrimary}>{draft.packagingMaterialPrimary}</option> : null}
+                            {packagingMaterialOptions.map((option) => <option key={option.recycleCode} value={option.value}>{option.label} ({option.recycleCode})</option>)}
+                          </select>
+                        </label>
+                        <div className="packaging-layer-preview">
+                          <span className="packaging-layer-field-label">Labelicoon</span>
+                          <PackagingMaterialIcon option={selectedPrimaryPackaging} compact />
+                        </div>
+                        <label>Recyclecode
+                          <input value={draft.packagingRecycleCodePrimary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodePrimary: event.target.value }))} />
+                        </label>
+                        <label>Gewicht (g)
+                          <input value={draft.packagingWeightPrimaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightPrimaryGrams: event.target.value }))} />
+                        </label>
+                      </div>
+                    </div>
+                    <div className="packaging-layer-card">
+                      <div className="packaging-layer-title">Secundair</div>
+                      <div className="packaging-layer-grid">
+                        <label>Verpakkingsmateriaal
+                          <select value={draft.packagingMaterialSecondary ?? ''} onChange={(event) => applyPackagingMaterial('secondary', event.target.value)}>
+                            <option value="">Selecteer...</option>
+                            {draft.packagingMaterialSecondary && !selectedSecondaryPackaging ? <option value={draft.packagingMaterialSecondary}>{draft.packagingMaterialSecondary}</option> : null}
+                            {packagingMaterialOptions.map((option) => <option key={`secondary-${option.recycleCode}`} value={option.value}>{option.label} ({option.recycleCode})</option>)}
+                          </select>
+                        </label>
+                        <div className="packaging-layer-preview">
+                          <span className="packaging-layer-field-label">Labelicoon</span>
+                          <PackagingMaterialIcon option={selectedSecondaryPackaging} compact />
+                        </div>
+                        <label>Recyclecode
+                          <input value={draft.packagingRecycleCodeSecondary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodeSecondary: event.target.value }))} />
+                        </label>
+                        <label>Gewicht (g)
+                          <input value={draft.packagingWeightSecondaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightSecondaryGrams: event.target.value }))} />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="product-form-subsection">
-                <h3>Opmerkingen</h3>
-                <div className="form-grid">
+                <div className="product-form-subsection">
+                  <h3>Opmerkingen</h3>
+                  <div className="form-grid">
                   <label className="span-2">Verpakkingsopmerking
                     <textarea value={draft.packagingNotes ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingNotes: event.target.value }))} />
                   </label>
