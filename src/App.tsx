@@ -32,6 +32,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import Dymo from 'dymo-connect';
+import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
 import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertWarrantyParts } from './lib/supabase';
@@ -459,6 +460,23 @@ function escapeLabelValue(value: string) {
     .replace(/>/g, '&gt;');
 }
 
+async function imageUrlToBase64(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('RSO logo kon niet worden geladen voor het productlabel.');
+  }
+  const blob = await response.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? '');
+      resolve(result.includes(',') ? result.split(',')[1] : result);
+    };
+    reader.onerror = () => reject(new Error('RSO logo kon niet worden verwerkt voor het productlabel.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
 function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
   const barcodeValue = escapeLabelValue(scooter.frameNumber);
   const frameLabel = escapeLabelValue(scooter.frameNumber);
@@ -565,7 +583,7 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
 </DieCutLabel>`;
 }
 
-function buildDymoProductLabelXml(product: Product) {
+function buildDymoProductLabelXml(product: Product, logoBase64: string) {
   const barcodeSource = product.barcode?.trim() || product.code.trim();
   if (!barcodeSource) {
     throw new Error('Product heeft geen barcode of code om te printen.');
@@ -584,6 +602,7 @@ function buildDymoProductLabelXml(product: Product) {
   const escapedDescription = escapeLabelValue(product.labelTitle?.trim() || product.shortDescription?.trim() || product.description.trim());
   const escapedBatchCode = escapeLabelValue(batchCode);
   const escapedMadeInLine = escapeLabelValue(madeInLine);
+  const escapedLogoBase64 = escapeLabelValue(logoBase64);
 
   const textObject = ({
     name,
@@ -642,8 +661,24 @@ function buildDymoProductLabelXml(product: Product) {
   </DrawCommands>
   ${textObject({ name: 'ProductCode', value: escapedCode, x: 220, y: 250, width: 1900, height: 360, size: 15 })}
   ${textObject({ name: 'ProductDescription', value: escapedDescription, x: 220, y: 620, width: 2700, height: 320, size: 11 })}
-  ${textObject({ name: 'RsoLogoText', value: 'RSO', x: 3550, y: 220, width: 1120, height: 360, size: 24, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'RsoTagline', value: 'ENJOY YOUR RIDE', x: 3520, y: 560, width: 1180, height: 160, size: 6, bold: true, alignment: 'Center' })}
+  <ObjectInfo>
+    <ImageObject>
+      <Name>RsoLogo</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <Image>${escapedLogoBase64}</Image>
+      <ScaleMode>Uniform</ScaleMode>
+      <BorderWidth>0</BorderWidth>
+      <BorderColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    <Bounds X="3500" Y="200" Width="1200" Height="520" />
+  </ObjectInfo>
   ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2060, y: 1180, width: 1360, height: 540, size: 8 })}
   ${textObject({ name: 'RecycleIcon', value: '♻', x: 3530, y: 1180, width: 420, height: 360, size: 28, bold: true, alignment: 'Center' })}
   ${textObject({ name: 'BarcodeHumanText', value: escapedBarcode, x: 300, y: 1720, width: 1540, height: 220, size: 11, alignment: 'Center' })}
@@ -728,7 +763,8 @@ async function printScooterDymoLabel(scooter: Scooter, dealer?: Dealer) {
 
 async function printProductDymoLabel(product: Product) {
   const { dymo, printerName } = await getAvailableDymoPrinter();
-  const labelXml = buildDymoProductLabelXml(product);
+  const logoBase64 = await imageUrlToBase64(rsoLogoUrl);
+  const labelXml = buildDymoProductLabelXml(product, logoBase64);
   const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Product ${product.code || product.description}` });
   if (!printResult.success) {
     throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
