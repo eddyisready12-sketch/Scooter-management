@@ -1363,7 +1363,7 @@ tbody tr:hover {
 }
 
 .product-detail-modal {
-  width: min(1280px, calc(100vw - 32px));
+  width: min(1600px, calc(100vw - 40px));
 }
 
 .product-summary-grid {
