@@ -153,14 +153,19 @@ function PackagingMaterialIcon({ option }: { option?: { label: string; recycleFa
 
   return (
     <div className="packaging-material-preview">
-      <svg viewBox="0 0 96 120" className="packaging-material-symbol" aria-hidden="true">
-        <g fill="currentColor">
-          <path d="M49 10 58 26h-6l-7 14-9-5 7-14h-6z" />
-          <path d="m74 63-18-1 3-5-8-13 9-5 8 13 3-5z" />
-          <path d="m21 72 9-16 3 5h16v10H33l3 5z" />
+      <svg viewBox="0 0 100 112" className="packaging-material-symbol" aria-hidden="true">
+        <g fill="none" stroke="currentColor" strokeWidth="7" strokeLinejoin="round" strokeLinecap="butt">
+          <path d="M31.63 31.5 44.78 9.57s5.29-5.12 9.92-.49l12.25 20.78" />
+          <path d="M45.95 70 20.38 69.57S13.31 67.55 15 61.23l11.87-21" />
+          <path d="M72.13 38.35 84.54 60.7s1.79 7.14-4.53 8.83l-24.12.23" />
         </g>
-        <text x="48" y="56" textAnchor="middle" className="packaging-material-number">{option.recycleNumber}</text>
-        <text x="48" y="102" textAnchor="middle" className="packaging-material-code">{option.recycleFamily}</text>
+        <g fill="currentColor">
+          <path d="m46.05 69.82 14.67-8.64v17.01z" />
+          <path d="m17.25 40.27 14.67-8.64v17.01z" />
+          <path d="m57.28 29.99 14.67-8.64v17.01z" />
+        </g>
+        <text x="50" y="54" textAnchor="middle" className="packaging-material-number">{option.recycleNumber}</text>
+        <text x="50" y="98" textAnchor="middle" className="packaging-material-code">{option.recycleFamily}</text>
       </svg>
       <div className="packaging-material-copy">
         <strong>{option.label}</strong>
