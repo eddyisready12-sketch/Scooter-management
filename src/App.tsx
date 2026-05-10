@@ -3106,39 +3106,6 @@ function ProductDetailModal({
           </div>
           {activeTab === 'basic' && (
             <div className="product-section-body">
-              <div className="product-summary-grid">
-                <section className="panel detail-card">
-                  <div className="detail-card-title">Kerngegevens</div>
-                  <dl className="detail-list">
-                    <dt>Code</dt><dd>{draft.code || '-'}</dd>
-                    <dt>Omschrijving</dt><dd>{draft.description || '-'}</dd>
-                    <dt>Merk</dt><dd>{draft.brand || '-'}</dd>
-                    <dt>Artikelgroep</dt><dd>{draft.articleGroup || '-'}</dd>
-                    <dt>Leverancier</dt><dd>{draft.supplier || draft.importerName || '-'}</dd>
-                  </dl>
-                </section>
-                <section className="panel detail-card">
-                  <div className="detail-card-title">Commercieel</div>
-                  <dl className="detail-list">
-                    <dt>Verkoopprijs</dt><dd>{formatPriceValue(draft.salePrice)}</dd>
-                    <dt>Kostprijs</dt><dd>{formatPriceValue(draft.costPrice)}</dd>
-                    <dt>Webwinkel</dt><dd>{draft.webshop ? 'Ja' : 'Nee'}</dd>
-                    <dt>Voorraad</dt><dd>{draft.stock || '-'}</dd>
-                    <dt>Batch</dt><dd>{draft.batchNumber || draft.batch || '-'}</dd>
-                    <dt>Barcode</dt><dd>{draft.barcode || '-'}</dd>
-                  </dl>
-                </section>
-                <section className="panel detail-card">
-                  <div className="detail-card-title">Levenscyclus</div>
-                  <dl className="detail-list">
-                    <dt>Begindatum</dt><dd>{formatDateOnly(draft.startDate)}</dd>
-                    <dt>Einddatum</dt><dd>{formatDateOnly(draft.endDate)}</dd>
-                    <dt>Land van herkomst</dt><dd>{draft.countryOfOrigin || '-'}</dd>
-                    <dt>Verpakking primair</dt><dd>{draft.packagingMaterialPrimary || '-'}</dd>
-                    <dt>Verpakking secundair</dt><dd>{draft.packagingMaterialSecondary || '-'}</dd>
-                  </dl>
-                </section>
-              </div>
               <div className="product-form-subsection">
                 <h3>Identificatie</h3>
                 <div className="form-grid">
