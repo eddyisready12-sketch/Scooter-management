@@ -31,6 +31,7 @@ import {
   XCircle,
   Wrench,
 } from 'lucide-react';
+import * as bwipjs from 'bwip-js';
 import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
@@ -570,6 +571,29 @@ function normalizeEan13Value(value: string) {
   return ean13CheckDigit(digits.slice(0, 12)) === digits[12] ? digits : null;
 }
 
+function buildEan13BarcodeBase64(value: string) {
+  const eanValue = normalizeEan13Value(value);
+  if (!eanValue) return null;
+
+  const canvas = document.createElement('canvas');
+  (bwipjs as unknown as { toCanvas: (canvas: HTMLCanvasElement, options: Record<string, unknown>) => HTMLCanvasElement }).toCanvas(canvas, {
+    bcid: 'ean13',
+    text: eanValue,
+    scaleX: 4,
+    scaleY: 3,
+    height: 15,
+    includetext: true,
+    guardwhitespace: true,
+    textxalign: 'center',
+    textsize: 12,
+    backgroundcolor: 'FFFFFF',
+    barcolor: '000000',
+    textcolor: '000000',
+  });
+  const dataUrl = canvas.toDataURL('image/png');
+  return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+}
+
 function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
   const barcodeValue = escapeLabelValue(scooter.frameNumber);
   const frameLabel = escapeLabelValue(scooter.frameNumber);
@@ -676,7 +700,7 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
 </DieCutLabel>`;
 }
 
-function buildDymoProductLabelXml(product: Product, logoBase64: string, materialIconsBase64: string) {
+function buildDymoProductLabelXml(product: Product, logoBase64: string, materialIconsBase64: string, barcodeBase64: string | null) {
   const barcodeSource = product.barcode?.trim() || product.code.trim();
   if (!barcodeSource) {
     throw new Error('Product heeft geen barcode of code om te printen.');
@@ -698,6 +722,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
   const escapedMadeInLine = escapeLabelValue(madeInLine);
   const escapedLogoBase64 = escapeLabelValue(logoBase64);
   const escapedMaterialIconsBase64 = escapeLabelValue(materialIconsBase64);
+  const escapedBarcodeBase64 = barcodeBase64 ? escapeLabelValue(barcodeBase64) : '';
   const textObject = ({
     name,
     value,
@@ -744,27 +769,23 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
     </TextObject>
     <Bounds X="${x}" Y="${y}" Width="${width}" Height="${height}" />
   </ObjectInfo>`;
-  const barcodeObject = normalizedEanValue ? `<ObjectInfo>
-    <BarcodeObject>
+  const barcodeObject = barcodeBase64 ? `<ObjectInfo>
+    <ImageObject>
       <Name>ProductBarcode</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
       <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
       <LinkedObjectName />
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
-      <IsVariable>True</IsVariable>
-      <Text>${normalizedEanValue}</Text>
-      <Type>EAN13</Type>
-      <Size>Large</Size>
-      <TextPosition>Bottom</TextPosition>
-      <TextFont Family="Arial" Size="11" Bold="False" Italic="False" Underline="False" Strikeout="False" />
-      <CheckSumFont Family="Arial" Size="11" Bold="False" Italic="False" Underline="False" Strikeout="False" />
-      <TextEmbedding>None</TextEmbedding>
-      <ECLevel>0</ECLevel>
+      <IsVariable>False</IsVariable>
+      <Image>${escapedBarcodeBase64}</Image>
+      <ScaleMode>Uniform</ScaleMode>
+      <BorderWidth>0</BorderWidth>
+      <BorderColor Alpha="255" Red="0" Green="0" Blue="0" />
       <HorizontalAlignment>Center</HorizontalAlignment>
-      <QuietZonesPadding Left="0" Top="0" Right="0" Bottom="0" />
-    </BarcodeObject>
-    <Bounds X="220" Y="900" Width="1900" Height="760" />
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    <Bounds X="220" Y="890" Width="1900" Height="800" />
   </ObjectInfo>` : `<ObjectInfo>
     <BarcodeObject>
       <Name>ProductBarcode</Name>
@@ -897,7 +918,8 @@ async function printProductDymoLabel(product: Product) {
   const { dymo, printerName } = await getAvailableDymoPrinter();
   const logoBase64 = await imageUrlToBase64(rsoLogoUrl);
   const materialIconsBase64 = await buildMaterialIconsBase64(product);
-  const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64);
+  const barcodeBase64 = buildEan13BarcodeBase64(product.barcode?.trim() || product.code.trim());
+  const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64, barcodeBase64);
   const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Product ${product.code || product.description}` });
   if (!printResult.success) {
     throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));

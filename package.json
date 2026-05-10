@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
+    "bwip-js": "^4.10.1",
     "dymo-connect": "^2.2.1",
     "lucide-react": "^0.468.0",
     "papaparse": "^5.4.1",
