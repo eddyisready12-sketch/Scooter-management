@@ -660,15 +660,6 @@ function buildEan13BarcodeBase64(value: string) {
     context.fillRect(barX + moduleIndex * moduleWidth, barTop, moduleWidth, isGuard ? guardHeight : barHeight);
   });
 
-  context.font = '42px Arial';
-  context.textBaseline = 'top';
-  context.textAlign = 'center';
-  context.fillText(firstDigit, digitMarginLeft / 2, 250);
-  context.fillText(eanValue.slice(1, 7), barX + 24 * moduleWidth, 250);
-  context.fillText(eanValue.slice(7), barX + 71 * moduleWidth, 250);
-  context.font = '34px Arial';
-  context.fillText('>', barX + 99 * moduleWidth, 256);
-
   const dataUrl = canvas.toDataURL('image/png');
   return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
 }
@@ -792,8 +783,12 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
 
   const country = product.countryOfOrigin?.trim() || 'China';
   const madeInLine = country.toLowerCase().startsWith('made in') ? country : `Made in ${country}`;
+  const normalizedEanValue = normalizeEan13Value(barcodeSource);
 
   const escapedBarcode = escapeLabelValue(barcodeSource);
+  const escapedEanFirstDigit = escapeLabelValue(normalizedEanValue?.slice(0, 1) ?? '');
+  const escapedEanLeftDigits = escapeLabelValue(normalizedEanValue?.slice(1, 7) ?? '');
+  const escapedEanRightDigits = escapeLabelValue(normalizedEanValue?.slice(7) ?? '');
   const escapedCode = escapeLabelValue(product.code.trim() || barcodeSource);
   const escapedDescription = escapeLabelValue(product.labelTitle?.trim() || product.shortDescription?.trim() || product.description.trim());
   const escapedBatchCode = escapeLabelValue(batchCode);
@@ -938,6 +933,10 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
   ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4070, y: 1600, width: 820, height: 180, size: 6, alignment: 'Center' })}
   ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4070, y: 1810, width: 820, height: 140, size: 6, alignment: 'Center' })}
   ${barcodeObject}
+  ${normalizedEanValue ? textObject({ name: 'EanFirstDigit', value: escapedEanFirstDigit, x: 220, y: 1592, width: 110, height: 160, size: 9, alignment: 'Center' }) : ''}
+  ${normalizedEanValue ? textObject({ name: 'EanLeftDigits', value: escapedEanLeftDigits, x: 430, y: 1592, width: 500, height: 160, size: 9, alignment: 'Center' }) : ''}
+  ${normalizedEanValue ? textObject({ name: 'EanRightDigits', value: escapedEanRightDigits, x: 1100, y: 1592, width: 500, height: 160, size: 9, alignment: 'Center' }) : ''}
+  ${normalizedEanValue ? textObject({ name: 'EanArrow', value: '&gt;', x: 1860, y: 1592, width: 120, height: 160, size: 9, alignment: 'Center' }) : ''}
   <ObjectInfo>
     <BarcodeObject>
       <Name>BatchQrCode</Name>
