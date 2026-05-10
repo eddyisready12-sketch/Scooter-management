@@ -755,8 +755,8 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="${dymo99012Layout.width}" Height="${dymo99012Layout.height}" Rx="180" Ry="180" />
   </DrawCommands>
-  ${textObject({ name: 'ProductCode', value: escapedCode, x: 220, y: 250, width: 1900, height: 360, size: 15 })}
-  ${textObject({ name: 'ProductDescription', value: escapedDescription, x: 220, y: 620, width: 2700, height: 320, size: 11 })}
+  ${textObject({ name: 'ProductCode', value: escapedCode, x: 220, y: 210, width: 1800, height: 320, size: 15 })}
+  ${textObject({ name: 'ProductDescription', value: escapedDescription, x: 220, y: 550, width: 2700, height: 300, size: 11 })}
   <ObjectInfo>
     <ImageObject>
       <Name>RsoLogo</Name>
@@ -773,9 +773,9 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="3500" Y="200" Width="1200" Height="520" />
+    <Bounds X="3040" Y="110" Width="1780" Height="760" />
   </ObjectInfo>
-  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2060, y: 1180, width: 1360, height: 540, size: 8 })}
+  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2500, y: 1040, width: 940, height: 580, size: 8 })}
   <ObjectInfo>
     <ImageObject>
       <Name>MaterialIcons</Name>
@@ -792,11 +792,11 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="3400" Y="1120" Width="560" Height="460" />
+    <Bounds X="3380" Y="980" Width="740" Height="600" />
   </ObjectInfo>
-  ${textObject({ name: 'BarcodeHumanText', value: escapedBarcode, x: 300, y: 1720, width: 1540, height: 220, size: 11, alignment: 'Center' })}
-  ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4040, y: 1600, width: 760, height: 180, size: 7, alignment: 'Center' })}
-  ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4040, y: 1800, width: 760, height: 160, size: 7, alignment: 'Center' })}
+  ${textObject({ name: 'BarcodeHumanText', value: escapedBarcode, x: 220, y: 1790, width: 2140, height: 210, size: 11, alignment: 'Center' })}
+  ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4160, y: 1610, width: 680, height: 180, size: 7, alignment: 'Center' })}
+  ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4160, y: 1810, width: 680, height: 150, size: 7, alignment: 'Center' })}
   <ObjectInfo>
     <BarcodeObject>
       <Name>ProductBarcode</Name>
@@ -808,16 +808,16 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <IsVariable>True</IsVariable>
       <Text>${escapedBarcode}</Text>
       <Type>Code128Auto</Type>
-      <Size>Small</Size>
+      <Size>Large</Size>
       <TextPosition>None</TextPosition>
       <TextFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
       <CheckSumFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
       <TextEmbedding>None</TextEmbedding>
       <ECLevel>0</ECLevel>
       <HorizontalAlignment>Center</HorizontalAlignment>
-      <QuietZonesPadding Left="0" Top="0" Right="0" Bottom="0" />
+      <QuietZonesPadding Left="120" Top="0" Right="120" Bottom="0" />
     </BarcodeObject>
-    <Bounds X="300" Y="1160" Width="1540" Height="560" />
+    <Bounds X="220" Y="980" Width="2140" Height="790" />
   </ObjectInfo>
   <ObjectInfo>
     <BarcodeObject>
@@ -830,7 +830,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <IsVariable>True</IsVariable>
       <Text>${escapedBatchCode}</Text>
       <Type>QRCode</Type>
-      <Size>Small</Size>
+      <Size>Medium</Size>
       <TextPosition>None</TextPosition>
       <TextFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
       <CheckSumFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
@@ -839,7 +839,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <QuietZonesPadding Left="0" Top="0" Right="0" Bottom="0" />
     </BarcodeObject>
-    <Bounds X="4040" Y="1000" Width="720" Height="620" />
+    <Bounds X="4160" Y="930" Width="680" Height="660" />
   </ObjectInfo>
 </DieCutLabel>`;
 }
