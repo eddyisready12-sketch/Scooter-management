@@ -911,7 +911,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
     </ImageObject>
     <Bounds X="3380" Y="150" Width="1420" Height="420" />
   </ObjectInfo>
-  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Nederland&#10;Info@rso-parts.nl', x: 2360, y: 1080, width: 980, height: 620, size: 6 })}
+  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2360, y: 1110, width: 980, height: 520, size: 6 })}
   <ObjectInfo>
     <ImageObject>
       <Name>MaterialIcons</Name>
@@ -928,7 +928,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="3500" Y="850" Width="620" Height="860" />
+    <Bounds X="3440" Y="790" Width="775" Height="1075" />
   </ObjectInfo>
   ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4070, y: 1600, width: 820, height: 180, size: 6, alignment: 'Center' })}
   ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4070, y: 1810, width: 820, height: 140, size: 6, alignment: 'Center' })}
