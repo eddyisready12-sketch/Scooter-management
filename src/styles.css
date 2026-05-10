@@ -1497,6 +1497,12 @@ tbody tr:hover {
   align-items: end;
 }
 
+.packaging-layer-grid label {
+  display: grid;
+  gap: 6px;
+  align-content: end;
+}
+
 .packaging-layer-preview {
   display: grid;
   gap: 6px;
@@ -1504,6 +1510,7 @@ tbody tr:hover {
 }
 
 .packaging-layer-field-label {
+  display: block;
   font-size: 0.84rem;
   font-weight: 700;
   color: #213547;
