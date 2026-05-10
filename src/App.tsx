@@ -634,12 +634,11 @@ function buildEan13BarcodeBase64(value: string) {
   const bits = `101${leftBits}01010${rightBits}101`;
 
   const moduleWidth = 8;
-  const quietLeft = 0;
-  const quietRight = 0;
-  const barcodeModules = quietLeft + bits.length + quietRight;
+  const digitMarginLeft = 56;
+  const arrowMarginRight = 44;
   const canvas = document.createElement('canvas');
-  canvas.width = barcodeModules * moduleWidth;
-  canvas.height = 400;
+  canvas.width = digitMarginLeft + bits.length * moduleWidth + arrowMarginRight;
+  canvas.height = 330;
 
   const context = canvas.getContext('2d');
   if (!context) {
@@ -650,20 +649,25 @@ function buildEan13BarcodeBase64(value: string) {
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = '#000';
 
-  const barTop = 16;
-  const barHeight = 250;
-  const guardHeight = 300;
+  const barX = digitMarginLeft;
+  const barTop = 10;
+  const barHeight = 224;
+  const guardHeight = 270;
   bits.split('').forEach((bit, index) => {
     if (bit !== '1') return;
     const moduleIndex = index;
     const isGuard = moduleIndex < 3 || (moduleIndex >= 45 && moduleIndex < 50) || moduleIndex >= 92;
-    context.fillRect((quietLeft + moduleIndex) * moduleWidth, barTop, moduleWidth, isGuard ? guardHeight : barHeight);
+    context.fillRect(barX + moduleIndex * moduleWidth, barTop, moduleWidth, isGuard ? guardHeight : barHeight);
   });
 
-  context.font = '54px Arial';
+  context.font = '42px Arial';
   context.textBaseline = 'top';
   context.textAlign = 'center';
-  context.fillText(eanValue, canvas.width / 2, 314);
+  context.fillText(firstDigit, digitMarginLeft / 2, 250);
+  context.fillText(eanValue.slice(1, 7), barX + 24 * moduleWidth, 250);
+  context.fillText(eanValue.slice(7), barX + 71 * moduleWidth, 250);
+  context.font = '34px Arial';
+  context.fillText('>', barX + 99 * moduleWidth, 256);
 
   const dataUrl = canvas.toDataURL('image/png');
   return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
@@ -860,7 +864,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="220" Y="1000" Width="1800" Height="850" />
+    <Bounds X="220" Y="1030" Width="1800" Height="720" />
   </ObjectInfo>` : `<ObjectInfo>
     <BarcodeObject>
       <Name>ProductBarcode</Name>
@@ -881,7 +885,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <QuietZonesPadding Left="160" Top="0" Right="160" Bottom="0" />
     </BarcodeObject>
-    <Bounds X="220" Y="1000" Width="1800" Height="850" />
+    <Bounds X="220" Y="1030" Width="1800" Height="720" />
   </ObjectInfo>`;
 
   return `<?xml version="1.0" encoding="utf-8"?>
