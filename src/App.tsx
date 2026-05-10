@@ -859,7 +859,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="220" Y="1030" Width="1800" Height="720" />
+    <Bounds X="220" Y="1010" Width="1800" Height="560" />
   </ObjectInfo>` : `<ObjectInfo>
     <BarcodeObject>
       <Name>ProductBarcode</Name>
@@ -880,7 +880,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <QuietZonesPadding Left="160" Top="0" Right="160" Bottom="0" />
     </BarcodeObject>
-    <Bounds X="220" Y="1030" Width="1800" Height="720" />
+    <Bounds X="220" Y="1010" Width="1800" Height="560" />
   </ObjectInfo>`;
 
   return `<?xml version="1.0" encoding="utf-8"?>
@@ -928,15 +928,15 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="3480" Y="890" Width="430" Height="720" />
+    <Bounds X="3500" Y="850" Width="620" Height="860" />
   </ObjectInfo>
   ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4070, y: 1600, width: 820, height: 180, size: 6, alignment: 'Center' })}
   ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4070, y: 1810, width: 820, height: 140, size: 6, alignment: 'Center' })}
   ${barcodeObject}
-  ${normalizedEanValue ? textObject({ name: 'EanFirstDigit', value: escapedEanFirstDigit, x: 220, y: 1592, width: 110, height: 160, size: 9, alignment: 'Center' }) : ''}
-  ${normalizedEanValue ? textObject({ name: 'EanLeftDigits', value: escapedEanLeftDigits, x: 430, y: 1592, width: 500, height: 160, size: 9, alignment: 'Center' }) : ''}
-  ${normalizedEanValue ? textObject({ name: 'EanRightDigits', value: escapedEanRightDigits, x: 1100, y: 1592, width: 500, height: 160, size: 9, alignment: 'Center' }) : ''}
-  ${normalizedEanValue ? textObject({ name: 'EanArrow', value: '&gt;', x: 1860, y: 1592, width: 120, height: 160, size: 9, alignment: 'Center' }) : ''}
+  ${normalizedEanValue ? textObject({ name: 'EanFirstDigit', value: escapedEanFirstDigit, x: 220, y: 1618, width: 110, height: 160, size: 10, alignment: 'Center' }) : ''}
+  ${normalizedEanValue ? textObject({ name: 'EanLeftDigits', value: escapedEanLeftDigits, x: 430, y: 1618, width: 500, height: 160, size: 10, alignment: 'Center' }) : ''}
+  ${normalizedEanValue ? textObject({ name: 'EanRightDigits', value: escapedEanRightDigits, x: 1100, y: 1618, width: 500, height: 160, size: 10, alignment: 'Center' }) : ''}
+  ${normalizedEanValue ? textObject({ name: 'EanArrow', value: '&gt;', x: 1860, y: 1618, width: 120, height: 160, size: 10, alignment: 'Center' }) : ''}
   <ObjectInfo>
     <BarcodeObject>
       <Name>BatchQrCode</Name>
