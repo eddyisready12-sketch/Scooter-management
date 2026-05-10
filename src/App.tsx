@@ -572,6 +572,123 @@ function buildMaterialIconsBase64(product: Product) {
   return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
 }
 
+function ean13CheckDigit(firstTwelveDigits: string) {
+  const sum = firstTwelveDigits
+    .split('')
+    .reduce((total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
+  return String((10 - (sum % 10)) % 10);
+}
+
+function normalizeEan13Value(value: string) {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 12) return `${digits}${ean13CheckDigit(digits)}`;
+  if (digits.length !== 13) return null;
+  return ean13CheckDigit(digits.slice(0, 12)) === digits[12] ? digits : null;
+}
+
+function buildEan13BarcodeBase64(value: string) {
+  const eanValue = normalizeEan13Value(value);
+  if (!eanValue) return null;
+
+  const leftOdd: Record<string, string> = {
+    '0': '0001101',
+    '1': '0011001',
+    '2': '0010011',
+    '3': '0111101',
+    '4': '0100011',
+    '5': '0110001',
+    '6': '0101111',
+    '7': '0111011',
+    '8': '0110111',
+    '9': '0001011',
+  };
+  const leftEven: Record<string, string> = {
+    '0': '0100111',
+    '1': '0110011',
+    '2': '0011011',
+    '3': '0100001',
+    '4': '0011101',
+    '5': '0111001',
+    '6': '0000101',
+    '7': '0010001',
+    '8': '0001001',
+    '9': '0010111',
+  };
+  const right: Record<string, string> = {
+    '0': '1110010',
+    '1': '1100110',
+    '2': '1101100',
+    '3': '1000010',
+    '4': '1011100',
+    '5': '1001110',
+    '6': '1010000',
+    '7': '1000100',
+    '8': '1001000',
+    '9': '1110100',
+  };
+  const parityPatterns: Record<string, string> = {
+    '0': 'OOOOOO',
+    '1': 'OOEOEE',
+    '2': 'OOEEOE',
+    '3': 'OOEEEO',
+    '4': 'OEOOEE',
+    '5': 'OEEOOE',
+    '6': 'OEEEOO',
+    '7': 'OEOEOE',
+    '8': 'OEOEEO',
+    '9': 'OEEOEO',
+  };
+
+  const firstDigit = eanValue[0];
+  const leftDigits = eanValue.slice(1, 7).split('');
+  const rightDigits = eanValue.slice(7).split('');
+  const parity = parityPatterns[firstDigit];
+  const leftBits = leftDigits
+    .map((digit, index) => (parity[index] === 'O' ? leftOdd[digit] : leftEven[digit]))
+    .join('');
+  const rightBits = rightDigits.map((digit) => right[digit]).join('');
+  const bits = `101${leftBits}01010${rightBits}101`;
+
+  const moduleWidth = 8;
+  const quietLeft = 12;
+  const quietRight = 12;
+  const barcodeModules = quietLeft + bits.length + quietRight;
+  const canvas = document.createElement('canvas');
+  canvas.width = barcodeModules * moduleWidth;
+  canvas.height = 360;
+
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('EAN-13 barcode kon niet worden gemaakt voor het productlabel.');
+  }
+
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#000';
+
+  const barTop = 16;
+  const barHeight = 240;
+  const guardHeight = 280;
+  bits.split('').forEach((bit, index) => {
+    if (bit !== '1') return;
+    const moduleIndex = index;
+    const isGuard = moduleIndex < 3 || (moduleIndex >= 45 && moduleIndex < 50) || moduleIndex >= 92;
+    context.fillRect((quietLeft + moduleIndex) * moduleWidth, barTop, moduleWidth, isGuard ? guardHeight : barHeight);
+  });
+
+  context.font = '36px Arial';
+  context.textBaseline = 'top';
+  context.textAlign = 'center';
+  context.fillText(firstDigit, (quietLeft - 4) * moduleWidth, 272);
+  context.fillText(eanValue.slice(1, 7), (quietLeft + 24) * moduleWidth, 272);
+  context.fillText(eanValue.slice(7), (quietLeft + 71) * moduleWidth, 272);
+  context.font = '28px Arial';
+  context.fillText('>', (quietLeft + 99) * moduleWidth, 276);
+
+  const dataUrl = canvas.toDataURL('image/png');
+  return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+}
+
 function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
   const barcodeValue = escapeLabelValue(scooter.frameNumber);
   const frameLabel = escapeLabelValue(scooter.frameNumber);
@@ -678,7 +795,7 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
 </DieCutLabel>`;
 }
 
-function buildDymoProductLabelXml(product: Product, logoBase64: string, materialIconsBase64: string) {
+function buildDymoProductLabelXml(product: Product, logoBase64: string, materialIconsBase64: string, barcodeBase64: string | null) {
   const barcodeSource = product.barcode?.trim() || product.code.trim();
   if (!barcodeSource) {
     throw new Error('Product heeft geen barcode of code om te printen.');
@@ -699,6 +816,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
   const escapedMadeInLine = escapeLabelValue(madeInLine);
   const escapedLogoBase64 = escapeLabelValue(logoBase64);
   const escapedMaterialIconsBase64 = escapeLabelValue(materialIconsBase64);
+  const escapedBarcodeBase64 = barcodeBase64 ? escapeLabelValue(barcodeBase64) : '';
 
   const textObject = ({
     name,
@@ -746,6 +864,45 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
     </TextObject>
     <Bounds X="${x}" Y="${y}" Width="${width}" Height="${height}" />
   </ObjectInfo>`;
+  const barcodeObject = barcodeBase64 ? `<ObjectInfo>
+    <ImageObject>
+      <Name>ProductBarcode</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <Image>${escapedBarcodeBase64}</Image>
+      <ScaleMode>Uniform</ScaleMode>
+      <BorderWidth>0</BorderWidth>
+      <BorderColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    <Bounds X="220" Y="1060" Width="1800" Height="760" />
+  </ObjectInfo>` : `<ObjectInfo>
+    <BarcodeObject>
+      <Name>ProductBarcode</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <Text>${escapedBarcode}</Text>
+      <Type>Code128Auto</Type>
+      <Size>Large</Size>
+      <TextPosition>Bottom</TextPosition>
+      <TextFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      <CheckSumFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      <TextEmbedding>None</TextEmbedding>
+      <ECLevel>0</ECLevel>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <QuietZonesPadding Left="160" Top="0" Right="160" Bottom="0" />
+    </BarcodeObject>
+    <Bounds X="220" Y="1060" Width="1800" Height="760" />
+  </ObjectInfo>`;
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
@@ -773,9 +930,9 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="3040" Y="110" Width="1780" Height="760" />
+    <Bounds X="3380" Y="160" Width="1420" Height="430" />
   </ObjectInfo>
-  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2500, y: 1040, width: 940, height: 580, size: 8 })}
+  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2040, y: 1120, width: 1220, height: 540, size: 8 })}
   <ObjectInfo>
     <ImageObject>
       <Name>MaterialIcons</Name>
@@ -792,33 +949,11 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="3380" Y="980" Width="740" Height="600" />
+    <Bounds X="3640" Y="1060" Width="390" Height="360" />
   </ObjectInfo>
-  ${textObject({ name: 'BarcodeHumanText', value: escapedBarcode, x: 220, y: 1790, width: 2140, height: 210, size: 11, alignment: 'Center' })}
   ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4160, y: 1610, width: 680, height: 180, size: 7, alignment: 'Center' })}
   ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4160, y: 1810, width: 680, height: 150, size: 7, alignment: 'Center' })}
-  <ObjectInfo>
-    <BarcodeObject>
-      <Name>ProductBarcode</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-      <LinkedObjectName />
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>True</IsVariable>
-      <Text>${escapedBarcode}</Text>
-      <Type>Code128Auto</Type>
-      <Size>Large</Size>
-      <TextPosition>None</TextPosition>
-      <TextFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
-      <CheckSumFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
-      <TextEmbedding>None</TextEmbedding>
-      <ECLevel>0</ECLevel>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <QuietZonesPadding Left="120" Top="0" Right="120" Bottom="0" />
-    </BarcodeObject>
-    <Bounds X="220" Y="980" Width="2140" Height="790" />
-  </ObjectInfo>
+  ${barcodeObject}
   <ObjectInfo>
     <BarcodeObject>
       <Name>BatchQrCode</Name>
@@ -878,7 +1013,8 @@ async function printProductDymoLabel(product: Product) {
   const { dymo, printerName } = await getAvailableDymoPrinter();
   const logoBase64 = await imageUrlToBase64(rsoLogoUrl);
   const materialIconsBase64 = buildMaterialIconsBase64(product);
-  const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64);
+  const barcodeBase64 = buildEan13BarcodeBase64(product.barcode?.trim() || product.code.trim());
+  const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64, barcodeBase64);
   const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Product ${product.code || product.description}` });
   if (!printResult.success) {
     throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
