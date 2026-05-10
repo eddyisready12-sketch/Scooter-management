@@ -482,10 +482,11 @@ function recycleCodeParts(layer: ProductPackagingLayer, fallbackMaterial?: strin
   const recycleCode = layer.recycleCode?.trim();
   const option = findPackagingMaterialOption(layer.material || fallbackMaterial);
   const fallbackParts = recycleCode?.match(/^([A-Za-z]+)\s*([0-9]+)?/);
+  if (!option && !fallbackParts) return null;
 
   return {
-    family: option?.recycleFamily || fallbackParts?.[1]?.toUpperCase() || 'PAP',
-    number: option?.recycleNumber || fallbackParts?.[2] || '20',
+    family: option?.recycleFamily || fallbackParts?.[1]?.toUpperCase() || '',
+    number: option?.recycleNumber || fallbackParts?.[2] || '',
   };
 }
 
@@ -524,11 +525,12 @@ function svgToPngBase64(svg: string, width: number, height: number) {
 }
 
 async function buildMaterialIconsBase64(product: Product) {
-  const layers = normalizePackagingLayers(product)
+  const iconParts = normalizePackagingLayers(product)
     .filter((item) => item.recycleCode?.trim() || item.material?.trim())
-    .slice(0, 2);
-  const iconParts = (layers.length ? layers : [{ material: product.packagingMaterialPrimary, recycleCode: product.packagingRecycleCodePrimary }])
-    .map((layer) => recycleCodeParts(layer, product.packagingMaterialPrimary));
+    .slice(0, 2)
+    .map((layer) => recycleCodeParts(layer))
+    .filter((part): part is { family: string; number: string } => !!part);
+  if (!iconParts.length) return null;
   const iconWidth = 112;
   const iconHeight = 126;
   const gap = 14;
@@ -686,7 +688,25 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
 </DieCutLabel>`;
 }
 
-function buildDymoProductLabelXml(product: Product, logoBase64: string, materialIconsBase64: string, barcodeBase64: string | null) {
+function productImporterLabelValue(product: Product) {
+  const importerLines = [
+    product.importerName,
+    product.importerAddress,
+    [product.importerPostalCode, product.importerCity].filter(Boolean).join(' '),
+    product.importerCountry,
+    product.importerEmail || product.importerWebsite,
+  ]
+    .map((line) => line?.trim())
+    .filter(Boolean);
+
+  if (importerLines.length) {
+    return importerLines.join('\n');
+  }
+
+  return 'Yreb b.v.\nHoekerstraat 12A\n3133KR Vlaardingen\nInfo@rso-parts.nl';
+}
+
+function buildDymoProductLabelXml(product: Product, logoBase64: string, materialIconsBase64: string | null, barcodeBase64: string | null) {
   const barcodeSource = product.barcode?.trim() || product.code.trim();
   if (!barcodeSource) {
     throw new Error('Product heeft geen barcode of code om te printen.');
@@ -704,8 +724,9 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
   const escapedDescription = escapeLabelValue(product.labelTitle?.trim() || product.shortDescription?.trim() || product.description.trim());
   const escapedBatchCode = escapeLabelValue(batchCode);
   const escapedMadeInLine = escapeLabelValue(madeInLine);
+  const escapedImporterInfo = escapeLabelValue(productImporterLabelValue(product));
   const escapedLogoBase64 = escapeLabelValue(logoBase64);
-  const escapedMaterialIconsBase64 = escapeLabelValue(materialIconsBase64);
+  const escapedMaterialIconsBase64 = materialIconsBase64 ? escapeLabelValue(materialIconsBase64) : '';
   const escapedBarcodeBase64 = barcodeBase64 ? escapeLabelValue(barcodeBase64) : '';
   const textObject = ({
     name,
@@ -792,6 +813,24 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
     </BarcodeObject>
     <Bounds X="220" Y="930" Width="1980" Height="760" />
   </ObjectInfo>`;
+  const materialIconsObject = materialIconsBase64 ? `<ObjectInfo>
+    <ImageObject>
+      <Name>MaterialIcons</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <Image>${escapedMaterialIconsBase64}</Image>
+      <ScaleMode>Uniform</ScaleMode>
+      <BorderWidth>0</BorderWidth>
+      <BorderColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    <Bounds X="3440" Y="790" Width="775" Height="1075" />
+  </ObjectInfo>` : '';
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
@@ -821,25 +860,8 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
     </ImageObject>
     <Bounds X="3380" Y="150" Width="1420" Height="420" />
   </ObjectInfo>
-  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2360, y: 1190, width: 980, height: 520, size: 6 })}
-  <ObjectInfo>
-    <ImageObject>
-      <Name>MaterialIcons</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-      <LinkedObjectName />
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <Image>${escapedMaterialIconsBase64}</Image>
-      <ScaleMode>Uniform</ScaleMode>
-      <BorderWidth>0</BorderWidth>
-      <BorderColor Alpha="255" Red="0" Green="0" Blue="0" />
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
-    </ImageObject>
-    <Bounds X="3440" Y="790" Width="775" Height="1075" />
-  </ObjectInfo>
+  ${textObject({ name: 'ImporterInfo', value: escapedImporterInfo, x: 2360, y: 1190, width: 980, height: 520, size: 6 })}
+  ${materialIconsObject}
   ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4070, y: 1600, width: 820, height: 180, size: 6, alignment: 'Center' })}
   ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4070, y: 1810, width: 820, height: 140, size: 6, alignment: 'Center' })}
   ${barcodeObject}
