@@ -530,12 +530,12 @@ async function buildMaterialIconsBase64(product: Product) {
     .map((layer) => recycleCodeParts(layer, product.packagingMaterialPrimary));
   const iconWidth = 112;
   const iconHeight = 126;
-  const gap = 18;
-  const width = iconParts.length * iconWidth + Math.max(0, iconParts.length - 1) * gap;
-  const height = iconHeight;
+  const gap = 14;
+  const width = iconWidth;
+  const height = iconParts.length * iconHeight + Math.max(0, iconParts.length - 1) * gap;
   const icons = iconParts.map((part, index) => {
-    const x = index * (iconWidth + gap);
-    return `<g transform="translate(${x} 0)">
+    const y = index * (iconHeight + gap);
+    return `<g transform="translate(0 ${y})">
       <svg x="0" y="0" width="${iconWidth}" height="${iconHeight}" viewBox="0 0 100 112">
         <g fill="none" stroke="#000" stroke-width="7" stroke-linejoin="round" stroke-linecap="butt">
           <path d="M31.63 31.5 44.78 9.57s5.29-5.12 9.92-.49l12.25 20.78" />
@@ -639,7 +639,7 @@ function buildEan13BarcodeBase64(value: string) {
   const barcodeModules = quietLeft + bits.length + quietRight;
   const canvas = document.createElement('canvas');
   canvas.width = barcodeModules * moduleWidth;
-  canvas.height = 300;
+  canvas.height = 400;
 
   const context = canvas.getContext('2d');
   if (!context) {
@@ -651,14 +651,19 @@ function buildEan13BarcodeBase64(value: string) {
   context.fillStyle = '#000';
 
   const barTop = 16;
-  const barHeight = 240;
-  const guardHeight = 280;
+  const barHeight = 250;
+  const guardHeight = 300;
   bits.split('').forEach((bit, index) => {
     if (bit !== '1') return;
     const moduleIndex = index;
     const isGuard = moduleIndex < 3 || (moduleIndex >= 45 && moduleIndex < 50) || moduleIndex >= 92;
     context.fillRect((quietLeft + moduleIndex) * moduleWidth, barTop, moduleWidth, isGuard ? guardHeight : barHeight);
   });
+
+  context.font = '54px Arial';
+  context.textBaseline = 'top';
+  context.textAlign = 'center';
+  context.fillText(eanValue, canvas.width / 2, 314);
 
   const dataUrl = canvas.toDataURL('image/png');
   return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
@@ -785,7 +790,6 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
   const madeInLine = country.toLowerCase().startsWith('made in') ? country : `Made in ${country}`;
 
   const escapedBarcode = escapeLabelValue(barcodeSource);
-  const escapedReadableBarcode = escapeLabelValue(normalizeEan13Value(barcodeSource) ?? barcodeSource);
   const escapedCode = escapeLabelValue(product.code.trim() || barcodeSource);
   const escapedDescription = escapeLabelValue(product.labelTitle?.trim() || product.shortDescription?.trim() || product.description.trim());
   const escapedBatchCode = escapeLabelValue(batchCode);
@@ -856,7 +860,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="220" Y="1040" Width="1800" Height="720" />
+    <Bounds X="220" Y="1000" Width="1800" Height="850" />
   </ObjectInfo>` : `<ObjectInfo>
     <BarcodeObject>
       <Name>ProductBarcode</Name>
@@ -877,7 +881,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <QuietZonesPadding Left="160" Top="0" Right="160" Bottom="0" />
     </BarcodeObject>
-    <Bounds X="220" Y="1040" Width="1800" Height="720" />
+    <Bounds X="220" Y="1000" Width="1800" Height="850" />
   </ObjectInfo>`;
 
   return `<?xml version="1.0" encoding="utf-8"?>
@@ -925,12 +929,11 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="3420" Y="1000" Width="840" Height="450" />
+    <Bounds X="3480" Y="890" Width="430" Height="720" />
   </ObjectInfo>
   ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4070, y: 1600, width: 820, height: 180, size: 6, alignment: 'Center' })}
   ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4070, y: 1810, width: 820, height: 140, size: 6, alignment: 'Center' })}
   ${barcodeObject}
-  ${textObject({ name: 'BarcodeHumanText', value: escapedReadableBarcode, x: 220, y: 1740, width: 1800, height: 220, size: 10, alignment: 'Center' })}
   <ObjectInfo>
     <BarcodeObject>
       <Name>BatchQrCode</Name>
