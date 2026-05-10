@@ -1474,6 +1474,40 @@ export function App() {
     }
   }
 
+  async function importSuppliersFromProducts() {
+    const existingNames = new Set(data.suppliers.map((supplier) => supplier.name.trim().toLowerCase()).filter(Boolean));
+    const productSupplierNames = Array.from(new Set(
+      data.products
+        .map((product) => product.supplier?.trim())
+        .filter((supplier): supplier is string => Boolean(supplier)),
+    ))
+      .filter((supplier) => !existingNames.has(supplier.toLowerCase()))
+      .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+
+    if (productSupplierNames.length === 0) {
+      setSupplierMessage('Geen nieuwe leveranciers gevonden in de producten.');
+      return;
+    }
+
+    const importedSuppliers: Supplier[] = productSupplierNames.map((name) => ({
+      id: stableId('supplier', name),
+      name,
+      active: true,
+    }));
+
+    try {
+      setData((current) => {
+        const byId = new Map(current.suppliers.map((supplier) => [supplier.id, supplier]));
+        importedSuppliers.forEach((supplier) => byId.set(supplier.id, supplier));
+        return { ...current, suppliers: Array.from(byId.values()) };
+      });
+      await upsertSuppliers(importedSuppliers);
+      setSupplierMessage(`${importedSuppliers.length} leveranciers uit producten aangemaakt. Je kunt ze nu aanvullen.`);
+    } catch (error) {
+      setSupplierMessage(`Leveranciers overnemen mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   async function addDealer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
@@ -2006,7 +2040,7 @@ export function App() {
               message={productMessage}
             />
           )}
-          {view === 'suppliers' && <SuppliersPage suppliers={data.suppliers} products={data.products} onSaveSupplier={upsertSupplierRecord} message={supplierMessage} />}
+          {view === 'suppliers' && <SuppliersPage suppliers={data.suppliers} products={data.products} onSaveSupplier={upsertSupplierRecord} onImportFromProducts={importSuppliersFromProducts} message={supplierMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} products={data.products} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
@@ -4053,7 +4087,19 @@ function ProductDetailModal({
   );
 }
 
-function SuppliersPage({ suppliers, products, onSaveSupplier, message }: { suppliers: Supplier[]; products: Product[]; onSaveSupplier: (supplier: Supplier) => Promise<void>; message: string }) {
+function SuppliersPage({
+  suppliers,
+  products,
+  onSaveSupplier,
+  onImportFromProducts,
+  message,
+}: {
+  suppliers: Supplier[];
+  products: Product[];
+  onSaveSupplier: (supplier: Supplier) => Promise<void>;
+  onImportFromProducts: () => Promise<void>;
+  message: string;
+}) {
   const [showAddSupplier, setShowAddSupplier] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const sortedSuppliers = [...suppliers].sort((a, b) => {
@@ -4066,14 +4112,19 @@ function SuppliersPage({ suppliers, products, onSaveSupplier, message }: { suppl
     return products.filter((product) => product.supplier === supplier.name);
   }
 
+  const productSupplierCount = new Set(products.map((product) => product.supplier?.trim()).filter(Boolean)).size;
+
   return (
     <>
       <div className="page-title-row">
         <div>
           <h1>Leveranciers</h1>
-          <span>Fabrikanten en productleveranciers centraal beheren</span>
+          <span>{suppliers.length} leveranciers aangemaakt, {productSupplierCount} namen gevonden bij producten</span>
         </div>
-        <button className="secondary-button" onClick={() => setShowAddSupplier(true)}><Plus size={16} /> Leverancier</button>
+        <div className="header-actions">
+          <button className="secondary-button" onClick={() => void onImportFromProducts()}><DatabaseZap size={16} /> Uit producten halen</button>
+          <button className="secondary-button" onClick={() => setShowAddSupplier(true)}><Plus size={16} /> Leverancier</button>
+        </div>
       </div>
       {message && <div className="notice">{message}</div>}
       <section className="panel table-panel">

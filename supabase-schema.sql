@@ -168,22 +168,29 @@ to anon
 using (true)
 with check (true);
 
-create policy "Allow public read suppliers"
+drop policy if exists "Allow public read suppliers" on suppliers;
+drop policy if exists "Allow public insert suppliers" on suppliers;
+drop policy if exists "Allow public update suppliers" on suppliers;
+drop policy if exists "Allow authenticated read suppliers" on suppliers;
+drop policy if exists "Allow authenticated insert suppliers" on suppliers;
+drop policy if exists "Allow authenticated update suppliers" on suppliers;
+
+create policy "Allow authenticated read suppliers"
 on suppliers
 for select
-to anon
+to authenticated
 using (true);
 
-create policy "Allow public insert suppliers"
+create policy "Allow authenticated insert suppliers"
 on suppliers
 for insert
-to anon
+to authenticated
 with check (true);
 
-create policy "Allow public update suppliers"
+create policy "Allow authenticated update suppliers"
 on suppliers
 for update
-to anon
+to authenticated
 using (true)
 with check (true);
 
