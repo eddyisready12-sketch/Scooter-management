@@ -1366,6 +1366,73 @@ tbody tr:hover {
   width: min(980px, calc(100vw - 32px));
 }
 
+.product-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px 16px 0;
+}
+
+.detail-card-title {
+  padding: 14px 16px 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5f6f7f;
+}
+
+.product-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-bottom: 1px solid #dce1e6;
+  background: transparent;
+  padding: 0 16px;
+  text-align: left;
+  font-weight: 700;
+}
+
+.product-section-toggle:hover {
+  background: #f8fbff;
+}
+
+.product-section-meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #6b7785;
+}
+
+.product-section-body {
+  padding: 14px 16px 16px;
+}
+
+.product-form-subsection + .product-form-subsection {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e7ebf0;
+}
+
+.product-form-subsection h3 {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #213547;
+}
+
+.product-form-subsection .form-grid {
+  padding: 0;
+}
+
+.product-form-subsection .span-2 {
+  grid-column: 1 / -1;
+}
+
 .battery-detail-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2516,6 +2583,7 @@ dd {
   .container-grid,
   .drawer-grid,
   .search-grid,
+  .product-summary-grid,
   .dashboard-links-grid {
     grid-template-columns: 1fr;
   }

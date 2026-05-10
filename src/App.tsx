@@ -3015,10 +3015,15 @@ function ProductDetailModal({
 }) {
   const [draft, setDraft] = useState<Product>(product);
   const [saving, setSaving] = useState(false);
+  const [openSection, setOpenSection] = useState<'basic' | 'gpsr' | 'packaging' | null>('basic');
 
   useEffect(() => {
     setDraft(product);
   }, [product]);
+
+  function toggleSection(section: 'basic' | 'gpsr' | 'packaging') {
+    setOpenSection((current) => (current === section ? null : section));
+  }
 
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -3088,190 +3093,274 @@ function ProductDetailModal({
           </div>
           <button type="button" onClick={onClose}>Close</button>
         </div>
-        <div className="battery-detail-grid">
+        <div className="product-summary-grid">
           <section className="panel detail-card">
+            <div className="detail-card-title">Kerngegevens</div>
             <dl className="detail-list">
               <dt>Code</dt><dd>{draft.code || '-'}</dd>
               <dt>Omschrijving</dt><dd>{draft.description || '-'}</dd>
-              <dt>Barcode</dt><dd>{draft.barcode || '-'}</dd>
-              <dt>Batch</dt><dd>{draft.batch || '-'}</dd>
+              <dt>Merk</dt><dd>{draft.brand || '-'}</dd>
               <dt>Artikelgroep</dt><dd>{draft.articleGroup || '-'}</dd>
-              <dt>Leverancier</dt><dd>{draft.supplier || '-'}</dd>
+              <dt>Leverancier</dt><dd>{draft.supplier || draft.importerName || '-'}</dd>
             </dl>
           </section>
           <section className="panel detail-card">
+            <div className="detail-card-title">Commercieel</div>
             <dl className="detail-list">
               <dt>Verkoopprijs</dt><dd>{formatPriceValue(draft.salePrice)}</dd>
               <dt>Kostprijs</dt><dd>{formatPriceValue(draft.costPrice)}</dd>
               <dt>Webwinkel</dt><dd>{draft.webshop ? 'Ja' : 'Nee'}</dd>
               <dt>Voorraad</dt><dd>{draft.stock || '-'}</dd>
+              <dt>Batch</dt><dd>{draft.batchNumber || draft.batch || '-'}</dd>
+              <dt>Barcode</dt><dd>{draft.barcode || '-'}</dd>
+            </dl>
+          </section>
+          <section className="panel detail-card">
+            <div className="detail-card-title">Levenscyclus en verpakking</div>
+            <dl className="detail-list">
               <dt>Begindatum</dt><dd>{formatDateOnly(draft.startDate)}</dd>
               <dt>Einddatum</dt><dd>{formatDateOnly(draft.endDate)}</dd>
               <dt>Land van herkomst</dt><dd>{draft.countryOfOrigin || '-'}</dd>
+              <dt>Verpakking primair</dt><dd>{draft.packagingMaterialPrimary || '-'}</dd>
+              <dt>Verpakking secundair</dt><dd>{draft.packagingMaterialSecondary || '-'}</dd>
             </dl>
           </section>
         </div>
         <section className="panel form-panel">
-          <div className="panel-title"><BriefcaseBusiness size={16} /> Productgegevens wijzigen</div>
-          <div className="form-grid">
-            <label>Code
-              <input value={draft.code} onChange={(event) => setDraft((current) => ({ ...current, code: event.target.value }))} />
-            </label>
-            <label>Barcode
-              <input value={draft.barcode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, barcode: event.target.value }))} />
-            </label>
-            <label>Omschrijving
-              <input value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} />
-            </label>
-            <label>Batch
-              <input value={draft.batch ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batch: event.target.value }))} />
-            </label>
-            <label>Hoofdleverancier
-              <select value={draft.supplier ?? ''} onChange={(event) => setDraft((current) => ({ ...current, supplier: event.target.value || undefined }))}>
-                <option value="">Geen leverancier</option>
-                {suppliers.map((supplier) => <option key={supplier} value={supplier}>{supplier}</option>)}
-              </select>
-            </label>
-            <label>Artikelgroep
-              <input value={draft.articleGroup ?? ''} onChange={(event) => setDraft((current) => ({ ...current, articleGroup: event.target.value }))} />
-            </label>
-            <label>Verkoopprijs
-              <input value={draft.salePrice ?? ''} onChange={(event) => setDraft((current) => ({ ...current, salePrice: event.target.value }))} />
-            </label>
-            <label>Kostprijs
-              <input value={draft.costPrice ?? ''} onChange={(event) => setDraft((current) => ({ ...current, costPrice: event.target.value }))} />
-            </label>
-            <label>Voorraad
-              <input value={draft.stock ?? ''} onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))} />
-            </label>
-            <label>Land van herkomst
-              <input value={draft.countryOfOrigin ?? ''} onChange={(event) => setDraft((current) => ({ ...current, countryOfOrigin: event.target.value }))} />
-            </label>
-            <label>Begindatum
-              <input type="date" value={rdwDateToInputDate(draft.startDate)} onChange={(event) => setDraft((current) => ({ ...current, startDate: event.target.value || undefined }))} />
-            </label>
-            <label>Einddatum
-              <input type="date" value={rdwDateToInputDate(draft.endDate)} onChange={(event) => setDraft((current) => ({ ...current, endDate: event.target.value || undefined }))} />
-            </label>
-            <label>Webwinkel
-              <select value={draft.webshop ? 'ja' : 'nee'} onChange={(event) => setDraft((current) => ({ ...current, webshop: event.target.value === 'ja' }))}>
-                <option value="ja">Ja</option>
-                <option value="nee">Nee</option>
-              </select>
-            </label>
-            <label>Afbeelding URL
-              <input value={draft.imageUrl ?? ''} onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.target.value }))} />
-            </label>
-          </div>
+          <button type="button" className="product-section-toggle" onClick={() => toggleSection('basic')}>
+            <span>
+              <span className="panel-title-label"><BriefcaseBusiness size={16} /> Basisgegevens</span>
+              <small className="product-section-meta">Artikelidentiteit, prijzen, leverancier en planning.</small>
+            </span>
+            {openSection === 'basic' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {openSection === 'basic' && (
+            <div className="product-section-body">
+              <div className="product-form-subsection">
+                <h3>Identificatie</h3>
+                <div className="form-grid">
+                  <label>Code
+                    <input value={draft.code} onChange={(event) => setDraft((current) => ({ ...current, code: event.target.value }))} />
+                  </label>
+                  <label>Barcode
+                    <input value={draft.barcode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, barcode: event.target.value }))} />
+                  </label>
+                  <label>Omschrijving
+                    <input value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} />
+                  </label>
+                  <label>Batch
+                    <input value={draft.batch ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batch: event.target.value }))} />
+                  </label>
+                  <label>Merk
+                    <input value={draft.brand ?? ''} onChange={(event) => setDraft((current) => ({ ...current, brand: event.target.value }))} />
+                  </label>
+                  <label>Artikelgroep
+                    <input value={draft.articleGroup ?? ''} onChange={(event) => setDraft((current) => ({ ...current, articleGroup: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+              <div className="product-form-subsection">
+                <h3>Verkoop en voorraad</h3>
+                <div className="form-grid">
+                  <label>Hoofdleverancier
+                    <select value={draft.supplier ?? ''} onChange={(event) => setDraft((current) => ({ ...current, supplier: event.target.value || undefined }))}>
+                      <option value="">Geen leverancier</option>
+                      {suppliers.map((supplier) => <option key={supplier} value={supplier}>{supplier}</option>)}
+                    </select>
+                  </label>
+                  <label>Webwinkel
+                    <select value={draft.webshop ? 'ja' : 'nee'} onChange={(event) => setDraft((current) => ({ ...current, webshop: event.target.value === 'ja' }))}>
+                      <option value="ja">Ja</option>
+                      <option value="nee">Nee</option>
+                    </select>
+                  </label>
+                  <label>Verkoopprijs
+                    <input value={draft.salePrice ?? ''} onChange={(event) => setDraft((current) => ({ ...current, salePrice: event.target.value }))} />
+                  </label>
+                  <label>Kostprijs
+                    <input value={draft.costPrice ?? ''} onChange={(event) => setDraft((current) => ({ ...current, costPrice: event.target.value }))} />
+                  </label>
+                  <label>Voorraad
+                    <input value={draft.stock ?? ''} onChange={(event) => setDraft((current) => ({ ...current, stock: event.target.value }))} />
+                  </label>
+                  <label>Land van herkomst
+                    <input value={draft.countryOfOrigin ?? ''} onChange={(event) => setDraft((current) => ({ ...current, countryOfOrigin: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+              <div className="product-form-subsection">
+                <h3>Planning en media</h3>
+                <div className="form-grid">
+                  <label>Begindatum
+                    <input type="date" value={rdwDateToInputDate(draft.startDate)} onChange={(event) => setDraft((current) => ({ ...current, startDate: event.target.value || undefined }))} />
+                  </label>
+                  <label>Einddatum
+                    <input type="date" value={rdwDateToInputDate(draft.endDate)} onChange={(event) => setDraft((current) => ({ ...current, endDate: event.target.value || undefined }))} />
+                  </label>
+                  <label className="span-2">Afbeelding URL
+                    <input value={draft.imageUrl ?? ''} onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
         <section className="panel form-panel">
-          <div className="panel-title"><ShieldCheck size={16} /> GPSR en labelinformatie</div>
-          <div className="form-grid">
-            <label>Merk
-              <input value={draft.brand ?? ''} onChange={(event) => setDraft((current) => ({ ...current, brand: event.target.value }))} />
-            </label>
-            <label>Label titel
-              <input value={draft.labelTitle ?? ''} onChange={(event) => setDraft((current) => ({ ...current, labelTitle: event.target.value }))} />
-            </label>
-            <label>Korte omschrijving
-              <input value={draft.shortDescription ?? ''} onChange={(event) => setDraft((current) => ({ ...current, shortDescription: event.target.value }))} />
-            </label>
-            <label>QR link
-              <input value={draft.qrUrl ?? ''} onChange={(event) => setDraft((current) => ({ ...current, qrUrl: event.target.value }))} />
-            </label>
-            <label>Batchnummer
-              <input value={draft.batchNumber ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batchNumber: event.target.value }))} />
-            </label>
-            <label>Serienummer
-              <input value={draft.serialNumber ?? ''} onChange={(event) => setDraft((current) => ({ ...current, serialNumber: event.target.value }))} />
-            </label>
-            <label>Traceercode
-              <input value={draft.traceabilityCode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, traceabilityCode: event.target.value }))} />
-            </label>
-            <label>Fabrikant naam
-              <input value={draft.manufacturerName ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerName: event.target.value }))} />
-            </label>
-            <label>Fabrikant straat + huisnummer
-              <input value={draft.manufacturerAddress ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerAddress: event.target.value }))} />
-            </label>
-            <label>Fabrikant postcode
-              <input value={draft.manufacturerPostalCode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerPostalCode: event.target.value }))} />
-            </label>
-            <label>Fabrikant plaats
-              <input value={draft.manufacturerCity ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerCity: event.target.value }))} />
-            </label>
-            <label>Fabrikant land
-              <input value={draft.manufacturerCountry ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerCountry: event.target.value }))} />
-            </label>
-            <label>Fabrikant e-mail
-              <input value={draft.manufacturerEmail ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerEmail: event.target.value }))} />
-            </label>
-            <label>Fabrikant website
-              <input value={draft.manufacturerWebsite ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerWebsite: event.target.value }))} />
-            </label>
-            <label>Importeur / EU-verantwoordelijke
-              <input value={draft.importerName ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerName: event.target.value }))} />
-            </label>
-            <label>Importeur straat + huisnummer
-              <input value={draft.importerAddress ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerAddress: event.target.value }))} />
-            </label>
-            <label>Importeur postcode
-              <input value={draft.importerPostalCode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerPostalCode: event.target.value }))} />
-            </label>
-            <label>Importeur plaats
-              <input value={draft.importerCity ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerCity: event.target.value }))} />
-            </label>
-            <label>Importeur land
-              <input value={draft.importerCountry ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerCountry: event.target.value }))} />
-            </label>
-            <label>Importeur e-mail
-              <input value={draft.importerEmail ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerEmail: event.target.value }))} />
-            </label>
-            <label>Importeur website
-              <input value={draft.importerWebsite ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerWebsite: event.target.value }))} />
-            </label>
-            <label>Waarschuwing
-              <textarea value={draft.warning ?? ''} onChange={(event) => setDraft((current) => ({ ...current, warning: event.target.value }))} />
-            </label>
-            <label>Veiligheidsinformatie
-              <textarea value={draft.safetyInfo ?? ''} onChange={(event) => setDraft((current) => ({ ...current, safetyInfo: event.target.value }))} />
-            </label>
-          </div>
+          <button type="button" className="product-section-toggle" onClick={() => toggleSection('gpsr')}>
+            <span>
+              <span className="panel-title-label"><ShieldCheck size={16} /> GPSR en labelinformatie</span>
+              <small className="product-section-meta">Traceerbaarheid, fabrikant, importeur en veiligheidsinfo.</small>
+            </span>
+            {openSection === 'gpsr' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {openSection === 'gpsr' && (
+            <div className="product-section-body">
+              <div className="product-form-subsection">
+                <h3>Label en traceerbaarheid</h3>
+                <div className="form-grid">
+                  <label>Label titel
+                    <input value={draft.labelTitle ?? ''} onChange={(event) => setDraft((current) => ({ ...current, labelTitle: event.target.value }))} />
+                  </label>
+                  <label>QR link
+                    <input value={draft.qrUrl ?? ''} onChange={(event) => setDraft((current) => ({ ...current, qrUrl: event.target.value }))} />
+                  </label>
+                  <label>Korte omschrijving
+                    <input value={draft.shortDescription ?? ''} onChange={(event) => setDraft((current) => ({ ...current, shortDescription: event.target.value }))} />
+                  </label>
+                  <label>Traceercode
+                    <input value={draft.traceabilityCode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, traceabilityCode: event.target.value }))} />
+                  </label>
+                  <label>Batchnummer
+                    <input value={draft.batchNumber ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batchNumber: event.target.value }))} />
+                  </label>
+                  <label>Serienummer
+                    <input value={draft.serialNumber ?? ''} onChange={(event) => setDraft((current) => ({ ...current, serialNumber: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+              <div className="product-form-subsection">
+                <h3>Fabrikant</h3>
+                <div className="form-grid">
+                  <label>Fabrikant naam
+                    <input value={draft.manufacturerName ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerName: event.target.value }))} />
+                  </label>
+                  <label>Fabrikant e-mail
+                    <input value={draft.manufacturerEmail ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerEmail: event.target.value }))} />
+                  </label>
+                  <label>Fabrikant straat + huisnummer
+                    <input value={draft.manufacturerAddress ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerAddress: event.target.value }))} />
+                  </label>
+                  <label>Fabrikant website
+                    <input value={draft.manufacturerWebsite ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerWebsite: event.target.value }))} />
+                  </label>
+                  <label>Fabrikant postcode
+                    <input value={draft.manufacturerPostalCode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerPostalCode: event.target.value }))} />
+                  </label>
+                  <label>Fabrikant plaats
+                    <input value={draft.manufacturerCity ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerCity: event.target.value }))} />
+                  </label>
+                  <label>Fabrikant land
+                    <input value={draft.manufacturerCountry ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerCountry: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+              <div className="product-form-subsection">
+                <h3>Importeur / EU-verantwoordelijke</h3>
+                <div className="form-grid">
+                  <label>Importeur naam
+                    <input value={draft.importerName ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerName: event.target.value }))} />
+                  </label>
+                  <label>Importeur e-mail
+                    <input value={draft.importerEmail ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerEmail: event.target.value }))} />
+                  </label>
+                  <label>Importeur straat + huisnummer
+                    <input value={draft.importerAddress ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerAddress: event.target.value }))} />
+                  </label>
+                  <label>Importeur website
+                    <input value={draft.importerWebsite ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerWebsite: event.target.value }))} />
+                  </label>
+                  <label>Importeur postcode
+                    <input value={draft.importerPostalCode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerPostalCode: event.target.value }))} />
+                  </label>
+                  <label>Importeur plaats
+                    <input value={draft.importerCity ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerCity: event.target.value }))} />
+                  </label>
+                  <label>Importeur land
+                    <input value={draft.importerCountry ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerCountry: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+              <div className="product-form-subsection">
+                <h3>Veiligheid</h3>
+                <div className="form-grid">
+                  <label className="span-2">Waarschuwing
+                    <textarea value={draft.warning ?? ''} onChange={(event) => setDraft((current) => ({ ...current, warning: event.target.value }))} />
+                  </label>
+                  <label className="span-2">Veiligheidsinformatie
+                    <textarea value={draft.safetyInfo ?? ''} onChange={(event) => setDraft((current) => ({ ...current, safetyInfo: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
         <section className="panel form-panel">
-          <div className="panel-title"><PackagePlus size={16} /> Verpakking en PPWR</div>
-          <div className="form-grid">
-            <label>Verpakkingseenheid
-              <input value={draft.packagingUnit ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingUnit: event.target.value }))} />
-            </label>
-            <label>Primair verpakkingsmateriaal
-              <input value={draft.packagingMaterialPrimary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingMaterialPrimary: event.target.value }))} />
-            </label>
-            <label>Secundair verpakkingsmateriaal
-              <input value={draft.packagingMaterialSecondary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingMaterialSecondary: event.target.value }))} />
-            </label>
-            <label>Recyclecode primair
-              <input value={draft.packagingRecycleCodePrimary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodePrimary: event.target.value }))} />
-            </label>
-            <label>Recyclecode secundair
-              <input value={draft.packagingRecycleCodeSecondary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodeSecondary: event.target.value }))} />
-            </label>
-            <label>Afvalstroom
-              <input value={draft.packagingWasteStream ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWasteStream: event.target.value }))} />
-            </label>
-            <label>Gewicht primaire verpakking (g)
-              <input value={draft.packagingWeightPrimaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightPrimaryGrams: event.target.value }))} />
-            </label>
-            <label>Gewicht secundaire verpakking (g)
-              <input value={draft.packagingWeightSecondaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightSecondaryGrams: event.target.value }))} />
-            </label>
-            <label>Totaal verpakkingsgewicht (g)
-              <input value={draft.packagingWeightTotalGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightTotalGrams: event.target.value }))} />
-            </label>
-            <label>Verpakkingsopmerking
-              <textarea value={draft.packagingNotes ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingNotes: event.target.value }))} />
-            </label>
-          </div>
+          <button type="button" className="product-section-toggle" onClick={() => toggleSection('packaging')}>
+            <span>
+              <span className="panel-title-label"><PackagePlus size={16} /> Verpakking en PPWR</span>
+              <small className="product-section-meta">Materiaal, recyclecodes en gewichten voor rapportage.</small>
+            </span>
+            {openSection === 'packaging' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {openSection === 'packaging' && (
+            <div className="product-section-body">
+              <div className="product-form-subsection">
+                <h3>Materiaal</h3>
+                <div className="form-grid">
+                  <label>Verpakkingseenheid
+                    <input value={draft.packagingUnit ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingUnit: event.target.value }))} />
+                  </label>
+                  <label>Afvalstroom
+                    <input value={draft.packagingWasteStream ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWasteStream: event.target.value }))} />
+                  </label>
+                  <label>Primair verpakkingsmateriaal
+                    <input value={draft.packagingMaterialPrimary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingMaterialPrimary: event.target.value }))} />
+                  </label>
+                  <label>Secundair verpakkingsmateriaal
+                    <input value={draft.packagingMaterialSecondary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingMaterialSecondary: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+              <div className="product-form-subsection">
+                <h3>Recyclecodes en gewichten</h3>
+                <div className="form-grid">
+                  <label>Recyclecode primair
+                    <input value={draft.packagingRecycleCodePrimary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodePrimary: event.target.value }))} />
+                  </label>
+                  <label>Recyclecode secundair
+                    <input value={draft.packagingRecycleCodeSecondary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodeSecondary: event.target.value }))} />
+                  </label>
+                  <label>Gewicht primaire verpakking (g)
+                    <input value={draft.packagingWeightPrimaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightPrimaryGrams: event.target.value }))} />
+                  </label>
+                  <label>Gewicht secundaire verpakking (g)
+                    <input value={draft.packagingWeightSecondaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightSecondaryGrams: event.target.value }))} />
+                  </label>
+                  <label>Gewicht totaal verpakking (g)
+                    <input value={draft.packagingWeightTotalGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightTotalGrams: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+              <div className="product-form-subsection">
+                <h3>Opmerkingen</h3>
+                <div className="form-grid">
+                  <label className="span-2">Verpakkingsopmerking
+                    <textarea value={draft.packagingNotes ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingNotes: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="drawer-actions">
             <button type="button" className="secondary-button" onClick={onClose}>Sluiten</button>
             <button className="primary-button" type="submit" disabled={saving}>Opslaan</button>
