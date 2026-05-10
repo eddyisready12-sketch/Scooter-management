@@ -3470,12 +3470,17 @@ function ProductDetailModal({
             {activeTab === 'packaging' && (
               <div className="product-section-body">
                 <div className="product-form-subsection">
-                  <h3>Verpakking algemeen</h3>
+                  <div className="product-subsection-header">
+                    <h3>Verpakking algemeen</h3>
+                    <button type="button" className="secondary-button" onClick={addPackagingLayer} disabled={packagingLayers.length >= packagingLayerNames.length}>
+                      <Plus size={16} /> Laag toevoegen
+                    </button>
+                  </div>
                   <div className="packaging-meta-grid">
                     <label>Verpakkingseenheid
                       <input value={draft.packagingUnit ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingUnit: event.target.value }))} />
                     </label>
-                    <label>Afvalstroom
+                    <label>Afvalstromen
                       <input value={derivedPackagingWasteStream ?? ''} readOnly />
                     </label>
                     <label>Gewicht totaal verpakking (g)
@@ -3484,15 +3489,12 @@ function ProductDetailModal({
                   </div>
                 </div>
                 <div className="product-form-subsection">
-                  <div className="product-subsection-header">
-                    <h3>Verpakkingslagen</h3>
-                    <button type="button" className="secondary-button" onClick={addPackagingLayer} disabled={packagingLayers.length >= packagingLayerNames.length}>
-                      <Plus size={16} /> Laag toevoegen
-                    </button>
-                  </div>
+                  <h3>Verpakkingslagen</h3>
+                  <p className="product-section-hint">Voeg per product tot 5 verpakkingslagen toe. Afvalstromen worden automatisch samengevat op basis van alle gekozen materialen.</p>
                   <div className="packaging-layer-stack">
                     {packagingLayers.map((layer, index) => {
                       const selectedOption = findPackagingMaterialOption(layer.material);
+                      const layerWasteStream = selectedOption?.wasteStream ?? '';
 
                       return (
                         <div key={`${layer.name ?? packagingLayerNames[index]}-${index}`} className="packaging-layer-card">
@@ -3507,6 +3509,9 @@ function ProductDetailModal({
                                 {layer.material && !selectedOption ? <option value={layer.material}>{layer.material}</option> : null}
                                 {packagingMaterialOptions.map((option) => <option key={`${index}-${option.recycleCode}`} value={option.value}>{option.label} ({option.recycleCode})</option>)}
                               </select>
+                            </label>
+                            <label>Afvalstroom
+                              <input value={layerWasteStream} readOnly />
                             </label>
                             <label>Recyclecode
                               <input value={layer.recycleCode ?? ''} onChange={(event) => updatePackagingLayer(index, { recycleCode: event.target.value || undefined })} />

@@ -1485,7 +1485,14 @@ tbody tr:hover {
 
 .packaging-layer-grid {
   display: grid;
-  grid-template-columns: minmax(110px, 0.55fr) minmax(280px, 1.35fr) minmax(170px, 0.85fr) minmax(150px, 0.7fr) minmax(250px, 1fr) auto;
+  grid-template-columns:
+    minmax(120px, 0.5fr)
+    minmax(260px, 1.2fr)
+    minmax(220px, 0.95fr)
+    minmax(160px, 0.75fr)
+    minmax(160px, 0.7fr)
+    minmax(250px, 1fr)
+    auto;
   gap: 12px;
   align-items: end;
 }
@@ -1576,6 +1583,12 @@ tbody tr:hover {
   margin: 0;
 }
 
+.product-section-hint {
+  margin: -4px 0 12px;
+  color: #6b7280;
+  font-size: 0.92rem;
+}
+
 .packaging-material-preview {
   display: flex;
   align-items: center;
@@ -1595,7 +1608,7 @@ tbody tr:hover {
 }
 
 .packaging-material-preview.compact {
-  min-height: 88px;
+  min-height: 72px;
   padding: 10px 12px;
 }
 
@@ -1617,6 +1630,11 @@ tbody tr:hover {
 
 .packaging-material-preview.compact .packaging-material-copy small {
   font-size: 0.84rem;
+}
+
+.packaging-layer-card input[readonly] {
+  background: #f8fafc;
+  color: #334155;
 }
 
 .packaging-material-number {
