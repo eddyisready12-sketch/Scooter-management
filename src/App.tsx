@@ -570,100 +570,6 @@ function normalizeEan13Value(value: string) {
   return ean13CheckDigit(digits.slice(0, 12)) === digits[12] ? digits : null;
 }
 
-function buildEan13BarcodeBase64(value: string) {
-  const eanValue = normalizeEan13Value(value);
-  if (!eanValue) return null;
-
-  const leftOdd: Record<string, string> = {
-    '0': '0001101',
-    '1': '0011001',
-    '2': '0010011',
-    '3': '0111101',
-    '4': '0100011',
-    '5': '0110001',
-    '6': '0101111',
-    '7': '0111011',
-    '8': '0110111',
-    '9': '0001011',
-  };
-  const leftEven: Record<string, string> = {
-    '0': '0100111',
-    '1': '0110011',
-    '2': '0011011',
-    '3': '0100001',
-    '4': '0011101',
-    '5': '0111001',
-    '6': '0000101',
-    '7': '0010001',
-    '8': '0001001',
-    '9': '0010111',
-  };
-  const right: Record<string, string> = {
-    '0': '1110010',
-    '1': '1100110',
-    '2': '1101100',
-    '3': '1000010',
-    '4': '1011100',
-    '5': '1001110',
-    '6': '1010000',
-    '7': '1000100',
-    '8': '1001000',
-    '9': '1110100',
-  };
-  const parityPatterns: Record<string, string> = {
-    '0': 'OOOOOO',
-    '1': 'OOEOEE',
-    '2': 'OOEEOE',
-    '3': 'OOEEEO',
-    '4': 'OEOOEE',
-    '5': 'OEEOOE',
-    '6': 'OEEEOO',
-    '7': 'OEOEOE',
-    '8': 'OEOEEO',
-    '9': 'OEEOEO',
-  };
-
-  const firstDigit = eanValue[0];
-  const leftDigits = eanValue.slice(1, 7).split('');
-  const rightDigits = eanValue.slice(7).split('');
-  const parity = parityPatterns[firstDigit];
-  const leftBits = leftDigits
-    .map((digit, index) => (parity[index] === 'O' ? leftOdd[digit] : leftEven[digit]))
-    .join('');
-  const rightBits = rightDigits.map((digit) => right[digit]).join('');
-  const bits = `101${leftBits}01010${rightBits}101`;
-
-  const moduleWidth = 10;
-  const digitMarginLeft = 56;
-  const arrowMarginRight = 44;
-  const canvas = document.createElement('canvas');
-  canvas.width = digitMarginLeft + bits.length * moduleWidth + arrowMarginRight;
-  canvas.height = 330;
-
-  const context = canvas.getContext('2d');
-  if (!context) {
-    throw new Error('EAN-13 barcode kon niet worden gemaakt voor het productlabel.');
-  }
-
-  context.fillStyle = '#fff';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = '#000';
-
-  const barX = digitMarginLeft;
-  const barTop = 10;
-  const barHeight = 230;
-  const guardHeight = 280;
-  bits.split('').forEach((bit, index) => {
-    if (bit !== '1') return;
-    const moduleIndex = index;
-    const isGuard = moduleIndex < 3 || (moduleIndex >= 45 && moduleIndex < 50) || moduleIndex >= 92;
-    context.fillRect(barX + moduleIndex * moduleWidth, barTop, moduleWidth, isGuard ? guardHeight : barHeight);
-  });
-
-  const dataUrl = canvas.toDataURL('image/png');
-  return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-}
-
 function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
   const barcodeValue = escapeLabelValue(scooter.frameNumber);
   const frameLabel = escapeLabelValue(scooter.frameNumber);
@@ -770,7 +676,7 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
 </DieCutLabel>`;
 }
 
-function buildDymoProductLabelXml(product: Product, logoBase64: string, materialIconsBase64: string, barcodeBase64: string | null) {
+function buildDymoProductLabelXml(product: Product, logoBase64: string, materialIconsBase64: string) {
   const barcodeSource = product.barcode?.trim() || product.code.trim();
   if (!barcodeSource) {
     throw new Error('Product heeft geen barcode of code om te printen.');
@@ -786,17 +692,12 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
   const normalizedEanValue = normalizeEan13Value(barcodeSource);
 
   const escapedBarcode = escapeLabelValue(barcodeSource);
-  const escapedEanFirstDigit = escapeLabelValue(normalizedEanValue?.slice(0, 1) ?? '');
-  const escapedEanLeftDigits = escapeLabelValue(normalizedEanValue?.slice(1, 7) ?? '');
-  const escapedEanRightDigits = escapeLabelValue(normalizedEanValue?.slice(7) ?? '');
   const escapedCode = escapeLabelValue(product.code.trim() || barcodeSource);
   const escapedDescription = escapeLabelValue(product.labelTitle?.trim() || product.shortDescription?.trim() || product.description.trim());
   const escapedBatchCode = escapeLabelValue(batchCode);
   const escapedMadeInLine = escapeLabelValue(madeInLine);
   const escapedLogoBase64 = escapeLabelValue(logoBase64);
   const escapedMaterialIconsBase64 = escapeLabelValue(materialIconsBase64);
-  const escapedBarcodeBase64 = barcodeBase64 ? escapeLabelValue(barcodeBase64) : '';
-
   const textObject = ({
     name,
     value,
@@ -843,23 +744,27 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
     </TextObject>
     <Bounds X="${x}" Y="${y}" Width="${width}" Height="${height}" />
   </ObjectInfo>`;
-  const barcodeObject = barcodeBase64 ? `<ObjectInfo>
-    <ImageObject>
+  const barcodeObject = normalizedEanValue ? `<ObjectInfo>
+    <BarcodeObject>
       <Name>ProductBarcode</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
       <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
       <LinkedObjectName />
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <Image>${escapedBarcodeBase64}</Image>
-      <ScaleMode>Uniform</ScaleMode>
-      <BorderWidth>0</BorderWidth>
-      <BorderColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <IsVariable>True</IsVariable>
+      <Text>${normalizedEanValue}</Text>
+      <Type>EAN13</Type>
+      <Size>Large</Size>
+      <TextPosition>Bottom</TextPosition>
+      <TextFont Family="Arial" Size="11" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      <CheckSumFont Family="Arial" Size="11" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      <TextEmbedding>None</TextEmbedding>
+      <ECLevel>0</ECLevel>
       <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
-    </ImageObject>
-    <Bounds X="220" Y="930" Width="1980" Height="720" />
+      <QuietZonesPadding Left="0" Top="0" Right="0" Bottom="0" />
+    </BarcodeObject>
+    <Bounds X="220" Y="900" Width="1900" Height="760" />
   </ObjectInfo>` : `<ObjectInfo>
     <BarcodeObject>
       <Name>ProductBarcode</Name>
@@ -880,7 +785,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <QuietZonesPadding Left="160" Top="0" Right="160" Bottom="0" />
     </BarcodeObject>
-    <Bounds X="220" Y="930" Width="1980" Height="720" />
+    <Bounds X="220" Y="930" Width="1980" Height="760" />
   </ObjectInfo>`;
 
   return `<?xml version="1.0" encoding="utf-8"?>
@@ -933,10 +838,6 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
   ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4070, y: 1600, width: 820, height: 180, size: 6, alignment: 'Center' })}
   ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4070, y: 1810, width: 820, height: 140, size: 6, alignment: 'Center' })}
   ${barcodeObject}
-  ${normalizedEanValue ? textObject({ name: 'EanFirstDigit', value: escapedEanFirstDigit, x: 220, y: 1638, width: 120, height: 160, size: 11, alignment: 'Center' }) : ''}
-  ${normalizedEanValue ? textObject({ name: 'EanLeftDigits', value: escapedEanLeftDigits, x: 470, y: 1638, width: 560, height: 160, size: 11, alignment: 'Center' }) : ''}
-  ${normalizedEanValue ? textObject({ name: 'EanRightDigits', value: escapedEanRightDigits, x: 1200, y: 1638, width: 560, height: 160, size: 11, alignment: 'Center' }) : ''}
-  ${normalizedEanValue ? textObject({ name: 'EanArrow', value: '&gt;', x: 2040, y: 1638, width: 120, height: 160, size: 11, alignment: 'Center' }) : ''}
   <ObjectInfo>
     <BarcodeObject>
       <Name>BatchQrCode</Name>
@@ -996,8 +897,7 @@ async function printProductDymoLabel(product: Product) {
   const { dymo, printerName } = await getAvailableDymoPrinter();
   const logoBase64 = await imageUrlToBase64(rsoLogoUrl);
   const materialIconsBase64 = await buildMaterialIconsBase64(product);
-  const barcodeBase64 = buildEan13BarcodeBase64(product.barcode?.trim() || product.code.trim());
-  const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64, barcodeBase64);
+  const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64);
   const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Product ${product.code || product.description}` });
   if (!printResult.success) {
     throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
