@@ -122,6 +122,7 @@ export type Product = {
   importerEmail?: string;
   importerWebsite?: string;
   packagingUnit?: string;
+  packagingLayers?: ProductPackagingLayer[];
   packagingMaterialPrimary?: string;
   packagingMaterialSecondary?: string;
   packagingRecycleCodePrimary?: string;
@@ -131,6 +132,13 @@ export type Product = {
   packagingWeightPrimaryGrams?: string;
   packagingWeightSecondaryGrams?: string;
   packagingWeightTotalGrams?: string;
+};
+
+export type ProductPackagingLayer = {
+  name?: string;
+  material?: string;
+  recycleCode?: string;
+  weightGrams?: string;
 };
 
 export type WarrantyPart = {

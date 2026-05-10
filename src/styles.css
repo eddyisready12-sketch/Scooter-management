@@ -1483,26 +1483,17 @@ tbody tr:hover {
   padding: 14px;
 }
 
-.packaging-layer-title {
-  margin-bottom: 12px;
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #5f6f7f;
-}
-
 .packaging-layer-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 1.5fr) minmax(180px, 0.8fr) minmax(150px, 0.7fr) minmax(260px, 1.05fr);
+  grid-template-columns: minmax(110px, 0.55fr) minmax(280px, 1.35fr) minmax(170px, 0.85fr) minmax(150px, 0.7fr) minmax(250px, 1fr) auto;
   gap: 12px;
-  align-items: start;
+  align-items: end;
 }
 
 .packaging-layer-preview {
   display: grid;
   gap: 6px;
-  align-content: start;
+  align-content: end;
 }
 
 .packaging-layer-field-label {
@@ -1526,6 +1517,63 @@ tbody tr:hover {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #5f6f7f;
+}
+
+.packaging-layer-name {
+  display: grid;
+  gap: 4px;
+  align-content: end;
+  padding-bottom: 6px;
+}
+
+.packaging-layer-name span {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #5f6f7f;
+}
+
+.packaging-layer-name strong {
+  font-size: 1rem;
+  color: #1f2937;
+}
+
+.packaging-layer-actions {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  padding-bottom: 6px;
+}
+
+.danger-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fff5f5;
+  color: #dc2626;
+  cursor: pointer;
+}
+
+.danger-icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.product-subsection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.product-subsection-header h3 {
+  margin: 0;
 }
 
 .packaging-material-preview {
@@ -2764,6 +2812,16 @@ dd {
   .packaging-meta-grid,
   .packaging-layer-grid {
     grid-template-columns: 1fr;
+  }
+
+  .product-subsection-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .packaging-layer-actions {
+    justify-content: flex-start;
+    padding-bottom: 0;
   }
 
   .dashboard-registered-row {

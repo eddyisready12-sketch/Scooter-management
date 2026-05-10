@@ -35,7 +35,7 @@ import Dymo from 'dymo-connect';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
 import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Product, Scooter, ScooterStatus, WarrantyPart } from './types';
+import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Product, ProductPackagingLayer, Scooter, ScooterStatus, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'products' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
@@ -66,6 +66,8 @@ const packagingMaterialOptions = [
   { value: 'PP', label: 'PP', recycleCode: 'PP 5', recycleFamily: 'PP', recycleNumber: '5', wasteStream: 'Plastic / PMD' },
   { value: 'PET', label: 'PET', recycleCode: 'PET 1', recycleFamily: 'PET', recycleNumber: '1', wasteStream: 'Plastic / PMD' },
 ] as const;
+
+const packagingLayerNames = ['Primair', 'Secundair', 'Tertiair', 'Quaternair', '5e laag'] as const;
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -140,6 +142,83 @@ function dealerName(dealers: Dealer[], dealerId?: string) {
 
 function findPackagingMaterialOption(value?: string) {
   return packagingMaterialOptions.find((option) => option.value === value);
+}
+
+function createEmptyPackagingLayer(index: number): ProductPackagingLayer {
+  return { name: packagingLayerNames[index] };
+}
+
+function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
+  const fromStored = Array.isArray(product.packagingLayers) ? product.packagingLayers : [];
+  const storedLayers = fromStored
+    .slice(0, packagingLayerNames.length)
+    .map((layer, index) => ({
+      name: layer.name?.trim() || packagingLayerNames[index],
+      material: layer.material?.trim() || undefined,
+      recycleCode: layer.recycleCode?.trim() || undefined,
+      weightGrams: layer.weightGrams?.trim() || undefined,
+    }))
+    .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
+
+  const fallbackLayers: ProductPackagingLayer[] = [];
+
+  if (product.packagingMaterialPrimary || product.packagingRecycleCodePrimary || product.packagingWeightPrimaryGrams) {
+    fallbackLayers.push({
+      name: packagingLayerNames[0],
+      material: product.packagingMaterialPrimary?.trim() || undefined,
+      recycleCode: product.packagingRecycleCodePrimary?.trim() || undefined,
+      weightGrams: product.packagingWeightPrimaryGrams?.trim() || undefined,
+    });
+  }
+
+  if (product.packagingMaterialSecondary || product.packagingRecycleCodeSecondary || product.packagingWeightSecondaryGrams) {
+    fallbackLayers.push({
+      name: packagingLayerNames[1],
+      material: product.packagingMaterialSecondary?.trim() || undefined,
+      recycleCode: product.packagingRecycleCodeSecondary?.trim() || undefined,
+      weightGrams: product.packagingWeightSecondaryGrams?.trim() || undefined,
+    });
+  }
+
+  const layers = (storedLayers.length > 0 ? storedLayers : fallbackLayers).slice(0, packagingLayerNames.length);
+
+  while (layers.length < 2) {
+    layers.push(createEmptyPackagingLayer(layers.length));
+  }
+
+  return layers.map((layer, index) => ({
+    name: layer.name?.trim() || packagingLayerNames[index],
+    material: layer.material?.trim() || undefined,
+    recycleCode: layer.recycleCode?.trim() || undefined,
+    weightGrams: layer.weightGrams?.trim() || undefined,
+  }));
+}
+
+function summarizePackagingWasteStream(materials: string[]): string | undefined {
+  const streams = Array.from(
+    new Set(
+      materials
+        .map((material) => findPackagingMaterialOption(material)?.wasteStream)
+        .filter(Boolean) as string[],
+    ),
+  );
+
+  if (streams.length === 0) return undefined;
+  if (streams.length === 1) return streams[0];
+  return streams.join(' + ');
+}
+
+function createProductDraft(product: Product): Product {
+  const packagingLayers = normalizePackagingLayers(product);
+  const derivedWasteStream = summarizePackagingWasteStream(
+    packagingLayers.map((layer) => layer.material).filter(Boolean) as string[],
+  );
+
+  return {
+    ...product,
+    packagingLayers,
+    packagingWasteStream: derivedWasteStream ?? product.packagingWasteStream,
+  };
 }
 
 function PackagingMaterialIcon({
@@ -3065,18 +3144,36 @@ function ProductDetailModal({
   onClose: () => void;
   onSave: (product: Product) => Promise<void>;
 }) {
-  const [draft, setDraft] = useState<Product>(product);
+  const [draft, setDraft] = useState<Product>(() => createProductDraft(product));
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'gpsr' | 'packaging'>('basic');
 
   useEffect(() => {
-    setDraft(product);
+    setDraft(createProductDraft(product));
   }, [product]);
+
+  const packagingLayers = draft.packagingLayers ?? normalizePackagingLayers(draft);
+  const derivedPackagingWasteStream = summarizePackagingWasteStream(
+    packagingLayers.map((layer) => layer.material).filter(Boolean) as string[],
+  );
 
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     try {
+      const normalizedLayers = packagingLayers
+        .slice(0, packagingLayerNames.length)
+        .map((layer, index) => ({
+          name: layer.name?.trim() || packagingLayerNames[index],
+          material: layer.material?.trim() || undefined,
+          recycleCode: layer.recycleCode?.trim() || undefined,
+          weightGrams: layer.weightGrams?.trim() || undefined,
+        }))
+        .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
+
+      const primaryLayer = normalizedLayers[0];
+      const secondaryLayer = normalizedLayers[1];
+
       await onSave({
         ...draft,
         code: draft.code.trim(),
@@ -3116,14 +3213,15 @@ function ProductDetailModal({
         importerEmail: draft.importerEmail?.trim() || undefined,
         importerWebsite: draft.importerWebsite?.trim() || undefined,
         packagingUnit: draft.packagingUnit?.trim() || undefined,
-        packagingMaterialPrimary: draft.packagingMaterialPrimary?.trim() || undefined,
-        packagingMaterialSecondary: draft.packagingMaterialSecondary?.trim() || undefined,
-        packagingRecycleCodePrimary: draft.packagingRecycleCodePrimary?.trim() || undefined,
-        packagingRecycleCodeSecondary: draft.packagingRecycleCodeSecondary?.trim() || undefined,
-        packagingWasteStream: draft.packagingWasteStream?.trim() || undefined,
+        packagingLayers: normalizedLayers,
+        packagingMaterialPrimary: primaryLayer?.material,
+        packagingMaterialSecondary: secondaryLayer?.material,
+        packagingRecycleCodePrimary: primaryLayer?.recycleCode,
+        packagingRecycleCodeSecondary: secondaryLayer?.recycleCode,
+        packagingWasteStream: derivedPackagingWasteStream?.trim() || undefined,
         packagingNotes: draft.packagingNotes?.trim() || undefined,
-        packagingWeightPrimaryGrams: draft.packagingWeightPrimaryGrams?.trim() || undefined,
-        packagingWeightSecondaryGrams: draft.packagingWeightSecondaryGrams?.trim() || undefined,
+        packagingWeightPrimaryGrams: primaryLayer?.weightGrams,
+        packagingWeightSecondaryGrams: secondaryLayer?.weightGrams,
         packagingWeightTotalGrams: draft.packagingWeightTotalGrams?.trim() || undefined,
       });
     } finally {
@@ -3131,25 +3229,58 @@ function ProductDetailModal({
     }
   }
 
-  function applyPackagingMaterial(which: 'primary' | 'secondary', value: string) {
-    const option = findPackagingMaterialOption(value);
-    setDraft((current) => ({
-      ...current,
-      packagingWasteStream: value ? option?.wasteStream ?? current.packagingWasteStream : current.packagingWasteStream,
-      ...(which === 'primary'
-        ? {
-            packagingMaterialPrimary: value || undefined,
-            packagingRecycleCodePrimary: value ? option?.recycleCode ?? current.packagingRecycleCodePrimary : undefined,
-          }
-        : {
-            packagingMaterialSecondary: value || undefined,
-            packagingRecycleCodeSecondary: value ? option?.recycleCode ?? current.packagingRecycleCodeSecondary : undefined,
-          }),
-    }));
+  function updatePackagingLayer(index: number, updates: Partial<ProductPackagingLayer>) {
+    setDraft((current) => {
+      const nextLayers = [...(current.packagingLayers ?? normalizePackagingLayers(current))];
+      const currentLayer = nextLayers[index] ?? createEmptyPackagingLayer(index);
+      nextLayers[index] = {
+        ...currentLayer,
+        ...updates,
+        name: currentLayer.name ?? packagingLayerNames[index],
+      };
+
+      return {
+        ...current,
+        packagingLayers: nextLayers,
+      };
+    });
   }
 
-  const selectedPrimaryPackaging = findPackagingMaterialOption(draft.packagingMaterialPrimary);
-  const selectedSecondaryPackaging = findPackagingMaterialOption(draft.packagingMaterialSecondary);
+  function applyPackagingMaterial(index: number, value: string) {
+    const option = findPackagingMaterialOption(value);
+    updatePackagingLayer(index, {
+      material: value || undefined,
+      recycleCode: value ? option?.recycleCode ?? undefined : undefined,
+    });
+  }
+
+  function addPackagingLayer() {
+    setDraft((current) => {
+      const nextLayers = [...(current.packagingLayers ?? normalizePackagingLayers(current))];
+      if (nextLayers.length >= packagingLayerNames.length) return current;
+      nextLayers.push(createEmptyPackagingLayer(nextLayers.length));
+      return { ...current, packagingLayers: nextLayers };
+    });
+  }
+
+  function removePackagingLayer(index: number) {
+    setDraft((current) => {
+      const currentLayers = [...(current.packagingLayers ?? normalizePackagingLayers(current))];
+      const nextLayers = currentLayers.filter((_, layerIndex) => layerIndex !== index);
+      while (nextLayers.length < 2) {
+        nextLayers.push(createEmptyPackagingLayer(nextLayers.length));
+      }
+      return {
+        ...current,
+        packagingLayers: nextLayers
+          .slice(0, packagingLayerNames.length)
+          .map((layer, layerIndex) => ({
+            ...layer,
+            name: packagingLayerNames[layerIndex],
+          })),
+      };
+    });
+  }
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
@@ -3345,7 +3476,7 @@ function ProductDetailModal({
                       <input value={draft.packagingUnit ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingUnit: event.target.value }))} />
                     </label>
                     <label>Afvalstroom
-                      <input value={draft.packagingWasteStream ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWasteStream: event.target.value }))} />
+                      <input value={derivedPackagingWasteStream ?? ''} readOnly />
                     </label>
                     <label>Gewicht totaal verpakking (g)
                       <input value={draft.packagingWeightTotalGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightTotalGrams: event.target.value }))} />
@@ -3353,52 +3484,55 @@ function ProductDetailModal({
                   </div>
                 </div>
                 <div className="product-form-subsection">
-                  <h3>Verpakkingslagen</h3>
+                  <div className="product-subsection-header">
+                    <h3>Verpakkingslagen</h3>
+                    <button type="button" className="secondary-button" onClick={addPackagingLayer} disabled={packagingLayers.length >= packagingLayerNames.length}>
+                      <Plus size={16} /> Laag toevoegen
+                    </button>
+                  </div>
                   <div className="packaging-layer-stack">
-                    <div className="packaging-layer-card">
-                      <div className="packaging-layer-title">Primair</div>
-                      <div className="packaging-layer-grid">
-                        <label>Verpakkingsmateriaal
-                          <select value={draft.packagingMaterialPrimary ?? ''} onChange={(event) => applyPackagingMaterial('primary', event.target.value)}>
-                            <option value="">Selecteer...</option>
-                            {draft.packagingMaterialPrimary && !selectedPrimaryPackaging ? <option value={draft.packagingMaterialPrimary}>{draft.packagingMaterialPrimary}</option> : null}
-                            {packagingMaterialOptions.map((option) => <option key={option.recycleCode} value={option.value}>{option.label} ({option.recycleCode})</option>)}
-                          </select>
-                        </label>
-                        <label>Recyclecode
-                          <input value={draft.packagingRecycleCodePrimary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodePrimary: event.target.value }))} />
-                        </label>
-                        <label>Gewicht (g)
-                          <input value={draft.packagingWeightPrimaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightPrimaryGrams: event.target.value }))} />
-                        </label>
-                        <div className="packaging-layer-preview">
-                          <span className="packaging-layer-field-label">Labelicoon</span>
-                          <PackagingMaterialIcon option={selectedPrimaryPackaging} compact />
+                    {packagingLayers.map((layer, index) => {
+                      const selectedOption = findPackagingMaterialOption(layer.material);
+
+                      return (
+                        <div key={`${layer.name ?? packagingLayerNames[index]}-${index}`} className="packaging-layer-card">
+                          <div className="packaging-layer-grid">
+                            <div className="packaging-layer-name">
+                              <span>Laag</span>
+                              <strong>{layer.name ?? packagingLayerNames[index]}</strong>
+                            </div>
+                            <label>Verpakkingsmateriaal
+                              <select value={layer.material ?? ''} onChange={(event) => applyPackagingMaterial(index, event.target.value)}>
+                                <option value="">Selecteer...</option>
+                                {layer.material && !selectedOption ? <option value={layer.material}>{layer.material}</option> : null}
+                                {packagingMaterialOptions.map((option) => <option key={`${index}-${option.recycleCode}`} value={option.value}>{option.label} ({option.recycleCode})</option>)}
+                              </select>
+                            </label>
+                            <label>Recyclecode
+                              <input value={layer.recycleCode ?? ''} onChange={(event) => updatePackagingLayer(index, { recycleCode: event.target.value || undefined })} />
+                            </label>
+                            <label>Gewicht (g)
+                              <input value={layer.weightGrams ?? ''} onChange={(event) => updatePackagingLayer(index, { weightGrams: event.target.value || undefined })} />
+                            </label>
+                            <div className="packaging-layer-preview">
+                              <span className="packaging-layer-field-label">Labelicoon</span>
+                              <PackagingMaterialIcon option={selectedOption} compact />
+                            </div>
+                            <div className="packaging-layer-actions">
+                              <button
+                                type="button"
+                                className="danger-icon-button"
+                                onClick={() => removePackagingLayer(index)}
+                                disabled={packagingLayers.length <= 2 && !layer.material && !layer.recycleCode && !layer.weightGrams}
+                                aria-label={`${layer.name ?? packagingLayerNames[index]} verwijderen`}
+                              >
+                                <XCircle size={18} />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                    <div className="packaging-layer-card">
-                      <div className="packaging-layer-title">Secundair</div>
-                      <div className="packaging-layer-grid">
-                        <label>Verpakkingsmateriaal
-                          <select value={draft.packagingMaterialSecondary ?? ''} onChange={(event) => applyPackagingMaterial('secondary', event.target.value)}>
-                            <option value="">Selecteer...</option>
-                            {draft.packagingMaterialSecondary && !selectedSecondaryPackaging ? <option value={draft.packagingMaterialSecondary}>{draft.packagingMaterialSecondary}</option> : null}
-                            {packagingMaterialOptions.map((option) => <option key={`secondary-${option.recycleCode}`} value={option.value}>{option.label} ({option.recycleCode})</option>)}
-                          </select>
-                        </label>
-                        <label>Recyclecode
-                          <input value={draft.packagingRecycleCodeSecondary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodeSecondary: event.target.value }))} />
-                        </label>
-                        <label>Gewicht (g)
-                          <input value={draft.packagingWeightSecondaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightSecondaryGrams: event.target.value }))} />
-                        </label>
-                        <div className="packaging-layer-preview">
-                          <span className="packaging-layer-field-label">Labelicoon</span>
-                          <PackagingMaterialIcon option={selectedSecondaryPackaging} compact />
-                        </div>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="product-form-subsection">
