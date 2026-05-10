@@ -73,14 +73,14 @@ const packagingLayerNames = ['Primair', 'Secundair', 'Tertiair', 'Quaternair', '
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
-  { id: 'containers', label: 'Containers', icon: Boxes },
-  { id: 'scooters', label: 'Scooters', icon: Bike },
-  { id: 'sales', label: 'Verkoop', icon: CircleDollarSign },
   { id: 'batteries', label: "Accu's", icon: BatteryCharging },
-  { id: 'products', label: 'Producten', icon: BriefcaseBusiness },
+  { id: 'containers', label: 'Containers', icon: Boxes },
   { id: 'dealers', label: 'Dealers', icon: UsersRound },
   { id: 'warranty', label: 'Garantie claims', icon: ShieldCheck },
   { id: 'maintenance', label: 'Onderhoud', icon: ClipboardList },
+  { id: 'products', label: 'Producten', icon: BriefcaseBusiness },
+  { id: 'scooters', label: 'Scooters', icon: Bike },
+  { id: 'sales', label: 'Verkoop', icon: CircleDollarSign },
   { id: 'search', label: 'Zoeken', icon: Search },
 ];
 
