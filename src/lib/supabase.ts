@@ -148,11 +148,27 @@ export async function upsertDealers(dealers: Dealer[]) {
 export async function upsertProducts(products: Product[]) {
   if (!supabase || products.length === 0) return;
 
-  const { error } = await supabase
-    .from('products')
-    .upsert(products);
+  let payload = products.map((product) => ({ ...product }) as Record<string, unknown>);
+  const removedColumns = new Set<string>();
 
-  if (error) throw error;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { error } = await supabase
+      .from('products')
+      .upsert(payload);
+
+    if (!error) return;
+
+    const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
+    if (!missingColumn || removedColumns.has(missingColumn)) throw error;
+
+    removedColumns.add(missingColumn);
+    payload = payload.map((record) => {
+      const { [missingColumn]: _removed, ...rest } = record;
+      return rest;
+    });
+  }
+
+  throw new Error('Product opslaan mislukt: Supabase schema mist meerdere productkolommen.');
 }
 
 export async function upsertMaintenanceRecords(records: MaintenanceRecord[]) {

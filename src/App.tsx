@@ -3039,6 +3039,39 @@ function ProductDetailModal({
         supplier: draft.supplier?.trim() || undefined,
         countryOfOrigin: draft.countryOfOrigin?.trim() || undefined,
         imageUrl: draft.imageUrl?.trim() || undefined,
+        brand: draft.brand?.trim() || undefined,
+        labelTitle: draft.labelTitle?.trim() || undefined,
+        shortDescription: draft.shortDescription?.trim() || undefined,
+        batchNumber: draft.batchNumber?.trim() || undefined,
+        serialNumber: draft.serialNumber?.trim() || undefined,
+        traceabilityCode: draft.traceabilityCode?.trim() || undefined,
+        qrUrl: draft.qrUrl?.trim() || undefined,
+        warning: draft.warning?.trim() || undefined,
+        safetyInfo: draft.safetyInfo?.trim() || undefined,
+        manufacturerName: draft.manufacturerName?.trim() || undefined,
+        manufacturerAddress: draft.manufacturerAddress?.trim() || undefined,
+        manufacturerPostalCode: draft.manufacturerPostalCode?.trim() || undefined,
+        manufacturerCity: draft.manufacturerCity?.trim() || undefined,
+        manufacturerCountry: draft.manufacturerCountry?.trim() || undefined,
+        manufacturerEmail: draft.manufacturerEmail?.trim() || undefined,
+        manufacturerWebsite: draft.manufacturerWebsite?.trim() || undefined,
+        importerName: draft.importerName?.trim() || undefined,
+        importerAddress: draft.importerAddress?.trim() || undefined,
+        importerPostalCode: draft.importerPostalCode?.trim() || undefined,
+        importerCity: draft.importerCity?.trim() || undefined,
+        importerCountry: draft.importerCountry?.trim() || undefined,
+        importerEmail: draft.importerEmail?.trim() || undefined,
+        importerWebsite: draft.importerWebsite?.trim() || undefined,
+        packagingUnit: draft.packagingUnit?.trim() || undefined,
+        packagingMaterialPrimary: draft.packagingMaterialPrimary?.trim() || undefined,
+        packagingMaterialSecondary: draft.packagingMaterialSecondary?.trim() || undefined,
+        packagingRecycleCodePrimary: draft.packagingRecycleCodePrimary?.trim() || undefined,
+        packagingRecycleCodeSecondary: draft.packagingRecycleCodeSecondary?.trim() || undefined,
+        packagingWasteStream: draft.packagingWasteStream?.trim() || undefined,
+        packagingNotes: draft.packagingNotes?.trim() || undefined,
+        packagingWeightPrimaryGrams: draft.packagingWeightPrimaryGrams?.trim() || undefined,
+        packagingWeightSecondaryGrams: draft.packagingWeightSecondaryGrams?.trim() || undefined,
+        packagingWeightTotalGrams: draft.packagingWeightTotalGrams?.trim() || undefined,
       });
     } finally {
       setSaving(false);
@@ -3128,6 +3161,115 @@ function ProductDetailModal({
             </label>
             <label>Afbeelding URL
               <input value={draft.imageUrl ?? ''} onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.target.value }))} />
+            </label>
+          </div>
+        </section>
+        <section className="panel form-panel">
+          <div className="panel-title"><ShieldCheck size={16} /> GPSR en labelinformatie</div>
+          <div className="form-grid">
+            <label>Merk
+              <input value={draft.brand ?? ''} onChange={(event) => setDraft((current) => ({ ...current, brand: event.target.value }))} />
+            </label>
+            <label>Label titel
+              <input value={draft.labelTitle ?? ''} onChange={(event) => setDraft((current) => ({ ...current, labelTitle: event.target.value }))} />
+            </label>
+            <label>Korte omschrijving
+              <input value={draft.shortDescription ?? ''} onChange={(event) => setDraft((current) => ({ ...current, shortDescription: event.target.value }))} />
+            </label>
+            <label>QR link
+              <input value={draft.qrUrl ?? ''} onChange={(event) => setDraft((current) => ({ ...current, qrUrl: event.target.value }))} />
+            </label>
+            <label>Batchnummer
+              <input value={draft.batchNumber ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batchNumber: event.target.value }))} />
+            </label>
+            <label>Serienummer
+              <input value={draft.serialNumber ?? ''} onChange={(event) => setDraft((current) => ({ ...current, serialNumber: event.target.value }))} />
+            </label>
+            <label>Traceercode
+              <input value={draft.traceabilityCode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, traceabilityCode: event.target.value }))} />
+            </label>
+            <label>Fabrikant naam
+              <input value={draft.manufacturerName ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerName: event.target.value }))} />
+            </label>
+            <label>Fabrikant straat + huisnummer
+              <input value={draft.manufacturerAddress ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerAddress: event.target.value }))} />
+            </label>
+            <label>Fabrikant postcode
+              <input value={draft.manufacturerPostalCode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerPostalCode: event.target.value }))} />
+            </label>
+            <label>Fabrikant plaats
+              <input value={draft.manufacturerCity ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerCity: event.target.value }))} />
+            </label>
+            <label>Fabrikant land
+              <input value={draft.manufacturerCountry ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerCountry: event.target.value }))} />
+            </label>
+            <label>Fabrikant e-mail
+              <input value={draft.manufacturerEmail ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerEmail: event.target.value }))} />
+            </label>
+            <label>Fabrikant website
+              <input value={draft.manufacturerWebsite ?? ''} onChange={(event) => setDraft((current) => ({ ...current, manufacturerWebsite: event.target.value }))} />
+            </label>
+            <label>Importeur / EU-verantwoordelijke
+              <input value={draft.importerName ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerName: event.target.value }))} />
+            </label>
+            <label>Importeur straat + huisnummer
+              <input value={draft.importerAddress ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerAddress: event.target.value }))} />
+            </label>
+            <label>Importeur postcode
+              <input value={draft.importerPostalCode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerPostalCode: event.target.value }))} />
+            </label>
+            <label>Importeur plaats
+              <input value={draft.importerCity ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerCity: event.target.value }))} />
+            </label>
+            <label>Importeur land
+              <input value={draft.importerCountry ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerCountry: event.target.value }))} />
+            </label>
+            <label>Importeur e-mail
+              <input value={draft.importerEmail ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerEmail: event.target.value }))} />
+            </label>
+            <label>Importeur website
+              <input value={draft.importerWebsite ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerWebsite: event.target.value }))} />
+            </label>
+            <label>Waarschuwing
+              <textarea value={draft.warning ?? ''} onChange={(event) => setDraft((current) => ({ ...current, warning: event.target.value }))} />
+            </label>
+            <label>Veiligheidsinformatie
+              <textarea value={draft.safetyInfo ?? ''} onChange={(event) => setDraft((current) => ({ ...current, safetyInfo: event.target.value }))} />
+            </label>
+          </div>
+        </section>
+        <section className="panel form-panel">
+          <div className="panel-title"><PackagePlus size={16} /> Verpakking en PPWR</div>
+          <div className="form-grid">
+            <label>Verpakkingseenheid
+              <input value={draft.packagingUnit ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingUnit: event.target.value }))} />
+            </label>
+            <label>Primair verpakkingsmateriaal
+              <input value={draft.packagingMaterialPrimary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingMaterialPrimary: event.target.value }))} />
+            </label>
+            <label>Secundair verpakkingsmateriaal
+              <input value={draft.packagingMaterialSecondary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingMaterialSecondary: event.target.value }))} />
+            </label>
+            <label>Recyclecode primair
+              <input value={draft.packagingRecycleCodePrimary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodePrimary: event.target.value }))} />
+            </label>
+            <label>Recyclecode secundair
+              <input value={draft.packagingRecycleCodeSecondary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodeSecondary: event.target.value }))} />
+            </label>
+            <label>Afvalstroom
+              <input value={draft.packagingWasteStream ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWasteStream: event.target.value }))} />
+            </label>
+            <label>Gewicht primaire verpakking (g)
+              <input value={draft.packagingWeightPrimaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightPrimaryGrams: event.target.value }))} />
+            </label>
+            <label>Gewicht secundaire verpakking (g)
+              <input value={draft.packagingWeightSecondaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightSecondaryGrams: event.target.value }))} />
+            </label>
+            <label>Totaal verpakkingsgewicht (g)
+              <input value={draft.packagingWeightTotalGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightTotalGrams: event.target.value }))} />
+            </label>
+            <label>Verpakkingsopmerking
+              <textarea value={draft.packagingNotes ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingNotes: event.target.value }))} />
             </label>
           </div>
           <div className="drawer-actions">
