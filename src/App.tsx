@@ -495,8 +495,8 @@ function buildMaterialIconsBase64(product: Product) {
   const iconParts = (layers.length ? layers : [{ material: product.packagingMaterialPrimary, recycleCode: product.packagingRecycleCodePrimary }])
     .map((layer) => recycleCodeParts(layer, product.packagingMaterialPrimary));
   const canvas = document.createElement('canvas');
-  canvas.width = 560;
-  canvas.height = 300;
+  canvas.width = 620;
+  canvas.height = 336;
 
   const context = canvas.getContext('2d');
   if (!context) {
@@ -507,10 +507,10 @@ function buildMaterialIconsBase64(product: Product) {
 
   const drawIcon = (centerX: number, family: string, number: string) => {
     context.save();
-    context.translate(centerX - 150, -12);
+    context.translate(centerX - 150, 0);
     context.strokeStyle = '#000';
     context.fillStyle = '#000';
-    context.lineWidth = 16;
+    context.lineWidth = 20;
     context.lineJoin = 'round';
     context.lineCap = 'butt';
 
@@ -558,14 +558,14 @@ function buildMaterialIconsBase64(product: Product) {
 
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.font = 'bold 56px Arial';
+    context.font = 'bold 62px Arial';
     context.fillText(number, 150, 164);
-    context.font = 'bold 40px Arial';
-    context.fillText(family, 150, 282);
+    context.font = 'bold 44px Arial';
+    context.fillText(family, 150, 292);
     context.restore();
   };
 
-  const centers = iconParts.length > 1 ? [145, 415] : [280];
+  const centers = iconParts.length > 1 ? [155, 465] : [310];
   iconParts.forEach((part, index) => drawIcon(centers[index], part.family, part.number));
 
   const dataUrl = canvas.toDataURL('image/png');
@@ -650,8 +650,8 @@ function buildEan13BarcodeBase64(value: string) {
   const bits = `101${leftBits}01010${rightBits}101`;
 
   const moduleWidth = 8;
-  const quietLeft = 12;
-  const quietRight = 12;
+  const quietLeft = 0;
+  const quietRight = 0;
   const barcodeModules = quietLeft + bits.length + quietRight;
   const canvas = document.createElement('canvas');
   canvas.width = barcodeModules * moduleWidth;
@@ -872,7 +872,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="220" Y="1060" Width="1800" Height="760" />
+    <Bounds X="220" Y="1040" Width="1800" Height="720" />
   </ObjectInfo>` : `<ObjectInfo>
     <BarcodeObject>
       <Name>ProductBarcode</Name>
@@ -893,7 +893,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <QuietZonesPadding Left="160" Top="0" Right="160" Bottom="0" />
     </BarcodeObject>
-    <Bounds X="220" Y="1060" Width="1800" Height="760" />
+    <Bounds X="220" Y="1040" Width="1800" Height="720" />
   </ObjectInfo>`;
 
   return `<?xml version="1.0" encoding="utf-8"?>
@@ -941,7 +941,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="3400" Y="1010" Width="620" Height="430" />
+    <Bounds X="3320" Y="920" Width="840" Height="560" />
   </ObjectInfo>
   ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4080, y: 1580, width: 820, height: 190, size: 7, alignment: 'Center' })}
   ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4080, y: 1800, width: 820, height: 150, size: 7, alignment: 'Center' })}
