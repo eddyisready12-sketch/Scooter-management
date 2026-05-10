@@ -1363,7 +1363,8 @@ tbody tr:hover {
 }
 
 .product-detail-modal {
-  width: min(1600px, calc(100vw - 40px));
+  width: min(1680px, calc(100vw - 64px)) !important;
+  max-width: calc(100vw - 64px);
 }
 
 .product-summary-grid {
@@ -1449,6 +1450,7 @@ tbody tr:hover {
 }
 
 .product-form-subsection .form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: 0;
 }
 
