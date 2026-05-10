@@ -557,37 +557,21 @@ async function buildMaterialIconsBase64(product: Product) {
   return svgToPngBase64(svg, width, height);
 }
 
-function ean13CheckDigit(firstTwelveDigits: string) {
-  const sum = firstTwelveDigits
-    .split('')
-    .reduce((total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
-  return String((10 - (sum % 10)) % 10);
-}
-
-function normalizeEan13Value(value: string) {
-  const digits = value.replace(/\D/g, '');
-  if (digits.length === 12) return `${digits}${ean13CheckDigit(digits)}`;
-  if (digits.length !== 13) return null;
-  return ean13CheckDigit(digits.slice(0, 12)) === digits[12] ? digits : null;
-}
-
-function buildEan13BarcodeBase64(value: string) {
-  const eanValue = normalizeEan13Value(value);
-  if (!eanValue) return null;
-
+function buildProductBarcodeBase64(value: string) {
+  const barcodeValue = value.replace(/\s/g, '');
+  if (!barcodeValue) return null;
   const canvas = document.createElement('canvas');
   (bwipjs as unknown as { toCanvas: (canvas: HTMLCanvasElement, options: Record<string, unknown>) => HTMLCanvasElement }).toCanvas(canvas, {
-    bcid: 'ean13',
-    text: eanValue,
-    scaleX: 4,
+    bcid: 'code128',
+    text: barcodeValue,
+    scaleX: 3,
     scaleY: 3,
     height: 15,
     includetext: true,
-    guardwhitespace: true,
     textxalign: 'center',
     textsize: 12,
     textyalign: 'below',
-    textyoffset: -6,
+    textyoffset: -4,
     backgroundcolor: 'FFFFFF',
     barcolor: '000000',
     textcolor: '000000',
@@ -715,8 +699,6 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
 
   const country = product.countryOfOrigin?.trim() || 'China';
   const madeInLine = country.toLowerCase().startsWith('made in') ? country : `Made in ${country}`;
-  const normalizedEanValue = normalizeEan13Value(barcodeSource);
-
   const escapedBarcode = escapeLabelValue(barcodeSource);
   const escapedCode = escapeLabelValue(product.code.trim() || barcodeSource);
   const escapedDescription = escapeLabelValue(product.labelTitle?.trim() || product.shortDescription?.trim() || product.description.trim());
@@ -920,7 +902,7 @@ async function printProductDymoLabel(product: Product) {
   const { dymo, printerName } = await getAvailableDymoPrinter();
   const logoBase64 = await imageUrlToBase64(rsoLogoUrl);
   const materialIconsBase64 = await buildMaterialIconsBase64(product);
-  const barcodeBase64 = buildEan13BarcodeBase64(product.barcode?.trim() || product.code.trim());
+  const barcodeBase64 = buildProductBarcodeBase64(product.barcode?.trim() || product.code.trim());
   const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64, barcodeBase64);
   const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Product ${product.code || product.description}` });
   if (!printResult.success) {
