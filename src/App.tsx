@@ -488,88 +488,72 @@ function recycleCodeParts(layer: ProductPackagingLayer, fallbackMaterial?: strin
   };
 }
 
-function buildMaterialIconsBase64(product: Product) {
+function svgToPngBase64(svg: string, width: number, height: number) {
+  return new Promise<string>((resolve, reject) => {
+    const image = new Image();
+    const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d');
+        if (!context) {
+          reject(new Error('Materiaal icoon kon niet worden gemaakt voor het productlabel.'));
+          return;
+        }
+        context.clearRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+        URL.revokeObjectURL(url);
+        const dataUrl = canvas.toDataURL('image/png');
+        resolve(dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl);
+      } catch (error) {
+        URL.revokeObjectURL(url);
+        reject(error);
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Materiaal icoon kon niet worden geladen voor het productlabel.'));
+    };
+    image.src = url;
+  });
+}
+
+async function buildMaterialIconsBase64(product: Product) {
   const layers = normalizePackagingLayers(product)
     .filter((item) => item.recycleCode?.trim() || item.material?.trim())
     .slice(0, 2);
   const iconParts = (layers.length ? layers : [{ material: product.packagingMaterialPrimary, recycleCode: product.packagingRecycleCodePrimary }])
     .map((layer) => recycleCodeParts(layer, product.packagingMaterialPrimary));
-  const canvas = document.createElement('canvas');
-  canvas.width = 620;
-  canvas.height = 336;
-
-  const context = canvas.getContext('2d');
-  if (!context) {
-    throw new Error('Materiaal icoon kon niet worden gemaakt voor het productlabel.');
-  }
-
-  context.clearRect(0, 0, canvas.width, canvas.height);
-
-  const drawIcon = (centerX: number, family: string, number: string) => {
-    context.save();
-    context.translate(centerX - 150, 0);
-    context.strokeStyle = '#000';
-    context.fillStyle = '#000';
-    context.lineWidth = 20;
-    context.lineJoin = 'round';
-    context.lineCap = 'butt';
-
-    context.beginPath();
-    context.moveTo(95, 94);
-    context.lineTo(132, 30);
-    context.quadraticCurveTo(150, 12, 168, 30);
-    context.lineTo(205, 94);
-    context.stroke();
-
-    context.beginPath();
-    context.moveTo(112, 210);
-    context.lineTo(40, 210);
-    context.quadraticCurveTo(15, 205, 28, 182);
-    context.lineTo(66, 116);
-    context.stroke();
-
-    context.beginPath();
-    context.moveTo(194, 116);
-    context.lineTo(232, 182);
-    context.quadraticCurveTo(245, 205, 220, 210);
-    context.lineTo(150, 210);
-    context.stroke();
-
-    context.beginPath();
-    context.moveTo(110, 208);
-    context.lineTo(154, 184);
-    context.lineTo(154, 232);
-    context.closePath();
-    context.fill();
-
-    context.beginPath();
-    context.moveTo(64, 116);
-    context.lineTo(108, 92);
-    context.lineTo(108, 140);
-    context.closePath();
-    context.fill();
-
-    context.beginPath();
-    context.moveTo(194, 116);
-    context.lineTo(238, 92);
-    context.lineTo(238, 140);
-    context.closePath();
-    context.fill();
-
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.font = 'bold 62px Arial';
-    context.fillText(number, 150, 164);
-    context.font = 'bold 44px Arial';
-    context.fillText(family, 150, 292);
-    context.restore();
-  };
-
-  const centers = iconParts.length > 1 ? [155, 465] : [310];
-  iconParts.forEach((part, index) => drawIcon(centers[index], part.family, part.number));
-
-  const dataUrl = canvas.toDataURL('image/png');
-  return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+  const iconWidth = 112;
+  const iconHeight = 126;
+  const gap = 18;
+  const width = iconParts.length * iconWidth + Math.max(0, iconParts.length - 1) * gap;
+  const height = iconHeight;
+  const icons = iconParts.map((part, index) => {
+    const x = index * (iconWidth + gap);
+    return `<g transform="translate(${x} 0)">
+      <svg x="0" y="0" width="${iconWidth}" height="${iconHeight}" viewBox="0 0 100 112">
+        <g fill="none" stroke="#000" stroke-width="7" stroke-linejoin="round" stroke-linecap="butt">
+          <path d="M31.63 31.5 44.78 9.57s5.29-5.12 9.92-.49l12.25 20.78" />
+          <path d="M45.95 70 20.38 69.57S13.31 67.55 15 61.23l11.87-21" />
+          <path d="M72.13 38.35 84.54 60.7s1.79 7.14-4.53 8.83l-24.12.23" />
+        </g>
+        <g fill="#000">
+          <path d="m46.05 69.82 14.67-8.64v17.01z" />
+          <path d="m17.25 40.27 14.67-8.64v17.01z" />
+          <path d="m57.28 29.99 14.67-8.64v17.01z" />
+        </g>
+        <text x="50" y="54" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#000">${escapeLabelValue(part.number)}</text>
+        <text x="50" y="98" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="800" fill="#000">${escapeLabelValue(part.family)}</text>
+      </svg>
+    </g>`;
+  }).join('');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${icons}</svg>`;
+  return svgToPngBase64(svg, width, height);
 }
 
 function ean13CheckDigit(firstTwelveDigits: string) {
@@ -904,8 +888,8 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="${dymo99012Layout.width}" Height="${dymo99012Layout.height}" Rx="180" Ry="180" />
   </DrawCommands>
-  ${textObject({ name: 'ProductCode', value: escapedCode, x: 220, y: 210, width: 1800, height: 320, size: 15 })}
-  ${textObject({ name: 'ProductDescription', value: escapedDescription, x: 220, y: 550, width: 2700, height: 300, size: 11 })}
+  ${textObject({ name: 'ProductCode', value: escapedCode, x: 220, y: 210, width: 1800, height: 300, size: 14 })}
+  ${textObject({ name: 'ProductDescription', value: escapedDescription, x: 220, y: 540, width: 2700, height: 290, size: 10 })}
   <ObjectInfo>
     <ImageObject>
       <Name>RsoLogo</Name>
@@ -922,9 +906,9 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="3380" Y="160" Width="1420" Height="430" />
+    <Bounds X="3380" Y="150" Width="1420" Height="420" />
   </ObjectInfo>
-  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2140, y: 1080, width: 1180, height: 620, size: 8 })}
+  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2080, y: 1160, width: 1100, height: 460, size: 6 })}
   <ObjectInfo>
     <ImageObject>
       <Name>MaterialIcons</Name>
@@ -941,10 +925,10 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="3320" Y="920" Width="840" Height="560" />
+    <Bounds X="3420" Y="1060" Width="560" Height="300" />
   </ObjectInfo>
-  ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4080, y: 1580, width: 820, height: 190, size: 7, alignment: 'Center' })}
-  ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4080, y: 1800, width: 820, height: 150, size: 7, alignment: 'Center' })}
+  ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4070, y: 1600, width: 820, height: 180, size: 6, alignment: 'Center' })}
+  ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4070, y: 1810, width: 820, height: 140, size: 6, alignment: 'Center' })}
   ${barcodeObject}
   ${textObject({ name: 'BarcodeHumanText', value: escapedReadableBarcode, x: 220, y: 1740, width: 1800, height: 220, size: 10, alignment: 'Center' })}
   <ObjectInfo>
@@ -1005,7 +989,7 @@ async function printScooterDymoLabel(scooter: Scooter, dealer?: Dealer) {
 async function printProductDymoLabel(product: Product) {
   const { dymo, printerName } = await getAvailableDymoPrinter();
   const logoBase64 = await imageUrlToBase64(rsoLogoUrl);
-  const materialIconsBase64 = buildMaterialIconsBase64(product);
+  const materialIconsBase64 = await buildMaterialIconsBase64(product);
   const barcodeBase64 = buildEan13BarcodeBase64(product.barcode?.trim() || product.code.trim());
   const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64, barcodeBase64);
   const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Product ${product.code || product.description}` });
