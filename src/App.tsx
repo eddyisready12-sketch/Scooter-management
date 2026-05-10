@@ -495,8 +495,8 @@ function buildMaterialIconsBase64(product: Product) {
   const iconParts = (layers.length ? layers : [{ material: product.packagingMaterialPrimary, recycleCode: product.packagingRecycleCodePrimary }])
     .map((layer) => recycleCodeParts(layer, product.packagingMaterialPrimary));
   const canvas = document.createElement('canvas');
-  canvas.width = 520;
-  canvas.height = 336;
+  canvas.width = 560;
+  canvas.height = 300;
 
   const context = canvas.getContext('2d');
   if (!context) {
@@ -507,7 +507,7 @@ function buildMaterialIconsBase64(product: Product) {
 
   const drawIcon = (centerX: number, family: string, number: string) => {
     context.save();
-    context.translate(centerX - 150, 0);
+    context.translate(centerX - 150, -12);
     context.strokeStyle = '#000';
     context.fillStyle = '#000';
     context.lineWidth = 16;
@@ -558,14 +558,14 @@ function buildMaterialIconsBase64(product: Product) {
 
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.font = 'bold 54px Arial';
+    context.font = 'bold 56px Arial';
     context.fillText(number, 150, 164);
-    context.font = 'bold 42px Arial';
-    context.fillText(family, 150, 292);
+    context.font = 'bold 40px Arial';
+    context.fillText(family, 150, 282);
     context.restore();
   };
 
-  const centers = iconParts.length > 1 ? [145, 375] : [260];
+  const centers = iconParts.length > 1 ? [145, 415] : [280];
   iconParts.forEach((part, index) => drawIcon(centers[index], part.family, part.number));
 
   const dataUrl = canvas.toDataURL('image/png');
@@ -924,7 +924,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
     </ImageObject>
     <Bounds X="3380" Y="160" Width="1420" Height="430" />
   </ObjectInfo>
-  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2040, y: 1120, width: 1220, height: 540, size: 8 })}
+  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2140, y: 1080, width: 1180, height: 620, size: 8 })}
   <ObjectInfo>
     <ImageObject>
       <Name>MaterialIcons</Name>
@@ -941,10 +941,10 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="3640" Y="1060" Width="390" Height="360" />
+    <Bounds X="3400" Y="1010" Width="620" Height="430" />
   </ObjectInfo>
-  ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4160, y: 1610, width: 680, height: 180, size: 7, alignment: 'Center' })}
-  ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4160, y: 1810, width: 680, height: 150, size: 7, alignment: 'Center' })}
+  ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4080, y: 1580, width: 820, height: 190, size: 7, alignment: 'Center' })}
+  ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4080, y: 1800, width: 820, height: 150, size: 7, alignment: 'Center' })}
   ${barcodeObject}
   ${textObject({ name: 'BarcodeHumanText', value: escapedReadableBarcode, x: 220, y: 1740, width: 1800, height: 220, size: 10, alignment: 'Center' })}
   <ObjectInfo>
@@ -967,7 +967,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
       <HorizontalAlignment>Center</HorizontalAlignment>
       <QuietZonesPadding Left="0" Top="0" Right="0" Bottom="0" />
     </BarcodeObject>
-    <Bounds X="4160" Y="930" Width="680" Height="660" />
+    <Bounds X="4200" Y="900" Width="620" Height="660" />
   </ObjectInfo>
 </DieCutLabel>`;
 }
