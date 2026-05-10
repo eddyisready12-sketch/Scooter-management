@@ -224,16 +224,30 @@ function summarizePackagingWasteStream(materials: string[]): string | undefined 
   return streams.join(' + ');
 }
 
+function sumPackagingLayerWeights(layers: ProductPackagingLayer[]): string | undefined {
+  const total = layers.reduce((sum, layer) => {
+    const rawValue = asOptionalTrimmedString(layer.weightGrams);
+    if (!rawValue) return sum;
+    const numericValue = Number.parseFloat(rawValue.replace(',', '.'));
+    return Number.isFinite(numericValue) ? sum + numericValue : sum;
+  }, 0);
+
+  if (total <= 0) return undefined;
+  return Number.isInteger(total) ? String(total) : total.toFixed(2).replace('.', ',');
+}
+
 function createProductDraft(product: Product): Product {
   const packagingLayers = normalizePackagingLayers(product);
   const derivedWasteStream = summarizePackagingWasteStream(
     packagingLayers.map((layer) => layer.material).filter(Boolean) as string[],
   );
+  const derivedTotalWeight = sumPackagingLayerWeights(packagingLayers);
 
   return {
     ...product,
     packagingLayers,
     packagingWasteStream: derivedWasteStream ?? product.packagingWasteStream,
+    packagingWeightTotalGrams: derivedTotalWeight ?? asOptionalTrimmedString(product.packagingWeightTotalGrams),
   };
 }
 
@@ -3172,6 +3186,7 @@ function ProductDetailModal({
   const derivedPackagingWasteStream = summarizePackagingWasteStream(
     packagingLayers.map((layer) => layer.material).filter(Boolean) as string[],
   );
+  const derivedPackagingWeightTotal = sumPackagingLayerWeights(packagingLayers);
 
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -3238,7 +3253,7 @@ function ProductDetailModal({
           packagingNotes: asOptionalTrimmedString(draft.packagingNotes),
           packagingWeightPrimaryGrams: primaryLayer?.weightGrams,
           packagingWeightSecondaryGrams: secondaryLayer?.weightGrams,
-          packagingWeightTotalGrams: asOptionalTrimmedString(draft.packagingWeightTotalGrams),
+          packagingWeightTotalGrams: derivedPackagingWeightTotal ?? asOptionalTrimmedString(draft.packagingWeightTotalGrams),
         });
     } finally {
       setSaving(false);
@@ -3500,7 +3515,7 @@ function ProductDetailModal({
                       <input value={derivedPackagingWasteStream ?? ''} readOnly />
                     </label>
                     <label>Gewicht totaal verpakking (g)
-                      <input value={draft.packagingWeightTotalGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightTotalGrams: event.target.value }))} />
+                      <input value={derivedPackagingWeightTotal ?? draft.packagingWeightTotalGrams ?? ''} readOnly />
                     </label>
                   </div>
                 </div>
