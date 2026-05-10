@@ -3365,16 +3365,16 @@ function ProductDetailModal({
                             {packagingMaterialOptions.map((option) => <option key={option.recycleCode} value={option.value}>{option.label} ({option.recycleCode})</option>)}
                           </select>
                         </label>
-                        <div className="packaging-layer-preview">
-                          <span className="packaging-layer-field-label">Labelicoon</span>
-                          <PackagingMaterialIcon option={selectedPrimaryPackaging} compact />
-                        </div>
                         <label>Recyclecode
                           <input value={draft.packagingRecycleCodePrimary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodePrimary: event.target.value }))} />
                         </label>
                         <label>Gewicht (g)
                           <input value={draft.packagingWeightPrimaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightPrimaryGrams: event.target.value }))} />
                         </label>
+                        <div className="packaging-layer-preview">
+                          <span className="packaging-layer-field-label">Labelicoon</span>
+                          <PackagingMaterialIcon option={selectedPrimaryPackaging} compact />
+                        </div>
                       </div>
                     </div>
                     <div className="packaging-layer-card">
@@ -3387,16 +3387,16 @@ function ProductDetailModal({
                             {packagingMaterialOptions.map((option) => <option key={`secondary-${option.recycleCode}`} value={option.value}>{option.label} ({option.recycleCode})</option>)}
                           </select>
                         </label>
-                        <div className="packaging-layer-preview">
-                          <span className="packaging-layer-field-label">Labelicoon</span>
-                          <PackagingMaterialIcon option={selectedSecondaryPackaging} compact />
-                        </div>
                         <label>Recyclecode
                           <input value={draft.packagingRecycleCodeSecondary ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingRecycleCodeSecondary: event.target.value }))} />
                         </label>
                         <label>Gewicht (g)
                           <input value={draft.packagingWeightSecondaryGrams ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingWeightSecondaryGrams: event.target.value }))} />
                         </label>
+                        <div className="packaging-layer-preview">
+                          <span className="packaging-layer-field-label">Labelicoon</span>
+                          <PackagingMaterialIcon option={selectedSecondaryPackaging} compact />
+                        </div>
                       </div>
                     </div>
                   </div>

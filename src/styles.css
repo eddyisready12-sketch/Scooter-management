@@ -1494,7 +1494,7 @@ tbody tr:hover {
 
 .packaging-layer-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) minmax(240px, 1fr) minmax(180px, 0.9fr) minmax(150px, 0.7fr);
+  grid-template-columns: minmax(260px, 1.5fr) minmax(180px, 0.8fr) minmax(150px, 0.7fr) minmax(260px, 1.05fr);
   gap: 12px;
   align-items: start;
 }
@@ -1502,6 +1502,7 @@ tbody tr:hover {
 .packaging-layer-preview {
   display: grid;
   gap: 6px;
+  align-content: start;
 }
 
 .packaging-layer-field-label {
@@ -1558,8 +1559,16 @@ tbody tr:hover {
 }
 
 .packaging-material-preview.compact .packaging-material-symbol {
-  width: 72px;
-  height: 90px;
+  width: 64px;
+  height: 82px;
+}
+
+.packaging-material-preview.compact .packaging-material-copy strong {
+  font-size: 0.95rem;
+}
+
+.packaging-material-preview.compact .packaging-material-copy small {
+  font-size: 0.84rem;
 }
 
 .packaging-material-number {
