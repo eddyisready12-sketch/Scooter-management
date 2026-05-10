@@ -58,13 +58,13 @@ const loginStorageKey = 'rso-admin-session';
 const productImportCompaniesStorageKey = 'rso-product-import-companies';
 const defaultProductImportCompanies = ['Blanco', 'Everestt', 'JIABIN', 'Wenling', 'mortch motor'];
 const packagingMaterialOptions = [
-  { value: 'Karton', label: 'Karton', recycleCode: 'PAP 20', recycleFamily: 'PAP', recycleNumber: '20' },
-  { value: 'Glad karton', label: 'Glad karton', recycleCode: 'PAP 21', recycleFamily: 'PAP', recycleNumber: '21' },
-  { value: 'Papier', label: 'Papier', recycleCode: 'PAP 22', recycleFamily: 'PAP', recycleNumber: '22' },
-  { value: 'LDPE', label: 'LDPE folie', recycleCode: 'LDPE 4', recycleFamily: 'LDPE', recycleNumber: '4' },
-  { value: 'HDPE', label: 'HDPE', recycleCode: 'HDPE 2', recycleFamily: 'HDPE', recycleNumber: '2' },
-  { value: 'PP', label: 'PP', recycleCode: 'PP 5', recycleFamily: 'PP', recycleNumber: '5' },
-  { value: 'PET', label: 'PET', recycleCode: 'PET 1', recycleFamily: 'PET', recycleNumber: '1' },
+  { value: 'Karton', label: 'Karton', recycleCode: 'PAP 20', recycleFamily: 'PAP', recycleNumber: '20', wasteStream: 'Papier en karton' },
+  { value: 'Glad karton', label: 'Glad karton', recycleCode: 'PAP 21', recycleFamily: 'PAP', recycleNumber: '21', wasteStream: 'Papier en karton' },
+  { value: 'Papier', label: 'Papier', recycleCode: 'PAP 22', recycleFamily: 'PAP', recycleNumber: '22', wasteStream: 'Papier en karton' },
+  { value: 'LDPE', label: 'LDPE folie', recycleCode: 'LDPE 4', recycleFamily: 'LDPE', recycleNumber: '4', wasteStream: 'Plastic / PMD' },
+  { value: 'HDPE', label: 'HDPE', recycleCode: 'HDPE 2', recycleFamily: 'HDPE', recycleNumber: '2', wasteStream: 'Plastic / PMD' },
+  { value: 'PP', label: 'PP', recycleCode: 'PP 5', recycleFamily: 'PP', recycleNumber: '5', wasteStream: 'Plastic / PMD' },
+  { value: 'PET', label: 'PET', recycleCode: 'PET 1', recycleFamily: 'PET', recycleNumber: '1', wasteStream: 'Plastic / PMD' },
 ] as const;
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
@@ -3120,6 +3120,7 @@ function ProductDetailModal({
     const option = findPackagingMaterialOption(value);
     setDraft((current) => ({
       ...current,
+      packagingWasteStream: value ? option?.wasteStream ?? current.packagingWasteStream : current.packagingWasteStream,
       ...(which === 'primary'
         ? {
             packagingMaterialPrimary: value || undefined,
