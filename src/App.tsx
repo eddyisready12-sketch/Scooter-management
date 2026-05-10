@@ -898,15 +898,17 @@ async function printScooterDymoLabel(scooter: Scooter, dealer?: Dealer) {
   return printerName;
 }
 
-async function printProductDymoLabel(product: Product) {
+async function printProductDymoLabel(product: Product, quantity = 1) {
   const { dymo, printerName } = await getAvailableDymoPrinter();
   const logoBase64 = await imageUrlToBase64(rsoLogoUrl);
   const materialIconsBase64 = await buildMaterialIconsBase64(product);
   const barcodeBase64 = buildProductBarcodeBase64(product.barcode?.trim() || product.code.trim());
   const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64, barcodeBase64);
-  const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Product ${product.code || product.description}` });
-  if (!printResult.success) {
-    throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
+  for (let index = 0; index < quantity; index += 1) {
+    const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Product ${product.code || product.description} (${index + 1}/${quantity})` });
+    if (!printResult.success) {
+      throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
+    }
   }
   return printerName;
 }
@@ -3669,11 +3671,19 @@ function ProductDetailModal({
   }
 
   async function handleDymoPrint() {
+    const quantityAnswer = window.prompt('Hoeveel productlabels wil je printen?', '1');
+    if (quantityAnswer === null) return;
+    const quantity = Number(quantityAnswer.replace(',', '.'));
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+      setDymoMessage('Vul een heel aantal labels in tussen 1 en 100.');
+      return;
+    }
+
     setDymoPrinting(true);
     setDymoMessage('');
     try {
-      const printerName = await printProductDymoLabel(draft);
-      setDymoMessage(`Productlabel verstuurd naar ${printerName}.`);
+      const printerName = await printProductDymoLabel(draft, quantity);
+      setDymoMessage(`${quantity} productlabel${quantity === 1 ? '' : 's'} verstuurd naar ${printerName}.`);
     } catch (error) {
       setDymoMessage(`DYMO print mislukt: ${importErrorMessage(error)}`);
     } finally {
