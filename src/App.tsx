@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, Fragment, useEffect, useId, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, Fragment, useEffect, useMemo, useState } from 'react';
 import {
   ArrowUpDown,
   BatteryCharging,
@@ -143,8 +143,6 @@ function findPackagingMaterialOption(value?: string) {
 }
 
 function PackagingMaterialIcon({ option }: { option?: { label: string; recycleFamily: string; recycleNumber: string; recycleCode: string } }) {
-  const markerId = useId().replace(/:/g, '');
-
   if (!option) {
     return (
       <div className="packaging-material-preview empty">
@@ -156,38 +154,11 @@ function PackagingMaterialIcon({ option }: { option?: { label: string; recycleFa
   return (
     <div className="packaging-material-preview">
       <svg viewBox="0 0 96 120" className="packaging-material-symbol" aria-hidden="true">
-        <defs>
-          <marker id={`${markerId}-arrow`} markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto" markerUnits="strokeWidth">
-            <path d="M0,0 L8,4 L0,8 z" fill="currentColor" />
-          </marker>
-        </defs>
-        <polyline
-          points="24,78 45,34"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          markerEnd={`url(#${markerId}-arrow)`}
-        />
-        <polyline
-          points="52,28 73,72"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          markerEnd={`url(#${markerId}-arrow)`}
-        />
-        <polyline
-          points="68,79 29,79"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          markerEnd={`url(#${markerId}-arrow)`}
-        />
+        <g fill="currentColor">
+          <path d="M49 10 58 26h-6l-7 14-9-5 7-14h-6z" />
+          <path d="m74 63-18-1 3-5-8-13 9-5 8 13 3-5z" />
+          <path d="m21 72 9-16 3 5h16v10H33l3 5z" />
+        </g>
         <text x="48" y="56" textAnchor="middle" className="packaging-material-number">{option.recycleNumber}</text>
         <text x="48" y="102" textAnchor="middle" className="packaging-material-code">{option.recycleFamily}</text>
       </svg>
