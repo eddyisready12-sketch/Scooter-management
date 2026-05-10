@@ -10,6 +10,21 @@ create table if not exists dealers (
   active boolean default true
 );
 
+create table if not exists suppliers (
+  id text primary key,
+  name text not null,
+  "contactName" text,
+  email text,
+  phone text,
+  website text,
+  address text,
+  "postalCode" text,
+  city text,
+  country text,
+  notes text,
+  active boolean default true
+);
+
 create table if not exists containers (
   id text primary key,
   number text not null,
@@ -119,6 +134,7 @@ create table if not exists documents (
 alter publication supabase_realtime add table scooters;
 alter publication supabase_realtime add table containers;
 alter publication supabase_realtime add table dealers;
+alter publication supabase_realtime add table suppliers;
 alter publication supabase_realtime add table batteries;
 alter publication supabase_realtime add table battery_models;
 alter publication supabase_realtime add table warranty_parts;
@@ -126,6 +142,7 @@ alter publication supabase_realtime add table maintenance_records;
 alter publication supabase_realtime add table documents;
 
 alter table dealers enable row level security;
+alter table suppliers enable row level security;
 alter table scooters enable row level security;
 alter table batteries enable row level security;
 alter table battery_models enable row level security;
@@ -146,6 +163,25 @@ with check (true);
 
 create policy "Allow public update dealers"
 on dealers
+for update
+to anon
+using (true)
+with check (true);
+
+create policy "Allow public read suppliers"
+on suppliers
+for select
+to anon
+using (true);
+
+create policy "Allow public insert suppliers"
+on suppliers
+for insert
+to anon
+with check (true);
+
+create policy "Allow public update suppliers"
+on suppliers
 for update
 to anon
 using (true)

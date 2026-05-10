@@ -134,6 +134,21 @@ export type Product = {
   packagingWeightTotalGrams?: string;
 };
 
+export type Supplier = {
+  id: string;
+  name: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  address?: string;
+  postalCode?: string;
+  city?: string;
+  country?: string;
+  notes?: string;
+  active?: boolean;
+};
+
 export type ProductPackagingLayer = {
   name?: string;
   material?: string;
@@ -195,6 +210,7 @@ export type AppData = {
   containers: Container[];
   dealers: Dealer[];
   products: Product[];
+  suppliers: Supplier[];
   batteries: Battery[];
   batteryModels: BatteryModel[];
   warranties: WarrantyPart[];
