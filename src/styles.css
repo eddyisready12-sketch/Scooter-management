@@ -2224,12 +2224,22 @@ tbody tr:hover {
   font-size: 22px;
 }
 
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .modal-header button {
   border: 1px solid #c8d1da;
   border-radius: 4px;
   background: #fff;
   min-height: 36px;
   padding: 0 12px;
+}
+
+.modal-header .secondary-button {
+  color: #1c2732;
 }
 
 .modal-actions {

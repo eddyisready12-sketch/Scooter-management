@@ -452,12 +452,14 @@ const dymo99012Layout = {
   detailsBounds: { x: 180, y: 1160, width: 4686, height: 700 },
 };
 
-function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
-  const escapeLabelValue = (value: string) => value
+function escapeLabelValue(value: string) {
+  return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
 
+function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
   const barcodeValue = escapeLabelValue(scooter.frameNumber);
   const frameLabel = escapeLabelValue(scooter.frameNumber);
   const dealerLine = dealer?.company || scooter.color || '';
@@ -563,6 +565,137 @@ function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
 </DieCutLabel>`;
 }
 
+function buildDymoProductLabelXml(product: Product) {
+  const barcodeSource = product.barcode?.trim() || product.code.trim();
+  if (!barcodeSource) {
+    throw new Error('Product heeft geen barcode of code om te printen.');
+  }
+
+  const batchCode = product.batchNumber?.trim() || product.batch?.trim() || product.traceabilityCode?.trim();
+  if (!batchCode) {
+    throw new Error('Product heeft geen batchcode om als QR-code te printen.');
+  }
+
+  const country = product.countryOfOrigin?.trim() || 'China';
+  const madeInLine = country.toLowerCase().startsWith('made in') ? country : `Made in ${country}`;
+
+  const escapedBarcode = escapeLabelValue(barcodeSource);
+  const escapedCode = escapeLabelValue(product.code.trim() || barcodeSource);
+  const escapedDescription = escapeLabelValue(product.labelTitle?.trim() || product.shortDescription?.trim() || product.description.trim());
+  const escapedBatchCode = escapeLabelValue(batchCode);
+  const escapedMadeInLine = escapeLabelValue(madeInLine);
+
+  const textObject = ({
+    name,
+    value,
+    x,
+    y,
+    width,
+    height,
+    size,
+    bold = false,
+    alignment = 'Left',
+  }: {
+    name: string;
+    value: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    size: number;
+    bold?: boolean;
+    alignment?: 'Left' | 'Center' | 'Right';
+  }) => `<ObjectInfo>
+    <TextObject>
+      <Name>${name}</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <HorizontalAlignment>${alignment}</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>False</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>${value}</String>
+          <Attributes>
+            <Font Family="Arial" Size="${size}" Bold="${bold ? 'True' : 'False'}" Italic="False" Underline="False" Strikeout="False" />
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="${x}" Y="${y}" Width="${width}" Height="${height}" />
+  </ObjectInfo>`;
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>${dymo99012Layout.id}</Id>
+  <PaperName>${dymo99012Layout.paperName}</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="${dymo99012Layout.width}" Height="${dymo99012Layout.height}" Rx="180" Ry="180" />
+  </DrawCommands>
+  ${textObject({ name: 'ProductCode', value: escapedCode, x: 220, y: 250, width: 1900, height: 360, size: 15 })}
+  ${textObject({ name: 'ProductDescription', value: escapedDescription, x: 220, y: 620, width: 2700, height: 320, size: 11 })}
+  ${textObject({ name: 'RsoLogoText', value: 'RSO', x: 3550, y: 220, width: 1120, height: 360, size: 24, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'RsoTagline', value: 'ENJOY YOUR RIDE', x: 3520, y: 560, width: 1180, height: 160, size: 6, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'ImporterInfo', value: 'Yreb b.v.&#10;Hoekerstraat 12A&#10;3133KR Vlaardingen&#10;Info@rso-parts.nl', x: 2060, y: 1180, width: 1360, height: 540, size: 8 })}
+  ${textObject({ name: 'RecycleIcon', value: '♻', x: 3530, y: 1180, width: 420, height: 360, size: 28, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'BarcodeHumanText', value: escapedBarcode, x: 300, y: 1720, width: 1540, height: 220, size: 11, alignment: 'Center' })}
+  ${textObject({ name: 'BatchText', value: `Batch ${escapedBatchCode}`, x: 4040, y: 1600, width: 760, height: 180, size: 7, alignment: 'Center' })}
+  ${textObject({ name: 'MadeInText', value: escapedMadeInLine, x: 4040, y: 1800, width: 760, height: 160, size: 7, alignment: 'Center' })}
+  <ObjectInfo>
+    <BarcodeObject>
+      <Name>ProductBarcode</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <Text>${escapedBarcode}</Text>
+      <Type>Code128Auto</Type>
+      <Size>Small</Size>
+      <TextPosition>None</TextPosition>
+      <TextFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      <CheckSumFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      <TextEmbedding>None</TextEmbedding>
+      <ECLevel>0</ECLevel>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <QuietZonesPadding Left="0" Top="0" Right="0" Bottom="0" />
+    </BarcodeObject>
+    <Bounds X="300" Y="1160" Width="1540" Height="560" />
+  </ObjectInfo>
+  <ObjectInfo>
+    <BarcodeObject>
+      <Name>BatchQrCode</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <Text>${escapedBatchCode}</Text>
+      <Type>QRCode</Type>
+      <Size>Small</Size>
+      <TextPosition>None</TextPosition>
+      <TextFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      <CheckSumFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      <TextEmbedding>None</TextEmbedding>
+      <ECLevel>0</ECLevel>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <QuietZonesPadding Left="0" Top="0" Right="0" Bottom="0" />
+    </BarcodeObject>
+    <Bounds X="4040" Y="1000" Width="720" Height="620" />
+  </ObjectInfo>
+</DieCutLabel>`;
+}
+
 async function getAvailableDymoPrinter() {
   const ports = Array.from({ length: 10 }, (_, index) => 41951 + index);
 
@@ -587,6 +720,16 @@ async function printScooterDymoLabel(scooter: Scooter, dealer?: Dealer) {
   const { dymo, printerName } = await getAvailableDymoPrinter();
   const labelXml = buildDymoScooterLabelXml(scooter, dealer);
   const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Scooter ${scooter.frameNumber}` });
+  if (!printResult.success) {
+    throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
+  }
+  return printerName;
+}
+
+async function printProductDymoLabel(product: Product) {
+  const { dymo, printerName } = await getAvailableDymoPrinter();
+  const labelXml = buildDymoProductLabelXml(product);
+  const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Product ${product.code || product.description}` });
   if (!printResult.success) {
     throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
   }
@@ -3212,6 +3355,8 @@ function ProductDetailModal({
   const [draft, setDraft] = useState<Product>(() => createProductDraft(product));
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'gpsr' | 'packaging'>('basic');
+  const [dymoPrinting, setDymoPrinting] = useState(false);
+  const [dymoMessage, setDymoMessage] = useState('');
 
   useEffect(() => {
     setDraft(createProductDraft(product));
@@ -3348,6 +3493,19 @@ function ProductDetailModal({
     });
   }
 
+  async function handleDymoPrint() {
+    setDymoPrinting(true);
+    setDymoMessage('');
+    try {
+      const printerName = await printProductDymoLabel(draft);
+      setDymoMessage(`Productlabel verstuurd naar ${printerName}.`);
+    } catch (error) {
+      setDymoMessage(`DYMO print mislukt: ${importErrorMessage(error)}`);
+    } finally {
+      setDymoPrinting(false);
+    }
+  }
+
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <form className="modal-card product-detail-modal" onMouseDown={(event) => event.stopPropagation()} onSubmit={saveProduct}>
@@ -3356,7 +3514,12 @@ function ProductDetailModal({
             <span>Productkaart</span>
             <h2>{draft.description || draft.code}</h2>
           </div>
-          <button type="button" onClick={onClose}>Close</button>
+          <div className="modal-header-actions">
+            <button type="button" className="secondary-button" disabled={dymoPrinting} onClick={handleDymoPrint}>
+              <Printer size={15} /> {dymoPrinting ? 'Label printen...' : 'Print productlabel'}
+            </button>
+            <button type="button" onClick={onClose}>Close</button>
+          </div>
         </div>
         <section className="panel form-panel product-form-shell">
           <div className="product-tab-bar top-attached">
@@ -3629,6 +3792,7 @@ function ProductDetailModal({
             </div>
           )}
           <div className="drawer-actions">
+            {dymoMessage && <p className="drawer-note product-dymo-message">{dymoMessage}</p>}
             <button type="button" className="secondary-button" onClick={onClose}>Sluiten</button>
             <button className="primary-button" type="submit" disabled={saving}>Opslaan</button>
           </div>
