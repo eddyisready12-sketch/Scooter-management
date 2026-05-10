@@ -3015,15 +3015,11 @@ function ProductDetailModal({
 }) {
   const [draft, setDraft] = useState<Product>(product);
   const [saving, setSaving] = useState(false);
-  const [openSection, setOpenSection] = useState<'basic' | 'gpsr' | 'packaging' | null>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'gpsr' | 'packaging'>('basic');
 
   useEffect(() => {
     setDraft(product);
   }, [product]);
-
-  function toggleSection(section: 'basic' | 'gpsr' | 'packaging') {
-    setOpenSection((current) => (current === section ? null : section));
-  }
 
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -3127,14 +3123,21 @@ function ProductDetailModal({
           </section>
         </div>
         <section className="panel form-panel">
-          <button type="button" className="product-section-toggle" onClick={() => toggleSection('basic')}>
-            <span>
+          <div className="product-tab-bar">
+            <button type="button" className={`product-tab-button${activeTab === 'basic' ? ' active' : ''}`} onClick={() => setActiveTab('basic')}>
               <span className="panel-title-label"><BriefcaseBusiness size={16} /> Basisgegevens</span>
-              <small className="product-section-meta">Artikelidentiteit, prijzen, leverancier en planning.</small>
-            </span>
-            {openSection === 'basic' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
-          {openSection === 'basic' && (
+              <small className="product-section-meta">Artikel, prijzen, leverancier en planning.</small>
+            </button>
+            <button type="button" className={`product-tab-button${activeTab === 'gpsr' ? ' active' : ''}`} onClick={() => setActiveTab('gpsr')}>
+              <span className="panel-title-label"><ShieldCheck size={16} /> GPSR en label</span>
+              <small className="product-section-meta">Traceerbaarheid, fabrikant en veiligheid.</small>
+            </button>
+            <button type="button" className={`product-tab-button${activeTab === 'packaging' ? ' active' : ''}`} onClick={() => setActiveTab('packaging')}>
+              <span className="panel-title-label"><PackagePlus size={16} /> Verpakking en PPWR</span>
+              <small className="product-section-meta">Materiaal, recyclecodes en gewichten.</small>
+            </button>
+          </div>
+          {activeTab === 'basic' && (
             <div className="product-section-body">
               <div className="product-form-subsection">
                 <h3>Identificatie</h3>
@@ -3204,16 +3207,7 @@ function ProductDetailModal({
               </div>
             </div>
           )}
-        </section>
-        <section className="panel form-panel">
-          <button type="button" className="product-section-toggle" onClick={() => toggleSection('gpsr')}>
-            <span>
-              <span className="panel-title-label"><ShieldCheck size={16} /> GPSR en labelinformatie</span>
-              <small className="product-section-meta">Traceerbaarheid, fabrikant, importeur en veiligheidsinfo.</small>
-            </span>
-            {openSection === 'gpsr' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
-          {openSection === 'gpsr' && (
+          {activeTab === 'gpsr' && (
             <div className="product-section-body">
               <div className="product-form-subsection">
                 <h3>Label en traceerbaarheid</h3>
@@ -3303,16 +3297,7 @@ function ProductDetailModal({
               </div>
             </div>
           )}
-        </section>
-        <section className="panel form-panel">
-          <button type="button" className="product-section-toggle" onClick={() => toggleSection('packaging')}>
-            <span>
-              <span className="panel-title-label"><PackagePlus size={16} /> Verpakking en PPWR</span>
-              <small className="product-section-meta">Materiaal, recyclecodes en gewichten voor rapportage.</small>
-            </span>
-            {openSection === 'packaging' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
-          {openSection === 'packaging' && (
+          {activeTab === 'packaging' && (
             <div className="product-section-body">
               <div className="product-form-subsection">
                 <h3>Materiaal</h3>
