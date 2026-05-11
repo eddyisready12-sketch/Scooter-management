@@ -992,6 +992,10 @@ function supplierNameMatches(supplier: Supplier, value?: string) {
   );
 }
 
+function displaySupplierName(suppliers: Supplier[], value?: string) {
+  return suppliers.find((supplier) => supplierNameMatches(supplier, value))?.name ?? value ?? '';
+}
+
 function loginNameFromEmail(email: string) {
   const localPart = email.split('@')[0] || 'Gebruiker';
   return localPart
@@ -3613,7 +3617,7 @@ function ProductsPage({
                     <td>{formatPriceValue(product.salePrice)}</td>
                     <td>{formatPriceValue(product.costPrice)}</td>
                     <td>{product.webshop ? 'Ja' : '-'}</td>
-                    <td>{product.supplier || '-'}</td>
+                    <td>{displaySupplierName(supplierRecords, product.supplier) || '-'}</td>
                     <td>{product.articleGroup || '-'}</td>
                     <td>{product.stock || '-'}</td>
                     <td>{formatDateOnly(product.endDate)}</td>
@@ -3679,6 +3683,12 @@ function ProductDetailModal({
     packagingLayers.map((layer) => layer.material).filter(Boolean) as string[],
   );
   const derivedPackagingWeightTotal = sumPackagingLayerWeights(packagingLayers);
+  const selectedSupplierName = displaySupplierName(supplierRecords, draft.supplier);
+  const supplierOptions = Array.from(new Set([
+    selectedSupplierName,
+    ...suppliers,
+  ].filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
 
   function applySupplierManufacturer(supplierName: string) {
     const supplier = supplierRecords.find((item) => item.name === supplierName);
@@ -3726,7 +3736,7 @@ function ProductDetailModal({
         stock: draft.stock?.trim() || undefined,
         startDate: draft.startDate?.trim() || undefined,
         endDate: draft.endDate?.trim() || undefined,
-        supplier: draft.supplier?.trim() || undefined,
+        supplier: selectedSupplierName.trim() || undefined,
         countryOfOrigin: draft.countryOfOrigin?.trim() || undefined,
         imageUrl: draft.imageUrl?.trim() || undefined,
         brand: draft.brand?.trim() || undefined,
@@ -3902,9 +3912,9 @@ function ProductDetailModal({
                 <h3>Verkoop en voorraad</h3>
                 <div className="form-grid">
                   <label>Leverancier / fabrikant
-                    <select value={draft.supplier ?? ''} onChange={(event) => applySupplierManufacturer(event.target.value)}>
+                    <select value={selectedSupplierName} onChange={(event) => applySupplierManufacturer(event.target.value)}>
                       <option value="">Geen leverancier</option>
-                      {suppliers.map((supplier) => <option key={supplier} value={supplier}>{supplier}</option>)}
+                      {supplierOptions.map((supplier) => <option key={supplier} value={supplier}>{supplier}</option>)}
                     </select>
                   </label>
                   <label>Webwinkel
