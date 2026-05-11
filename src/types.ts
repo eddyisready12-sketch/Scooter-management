@@ -62,6 +62,11 @@ export type ContainerCostBatch = {
   transportAllocationMode: ContainerCostAllocationMode;
   importAllocationMode: ContainerCostAllocationMode;
   costItemsJson?: string;
+  goodsNetEur?: string;
+  logisticsNetEur?: string;
+  paymentNetEur?: string;
+  paymentNetOverrideEur?: string;
+  exactReference?: string;
   notes?: string;
   createdAt?: string;
 };

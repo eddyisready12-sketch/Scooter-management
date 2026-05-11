@@ -2935,6 +2935,9 @@ function CostBatchesPage({
                   <th>Ordernummer</th>
                   <th>Container</th>
                   <th>Leverancier</th>
+                  <th>Goederen netto</th>
+                  <th>Logistiek netto</th>
+                  <th>Betaling netto</th>
                   <th>Transport</th>
                   <th>Invoer</th>
                   <th>Datum</th>
@@ -2948,6 +2951,9 @@ function CostBatchesPage({
                       <td>{batch.orderNumber}</td>
                       <td>{container?.number || '-'}</td>
                       <td>{batch.supplierName || '-'}</td>
+                      <td>EUR {batch.goodsNetEur || '-'}</td>
+                      <td>EUR {batch.logisticsNetEur || '-'}</td>
+                      <td>EUR {batch.paymentNetEur || '-'}</td>
                       <td>EUR {batch.transportCostEur}</td>
                       <td>EUR {batch.importCostEur}</td>
                       <td>{formatDate(batch.createdAt)}</td>
@@ -2996,6 +3002,8 @@ function ContainerCostModal({
   const [supplierName, setSupplierName] = useState('');
   const [exchangeRate, setExchangeRate] = useState('0,92');
   const [costItems, setCostItems] = useState<ContainerCostDraftItem[]>(() => defaultContainerCostItems());
+  const [paymentNetOverrideEur, setPaymentNetOverrideEur] = useState('');
+  const [exactReference, setExactReference] = useState('');
   const [notes, setNotes] = useState('');
   const [content, setContent] = useState('');
   const [draftLines, setDraftLines] = useState<ContainerCostImportDraftLine[]>([]);
@@ -3088,6 +3096,10 @@ function ContainerCostModal({
   const transportPool = resolvedCostItems.filter((item) => item.category === 'transport').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
   const importPool = resolvedCostItems.filter((item) => item.category === 'import').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
   const otherPool = resolvedCostItems.filter((item) => item.category === 'other').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
+  const logisticsNetEur = roundValue(transportPool + importPool + otherPool, 4);
+  const goodsNetEur = roundValue(totalGoodsValue, 4);
+  const calculatedPaymentNetEur = roundValue(goodsNetEur + logisticsNetEur, 4);
+  const finalPaymentNetEur = paymentNetOverrideEur.trim() ? parseDecimal(paymentNetOverrideEur) : calculatedPaymentNetEur;
 
   const calculatedLines = computedLines.map((line) => {
     const lineVolumeTotal = line.volumeCbm * line.quantity;
@@ -3151,6 +3163,11 @@ function ContainerCostModal({
         transportAllocationMode: 'volume',
         importAllocationMode: 'value',
         costItemsJson: JSON.stringify(resolvedCostItems.map(({ resolvedAmountEur, ...item }) => ({ ...item, resolvedAmountEur: formatDecimal(resolvedAmountEur, 4) }))),
+        goodsNetEur: formatDecimal(goodsNetEur, 2),
+        logisticsNetEur: formatDecimal(logisticsNetEur, 2),
+        paymentNetEur: formatDecimal(finalPaymentNetEur, 2),
+        paymentNetOverrideEur: paymentNetOverrideEur.trim() ? formatDecimal(parseDecimal(paymentNetOverrideEur), 2) : undefined,
+        exactReference: exactReference.trim() || undefined,
         notes: notes.trim() || undefined,
         createdAt: new Date().toISOString(),
       };
@@ -3276,6 +3293,30 @@ function ContainerCostModal({
                   </div>
                 );
               })}
+            </div>
+          </section>
+
+          <section className="product-form-subsection">
+            <h3>Betaling / Exact</h3>
+            <div className="form-grid">
+              <label>Goederen netto (auto)
+                <input value={formatDecimal(goodsNetEur, 2)} disabled />
+              </label>
+              <label>Logistiek netto (auto)
+                <input value={formatDecimal(logisticsNetEur, 2)} disabled />
+              </label>
+              <label>Betaling netto (auto)
+                <input value={formatDecimal(calculatedPaymentNetEur, 2)} disabled />
+              </label>
+              <label>Betaling netto override
+                <input value={paymentNetOverrideEur} onChange={(event) => setPaymentNetOverrideEur(event.target.value)} placeholder="Leeg = automatisch bedrag" />
+              </label>
+              <label className="span-2">Exact referentie
+                <input value={exactReference} onChange={(event) => setExactReference(event.target.value)} placeholder="Bijv. factuur-, boeking- of betaalreferentie" />
+              </label>
+            </div>
+            <div className="inline-notice">
+              <span>Containertransport China naar Nederland telt mee in de betaling aan China en wordt naar verhouding over alle scooters en onderdelen verdeeld.</span>
             </div>
           </section>
 
