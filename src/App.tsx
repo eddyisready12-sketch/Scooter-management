@@ -2764,15 +2764,25 @@ function Containers({
         </div>
       </div>
       <ExpandableNotice message={message} details={messageDetails} />
-      <section className="panel container-command-panel">
-        <div>
-          <span>Container import</span>
-          <strong>Nieuwe zending toevoegen</strong>
-          <small>Importeer containerregels of voeg handmatig een container toe om scooters per zending te volgen.</small>
+      <section className="panel">
+        <div className="panel-title">
+          <span className="panel-title-label"><Boxes size={16} /> Container tools</span>
         </div>
-        <div className="container-command-actions">
-          <button className="secondary-button" onClick={() => setShowCostModal(true)}><CircleDollarSign size={16} /> Kostprijs berekenen</button>
-          <button className="primary-button" onClick={() => setShowImport(true)}><Upload size={16} /> Container importeren</button>
+        <div className="container-tool-grid">
+          <button type="button" className="container-tool-tile" onClick={() => setShowImport(true)}>
+            <span className="container-tool-icon"><Upload size={20} /></span>
+            <span className="container-tool-copy">
+              <strong>Container importeren</strong>
+              <small>Nieuwe zending toevoegen en scooters aan een container koppelen.</small>
+            </span>
+          </button>
+          <button type="button" className="container-tool-tile finance" onClick={() => setShowCostModal(true)}>
+            <span className="container-tool-icon"><CircleDollarSign size={20} /></span>
+            <span className="container-tool-copy">
+              <strong>Kostprijs batch</strong>
+              <small>Transport, inklaring en douane over scooters en onderdelen verdelen.</small>
+            </span>
+          </button>
         </div>
       </section>
       <section className="panel sales-summary">
