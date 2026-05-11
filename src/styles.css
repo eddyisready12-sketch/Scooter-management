@@ -2079,6 +2079,21 @@ tbody tr:hover {
   font-size: 13px;
 }
 
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+
+.form-grid .checkbox-field {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-height: 38px;
+}
+
+.form-grid .checkbox-field input {
+  width: auto;
+}
+
 .form-panel .primary-button {
   margin-left: 16px;
 }
@@ -2131,6 +2146,67 @@ tbody tr:hover {
 .supplier-table-header,
 .supplier-table-row {
   grid-template-columns: minmax(260px, 1.7fr) minmax(140px, 0.8fr) minmax(120px, 0.7fr) minmax(150px, 0.6fr) 72px;
+}
+
+.supplier-contacts-section {
+  border-top: 1px solid #dce1e6;
+  padding: 16px;
+}
+
+.supplier-contacts-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.supplier-contacts-header h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.supplier-contacts-header span {
+  color: #657282;
+  font-size: 13px;
+}
+
+.supplier-contact-list {
+  border: 1px solid #dce1e6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.supplier-contact-row {
+  align-items: center;
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid #e7ebef;
+  color: #17202a;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(180px, 1fr) minmax(140px, 0.8fr) minmax(120px, 0.7fr);
+  padding: 11px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.supplier-contact-row:last-child {
+  border-bottom: 0;
+}
+
+.supplier-contact-row:hover {
+  background: #f3f8ff;
+}
+
+.supplier-contact-row strong,
+.supplier-contact-row small {
+  display: block;
+}
+
+.supplier-contact-row small {
+  color: #657282;
+  margin-top: 2px;
 }
 
 .active-status {
@@ -3052,5 +3128,19 @@ dd {
   .supplier-table-header,
   .supplier-table-row {
     grid-template-columns: 1fr;
+  }
+
+  .supplier-contact-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .supplier-contacts-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .form-grid .span-2 {
+    grid-column: span 1;
   }
 }

@@ -16,6 +16,7 @@ create table if not exists suppliers (
   "contactName" text,
   email text,
   phone text,
+  mobile text,
   website text,
   address text,
   "postalCode" text,
@@ -24,6 +25,26 @@ create table if not exists suppliers (
   notes text,
   active boolean default true
 );
+
+alter table suppliers add column if not exists mobile text;
+
+create table if not exists supplier_contacts (
+  id text primary key,
+  "supplierId" text not null references suppliers(id) on delete cascade,
+  name text not null,
+  role text,
+  email text,
+  phone text,
+  mobile text,
+  wechat text,
+  notes text,
+  "isPrimary" boolean default false,
+  active boolean default true,
+  "createdAt" timestamptz default now()
+);
+
+create index if not exists supplier_contacts_supplier_id_idx
+on supplier_contacts("supplierId");
 
 create table if not exists containers (
   id text primary key,
@@ -135,6 +156,7 @@ alter publication supabase_realtime add table scooters;
 alter publication supabase_realtime add table containers;
 alter publication supabase_realtime add table dealers;
 alter publication supabase_realtime add table suppliers;
+alter publication supabase_realtime add table supplier_contacts;
 alter publication supabase_realtime add table batteries;
 alter publication supabase_realtime add table battery_models;
 alter publication supabase_realtime add table warranty_parts;
@@ -143,6 +165,7 @@ alter publication supabase_realtime add table documents;
 
 alter table dealers enable row level security;
 alter table suppliers enable row level security;
+alter table supplier_contacts enable row level security;
 alter table scooters enable row level security;
 alter table batteries enable row level security;
 alter table battery_models enable row level security;
@@ -193,6 +216,36 @@ for update
 to authenticated
 using (true)
 with check (true);
+
+drop policy if exists "Allow authenticated read supplier contacts" on supplier_contacts;
+drop policy if exists "Allow authenticated insert supplier contacts" on supplier_contacts;
+drop policy if exists "Allow authenticated update supplier contacts" on supplier_contacts;
+drop policy if exists "Allow authenticated delete supplier contacts" on supplier_contacts;
+
+create policy "Allow authenticated read supplier contacts"
+on supplier_contacts
+for select
+to authenticated
+using (true);
+
+create policy "Allow authenticated insert supplier contacts"
+on supplier_contacts
+for insert
+to authenticated
+with check (true);
+
+create policy "Allow authenticated update supplier contacts"
+on supplier_contacts
+for update
+to authenticated
+using (true)
+with check (true);
+
+create policy "Allow authenticated delete supplier contacts"
+on supplier_contacts
+for delete
+to authenticated
+using (true);
 
 create policy "Allow public read scooters"
 on scooters

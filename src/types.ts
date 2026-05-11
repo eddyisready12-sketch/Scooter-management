@@ -140,12 +140,27 @@ export type Supplier = {
   contactName?: string;
   email?: string;
   phone?: string;
+  mobile?: string;
   website?: string;
   address?: string;
   postalCode?: string;
   city?: string;
   country?: string;
   notes?: string;
+  active?: boolean;
+};
+
+export type SupplierContact = {
+  id: string;
+  supplierId: string;
+  name: string;
+  role?: string;
+  email?: string;
+  phone?: string;
+  mobile?: string;
+  wechat?: string;
+  notes?: string;
+  isPrimary?: boolean;
   active?: boolean;
 };
 
@@ -211,6 +226,7 @@ export type AppData = {
   dealers: Dealer[];
   products: Product[];
   suppliers: Supplier[];
+  supplierContacts: SupplierContact[];
   batteries: Battery[];
   batteryModels: BatteryModel[];
   warranties: WarrantyPart[];

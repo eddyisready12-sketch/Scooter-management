@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, Container, Dealer, DocumentRecord, MaintenanceRecord, Product, Scooter, Supplier, WarrantyPart } from '../types';
+import type { AppData, Battery, BatteryModel, Container, Dealer, DocumentRecord, MaintenanceRecord, Product, Scooter, Supplier, SupplierContact, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -56,6 +56,7 @@ const tableMap: Record<keyof AppData, string> = {
   dealers: 'dealers',
   products: 'products',
   suppliers: 'suppliers',
+  supplierContacts: 'supplier_contacts',
   batteries: 'batteries',
   batteryModels: 'battery_models',
   warranties: 'warranty_parts',
@@ -175,9 +176,35 @@ export async function upsertProducts(products: Product[]) {
 export async function upsertSuppliers(suppliers: Supplier[]) {
   if (!supabase || suppliers.length === 0) return;
 
+  let payload = suppliers.map((supplier) => ({ ...supplier }) as Record<string, unknown>);
+  const removedColumns = new Set<string>();
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await supabase
+      .from('suppliers')
+      .upsert(payload);
+
+    if (!error) return;
+
+    const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
+    if (!missingColumn || removedColumns.has(missingColumn)) throw error;
+
+    removedColumns.add(missingColumn);
+    payload = payload.map((record) => {
+      const { [missingColumn]: _removed, ...rest } = record;
+      return rest;
+    });
+  }
+
+  throw new Error('Leverancier opslaan mislukt: Supabase schema mist meerdere leverancierkolommen.');
+}
+
+export async function upsertSupplierContacts(contacts: SupplierContact[]) {
+  if (!supabase || contacts.length === 0) return;
+
   const { error } = await supabase
-    .from('suppliers')
-    .upsert(suppliers);
+    .from('supplier_contacts')
+    .upsert(contacts);
 
   if (error) throw error;
 }

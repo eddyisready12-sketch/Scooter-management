@@ -37,8 +37,8 @@ import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Product, ProductPackagingLayer, Scooter, ScooterStatus, Supplier, WarrantyPart } from './types';
+import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Product, ProductPackagingLayer, Scooter, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
@@ -1474,6 +1474,20 @@ export function App() {
     }
   }
 
+  async function upsertSupplierContactRecord(contact: SupplierContact) {
+    try {
+      setData((current) => {
+        const byId = new Map(current.supplierContacts.map((item) => [item.id, item]));
+        byId.set(contact.id, contact);
+        return { ...current, supplierContacts: Array.from(byId.values()) };
+      });
+      await upsertSupplierContacts([contact]);
+      setSupplierMessage(`${contact.name} is opgeslagen bij de leverancier.`);
+    } catch (error) {
+      setSupplierMessage(`Contactpersoon opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   async function importSuppliersFromProducts() {
     const existingNames = new Set(data.suppliers.map((supplier) => supplier.name.trim().toLowerCase()).filter(Boolean));
     const productSupplierNames = Array.from(new Set(
@@ -2040,7 +2054,7 @@ export function App() {
               message={productMessage}
             />
           )}
-          {view === 'suppliers' && <SuppliersPage suppliers={data.suppliers} products={data.products} onSaveSupplier={upsertSupplierRecord} onImportFromProducts={importSuppliersFromProducts} message={supplierMessage} />}
+          {view === 'suppliers' && <SuppliersPage suppliers={data.suppliers} supplierContacts={data.supplierContacts} products={data.products} onSaveSupplier={upsertSupplierRecord} onSaveSupplierContact={upsertSupplierContactRecord} onImportFromProducts={importSuppliersFromProducts} message={supplierMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} products={data.products} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
@@ -4089,14 +4103,18 @@ function ProductDetailModal({
 
 function SuppliersPage({
   suppliers,
+  supplierContacts,
   products,
   onSaveSupplier,
+  onSaveSupplierContact,
   onImportFromProducts,
   message,
 }: {
   suppliers: Supplier[];
+  supplierContacts: SupplierContact[];
   products: Product[];
   onSaveSupplier: (supplier: Supplier) => Promise<void>;
+  onSaveSupplierContact: (contact: SupplierContact) => Promise<void>;
   onImportFromProducts: () => Promise<void>;
   message: string;
 }) {
@@ -4157,22 +4175,26 @@ function SuppliersPage({
       {showAddSupplier && (
         <SupplierModal
           title="Nieuwe leverancier"
+          contacts={[]}
           onClose={() => setShowAddSupplier(false)}
           onSave={async (supplier) => {
             await onSaveSupplier(supplier);
             setShowAddSupplier(false);
           }}
+          onSaveContact={onSaveSupplierContact}
         />
       )}
       {selectedSupplier && (
         <SupplierModal
           supplier={selectedSupplier}
           title={selectedSupplier.name}
+          contacts={supplierContacts.filter((contact) => contact.supplierId === selectedSupplier.id)}
           onClose={() => setSelectedSupplier(null)}
           onSave={async (supplier) => {
             await onSaveSupplier(supplier);
             setSelectedSupplier(supplier);
           }}
+          onSaveContact={onSaveSupplierContact}
         />
       )}
     </>
@@ -4184,6 +4206,7 @@ function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
   const contactName = String(form.get('contactName') ?? '').trim();
   const email = String(form.get('email') ?? '').trim();
   const phone = String(form.get('phone') ?? '').trim();
+  const mobile = String(form.get('mobile') ?? '').trim();
   const website = String(form.get('website') ?? '').trim();
   const address = String(form.get('address') ?? '').trim();
   const postalCode = String(form.get('postalCode') ?? '').trim();
@@ -4192,11 +4215,12 @@ function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
   const notes = String(form.get('notes') ?? '').trim();
 
   return {
-    id: existing?.id ?? stableId('supplier', name || email || website),
+    id: existing?.id ?? stableId('supplier', name || email || website || mobile),
     name,
     contactName: contactName || undefined,
     email: email || undefined,
     phone: phone || undefined,
+    mobile: mobile || undefined,
     website: website || undefined,
     address: address || undefined,
     postalCode: postalCode || undefined,
@@ -4207,8 +4231,54 @@ function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
   };
 }
 
-function SupplierModal({ supplier, title, onClose, onSave }: { supplier?: Supplier; title: string; onClose: () => void; onSave: (supplier: Supplier) => Promise<void> }) {
+function supplierContactFromForm(form: FormData, supplierId: string, existing?: SupplierContact): SupplierContact {
+  const name = String(form.get('name') ?? '').trim();
+  const role = String(form.get('role') ?? '').trim();
+  const email = String(form.get('email') ?? '').trim();
+  const phone = String(form.get('phone') ?? '').trim();
+  const mobile = String(form.get('mobile') ?? '').trim();
+  const wechat = String(form.get('wechat') ?? '').trim();
+  const notes = String(form.get('notes') ?? '').trim();
+  const isPrimary = form.get('isPrimary') === 'on';
+
+  return {
+    id: existing?.id ?? stableId('supplier-contact', `${supplierId}-${name || email || mobile || wechat}-${Date.now()}`),
+    supplierId,
+    name,
+    role: role || undefined,
+    email: email || undefined,
+    phone: phone || undefined,
+    mobile: mobile || undefined,
+    wechat: wechat || undefined,
+    notes: notes || undefined,
+    isPrimary,
+    active: existing?.active ?? true,
+  };
+}
+
+function SupplierModal({
+  supplier,
+  title,
+  contacts,
+  onClose,
+  onSave,
+  onSaveContact,
+}: {
+  supplier?: Supplier;
+  title: string;
+  contacts: SupplierContact[];
+  onClose: () => void;
+  onSave: (supplier: Supplier) => Promise<void>;
+  onSaveContact: (contact: SupplierContact) => Promise<void>;
+}) {
   const isActive = supplier?.active !== false;
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<SupplierContact | null>(null);
+  const sortedContacts = [...contacts].sort((a, b) => {
+    const primaryRank = Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary));
+    if (primaryRank !== 0) return primaryRank;
+    return a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' });
+  });
 
   async function submitSupplier(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -4216,7 +4286,8 @@ function SupplierModal({ supplier, title, onClose, onSave }: { supplier?: Suppli
   }
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
+    <>
+      <div className="modal-backdrop" onMouseDown={onClose}>
       <form className="modal-card dealer-modal" onSubmit={submitSupplier} onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div>
@@ -4230,6 +4301,7 @@ function SupplierModal({ supplier, title, onClose, onSave }: { supplier?: Suppli
           <label>Contactpersoon<input name="contactName" defaultValue={supplier?.contactName ?? ''} /></label>
           <label>E-mail<input name="email" type="email" defaultValue={supplier?.email ?? ''} /></label>
           <label>Telefoon<input name="phone" defaultValue={supplier?.phone ?? ''} /></label>
+          <label>Mobiel<input name="mobile" defaultValue={supplier?.mobile ?? ''} /></label>
           <label>Website<input name="website" defaultValue={supplier?.website ?? ''} /></label>
           <label>Straat + huisnummer<input name="address" defaultValue={supplier?.address ?? ''} /></label>
           <label>Postcode<input name="postalCode" defaultValue={supplier?.postalCode ?? ''} /></label>
@@ -4237,6 +4309,34 @@ function SupplierModal({ supplier, title, onClose, onSave }: { supplier?: Suppli
           <label>Land<input name="country" defaultValue={supplier?.country ?? ''} /></label>
           <label className="span-2">Notities<textarea name="notes" defaultValue={supplier?.notes ?? ''} /></label>
         </div>
+        <section className="supplier-contacts-section">
+          <div className="supplier-contacts-header">
+            <div>
+              <h3>Contactpersonen</h3>
+              <span>{supplier ? `${sortedContacts.length} gekoppeld` : 'Sla de leverancier eerst op om contactpersonen toe te voegen.'}</span>
+            </div>
+            {supplier && (
+              <button type="button" className="secondary-button" onClick={() => setShowAddContact(true)}>
+                <Plus size={16} /> Contactpersoon
+              </button>
+            )}
+          </div>
+          {supplier && sortedContacts.length > 0 && (
+            <div className="supplier-contact-list">
+              {sortedContacts.map((contact) => (
+                <button type="button" className="supplier-contact-row" key={contact.id} onClick={() => setSelectedContact(contact)}>
+                  <span>
+                    <strong>{contact.name}</strong>
+                    {contact.role && <small>{contact.role}</small>}
+                  </span>
+                  <span>{contact.email || '-'}</span>
+                  <span>{contact.mobile || contact.phone || '-'}</span>
+                  <span>{contact.wechat || '-'}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
         <div className="modal-actions">
           {supplier && (
             <button
@@ -4247,6 +4347,65 @@ function SupplierModal({ supplier, title, onClose, onSave }: { supplier?: Suppli
               {isActive ? 'Zet niet actief' : 'Zet actief'}
             </button>
           )}
+          <button type="button" className="secondary-button" onClick={onClose}>Annuleren</button>
+          <button className="primary-button" type="submit">Opslaan</button>
+        </div>
+      </form>
+      </div>
+      {supplier && showAddContact && (
+        <SupplierContactModal
+          supplierId={supplier.id}
+          title="Nieuwe contactpersoon"
+          onClose={() => setShowAddContact(false)}
+          onSave={async (contact) => {
+            await onSaveContact(contact);
+            setShowAddContact(false);
+          }}
+        />
+      )}
+      {supplier && selectedContact && (
+        <SupplierContactModal
+          supplierId={supplier.id}
+          contact={selectedContact}
+          title={selectedContact.name}
+          onClose={() => setSelectedContact(null)}
+          onSave={async (contact) => {
+            await onSaveContact(contact);
+            setSelectedContact(contact);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function SupplierContactModal({ supplierId, contact, title, onClose, onSave }: { supplierId: string; contact?: SupplierContact; title: string; onClose: () => void; onSave: (contact: SupplierContact) => Promise<void> }) {
+  async function submitContact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSave(supplierContactFromForm(new FormData(event.currentTarget), supplierId, contact));
+  }
+
+  return (
+    <div className="modal-backdrop nested-modal" onMouseDown={onClose}>
+      <form className="modal-card dealer-modal" onSubmit={submitContact} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <span>Contactpersoon</span>
+            <h2>{title}</h2>
+          </div>
+          <button type="button" onClick={onClose}>Close</button>
+        </div>
+        <div className="form-grid">
+          <label>Naam*<input name="name" defaultValue={contact?.name ?? ''} required /></label>
+          <label>Functie<input name="role" defaultValue={contact?.role ?? ''} /></label>
+          <label>E-mail<input name="email" type="email" defaultValue={contact?.email ?? ''} /></label>
+          <label>Telefoon<input name="phone" defaultValue={contact?.phone ?? ''} /></label>
+          <label>Mobiel<input name="mobile" defaultValue={contact?.mobile ?? ''} /></label>
+          <label>WeChat<input name="wechat" defaultValue={contact?.wechat ?? ''} /></label>
+          <label className="checkbox-field"><input name="isPrimary" type="checkbox" defaultChecked={Boolean(contact?.isPrimary)} /> Primair contact</label>
+          <label className="span-2">Notities<textarea name="notes" defaultValue={contact?.notes ?? ''} /></label>
+        </div>
+        <div className="modal-actions">
           <button type="button" className="secondary-button" onClick={onClose}>Annuleren</button>
           <button className="primary-button" type="submit">Opslaan</button>
         </div>
