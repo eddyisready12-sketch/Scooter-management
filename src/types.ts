@@ -47,6 +47,7 @@ export type Container = {
 };
 
 export type ContainerCostAllocationMode = 'volume' | 'value';
+export type ContainerCostItemCategory = 'transport' | 'import' | 'other';
 
 export type ContainerCostBatch = {
   id: string;
@@ -60,6 +61,7 @@ export type ContainerCostBatch = {
   otherCostEur?: string;
   transportAllocationMode: ContainerCostAllocationMode;
   importAllocationMode: ContainerCostAllocationMode;
+  costItemsJson?: string;
   notes?: string;
   createdAt?: string;
 };

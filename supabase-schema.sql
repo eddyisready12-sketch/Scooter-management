@@ -68,6 +68,7 @@ create table if not exists container_cost_batches (
   "otherCostEur" text,
   "transportAllocationMode" text not null default 'volume',
   "importAllocationMode" text not null default 'value',
+  "costItemsJson" text,
   notes text,
   "createdAt" timestamptz default now()
 );

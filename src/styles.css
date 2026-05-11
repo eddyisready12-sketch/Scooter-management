@@ -2424,6 +2424,30 @@ tbody tr:hover {
   padding-bottom: 8px;
 }
 
+.cost-item-actions {
+  padding: 0 16px 12px;
+}
+
+.cost-item-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.cost-item-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 1.5fr) minmax(120px, 0.8fr) minmax(130px, 0.9fr) minmax(120px, 0.8fr) minmax(160px, 1fr) 110px 40px;
+}
+
+.cost-item-total {
+  color: #17202a;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
 .container-cost-table td strong,
 .container-cost-table td small {
   display: block;
@@ -3207,6 +3231,14 @@ dd {
 
   .container-tool-grid {
     grid-template-columns: 1fr;
+  }
+
+  .cost-item-row {
+    grid-template-columns: 1fr;
+  }
+
+  .cost-item-total {
+    text-align: left;
   }
 
   .container-command-actions {

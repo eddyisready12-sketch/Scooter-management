@@ -57,6 +57,17 @@ type LoginSession = {
   expiresAt?: number;
 };
 
+type ContainerCostDraftItem = {
+  id: string;
+  label: string;
+  category: 'transport' | 'import' | 'other';
+  mode: ContainerCostAllocationMode;
+  kind: 'fixed' | 'duty';
+  amountEur: string;
+  dutyRate: string;
+  appliesTo: 'all' | 'scooter' | 'onderdeel' | 'samengesteld' | 'non-scooter';
+};
+
 const loginStorageKey = 'rso-admin-session';
 const productImportCompaniesStorageKey = 'rso-product-import-companies';
 const defaultProductImportCompanies = ['Blanco', 'Everestt', 'JIABIN', 'Wenling', 'mortch motor'];
@@ -76,7 +87,7 @@ const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'batteries', label: "Accu's", icon: BatteryCharging },
   { id: 'containers', label: 'Containers', icon: Boxes },
-  { id: 'costBatches', label: 'Kostprijs batches', icon: FileText },
+  { id: 'costBatches', label: 'Import China', icon: FileText },
   { id: 'dealers', label: 'Dealers', icon: UsersRound },
   { id: 'warranty', label: 'Garantie claims', icon: ShieldCheck },
   { id: 'suppliers', label: 'Leveranciers', icon: Factory },
@@ -1066,6 +1077,21 @@ function parseContainerCostContent(content: string) {
       return parsedLine;
     })
     .filter((line): line is ContainerCostImportDraftLine => Boolean(line));
+}
+
+function defaultContainerCostItems() {
+  return [
+    { id: 'cost-item-china-transport', label: 'China transport', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
+    { id: 'cost-item-freight', label: 'Freight', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
+    { id: 'cost-item-destination', label: 'Destination', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
+    { id: 'cost-item-road', label: 'Road', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
+    { id: 'cost-item-customs-scooters', label: 'Customs duties scooters', category: 'import', mode: 'value', kind: 'duty', amountEur: '0', dutyRate: '8', appliesTo: 'scooter' },
+    { id: 'cost-item-customs-parts', label: 'Customs duties onderdelen', category: 'import', mode: 'value', kind: 'duty', amountEur: '0', dutyRate: '3,7', appliesTo: 'non-scooter' },
+  ] satisfies ContainerCostDraftItem[];
+}
+
+function nextCostItemId() {
+  return `cost-item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function loginNameFromEmail(email: string) {
@@ -2870,35 +2896,35 @@ function CostBatchesPage({
     <>
       <div className="page-title-row">
         <div>
-          <h1>Kostprijs batches</h1>
-          <span>{data.containerCostBatches.length} batches opgeslagen</span>
+          <h1>Import China</h1>
+          <span>{data.containerCostBatches.length} importbatches opgeslagen</span>
         </div>
       </div>
       <section className="panel">
         <div className="panel-title">
-          <span className="panel-title-label"><FileText size={16} /> Kostprijs tools</span>
+          <span className="panel-title-label"><FileText size={16} /> Import China tools</span>
         </div>
         <div className="container-tool-grid single">
           <button type="button" className="container-tool-tile finance" onClick={() => setShowCostModal(true)}>
             <span className="container-tool-icon"><CircleDollarSign size={20} /></span>
             <span className="container-tool-copy">
-              <strong>Nieuwe kostprijs batch</strong>
+              <strong>Nieuwe importbatch</strong>
               <small>Transport, inklaring en douane over scooters en onderdelen verdelen en wegschrijven naar kostprijs.</small>
             </span>
           </button>
         </div>
       </section>
       <section className="panel sales-summary">
-        <div><span>Kostprijs batches</span><strong>{data.containerCostBatches.length}</strong></div>
-        <div><span>Kostprijsregels</span><strong>{data.containerCostLines.length}</strong></div>
+        <div><span>Importbatches</span><strong>{data.containerCostBatches.length}</strong></div>
+        <div><span>Importregels</span><strong>{data.containerCostLines.length}</strong></div>
         <div><span>Laatste order</span><strong>{sortedBatches[0]?.orderNumber || '-'}</strong></div>
       </section>
       <section className="panel table-panel">
-        <div className="panel-title"><span className="panel-title-label"><CircleDollarSign size={16} /> Recente batches</span></div>
+        <div className="panel-title"><span className="panel-title-label"><CircleDollarSign size={16} /> Recente importbatches</span></div>
         {sortedBatches.length === 0 ? (
           <div className="empty-state inline">
             <CircleDollarSign size={22} />
-            <strong>Nog geen kostprijs batches</strong>
+            <strong>Nog geen importbatches</strong>
             <span>Maak een batch aan om transport, inklaring en actuele kostprijzen vast te leggen.</span>
           </div>
         ) : (
@@ -2969,17 +2995,53 @@ function ContainerCostModal({
   const [orderNumber, setOrderNumber] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [exchangeRate, setExchangeRate] = useState('0,92');
-  const [transportCostEur, setTransportCostEur] = useState('0');
-  const [importCostEur, setImportCostEur] = useState('0');
-  const [otherCostEur, setOtherCostEur] = useState('0');
-  const [transportMode, setTransportMode] = useState<ContainerCostAllocationMode>('volume');
-  const [importMode, setImportMode] = useState<ContainerCostAllocationMode>('value');
+  const [costItems, setCostItems] = useState<ContainerCostDraftItem[]>(() => defaultContainerCostItems());
   const [notes, setNotes] = useState('');
   const [content, setContent] = useState('');
   const [draftLines, setDraftLines] = useState<ContainerCostImportDraftLine[]>([]);
   const [saving, setSaving] = useState(false);
   const selectedContainer = containers.find((container) => container.id === selectedContainerId);
   const supplierOptions = suppliers.map((supplier) => supplier.name).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+
+  function updateCostItem(id: string, patch: Partial<ContainerCostDraftItem>) {
+    setCostItems((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  }
+
+  function addFixedCostItem() {
+    setCostItems((current) => [
+      ...current,
+      {
+        id: nextCostItemId(),
+        label: 'Nieuwe kostenpost',
+        category: 'other',
+        mode: 'value',
+        kind: 'fixed',
+        amountEur: '0',
+        dutyRate: '0',
+        appliesTo: 'all',
+      },
+    ]);
+  }
+
+  function addDutyCostItem() {
+    setCostItems((current) => [
+      ...current,
+      {
+        id: nextCostItemId(),
+        label: 'Nieuwe douanepost',
+        category: 'import',
+        mode: 'value',
+        kind: 'duty',
+        amountEur: '0',
+        dutyRate: '0',
+        appliesTo: 'all',
+      },
+    ]);
+  }
+
+  function removeCostItem(id: string) {
+    setCostItems((current) => current.filter((item) => item.id !== id));
+  }
 
   const computedLines = draftLines.map((line) => {
     const quantity = Math.max(1, parseDecimal(line.quantity));
@@ -3003,19 +3065,60 @@ function ContainerCostModal({
 
   const totalVolume = computedLines.reduce((sum, line) => sum + (line.volumeCbm * line.quantity), 0);
   const totalGoodsValue = computedLines.reduce((sum, line) => sum + line.goodsValueEurBase, 0);
-  const transportPool = parseDecimal(transportCostEur);
-  const importPool = parseDecimal(importCostEur);
-  const otherPool = parseDecimal(otherCostEur);
+
+  const resolvedCostItems = costItems.map((item) => {
+    const fixedAmount = parseDecimal(item.amountEur);
+    if (item.kind === 'fixed') {
+      return { ...item, resolvedAmountEur: fixedAmount };
+    }
+
+    const dutyRate = parseDecimal(item.dutyRate) / 100;
+    const dutyBase = computedLines.reduce((sum, line) => {
+      const applies = item.appliesTo === 'all'
+        || (item.appliesTo === 'scooter' && line.type === 'scooter')
+        || (item.appliesTo === 'onderdeel' && line.type === 'onderdeel')
+        || (item.appliesTo === 'samengesteld' && line.type === 'samengesteld')
+        || (item.appliesTo === 'non-scooter' && line.type !== 'scooter');
+      return sum + (applies ? line.goodsValueEurBase : 0);
+    }, 0);
+
+    return { ...item, resolvedAmountEur: roundValue(dutyBase * dutyRate, 4) };
+  });
+
+  const transportPool = resolvedCostItems.filter((item) => item.category === 'transport').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
+  const importPool = resolvedCostItems.filter((item) => item.category === 'import').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
+  const otherPool = resolvedCostItems.filter((item) => item.category === 'other').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
 
   const calculatedLines = computedLines.map((line) => {
     const lineVolumeTotal = line.volumeCbm * line.quantity;
     const volumeShare = totalVolume > 0 ? lineVolumeTotal / totalVolume : 0;
     const valueShare = totalGoodsValue > 0 ? line.goodsValueEurBase / totalGoodsValue : 0;
-    const transportShare = transportMode === 'volume' ? volumeShare : valueShare;
-    const importShare = importMode === 'volume' ? volumeShare : valueShare;
-    const allocatedTransportEur = roundValue(transportPool * transportShare, 4);
-    const allocatedImportEur = roundValue(importPool * importShare, 4);
-    const allocatedOtherEur = roundValue(otherPool * volumeShare, 4);
+    let allocatedTransportEur = 0;
+    let allocatedImportEur = 0;
+    let allocatedOtherEur = 0;
+
+    resolvedCostItems.forEach((item) => {
+      const itemShare = item.kind === 'duty'
+        ? (
+          item.appliesTo === 'all'
+          || (item.appliesTo === 'scooter' && line.type === 'scooter')
+          || (item.appliesTo === 'onderdeel' && line.type === 'onderdeel')
+          || (item.appliesTo === 'samengesteld' && line.type === 'samengesteld')
+          || (item.appliesTo === 'non-scooter' && line.type !== 'scooter')
+            ? valueShare
+            : 0
+        )
+        : item.mode === 'volume' ? volumeShare : valueShare;
+      const allocation = roundValue(item.resolvedAmountEur * itemShare, 4);
+
+      if (item.category === 'transport') allocatedTransportEur += allocation;
+      if (item.category === 'import') allocatedImportEur += allocation;
+      if (item.category === 'other') allocatedOtherEur += allocation;
+    });
+
+    allocatedTransportEur = roundValue(allocatedTransportEur, 4);
+    allocatedImportEur = roundValue(allocatedImportEur, 4);
+    allocatedOtherEur = roundValue(allocatedOtherEur, 4);
     const calculatedUnitCostEur = line.quantity > 0
       ? roundValue((line.goodsValueEurBase + allocatedTransportEur + allocatedImportEur + allocatedOtherEur) / line.quantity, 4)
       : 0;
@@ -3045,8 +3148,9 @@ function ContainerCostModal({
         transportCostEur: formatDecimal(transportPool, 2),
         importCostEur: formatDecimal(importPool, 2),
         otherCostEur: otherPool > 0 ? formatDecimal(otherPool, 2) : undefined,
-        transportAllocationMode: transportMode,
-        importAllocationMode: importMode,
+        transportAllocationMode: 'volume',
+        importAllocationMode: 'value',
+        costItemsJson: JSON.stringify(resolvedCostItems.map(({ resolvedAmountEur, ...item }) => ({ ...item, resolvedAmountEur: formatDecimal(resolvedAmountEur, 4) }))),
         notes: notes.trim() || undefined,
         createdAt: new Date().toISOString(),
       };
@@ -3089,7 +3193,7 @@ function ContainerCostModal({
         <div className="modal-header">
           <div>
             <span>Containers</span>
-            <h2>Import kostprijs berekenen</h2>
+            <h2>Import China batch</h2>
           </div>
           <button type="button" onClick={onClose}>Close</button>
         </div>
@@ -3118,30 +3222,60 @@ function ContainerCostModal({
               <label>Wisselkoers USD - EUR
                 <input value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} />
               </label>
-              <label>Transportkosten container (EUR)
-                <input value={transportCostEur} onChange={(event) => setTransportCostEur(event.target.value)} />
-              </label>
-              <label>Invoerkosten / douane (EUR)
-                <input value={importCostEur} onChange={(event) => setImportCostEur(event.target.value)} />
-              </label>
-              <label>Overige kosten (EUR)
-                <input value={otherCostEur} onChange={(event) => setOtherCostEur(event.target.value)} />
-              </label>
-              <label>Transport verdelen op
-                <select value={transportMode} onChange={(event) => setTransportMode(event.target.value as ContainerCostAllocationMode)}>
-                  <option value="volume">Volume</option>
-                  <option value="value">Goederenwaarde</option>
-                </select>
-              </label>
-              <label>Invoerkosten verdelen op
-                <select value={importMode} onChange={(event) => setImportMode(event.target.value as ContainerCostAllocationMode)}>
-                  <option value="value">Goederenwaarde</option>
-                  <option value="volume">Volume</option>
-                </select>
-              </label>
               <label className="span-2">Notities
                 <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optioneel: opmerking over containerinhoud, samengestelde sets of correcties." />
               </label>
+            </div>
+          </section>
+
+          <section className="product-form-subsection">
+            <h3>Kostenposten</h3>
+            <div className="container-command-actions cost-item-actions">
+              <button type="button" className="secondary-button" onClick={addFixedCostItem}><Plus size={16} /> Kostenpost</button>
+              <button type="button" className="secondary-button" onClick={addDutyCostItem}><Plus size={16} /> Douanepost</button>
+            </div>
+            <div className="cost-item-list">
+              {costItems.map((item) => {
+                const resolved = resolvedCostItems.find((entry) => entry.id === item.id);
+                return (
+                  <div className="cost-item-row" key={item.id}>
+                    <input value={item.label} onChange={(event) => updateCostItem(item.id, { label: event.target.value })} placeholder="Naam kostenpost" />
+                    <select value={item.category} onChange={(event) => updateCostItem(item.id, { category: event.target.value as ContainerCostDraftItem['category'] })}>
+                      <option value="transport">Transport</option>
+                      <option value="import">Import</option>
+                      <option value="other">Overig</option>
+                    </select>
+                    <select value={item.kind} onChange={(event) => updateCostItem(item.id, { kind: event.target.value as ContainerCostDraftItem['kind'] })}>
+                      <option value="fixed">Vast bedrag</option>
+                      <option value="duty">Douanetarief</option>
+                    </select>
+                    {item.kind === 'fixed' ? (
+                      <>
+                        <input value={item.amountEur} onChange={(event) => updateCostItem(item.id, { amountEur: event.target.value })} placeholder="Bedrag EUR" />
+                        <select value={item.mode} onChange={(event) => updateCostItem(item.id, { mode: event.target.value as ContainerCostAllocationMode })}>
+                          <option value="volume">Verdelen op volume</option>
+                          <option value="value">Verdelen op waarde</option>
+                        </select>
+                      </>
+                    ) : (
+                      <>
+                        <input value={item.dutyRate} onChange={(event) => updateCostItem(item.id, { dutyRate: event.target.value })} placeholder="Tarief %" />
+                        <select value={item.appliesTo} onChange={(event) => updateCostItem(item.id, { appliesTo: event.target.value as ContainerCostDraftItem['appliesTo'] })}>
+                          <option value="all">Alles</option>
+                          <option value="scooter">Alleen scooters</option>
+                          <option value="onderdeel">Alleen onderdelen</option>
+                          <option value="samengesteld">Alleen samengesteld</option>
+                          <option value="non-scooter">Alles behalve scooters</option>
+                        </select>
+                      </>
+                    )}
+                    <div className="cost-item-total">EUR {formatDecimal(resolved?.resolvedAmountEur ?? 0, 2)}</div>
+                    <button type="button" className="danger-icon-button" onClick={() => removeCostItem(item.id)} aria-label="Kostenpost verwijderen">
+                      <XCircle size={18} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </section>
 
@@ -3214,7 +3348,7 @@ function ContainerCostModal({
             )}
             <div className="inline-notice">
               <span>
-                Onderdelen krijgen bij opslaan direct de actuele `kostprijs` en het `batch`-nummer van deze order. Scooters worden nu alleen historisch vastgelegd in de batchregels.
+            Onderdelen krijgen bij opslaan direct de actuele `kostprijs` en het `batch`-nummer van deze order. Scooters worden nu alleen historisch vastgelegd in de importregels.
               </span>
             </div>
           </section>
@@ -3227,7 +3361,7 @@ function ContainerCostModal({
             disabled={saving || !selectedContainerId || !orderNumber.trim() || calculatedLines.length === 0}
             onClick={() => void handleSave()}
           >
-            {saving ? 'Opslaan...' : 'Kostprijs opslaan'}
+            {saving ? 'Opslaan...' : 'Importbatch opslaan'}
           </button>
         </div>
       </div>
