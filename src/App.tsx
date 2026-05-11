@@ -4137,7 +4137,7 @@ function SuppliersPage({
               <span>Leverancier</span>
               <span>Plaats</span>
               <span>Land</span>
-              <span>Producten</span>
+              <span>Gekoppelde producten</span>
               <span>Actief</span>
             </div>
             {sortedSuppliers.map((supplier) => (
