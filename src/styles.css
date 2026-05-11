@@ -2412,7 +2412,74 @@ tbody tr:hover {
 .container-cost-layout {
   display: grid;
   gap: 12px;
-  padding-bottom: 16px;
+  padding: 0 16px 16px;
+}
+
+.container-cost-hero {
+  align-items: center;
+  background: linear-gradient(135deg, #f5f8fd 0%, #fff8e8 100%);
+  border: 1px solid #dde5ee;
+  border-radius: 10px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
+  padding: 18px;
+}
+
+.container-cost-hero-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.container-cost-hero-copy strong {
+  color: #1f2d3d;
+  font-size: 18px;
+}
+
+.container-cost-hero-copy span {
+  color: #5f6f7f;
+  line-height: 1.45;
+}
+
+.container-cost-hero-stats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.container-cost-hero-stats div {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid #dbe3ec;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.container-cost-hero-stats span {
+  color: #6a7785;
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.container-cost-hero-stats strong {
+  color: #17202a;
+  display: block;
+  font-size: 15px;
+}
+
+.container-cost-top-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+}
+
+.container-cost-card {
+  background: #fbfcfe;
+  border: 1px solid #e5eaf0;
+  border-radius: 10px;
+  padding: 16px;
 }
 
 .container-import-form {
@@ -2425,20 +2492,36 @@ tbody tr:hover {
 }
 
 .cost-item-actions {
-  padding: 0 16px 12px;
+  padding: 0 0 12px;
 }
 
 .cost-item-list {
   display: grid;
   gap: 10px;
-  padding: 0 16px 16px;
+  padding: 0 0 8px;
 }
 
+.cost-item-header,
 .cost-item-row {
   align-items: center;
   display: grid;
   gap: 10px;
   grid-template-columns: minmax(180px, 1.5fr) minmax(120px, 0.8fr) minmax(130px, 0.9fr) minmax(120px, 0.8fr) minmax(160px, 1fr) 110px 40px;
+}
+
+.cost-item-header {
+  color: #65717d;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.cost-item-row {
+  background: #fbfcfd;
+  border: 1px solid #e3e8ee;
+  border-radius: 8px;
+  padding: 10px;
 }
 
 .cost-item-total {
@@ -2462,7 +2545,7 @@ tbody tr:hover {
 .container-content-field {
   display: grid;
   gap: 8px;
-  padding: 0 16px 18px;
+  padding: 0 0 8px;
   font-weight: 700;
 }
 
@@ -3233,8 +3316,21 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .container-cost-hero,
+  .container-cost-top-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .container-cost-hero-stats {
+    grid-template-columns: 1fr;
+  }
+
   .cost-item-row {
     grid-template-columns: 1fr;
+  }
+
+  .cost-item-header {
+    display: none;
   }
 
   .cost-item-total {

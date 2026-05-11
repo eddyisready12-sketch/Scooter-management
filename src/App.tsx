@@ -3215,7 +3215,20 @@ function ContainerCostModal({
           <button type="button" onClick={onClose}>Close</button>
         </div>
         <div className="container-cost-layout">
-          <section className="product-form-subsection">
+          <section className="container-cost-hero">
+            <div className="container-cost-hero-copy">
+              <strong>Containerkosten, douane en productkostprijs in een batch.</strong>
+              <span>Koppel de betaling aan Exact en verdeel China-transport naar verhouding over scooters en onderdelen.</span>
+            </div>
+            <div className="container-cost-hero-stats">
+              <div><span>Container</span><strong>{selectedContainer?.number || '-'}</strong></div>
+              <div><span>Order</span><strong>{orderNumber || '-'}</strong></div>
+              <div><span>Netto betaling</span><strong>EUR {formatDecimal(finalPaymentNetEur, 2)}</strong></div>
+            </div>
+          </section>
+
+          <div className="container-cost-top-grid">
+          <section className="product-form-subsection container-cost-card">
             <h3>Container en order</h3>
             <div className="form-grid">
               <label>Container
@@ -3245,13 +3258,47 @@ function ContainerCostModal({
             </div>
           </section>
 
-          <section className="product-form-subsection">
+          <section className="product-form-subsection container-cost-card">
+            <h3>Betaling / Exact</h3>
+            <div className="form-grid">
+              <label>Goederen netto (auto)
+                <input value={formatDecimal(goodsNetEur, 2)} disabled />
+              </label>
+              <label>Logistiek netto (auto)
+                <input value={formatDecimal(logisticsNetEur, 2)} disabled />
+              </label>
+              <label>Betaling netto (auto)
+                <input value={formatDecimal(calculatedPaymentNetEur, 2)} disabled />
+              </label>
+              <label>Betaling netto override
+                <input value={paymentNetOverrideEur} onChange={(event) => setPaymentNetOverrideEur(event.target.value)} placeholder="Leeg = automatisch bedrag" />
+              </label>
+              <label className="span-2">Exact referentie
+                <input value={exactReference} onChange={(event) => setExactReference(event.target.value)} placeholder="Bijv. factuur-, boeking- of betaalreferentie" />
+              </label>
+            </div>
+            <div className="inline-notice">
+              <span>Containertransport China naar Nederland telt mee in de betaling aan China en wordt naar verhouding over alle scooters en onderdelen verdeeld.</span>
+            </div>
+          </section>
+          </div>
+
+          <section className="product-form-subsection container-cost-card">
             <h3>Kostenposten</h3>
             <div className="container-command-actions cost-item-actions">
               <button type="button" className="secondary-button" onClick={addFixedCostItem}><Plus size={16} /> Kostenpost</button>
               <button type="button" className="secondary-button" onClick={addDutyCostItem}><Plus size={16} /> Douanepost</button>
             </div>
             <div className="cost-item-list">
+              <div className="cost-item-header" aria-hidden="true">
+                <span>Post</span>
+                <span>Categorie</span>
+                <span>Type</span>
+                <span>Bedrag / tarief</span>
+                <span>Verdeling / doelgroep</span>
+                <span>Totaal</span>
+                <span></span>
+              </div>
               {costItems.map((item) => {
                 const resolved = resolvedCostItems.find((entry) => entry.id === item.id);
                 return (
@@ -3296,31 +3343,7 @@ function ContainerCostModal({
             </div>
           </section>
 
-          <section className="product-form-subsection">
-            <h3>Betaling / Exact</h3>
-            <div className="form-grid">
-              <label>Goederen netto (auto)
-                <input value={formatDecimal(goodsNetEur, 2)} disabled />
-              </label>
-              <label>Logistiek netto (auto)
-                <input value={formatDecimal(logisticsNetEur, 2)} disabled />
-              </label>
-              <label>Betaling netto (auto)
-                <input value={formatDecimal(calculatedPaymentNetEur, 2)} disabled />
-              </label>
-              <label>Betaling netto override
-                <input value={paymentNetOverrideEur} onChange={(event) => setPaymentNetOverrideEur(event.target.value)} placeholder="Leeg = automatisch bedrag" />
-              </label>
-              <label className="span-2">Exact referentie
-                <input value={exactReference} onChange={(event) => setExactReference(event.target.value)} placeholder="Bijv. factuur-, boeking- of betaalreferentie" />
-              </label>
-            </div>
-            <div className="inline-notice">
-              <span>Containertransport China naar Nederland telt mee in de betaling aan China en wordt naar verhouding over alle scooters en onderdelen verdeeld.</span>
-            </div>
-          </section>
-
-          <section className="product-form-subsection">
+          <section className="product-form-subsection container-cost-card">
             <h3>Excel regels plakken</h3>
             <div className="container-content-field container-cost-paste-field">
               <span>Gebruik tab-gescheiden kolommen in deze volgorde:</span>
@@ -3337,7 +3360,7 @@ function ContainerCostModal({
             </div>
           </section>
 
-          <section className="product-form-subsection">
+          <section className="product-form-subsection container-cost-card">
             <h3>Verdeling preview</h3>
             <div className="sales-summary">
               <div><span>Regels</span><strong>{calculatedLines.length}</strong></div>
