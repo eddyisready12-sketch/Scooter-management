@@ -971,6 +971,27 @@ function stableId(prefix: string, value: string) {
   return `${prefix}-${value.replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
 }
 
+function normalizedSupplierKey(value?: string) {
+  return (value ?? '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+}
+
+function supplierImportedKey(supplier: Supplier) {
+  return supplier.id.startsWith('supplier-') ? supplier.id.slice('supplier-'.length) : '';
+}
+
+function supplierNameMatches(supplier: Supplier, value?: string) {
+  const candidate = normalizedSupplierKey(value);
+  if (!candidate) return false;
+
+  const supplierName = normalizedSupplierKey(supplier.name);
+  const importedName = supplierImportedKey(supplier);
+  if (candidate === supplierName || candidate === importedName) return true;
+
+  return candidate.length >= 5 && supplierName.length >= 5 && (
+    supplierName.includes(candidate) || candidate.includes(supplierName)
+  );
+}
+
 function loginNameFromEmail(email: string) {
   const localPart = email.split('@')[0] || 'Gebruiker';
   return localPart
@@ -1462,13 +1483,28 @@ export function App() {
 
   async function upsertSupplierRecord(supplier: Supplier) {
     try {
+      let productsToUpdate: Product[] = [];
       setData((current) => {
         const byId = new Map(current.suppliers.map((item) => [item.id, item]));
+        const existingSupplier = byId.get(supplier.id);
         byId.set(supplier.id, supplier);
-        return { ...current, suppliers: Array.from(byId.values()) };
+        const updatedProducts = current.products.map((product) => {
+          if (!existingSupplier || !product.supplier || !supplierNameMatches(existingSupplier, product.supplier)) return product;
+          if (product.supplier === supplier.name) return product;
+          const updatedProduct = { ...product, supplier: supplier.name };
+          productsToUpdate.push(updatedProduct);
+          return updatedProduct;
+        });
+
+        return { ...current, suppliers: Array.from(byId.values()), products: updatedProducts };
       });
       await upsertSuppliers([supplier]);
-      setSupplierMessage(`${supplier.name} is opgeslagen.`);
+      if (productsToUpdate.length > 0) {
+        await upsertProducts(productsToUpdate);
+      }
+      setSupplierMessage(productsToUpdate.length > 0
+        ? `${supplier.name} is opgeslagen. ${productsToUpdate.length} producten zijn mee gekoppeld aan deze naam.`
+        : `${supplier.name} is opgeslagen.`);
     } catch (error) {
       setSupplierMessage(`Leverancier opslaan mislukt: ${importErrorMessage(error)}`);
     }
@@ -1489,13 +1525,12 @@ export function App() {
   }
 
   async function importSuppliersFromProducts() {
-    const existingNames = new Set(data.suppliers.map((supplier) => supplier.name.trim().toLowerCase()).filter(Boolean));
     const productSupplierNames = Array.from(new Set(
       data.products
         .map((product) => product.supplier?.trim())
         .filter((supplier): supplier is string => Boolean(supplier)),
     ))
-      .filter((supplier) => !existingNames.has(supplier.toLowerCase()))
+      .filter((supplierName) => !data.suppliers.some((supplier) => supplierNameMatches(supplier, supplierName)))
       .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
 
     if (productSupplierNames.length === 0) {
@@ -3306,9 +3341,10 @@ function ProductsPage({
 
   const articleGroups = Array.from(new Set(products.map((product) => product.articleGroup).filter(Boolean) as string[]))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const productSupplierNames = products.map((product) => product.supplier).filter(Boolean) as string[];
   const suppliers = Array.from(new Set([
     ...supplierRecords.map((supplier) => supplier.name).filter(Boolean),
-    ...(products.map((product) => product.supplier).filter(Boolean) as string[]),
+    ...productSupplierNames.filter((supplierName) => !supplierRecords.some((supplier) => supplierNameMatches(supplier, supplierName))),
   ]))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const stockValues = Array.from(new Set(products.map((product) => product.stock).filter(Boolean) as string[]))
@@ -3345,7 +3381,9 @@ function ProductsPage({
         && (!descriptionNeedle || product.description?.toLowerCase().includes(descriptionNeedle))
         && (!barcodeNeedle || product.barcode?.toLowerCase().includes(barcodeNeedle))
         && (!groupFilter || product.articleGroup === groupFilter)
-        && (!supplierFilter || (supplierFilter === missingSupplierValue ? !product.supplier?.trim() : product.supplier === supplierFilter))
+        && (!supplierFilter || (supplierFilter === missingSupplierValue
+          ? !product.supplier?.trim()
+          : product.supplier === supplierFilter || supplierRecords.some((record) => record.name === supplierFilter && supplierNameMatches(record, product.supplier))))
         && (!stockFilter || product.stock === stockFilter)
         && (!ownImportOnly || isOwnImportProduct)
         && lifecycleMatch
@@ -4127,7 +4165,7 @@ function SuppliersPage({
   });
 
   function productsForSupplier(supplier: Supplier) {
-    return products.filter((product) => product.supplier === supplier.name);
+    return products.filter((product) => supplierNameMatches(supplier, product.supplier));
   }
 
   const productSupplierCount = new Set(products.map((product) => product.supplier?.trim()).filter(Boolean)).size;
