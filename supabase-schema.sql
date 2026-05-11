@@ -30,7 +30,7 @@ alter table suppliers add column if not exists mobile text;
 
 create table if not exists supplier_contacts (
   id text primary key,
-  "supplierId" text not null references suppliers(id) on delete cascade,
+  supplier_id text not null references suppliers(id) on delete cascade,
   name text not null,
   role text,
   email text,
@@ -38,13 +38,13 @@ create table if not exists supplier_contacts (
   mobile text,
   wechat text,
   notes text,
-  "isPrimary" boolean default false,
+  is_primary boolean default false,
   active boolean default true,
-  "createdAt" timestamptz default now()
+  created_at timestamptz default now()
 );
 
 create index if not exists supplier_contacts_supplier_id_idx
-on supplier_contacts("supplierId");
+on supplier_contacts(supplier_id);
 
 create table if not exists containers (
   id text primary key,

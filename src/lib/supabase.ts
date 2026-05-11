@@ -87,6 +87,54 @@ async function loadAllRows(table: string) {
   return rows;
 }
 
+function normalizeSupplierContact(row: Record<string, unknown>): SupplierContact {
+  return {
+    id: String(row.id ?? ''),
+    supplierId: String(row.supplierId ?? row.supplier_id ?? ''),
+    name: String(row.name ?? ''),
+    role: row.role ? String(row.role) : undefined,
+    email: row.email ? String(row.email) : undefined,
+    phone: row.phone ? String(row.phone) : undefined,
+    mobile: row.mobile ? String(row.mobile) : undefined,
+    wechat: row.wechat ? String(row.wechat) : undefined,
+    notes: row.notes ? String(row.notes) : undefined,
+    isPrimary: Boolean(row.isPrimary ?? row.is_primary ?? false),
+    active: row.active === false ? false : true,
+  };
+}
+
+function supplierContactToDatabase(contact: SupplierContact) {
+  return {
+    id: contact.id,
+    supplier_id: contact.supplierId,
+    name: contact.name,
+    role: contact.role,
+    email: contact.email,
+    phone: contact.phone,
+    mobile: contact.mobile,
+    wechat: contact.wechat,
+    notes: contact.notes,
+    is_primary: contact.isPrimary ?? false,
+    active: contact.active ?? true,
+  };
+}
+
+function supplierContactToLegacyDatabase(contact: SupplierContact) {
+  return {
+    id: contact.id,
+    supplierId: contact.supplierId,
+    name: contact.name,
+    role: contact.role,
+    email: contact.email,
+    phone: contact.phone,
+    mobile: contact.mobile,
+    wechat: contact.wechat,
+    notes: contact.notes,
+    isPrimary: contact.isPrimary ?? false,
+    active: contact.active ?? true,
+  };
+}
+
 export async function loadSupabaseData(): Promise<Partial<AppData>> {
   if (!supabase) return {};
 
@@ -94,6 +142,9 @@ export async function loadSupabaseData(): Promise<Partial<AppData>> {
     Object.entries(tableMap).map(async ([key, table]) => {
       try {
         const data = await loadAllRows(table);
+        if (key === 'supplierContacts') {
+          return [key, data.map(normalizeSupplierContact)] as const;
+        }
         return [key, data] as const;
       } catch {
         return null;
@@ -204,10 +255,17 @@ export async function upsertSupplierContacts(contacts: SupplierContact[]) {
 
   const { error } = await supabase
     .from('supplier_contacts')
-    .upsert(contacts);
+    .upsert(contacts.map(supplierContactToDatabase));
 
-  if (error) throw error;
+  if (!error) return;
+
+  const legacyResult = await supabase
+    .from('supplier_contacts')
+    .upsert(contacts.map(supplierContactToLegacyDatabase));
+
+  if (legacyResult.error) throw error;
 }
+
 
 export async function upsertMaintenanceRecords(records: MaintenanceRecord[]) {
   if (!supabase || records.length === 0) return;
