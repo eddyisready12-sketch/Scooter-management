@@ -2340,9 +2340,34 @@ tbody tr:hover {
   width: min(920px, calc(100vw - 32px));
 }
 
+.container-cost-modal {
+  width: min(1180px, calc(100vw - 32px));
+}
+
+.container-cost-layout {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 16px;
+}
+
 .container-import-form {
   display: grid;
   gap: 6px;
+}
+
+.container-cost-paste-field {
+  padding-bottom: 8px;
+}
+
+.container-cost-table td strong,
+.container-cost-table td small {
+  display: block;
+}
+
+.container-cost-table td small {
+  color: #65717d;
+  font-size: 12px;
+  margin-top: 3px;
 }
 
 .container-content-field {

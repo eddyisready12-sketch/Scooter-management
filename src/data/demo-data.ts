@@ -55,6 +55,8 @@ const scooters = Array.from({ length: 42 }, (_, index) => {
 export const demoData: AppData = {
   scooters,
   containers,
+  containerCostBatches: [],
+  containerCostLines: [],
   dealers,
   products: [],
   suppliers: [],

@@ -46,6 +46,44 @@ export type Container = {
   arrivedAt?: string;
 };
 
+export type ContainerCostAllocationMode = 'volume' | 'value';
+
+export type ContainerCostBatch = {
+  id: string;
+  containerId: string;
+  orderNumber: string;
+  supplierName?: string;
+  currency: 'USD' | 'EUR';
+  exchangeRate: string;
+  transportCostEur: string;
+  importCostEur: string;
+  otherCostEur?: string;
+  transportAllocationMode: ContainerCostAllocationMode;
+  importAllocationMode: ContainerCostAllocationMode;
+  notes?: string;
+  createdAt?: string;
+};
+
+export type ContainerCostLineType = 'onderdeel' | 'scooter' | 'samengesteld';
+
+export type ContainerCostLine = {
+  id: string;
+  batchId: string;
+  type: ContainerCostLineType;
+  referenceId?: string;
+  referenceCode: string;
+  description: string;
+  quantity: string;
+  volumeCbm: string;
+  unitPriceUsd: string;
+  goodsValueEur: string;
+  allocatedTransportEur: string;
+  allocatedImportEur: string;
+  allocatedOtherEur: string;
+  calculatedUnitCostEur: string;
+  componentsNote?: string;
+};
+
 export type Dealer = {
   id: string;
   name: string;
@@ -223,6 +261,8 @@ export type DocumentRecord = {
 export type AppData = {
   scooters: Scooter[];
   containers: Container[];
+  containerCostBatches: ContainerCostBatch[];
+  containerCostLines: ContainerCostLine[];
   dealers: Dealer[];
   products: Product[];
   suppliers: Supplier[];

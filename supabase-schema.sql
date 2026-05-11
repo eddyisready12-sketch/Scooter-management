@@ -56,6 +56,46 @@ create table if not exists containers (
   "arrivedAt" timestamptz
 );
 
+create table if not exists container_cost_batches (
+  id text primary key,
+  "containerId" text not null references containers(id) on delete cascade,
+  "orderNumber" text not null,
+  "supplierName" text,
+  currency text not null default 'USD',
+  "exchangeRate" text not null,
+  "transportCostEur" text not null,
+  "importCostEur" text not null,
+  "otherCostEur" text,
+  "transportAllocationMode" text not null default 'volume',
+  "importAllocationMode" text not null default 'value',
+  notes text,
+  "createdAt" timestamptz default now()
+);
+
+create table if not exists container_cost_lines (
+  id text primary key,
+  "batchId" text not null references container_cost_batches(id) on delete cascade,
+  type text not null,
+  "referenceId" text,
+  "referenceCode" text not null,
+  description text not null,
+  quantity text not null,
+  "volumeCbm" text not null,
+  "unitPriceUsd" text not null,
+  "goodsValueEur" text not null,
+  "allocatedTransportEur" text not null,
+  "allocatedImportEur" text not null,
+  "allocatedOtherEur" text not null,
+  "calculatedUnitCostEur" text not null,
+  "componentsNote" text
+);
+
+create index if not exists container_cost_batches_container_idx
+on container_cost_batches("containerId");
+
+create index if not exists container_cost_lines_batch_idx
+on container_cost_lines("batchId");
+
 create table if not exists scooters (
   id text primary key,
   "frameNumber" text unique not null,
@@ -154,6 +194,8 @@ create table if not exists documents (
 
 alter publication supabase_realtime add table scooters;
 alter publication supabase_realtime add table containers;
+alter publication supabase_realtime add table container_cost_batches;
+alter publication supabase_realtime add table container_cost_lines;
 alter publication supabase_realtime add table dealers;
 alter publication supabase_realtime add table suppliers;
 alter publication supabase_realtime add table supplier_contacts;
@@ -167,6 +209,8 @@ alter table dealers enable row level security;
 alter table suppliers enable row level security;
 alter table supplier_contacts enable row level security;
 alter table scooters enable row level security;
+alter table container_cost_batches enable row level security;
+alter table container_cost_lines enable row level security;
 alter table batteries enable row level security;
 alter table battery_models enable row level security;
 alter table warranty_parts enable row level security;
@@ -263,6 +307,51 @@ create policy "Allow public update scooters"
 on scooters
 for update
 to anon
+using (true)
+with check (true);
+
+drop policy if exists "Allow authenticated read container cost batches" on container_cost_batches;
+drop policy if exists "Allow authenticated insert container cost batches" on container_cost_batches;
+drop policy if exists "Allow authenticated update container cost batches" on container_cost_batches;
+drop policy if exists "Allow authenticated read container cost lines" on container_cost_lines;
+drop policy if exists "Allow authenticated insert container cost lines" on container_cost_lines;
+drop policy if exists "Allow authenticated update container cost lines" on container_cost_lines;
+
+create policy "Allow authenticated read container cost batches"
+on container_cost_batches
+for select
+to authenticated
+using (true);
+
+create policy "Allow authenticated insert container cost batches"
+on container_cost_batches
+for insert
+to authenticated
+with check (true);
+
+create policy "Allow authenticated update container cost batches"
+on container_cost_batches
+for update
+to authenticated
+using (true)
+with check (true);
+
+create policy "Allow authenticated read container cost lines"
+on container_cost_lines
+for select
+to authenticated
+using (true);
+
+create policy "Allow authenticated insert container cost lines"
+on container_cost_lines
+for insert
+to authenticated
+with check (true);
+
+create policy "Allow authenticated update container cost lines"
+on container_cost_lines
+for update
+to authenticated
 using (true)
 with check (true);
 

@@ -37,8 +37,8 @@ import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, Battery, BatteryModel, Container, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Product, ProductPackagingLayer, Scooter, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
+import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Product, ProductPackagingLayer, Scooter, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
@@ -996,6 +996,77 @@ function displaySupplierName(suppliers: Supplier[], value?: string) {
   return suppliers.find((supplier) => supplierNameMatches(supplier, value))?.name ?? value ?? '';
 }
 
+function parseDecimal(value?: string | number | null) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (!value) return 0;
+  const raw = String(value).trim();
+  const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw;
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatDecimal(value: number, digits = 4) {
+  return value.toLocaleString('nl-NL', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+function formatCompactDecimal(value: number, digits = 3) {
+  return value.toLocaleString('nl-NL', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  });
+}
+
+function roundValue(value: number, digits = 4) {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
+type ContainerCostImportDraftLine = {
+  id: string;
+  type: ContainerCostLineType;
+  referenceCode: string;
+  description: string;
+  quantity: string;
+  volumeCbm: string;
+  unitPriceUsd: string;
+  componentsNote?: string;
+};
+
+function parseContainerCostContent(content: string) {
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const columns = line.split('\t').map((item) => item.trim());
+      if (columns.length < 5) return null;
+      const [type, referenceCode, description, quantity, volumeCbm, unitPriceUsd = '', componentsNote = ''] = columns;
+      const normalizedType = (type || 'onderdeel').toLowerCase();
+      const lineType: ContainerCostLineType = normalizedType.startsWith('scoot')
+        ? 'scooter'
+        : normalizedType.startsWith('sam')
+          ? 'samengesteld'
+          : 'onderdeel';
+
+      const parsedLine: ContainerCostImportDraftLine = {
+        id: `draft-${index + 1}-${referenceCode || description}`.replace(/[^a-z0-9-]/gi, '').toLowerCase(),
+        type: lineType,
+        referenceCode,
+        description: description || referenceCode,
+        quantity: quantity || '1',
+        volumeCbm: volumeCbm || '0',
+        unitPriceUsd: unitPriceUsd || '0',
+        componentsNote: componentsNote || undefined,
+      };
+
+      return parsedLine;
+    })
+    .filter((line): line is ContainerCostImportDraftLine => Boolean(line));
+}
+
 function loginNameFromEmail(email: string) {
   const localPart = email.split('@')[0] || 'Gebruiker';
   return localPart
@@ -1482,6 +1553,36 @@ export function App() {
       setProductMessage(`Product ${updatedProduct.code} bijgewerkt.`);
     } catch (error) {
       setProductMessage(`Product opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
+  async function saveContainerCostBatch(batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) {
+    try {
+      setData((current) => {
+        const batchMap = new Map(current.containerCostBatches.map((item) => [item.id, item]));
+        const lineMap = new Map(current.containerCostLines.map((item) => [item.id, item]));
+        const productMap = new Map(current.products.map((item) => [item.id, item]));
+
+        batchMap.set(batch.id, batch);
+        lines.forEach((line) => lineMap.set(line.id, line));
+        productUpdates.forEach((product) => productMap.set(product.id, product));
+
+        return {
+          ...current,
+          containerCostBatches: Array.from(batchMap.values()),
+          containerCostLines: Array.from(lineMap.values()),
+          products: Array.from(productMap.values()),
+        };
+      });
+
+      await upsertContainerCostBatches([batch]);
+      await upsertContainerCostLines(lines);
+      if (productUpdates.length > 0) {
+        await upsertProducts(productUpdates);
+      }
+      showCsvMessage(`${lines.length} kostprijsregels opgeslagen voor order ${batch.orderNumber}.`);
+    } catch (error) {
+      showCsvMessage(`Container kostprijs opslaan mislukt: ${importErrorMessage(error)}`);
     }
   }
 
@@ -2080,7 +2181,7 @@ export function App() {
 
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
-          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
+          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSaveCostBatch={saveContainerCostBatch} onSelect={setSelectedScooter} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
@@ -2639,15 +2740,18 @@ function Containers({
   message,
   messageDetails,
   onImport,
+  onSaveCostBatch,
   onSelect,
 }: {
   data: AppData;
   message: string;
   messageDetails: string[];
   onImport: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
   onSelect: (scooter: Scooter) => void;
 }) {
   const [showImport, setShowImport] = useState(false);
+  const [showCostModal, setShowCostModal] = useState(false);
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const pending = sortedContainers.filter((container) => container.status !== 'Aangekomen');
   const arrived = sortedContainers.filter((container) => container.status === 'Aangekomen');
@@ -2667,8 +2771,14 @@ function Containers({
           <small>Importeer containerregels of voeg handmatig een container toe om scooters per zending te volgen.</small>
         </div>
         <div className="container-command-actions">
+          <button className="secondary-button" onClick={() => setShowCostModal(true)}><CircleDollarSign size={16} /> Kostprijs berekenen</button>
           <button className="primary-button" onClick={() => setShowImport(true)}><Upload size={16} /> Container importeren</button>
         </div>
+      </section>
+      <section className="panel sales-summary">
+        <div><span>Kostprijs batches</span><strong>{data.containerCostBatches.length}</strong></div>
+        <div><span>Kostprijsregels</span><strong>{data.containerCostLines.length}</strong></div>
+        <div><span>Laatste order</span><strong>{data.containerCostBatches[0]?.orderNumber || '-'}</strong></div>
       </section>
       {data.containers.length === 0 ? (
         <section className="panel container-empty-state">
@@ -2744,7 +2854,305 @@ function Containers({
           </form>
         </div>
       )}
+      {showCostModal && (
+        <ContainerCostModal
+          containers={sortedContainers}
+          products={data.products}
+          scooters={data.scooters}
+          suppliers={data.suppliers}
+          onClose={() => setShowCostModal(false)}
+          onSave={async (batch, lines, productUpdates) => {
+            await onSaveCostBatch(batch, lines, productUpdates);
+            setShowCostModal(false);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function ContainerCostModal({
+  containers,
+  products,
+  scooters,
+  suppliers,
+  onClose,
+  onSave,
+}: {
+  containers: Container[];
+  products: Product[];
+  scooters: Scooter[];
+  suppliers: Supplier[];
+  onClose: () => void;
+  onSave: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
+}) {
+  const [selectedContainerId, setSelectedContainerId] = useState(containers[0]?.id ?? '');
+  const [orderNumber, setOrderNumber] = useState('');
+  const [supplierName, setSupplierName] = useState('');
+  const [exchangeRate, setExchangeRate] = useState('0,92');
+  const [transportCostEur, setTransportCostEur] = useState('0');
+  const [importCostEur, setImportCostEur] = useState('0');
+  const [otherCostEur, setOtherCostEur] = useState('0');
+  const [transportMode, setTransportMode] = useState<ContainerCostAllocationMode>('volume');
+  const [importMode, setImportMode] = useState<ContainerCostAllocationMode>('value');
+  const [notes, setNotes] = useState('');
+  const [content, setContent] = useState('');
+  const [draftLines, setDraftLines] = useState<ContainerCostImportDraftLine[]>([]);
+  const [saving, setSaving] = useState(false);
+  const selectedContainer = containers.find((container) => container.id === selectedContainerId);
+  const supplierOptions = suppliers.map((supplier) => supplier.name).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+
+  const computedLines = draftLines.map((line) => {
+    const quantity = Math.max(1, parseDecimal(line.quantity));
+    const volumeCbm = Math.max(0, parseDecimal(line.volumeCbm));
+    const unitPriceUsd = Math.max(0, parseDecimal(line.unitPriceUsd));
+    const matchedProduct = products.find((product) => product.code.trim().toLowerCase() === line.referenceCode.trim().toLowerCase());
+    const matchedScooter = scooters.find((scooter) => scooter.frameNumber.trim().toLowerCase() === line.referenceCode.trim().toLowerCase());
+
+    return {
+      ...line,
+      quantity,
+      volumeCbm,
+      unitPriceUsd,
+      goodsValueEurBase: roundValue(quantity * unitPriceUsd * parseDecimal(exchangeRate), 4),
+      matchedProduct,
+      matchedScooter,
+      referenceId: matchedProduct?.id ?? matchedScooter?.id,
+      normalizedDescription: line.description || matchedProduct?.description || matchedScooter?.model || line.referenceCode,
+    };
+  });
+
+  const totalVolume = computedLines.reduce((sum, line) => sum + (line.volumeCbm * line.quantity), 0);
+  const totalGoodsValue = computedLines.reduce((sum, line) => sum + line.goodsValueEurBase, 0);
+  const transportPool = parseDecimal(transportCostEur);
+  const importPool = parseDecimal(importCostEur);
+  const otherPool = parseDecimal(otherCostEur);
+
+  const calculatedLines = computedLines.map((line) => {
+    const lineVolumeTotal = line.volumeCbm * line.quantity;
+    const volumeShare = totalVolume > 0 ? lineVolumeTotal / totalVolume : 0;
+    const valueShare = totalGoodsValue > 0 ? line.goodsValueEurBase / totalGoodsValue : 0;
+    const transportShare = transportMode === 'volume' ? volumeShare : valueShare;
+    const importShare = importMode === 'volume' ? volumeShare : valueShare;
+    const allocatedTransportEur = roundValue(transportPool * transportShare, 4);
+    const allocatedImportEur = roundValue(importPool * importShare, 4);
+    const allocatedOtherEur = roundValue(otherPool * volumeShare, 4);
+    const calculatedUnitCostEur = line.quantity > 0
+      ? roundValue((line.goodsValueEurBase + allocatedTransportEur + allocatedImportEur + allocatedOtherEur) / line.quantity, 4)
+      : 0;
+
+    return {
+      ...line,
+      lineVolumeTotal,
+      allocatedTransportEur,
+      allocatedImportEur,
+      allocatedOtherEur,
+      calculatedUnitCostEur,
+    };
+  });
+
+  async function handleSave() {
+    if (!selectedContainerId || !orderNumber.trim() || calculatedLines.length === 0) return;
+    setSaving(true);
+    try {
+      const batchId = stableId('container-cost-batch', `${selectedContainerId}-${orderNumber}-${Date.now()}`);
+      const batch: ContainerCostBatch = {
+        id: batchId,
+        containerId: selectedContainerId,
+        orderNumber: orderNumber.trim(),
+        supplierName: supplierName.trim() || undefined,
+        currency: 'USD',
+        exchangeRate: formatDecimal(parseDecimal(exchangeRate), 4),
+        transportCostEur: formatDecimal(transportPool, 2),
+        importCostEur: formatDecimal(importPool, 2),
+        otherCostEur: otherPool > 0 ? formatDecimal(otherPool, 2) : undefined,
+        transportAllocationMode: transportMode,
+        importAllocationMode: importMode,
+        notes: notes.trim() || undefined,
+        createdAt: new Date().toISOString(),
+      };
+
+      const lines: ContainerCostLine[] = calculatedLines.map((line, index) => ({
+        id: stableId('container-cost-line', `${batchId}-${line.referenceCode}-${index + 1}`),
+        batchId,
+        type: line.type,
+        referenceId: line.referenceId,
+        referenceCode: line.referenceCode,
+        description: line.normalizedDescription,
+        quantity: formatCompactDecimal(line.quantity, 3),
+        volumeCbm: formatDecimal(line.volumeCbm, 4),
+        unitPriceUsd: formatDecimal(line.unitPriceUsd, 4),
+        goodsValueEur: formatDecimal(line.goodsValueEurBase, 4),
+        allocatedTransportEur: formatDecimal(line.allocatedTransportEur, 4),
+        allocatedImportEur: formatDecimal(line.allocatedImportEur, 4),
+        allocatedOtherEur: formatDecimal(line.allocatedOtherEur, 4),
+        calculatedUnitCostEur: formatDecimal(line.calculatedUnitCostEur, 4),
+        componentsNote: line.componentsNote,
+      }));
+
+      const productUpdates = calculatedLines
+        .filter((line) => line.type !== 'scooter' && line.matchedProduct)
+        .map((line) => ({
+          ...line.matchedProduct!,
+          costPrice: formatDecimal(line.calculatedUnitCostEur, 4),
+          batch: orderNumber.trim(),
+        }));
+
+      await onSave(batch, lines, productUpdates);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal-card container-cost-modal" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <span>Containers</span>
+            <h2>Import kostprijs berekenen</h2>
+          </div>
+          <button type="button" onClick={onClose}>Close</button>
+        </div>
+        <div className="container-cost-layout">
+          <section className="product-form-subsection">
+            <h3>Container en order</h3>
+            <div className="form-grid">
+              <label>Container
+                <select value={selectedContainerId} onChange={(event) => setSelectedContainerId(event.target.value)}>
+                  <option value="">Kies container</option>
+                  {containers.map((container) => <option key={container.id} value={container.id}>{container.number} - {container.invoiceNumber}</option>)}
+                </select>
+              </label>
+              <label>Ordernummer / batch onderdelen
+                <input value={orderNumber} onChange={(event) => setOrderNumber(event.target.value)} placeholder="bijv. WL-2026-041" />
+              </label>
+              <label>Leverancier
+                <input list="supplier-cost-options" value={supplierName} onChange={(event) => setSupplierName(event.target.value)} placeholder="bijv. Mortch Motor Limited" />
+                <datalist id="supplier-cost-options">
+                  {supplierOptions.map((option) => <option key={option} value={option} />)}
+                </datalist>
+              </label>
+              <label>Valuta
+                <input value="USD" disabled />
+              </label>
+              <label>Wisselkoers USD - EUR
+                <input value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} />
+              </label>
+              <label>Transportkosten container (EUR)
+                <input value={transportCostEur} onChange={(event) => setTransportCostEur(event.target.value)} />
+              </label>
+              <label>Invoerkosten / douane (EUR)
+                <input value={importCostEur} onChange={(event) => setImportCostEur(event.target.value)} />
+              </label>
+              <label>Overige kosten (EUR)
+                <input value={otherCostEur} onChange={(event) => setOtherCostEur(event.target.value)} />
+              </label>
+              <label>Transport verdelen op
+                <select value={transportMode} onChange={(event) => setTransportMode(event.target.value as ContainerCostAllocationMode)}>
+                  <option value="volume">Volume</option>
+                  <option value="value">Goederenwaarde</option>
+                </select>
+              </label>
+              <label>Invoerkosten verdelen op
+                <select value={importMode} onChange={(event) => setImportMode(event.target.value as ContainerCostAllocationMode)}>
+                  <option value="value">Goederenwaarde</option>
+                  <option value="volume">Volume</option>
+                </select>
+              </label>
+              <label className="span-2">Notities
+                <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optioneel: opmerking over containerinhoud, samengestelde sets of correcties." />
+              </label>
+            </div>
+          </section>
+
+          <section className="product-form-subsection">
+            <h3>Excel regels plakken</h3>
+            <div className="container-content-field container-cost-paste-field">
+              <span>Gebruik tab-gescheiden kolommen in deze volgorde:</span>
+              <code>type  productcode-of-frame  omschrijving  aantal  volume_cbm  usd_stukprijs  componenten_notitie</code>
+              <textarea
+                value={content}
+                onChange={(event) => setContent(event.target.value)}
+                placeholder={'onderdeel\tA2A81023001\tSpruitstuk Piaggio 50cc 2T\t120\t0,004\t1,85\t\nscooter\tL5YBYCBA01S1154100\tRSO Sense zwart\t1\t1,85\t265\t\nsamengesteld\tKAPPENSET-S9-BLK\tKappenset S9 zwart\t12\t0,11\t36,5\tBestaat uit 7 losse panelen'}
+              />
+              <div className="container-command-actions">
+                <button type="button" className="secondary-button" onClick={() => setDraftLines(parseContainerCostContent(content))}>Preview regels</button>
+                <button type="button" className="secondary-button" onClick={() => { setContent(''); setDraftLines([]); }}>Wissen</button>
+              </div>
+            </div>
+          </section>
+
+          <section className="product-form-subsection">
+            <h3>Verdeling preview</h3>
+            <div className="sales-summary">
+              <div><span>Regels</span><strong>{calculatedLines.length}</strong></div>
+              <div><span>Totaal volume</span><strong>{formatCompactDecimal(totalVolume, 3)} cbm</strong></div>
+              <div><span>Goederenwaarde</span><strong>EUR {formatDecimal(totalGoodsValue, 2)}</strong></div>
+            </div>
+            {calculatedLines.length === 0 ? (
+              <div className="empty-state inline">
+                <CircleDollarSign size={22} />
+                <strong>Nog geen regels</strong>
+                <span>Plak Excel-regels en klik op preview om de kostprijsverdeling te zien.</span>
+              </div>
+            ) : (
+              <div className="table-wrap">
+                <table className="sales-table container-cost-table">
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Referentie</th>
+                      <th>Aantal</th>
+                      <th>Volume</th>
+                      <th>USD stuk</th>
+                      <th>EUR goederen</th>
+                      <th>Transport</th>
+                      <th>Invoer</th>
+                      <th>Kostprijs stuk</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {calculatedLines.map((line) => (
+                      <tr key={line.id}>
+                        <td>{line.type}</td>
+                        <td>
+                          <strong>{line.referenceCode}</strong>
+                          <small>{line.normalizedDescription}</small>
+                        </td>
+                        <td>{formatCompactDecimal(line.quantity, 3)}</td>
+                        <td>{formatCompactDecimal(line.lineVolumeTotal, 3)}</td>
+                        <td>{formatDecimal(line.unitPriceUsd, 4)}</td>
+                        <td>{formatDecimal(line.goodsValueEurBase, 2)}</td>
+                        <td>{formatDecimal(line.allocatedTransportEur, 2)}</td>
+                        <td>{formatDecimal(line.allocatedImportEur + line.allocatedOtherEur, 2)}</td>
+                        <td>{formatDecimal(line.calculatedUnitCostEur, 4)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="inline-notice">
+              <span>
+                Onderdelen krijgen bij opslaan direct de actuele `kostprijs` en het `batch`-nummer van deze order. Scooters worden nu alleen historisch vastgelegd in de batchregels.
+              </span>
+            </div>
+          </section>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="secondary-button" onClick={onClose}>Annuleren</button>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={saving || !selectedContainerId || !orderNumber.trim() || calculatedLines.length === 0}
+            onClick={() => void handleSave()}
+          >
+            {saving ? 'Opslaan...' : 'Kostprijs opslaan'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
