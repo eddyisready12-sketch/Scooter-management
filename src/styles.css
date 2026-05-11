@@ -961,6 +961,10 @@ tbody tr:hover {
   padding: 0 18px 18px;
 }
 
+.container-tool-grid.single {
+  grid-template-columns: 1fr;
+}
+
 .container-tool-tile {
   align-items: flex-start;
   background: linear-gradient(180deg, #fdfefe 0%, #f3f8ff 100%);

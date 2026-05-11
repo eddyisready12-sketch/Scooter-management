@@ -40,7 +40,7 @@ import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseP
 import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Product, ProductPackagingLayer, Scooter, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
-type View = 'dashboard' | 'containers' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
+type View = 'dashboard' | 'containers' | 'costBatches' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
 type SearchField = 'frameNumber' | 'engineNumber' | 'licensePlate';
@@ -76,6 +76,7 @@ const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'batteries', label: "Accu's", icon: BatteryCharging },
   { id: 'containers', label: 'Containers', icon: Boxes },
+  { id: 'costBatches', label: 'Kostprijs batches', icon: FileText },
   { id: 'dealers', label: 'Dealers', icon: UsersRound },
   { id: 'warranty', label: 'Garantie claims', icon: ShieldCheck },
   { id: 'suppliers', label: 'Leveranciers', icon: Factory },
@@ -2181,7 +2182,8 @@ export function App() {
 
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
-          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSaveCostBatch={saveContainerCostBatch} onSelect={setSelectedScooter} />}
+          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
+          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
@@ -2740,18 +2742,15 @@ function Containers({
   message,
   messageDetails,
   onImport,
-  onSaveCostBatch,
   onSelect,
 }: {
   data: AppData;
   message: string;
   messageDetails: string[];
   onImport: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
   onSelect: (scooter: Scooter) => void;
 }) {
   const [showImport, setShowImport] = useState(false);
-  const [showCostModal, setShowCostModal] = useState(false);
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const pending = sortedContainers.filter((container) => container.status !== 'Aangekomen');
   const arrived = sortedContainers.filter((container) => container.status === 'Aangekomen');
@@ -2776,19 +2775,7 @@ function Containers({
               <small>Nieuwe zending toevoegen en scooters aan een container koppelen.</small>
             </span>
           </button>
-          <button type="button" className="container-tool-tile finance" onClick={() => setShowCostModal(true)}>
-            <span className="container-tool-icon"><CircleDollarSign size={20} /></span>
-            <span className="container-tool-copy">
-              <strong>Kostprijs batch</strong>
-              <small>Transport, inklaring en douane over scooters en onderdelen verdelen.</small>
-            </span>
-          </button>
         </div>
-      </section>
-      <section className="panel sales-summary">
-        <div><span>Kostprijs batches</span><strong>{data.containerCostBatches.length}</strong></div>
-        <div><span>Kostprijsregels</span><strong>{data.containerCostLines.length}</strong></div>
-        <div><span>Laatste order</span><strong>{data.containerCostBatches[0]?.orderNumber || '-'}</strong></div>
       </section>
       {data.containers.length === 0 ? (
         <section className="panel container-empty-state">
@@ -2864,6 +2851,88 @@ function Containers({
           </form>
         </div>
       )}
+    </>
+  );
+}
+
+function CostBatchesPage({
+  data,
+  onSaveCostBatch,
+}: {
+  data: AppData;
+  onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
+}) {
+  const [showCostModal, setShowCostModal] = useState(false);
+  const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
+  const sortedBatches = [...data.containerCostBatches].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+  return (
+    <>
+      <div className="page-title-row">
+        <div>
+          <h1>Kostprijs batches</h1>
+          <span>{data.containerCostBatches.length} batches opgeslagen</span>
+        </div>
+      </div>
+      <section className="panel">
+        <div className="panel-title">
+          <span className="panel-title-label"><FileText size={16} /> Kostprijs tools</span>
+        </div>
+        <div className="container-tool-grid single">
+          <button type="button" className="container-tool-tile finance" onClick={() => setShowCostModal(true)}>
+            <span className="container-tool-icon"><CircleDollarSign size={20} /></span>
+            <span className="container-tool-copy">
+              <strong>Nieuwe kostprijs batch</strong>
+              <small>Transport, inklaring en douane over scooters en onderdelen verdelen en wegschrijven naar kostprijs.</small>
+            </span>
+          </button>
+        </div>
+      </section>
+      <section className="panel sales-summary">
+        <div><span>Kostprijs batches</span><strong>{data.containerCostBatches.length}</strong></div>
+        <div><span>Kostprijsregels</span><strong>{data.containerCostLines.length}</strong></div>
+        <div><span>Laatste order</span><strong>{sortedBatches[0]?.orderNumber || '-'}</strong></div>
+      </section>
+      <section className="panel table-panel">
+        <div className="panel-title"><span className="panel-title-label"><CircleDollarSign size={16} /> Recente batches</span></div>
+        {sortedBatches.length === 0 ? (
+          <div className="empty-state inline">
+            <CircleDollarSign size={22} />
+            <strong>Nog geen kostprijs batches</strong>
+            <span>Maak een batch aan om transport, inklaring en actuele kostprijzen vast te leggen.</span>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ordernummer</th>
+                  <th>Container</th>
+                  <th>Leverancier</th>
+                  <th>Transport</th>
+                  <th>Invoer</th>
+                  <th>Datum</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedBatches.slice(0, 25).map((batch) => {
+                  const container = data.containers.find((item) => item.id === batch.containerId);
+                  return (
+                    <tr key={batch.id}>
+                      <td>{batch.orderNumber}</td>
+                      <td>{container?.number || '-'}</td>
+                      <td>{batch.supplierName || '-'}</td>
+                      <td>EUR {batch.transportCostEur}</td>
+                      <td>EUR {batch.importCostEur}</td>
+                      <td>{formatDate(batch.createdAt)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
       {showCostModal && (
         <ContainerCostModal
           containers={sortedContainers}
