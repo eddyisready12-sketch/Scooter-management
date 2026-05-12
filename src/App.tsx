@@ -1116,63 +1116,119 @@ function sanitizeImportedNumber(value: string) {
   return value.replace(/[^\d,.-]/g, '').trim();
 }
 
+function isNumericImportToken(value: string) {
+  const normalized = sanitizeImportedNumber(value);
+  if (!normalized) return false;
+  return /^-?\d+(?:[.,]\d+)?$/.test(normalized);
+}
+
+function looksLikeContainerNumber(value: string) {
+  const normalized = value.trim();
+  return /^\d+(?:-\d+)?$/i.test(normalized) || /^[a-z]{3,}\d+/i.test(normalized);
+}
+
+function looksLikeItemNumber(value: string) {
+  return /[a-z]/i.test(value) && /\d/.test(value);
+}
+
 function parseContainerCostContent(content: string) {
-  return content
+  const rows = content
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, index) => {
-      const columns = line.split('\t').map((item) => item.trim());
-      if (!columns.length) return null;
+    .filter(Boolean);
 
-      const headerKey = columns.map((column) => column.toLowerCase()).join('|');
-      if (headerKey.includes('ctn no') || headerKey.includes('artikelnummer') || headerKey.includes('item no')) {
-        return null;
+  const parsed: ContainerCostImportDraftLine[] = [];
+  let lastKnownCtnNo = '';
+
+  rows.forEach((line, index) => {
+    const columns = line.split('\t').map((item) => item.trim());
+    if (!columns.length) return;
+
+    const headerKey = columns.map((column) => column.toLowerCase()).join('|');
+    if (headerKey.includes('ctn no') || headerKey.includes('artikelnummer') || headerKey.includes('item no')) {
+      return;
+    }
+
+    const numericIndices = columns
+      .map((value, columnIndex) => (isNumericImportToken(value) ? columnIndex : -1))
+      .filter((columnIndex) => columnIndex >= 0);
+
+    if (numericIndices.length >= 3) {
+      const amountIndex = numericIndices[numericIndices.length - 1];
+      const unitPriceIndex = numericIndices[numericIndices.length - 2];
+      const qtyIndex = numericIndices[numericIndices.length - 3];
+      const leading = columns.slice(0, qtyIndex);
+      const parts = leading[leading.length - 1] || '';
+      const meta = leading.slice(0, -1).filter(Boolean);
+      const supplier = columns.slice(amountIndex + 1).filter(Boolean).join(' ');
+      let ctnNo = '';
+      let model = '';
+      let articleNumber = '';
+      let itemNo = '';
+
+      if (meta.length >= 4) {
+        [ctnNo, model, articleNumber, itemNo] = meta.slice(0, 4);
+      } else if (meta.length === 3) {
+        if (looksLikeContainerNumber(meta[0])) {
+          [ctnNo, model] = meta;
+          itemNo = meta[2] || '';
+        } else {
+          [model, articleNumber, itemNo] = meta;
+        }
+      } else if (meta.length === 2) {
+        [model] = meta;
+        if (looksLikeItemNumber(meta[1])) {
+          itemNo = meta[1];
+        } else {
+          articleNumber = meta[1];
+        }
+      } else if (meta.length === 1) {
+        [model] = meta;
       }
 
-      if (columns.length >= 8) {
-        const [ctnNo, model, articleNumber, itemNo, parts, qty, unitPrice = '', _amount = '', supplier = ''] = columns;
-        const referenceCode = articleNumber || itemNo || `${model}-${parts}`.replace(/\s+/g, '-');
-        if (!referenceCode && !parts) return null;
-
+      if (ctnNo) lastKnownCtnNo = ctnNo;
+      const effectiveCtnNo = ctnNo || lastKnownCtnNo;
+      const referenceCode = articleNumber || itemNo || `${model}-${parts}`.replace(/\s+/g, '-');
+      if (referenceCode || parts) {
         const normalizedParts = (parts || '').toLowerCase();
         const lineType: ContainerCostLineType = normalizedParts.includes('set') ? 'samengesteld' : 'onderdeel';
 
-        return {
+        parsed.push({
           id: `draft-${index + 1}-${referenceCode || parts}`.replace(/[^a-z0-9-]/gi, '').toLowerCase(),
           type: lineType,
           referenceCode,
           description: parts || referenceCode,
-          quantity: qty || '1',
+          quantity: sanitizeImportedNumber(columns[qtyIndex]) || '1',
           volumeCbm: '0',
-          unitPriceUsd: sanitizeImportedNumber(unitPrice) || '0',
-          componentsNote: [model, itemNo ? `Item No. ${itemNo}` : '', supplier, ctnNo ? `Ctn ${ctnNo}` : ''].filter(Boolean).join(' - '),
-        } satisfies ContainerCostImportDraftLine;
+          unitPriceUsd: sanitizeImportedNumber(columns[unitPriceIndex]) || '0',
+          componentsNote: [model, itemNo ? `Item No. ${itemNo}` : '', supplier, effectiveCtnNo ? `Ctn ${effectiveCtnNo}` : ''].filter(Boolean).join(' - '),
+        });
+        return;
       }
+    }
 
-      if (columns.length < 5) return null;
-      const [type, referenceCode, description, quantity, volumeCbm, unitPriceUsd = '', componentsNote = ''] = columns;
-      const normalizedType = (type || 'onderdeel').toLowerCase();
-      const lineType: ContainerCostLineType = normalizedType.startsWith('scoot')
-        ? 'scooter'
-        : normalizedType.startsWith('sam')
-          ? 'samengesteld'
-          : 'onderdeel';
+    if (columns.length < 5) return;
+    const [type, referenceCode, description, quantity, volumeCbm, unitPriceUsd = '', componentsNote = ''] = columns;
+    const normalizedType = (type || 'onderdeel').toLowerCase();
+    const lineType: ContainerCostLineType = normalizedType.startsWith('scoot')
+      ? 'scooter'
+      : normalizedType.startsWith('sam')
+        ? 'samengesteld'
+        : 'onderdeel';
 
-      const parsedLine: ContainerCostImportDraftLine = {
-        id: `draft-${index + 1}-${referenceCode || description}`.replace(/[^a-z0-9-]/gi, '').toLowerCase(),
-        type: lineType,
-        referenceCode,
-        description: description || referenceCode,
-        quantity: quantity || '1',
-        volumeCbm: volumeCbm || '0',
-        unitPriceUsd: sanitizeImportedNumber(unitPriceUsd) || '0',
-        componentsNote: componentsNote || undefined,
-      };
+    parsed.push({
+      id: `draft-${index + 1}-${referenceCode || description}`.replace(/[^a-z0-9-]/gi, '').toLowerCase(),
+      type: lineType,
+      referenceCode,
+      description: description || referenceCode,
+      quantity: quantity || '1',
+      volumeCbm: volumeCbm || '0',
+      unitPriceUsd: sanitizeImportedNumber(unitPriceUsd) || '0',
+      componentsNote: componentsNote || undefined,
+    });
+  });
 
-      return parsedLine;
-    })
-    .filter((line): line is ContainerCostImportDraftLine => Boolean(line));
+  return parsed;
 }
 
 function defaultContainerCostItems() {
