@@ -53,6 +53,8 @@ export type ContainerCostBatch = {
   id: string;
   containerId?: string;
   containerNumber: string;
+  containerProfile?: string;
+  containerVolumeCbm?: string;
   orderNumber: string;
   supplierName?: string;
   currency: 'USD' | 'EUR';

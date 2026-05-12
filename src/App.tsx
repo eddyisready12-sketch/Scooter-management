@@ -68,6 +68,14 @@ type ContainerCostDraftItem = {
   appliesTo: 'all' | 'scooter' | 'onderdeel' | 'samengesteld' | 'non-scooter';
 };
 
+const containerVolumePresets = [
+  { value: '20ft', label: '20ft', volumeCbm: 33.2 },
+  { value: '40ft', label: '40ft', volumeCbm: 67.7 },
+  { value: '40hc', label: '40ft High Cube', volumeCbm: 76.3 },
+  { value: '45hc', label: '45ft High Cube', volumeCbm: 86 },
+  { value: 'custom', label: 'Aangepast', volumeCbm: 0 },
+] as const;
+
 const loginStorageKey = 'rso-admin-session';
 const productImportCompaniesStorageKey = 'rso-product-import-companies';
 const defaultProductImportCompanies = ['Blanco', 'Everestt', 'JIABIN', 'Wenling', 'mortch motor'];
@@ -2998,6 +3006,8 @@ function ContainerCostModal({
   onSave: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
 }) {
   const [containerNumber, setContainerNumber] = useState(containers[0]?.number ?? '');
+  const [containerProfile, setContainerProfile] = useState<(typeof containerVolumePresets)[number]['value']>('40hc');
+  const [containerVolumeCbm, setContainerVolumeCbm] = useState('76,3');
   const [orderNumber, setOrderNumber] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [exchangeRate, setExchangeRate] = useState('0,92');
@@ -3074,6 +3084,8 @@ function ContainerCostModal({
   });
 
   const totalVolume = computedLines.reduce((sum, line) => sum + (line.volumeCbm * line.quantity), 0);
+  const selectedContainerVolume = parseDecimal(containerVolumeCbm);
+  const volumeUsagePercent = selectedContainerVolume > 0 ? Math.min(999, roundValue((totalVolume / selectedContainerVolume) * 100, 1)) : 0;
   const totalGoodsValue = computedLines.reduce((sum, line) => sum + line.goodsValueEurBase, 0);
 
   const resolvedCostItems = costItems.map((item) => {
@@ -3102,6 +3114,13 @@ function ContainerCostModal({
   const goodsNetEur = roundValue(totalGoodsValue, 4);
   const calculatedPaymentNetEur = roundValue(goodsNetEur + logisticsNetEur, 4);
   const finalPaymentNetEur = paymentNetOverrideEur.trim() ? parseDecimal(paymentNetOverrideEur) : calculatedPaymentNetEur;
+
+  function handleContainerProfileChange(value: (typeof containerVolumePresets)[number]['value']) {
+    setContainerProfile(value);
+    const preset = containerVolumePresets.find((item) => item.value === value);
+    if (!preset || value === 'custom') return;
+    setContainerVolumeCbm(formatCompactDecimal(preset.volumeCbm, 1).replace('.', ','));
+  }
 
   const calculatedLines = computedLines.map((line) => {
     const lineVolumeTotal = line.volumeCbm * line.quantity;
@@ -3156,6 +3175,8 @@ function ContainerCostModal({
         id: batchId,
         containerId: selectedContainerId,
         containerNumber: containerNumber.trim(),
+        containerProfile: containerProfile,
+        containerVolumeCbm: containerVolumeCbm.trim() || undefined,
         orderNumber: orderNumber.trim(),
         supplierName: supplierName.trim() || undefined,
         currency: 'USD',
@@ -3227,6 +3248,9 @@ function ContainerCostModal({
               <div><span>Container</span><strong>{containerNumber || '-'}</strong></div>
               <div><span>Order</span><strong>{orderNumber || '-'}</strong></div>
               <div><span>Netto betaling</span><strong>EUR {formatDecimal(finalPaymentNetEur, 2)}</strong></div>
+              <div><span>Container volume</span><strong>{containerVolumeCbm || '-'} cbm</strong></div>
+              <div><span>Gebruikt</span><strong>{formatCompactDecimal(totalVolume, 3)} cbm</strong></div>
+              <div><span>Bezetting</span><strong>{selectedContainerVolume > 0 ? `${String(volumeUsagePercent).replace('.', ',')}%` : '-'}</strong></div>
             </div>
           </section>
 
@@ -3259,6 +3283,18 @@ function ContainerCostModal({
               </label>
               <label>Wisselkoers USD - EUR
                 <input value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} />
+              </label>
+              <label>Containertype
+                <select value={containerProfile} onChange={(event) => handleContainerProfileChange(event.target.value as (typeof containerVolumePresets)[number]['value'])}>
+                  {containerVolumePresets.map((preset) => (
+                    <option key={preset.value} value={preset.value}>
+                      {preset.label}{preset.volumeCbm > 0 ? ` - ${String(preset.volumeCbm).replace('.', ',')} cbm` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>Containervolume (cbm)
+                <input value={containerVolumeCbm} onChange={(event) => setContainerVolumeCbm(event.target.value)} />
               </label>
               <label className="span-2">Notities
                 <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optioneel: opmerking over containerinhoud, samengestelde sets of correcties." />
