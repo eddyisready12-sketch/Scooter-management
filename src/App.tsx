@@ -3288,6 +3288,7 @@ function ContainerCostModal({
   const selectedContainerVolume = parseDecimal(containerVolumeCbm);
   const volumeUsagePercent = selectedContainerVolume > 0 ? Math.min(999, roundValue((totalVolume / selectedContainerVolume) * 100, 1)) : 0;
   const totalGoodsValue = computedLines.reduce((sum, line) => sum + line.goodsValueEurBase, 0);
+  const totalGoodsValueUsd = computedLines.reduce((sum, line) => sum + (line.quantity * line.unitPriceUsd), 0);
   const chinaTransportEur = roundValue(parseDecimal(chinaTransportUsd) * parseDecimal(exchangeRate), 4);
 
   const resolvedCostItems = costItems.map((item) => {
@@ -3652,7 +3653,7 @@ function ContainerCostModal({
             <div className="sales-summary">
               <div><span>Regels</span><strong>{calculatedLines.length}</strong></div>
               <div><span>Totaal volume</span><strong>{formatCompactDecimal(totalVolume, 3)} cbm</strong></div>
-              <div><span>Goederenwaarde</span><strong>EUR {formatDecimal(totalGoodsValue, 2)}</strong></div>
+              <div><span>Goederenwaarde</span><strong>EUR {formatDecimal(totalGoodsValue, 2)}</strong><small>USD {formatDecimal(totalGoodsValueUsd, 2)}</small></div>
             </div>
             {calculatedLines.length === 0 ? (
               <div className="empty-state inline">

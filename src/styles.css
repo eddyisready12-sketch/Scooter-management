@@ -811,6 +811,12 @@ tbody tr:hover {
   font-size: 22px;
 }
 
+.sales-summary small {
+  color: #65717d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .sales-table-wrap {
   margin: 0;
 }
