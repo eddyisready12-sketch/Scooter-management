@@ -2641,6 +2641,45 @@ tbody tr:hover {
   display: block;
 }
 
+.container-cost-table {
+  min-width: 1120px;
+  table-layout: auto;
+  width: 100%;
+}
+
+.container-cost-table th,
+.container-cost-table td {
+  white-space: nowrap;
+}
+
+.container-cost-table th:nth-child(2),
+.container-cost-table td:nth-child(2) {
+  min-width: 220px;
+  white-space: normal;
+}
+
+.container-cost-table th:nth-child(1),
+.container-cost-table td:nth-child(1),
+.container-cost-table th:nth-child(3),
+.container-cost-table td:nth-child(3),
+.container-cost-table th:nth-child(4),
+.container-cost-table td:nth-child(4) {
+  text-align: center;
+}
+
+.container-cost-table th:nth-child(5),
+.container-cost-table td:nth-child(5),
+.container-cost-table th:nth-child(6),
+.container-cost-table td:nth-child(6),
+.container-cost-table th:nth-child(7),
+.container-cost-table td:nth-child(7),
+.container-cost-table th:nth-child(8),
+.container-cost-table td:nth-child(8),
+.container-cost-table th:nth-child(9),
+.container-cost-table td:nth-child(9) {
+  text-align: right;
+}
+
 .container-cost-table td small {
   color: #65717d;
   font-size: 12px;

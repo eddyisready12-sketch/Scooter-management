@@ -3528,18 +3528,18 @@ function ContainerCostModal({
               </div>
             ) : (
               <div className="table-wrap">
-                <table className="sales-table container-cost-table">
+                <table className="container-cost-table">
                   <thead>
                     <tr>
                       <th>Type</th>
                       <th>Referentie</th>
                       <th>Aantal</th>
                       <th>Volume</th>
-                      <th>USD stuk</th>
+                      <th>USD / stuk</th>
                       <th>EUR goederen</th>
                       <th>Transport</th>
-                      <th>Invoer</th>
-                      <th>Kostprijs stuk</th>
+                      <th>Invoer + overig</th>
+                      <th>Kostprijs / stuk</th>
                     </tr>
                   </thead>
                   <tbody>
