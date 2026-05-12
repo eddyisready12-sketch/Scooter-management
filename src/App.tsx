@@ -1138,6 +1138,58 @@ function parseContainerCostContent(content: string) {
     .map((line) => line.trim())
     .filter(Boolean);
 
+  const supplierHeaderIndex = rows.findIndex((line) => {
+    const columns = line.split('\t').map((item) => item.trim().toLowerCase());
+    return columns.some((column) => column.includes('ctn no'))
+      && columns.some((column) => column.includes('artikelnummer'))
+      && columns.some((column) => column.includes('item no'));
+  });
+
+  if (supplierHeaderIndex >= 0) {
+    const parsed: ContainerCostImportDraftLine[] = [];
+    let lastKnownCtnNo = '';
+    let lastKnownModel = '';
+    let lastKnownSupplier = '';
+
+    rows.slice(supplierHeaderIndex + 1).forEach((line, index) => {
+      const columns = line.split('\t').map((item) => item.trim());
+      const padded = [...columns];
+      while (padded.length < 9) padded.push('');
+
+      const [ctnNoRaw, modelRaw, articleNumberRaw, itemNoRaw, partsRaw, qtyRaw, unitPriceRaw, amountRaw, supplierRaw] = padded;
+      const ctnNo = ctnNoRaw || lastKnownCtnNo;
+      const model = modelRaw || lastKnownModel;
+      const articleNumber = articleNumberRaw;
+      const itemNo = itemNoRaw;
+      const parts = partsRaw;
+      const supplier = supplierRaw || lastKnownSupplier;
+
+      if (!parts && !articleNumber && !itemNo) return;
+
+      lastKnownCtnNo = ctnNo || lastKnownCtnNo;
+      lastKnownModel = model || lastKnownModel;
+      lastKnownSupplier = supplier || lastKnownSupplier;
+
+      const referenceCode = articleNumber || itemNo || `${model}-${parts}`.replace(/\s+/g, '-');
+      const normalizedParts = parts.toLowerCase();
+      const lineType: ContainerCostLineType = normalizedParts.includes('set') ? 'samengesteld' : 'onderdeel';
+
+      parsed.push({
+        id: `draft-supplier-${index + 1}-${referenceCode || parts}`.replace(/[^a-z0-9-]/gi, '').toLowerCase(),
+        type: lineType,
+        referenceCode,
+        description: parts || referenceCode,
+        quantity: sanitizeImportedNumber(qtyRaw) || '1',
+        volumeCbm: '0',
+        unitPriceUsd: sanitizeImportedNumber(unitPriceRaw) || '0',
+        amountUsd: sanitizeImportedNumber(amountRaw) || undefined,
+        componentsNote: [model, itemNo ? `Item No. ${itemNo}` : '', supplier, ctnNo ? `Ctn ${ctnNo}` : ''].filter(Boolean).join(' - '),
+      });
+    });
+
+    return parsed;
+  }
+
   const parsed: ContainerCostImportDraftLine[] = [];
   let lastKnownCtnNo = '';
 
