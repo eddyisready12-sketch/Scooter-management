@@ -1092,8 +1092,8 @@ function defaultContainerCostItems() {
     { id: 'cost-item-freight', label: 'Freight', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
     { id: 'cost-item-destination', label: 'Destination', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
     { id: 'cost-item-road', label: 'Road', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
-    { id: 'cost-item-customs-scooters', label: 'Customs duties scooters', category: 'import', mode: 'value', kind: 'duty', amountEur: '0', dutyRate: '8', appliesTo: 'scooter' },
-    { id: 'cost-item-customs-parts', label: 'Customs duties onderdelen', category: 'import', mode: 'value', kind: 'duty', amountEur: '0', dutyRate: '3,7', appliesTo: 'non-scooter' },
+    { id: 'cost-item-customs', label: 'Customs duties', category: 'import', mode: 'value', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
+    { id: 'cost-item-specification', label: 'As per specification', category: 'other', mode: 'value', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
   ] satisfies ContainerCostDraftItem[];
 }
 
@@ -3032,7 +3032,7 @@ function ContainerCostModal({
       ...current,
       {
         id: nextCostItemId(),
-        label: 'Nieuwe kostenpost',
+        label: 'Nieuwe factuurregel',
         category: 'other',
         mode: 'value',
         kind: 'fixed',
@@ -3048,7 +3048,7 @@ function ContainerCostModal({
       ...current,
       {
         id: nextCostItemId(),
-        label: 'Nieuwe douanepost',
+        label: 'Nieuwe douane helper',
         category: 'import',
         mode: 'value',
         kind: 'duty',
@@ -3057,6 +3057,10 @@ function ContainerCostModal({
         appliesTo: 'all',
       },
     ]);
+  }
+
+  function resetCostItemsToInvoiceTemplate() {
+    setCostItems(defaultContainerCostItems());
   }
 
   function removeCostItem(id: string) {
@@ -3243,8 +3247,8 @@ function ContainerCostModal({
         <div className="container-cost-layout">
           <section className="container-cost-hero">
             <div className="container-cost-hero-copy">
-              <strong>Containerkosten, douane en productkostprijs in een batch.</strong>
-              <span>Koppel de betaling aan Exact en verdeel China-transport naar verhouding over scooters en onderdelen.</span>
+              <strong>Werk vanuit je echte factuurregels en verdeel daarna de kostprijs.</strong>
+              <span>China-transport vul je bovenin in USD in. De factuurregels hieronder volgen de inklaringsfactuur zoals op je voorbeelden.</span>
             </div>
             <div className="container-cost-hero-stats">
               <div><span>Container</span><strong>{containerNumber || '-'}</strong></div>
@@ -3329,20 +3333,29 @@ function ContainerCostModal({
               </label>
             </div>
             <div className="inline-notice">
-              <span>Containertransport China naar Nederland vul je in USD in. De app rekent dit via de wisselkoers om naar EUR en verdeelt het naar verhouding over alle scooters en onderdelen.</span>
+              <span>Containertransport China naar Nederland vul je apart in USD in. De factuurregels hieronder zijn voor Freight, Destination, Road, Customs duties en extra posten uit de inklaringsfactuur.</span>
             </div>
           </section>
           </div>
 
           <section className="product-form-subsection container-cost-card">
-            <h3>Kostenposten</h3>
+            <div className="section-header-with-actions">
+              <div>
+                <h3>Factuurregels en verdeling</h3>
+                <p className="section-subtitle">Start met dezelfde regels als op je factuur en voeg alleen extra posten toe als de nota afwijkt.</p>
+              </div>
+            </div>
             <div className="container-command-actions cost-item-actions">
-              <button type="button" className="secondary-button" onClick={addFixedCostItem}><Plus size={16} /> Kostenpost</button>
-              <button type="button" className="secondary-button" onClick={addDutyCostItem}><Plus size={16} /> Douanepost</button>
+              <button type="button" className="secondary-button" onClick={resetCostItemsToInvoiceTemplate}>Standaard factuurregels</button>
+              <button type="button" className="secondary-button" onClick={addFixedCostItem}><Plus size={16} /> Factuurregel</button>
+              <button type="button" className="secondary-button" onClick={addDutyCostItem}><Plus size={16} /> Douane helper</button>
+            </div>
+            <div className="inline-notice">
+              <span>Standaard staan hier: Freight, Destination, Road, Customs duties en As per specification. Alleen China-transport staat bewust apart bovenin.</span>
             </div>
             <div className="cost-item-list">
               <div className="cost-item-header" aria-hidden="true">
-                <span>Post</span>
+                <span>Factuurregel</span>
                 <span>Categorie</span>
                 <span>Type</span>
                 <span>Bedrag / tarief</span>
