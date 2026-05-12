@@ -1109,6 +1109,7 @@ type ContainerCostImportDraftLine = {
   quantity: string;
   volumeCbm: string;
   unitPriceUsd: string;
+  amountUsd?: string;
   componentsNote?: string;
 };
 
@@ -1201,6 +1202,7 @@ function parseContainerCostContent(content: string) {
           quantity: sanitizeImportedNumber(columns[qtyIndex]) || '1',
           volumeCbm: '0',
           unitPriceUsd: sanitizeImportedNumber(columns[unitPriceIndex]) || '0',
+          amountUsd: sanitizeImportedNumber(columns[amountIndex]) || undefined,
           componentsNote: [model, itemNo ? `Item No. ${itemNo}` : '', supplier, effectiveCtnNo ? `Ctn ${effectiveCtnNo}` : ''].filter(Boolean).join(' - '),
         });
         return;
@@ -1224,6 +1226,7 @@ function parseContainerCostContent(content: string) {
       quantity: quantity || '1',
       volumeCbm: volumeCbm || '0',
       unitPriceUsd: sanitizeImportedNumber(unitPriceUsd) || '0',
+      amountUsd: undefined,
       componentsNote: componentsNote || undefined,
     });
   });
@@ -3266,15 +3269,19 @@ function ContainerCostModal({
     const quantity = Math.max(1, parseDecimal(line.quantity));
     const volumeCbm = Math.max(0, parseDecimal(line.volumeCbm));
     const unitPriceUsd = Math.max(0, parseDecimal(line.unitPriceUsd));
+    const amountUsd = Math.max(0, parseDecimal(line.amountUsd));
     const matchedProduct = products.find((product) => product.code.trim().toLowerCase() === line.referenceCode.trim().toLowerCase());
     const matchedScooter = scooters.find((scooter) => scooter.frameNumber.trim().toLowerCase() === line.referenceCode.trim().toLowerCase());
+    const goodsValueUsdBase = amountUsd > 0 ? amountUsd : roundValue(quantity * unitPriceUsd, 4);
 
     return {
       ...line,
       quantity,
       volumeCbm,
       unitPriceUsd,
-      goodsValueEurBase: roundValue(quantity * unitPriceUsd * parseDecimal(exchangeRate), 4),
+      amountUsd,
+      goodsValueUsdBase,
+      goodsValueEurBase: roundValue(goodsValueUsdBase * parseDecimal(exchangeRate), 4),
       matchedProduct,
       matchedScooter,
       referenceId: matchedProduct?.id ?? matchedScooter?.id,
@@ -3288,7 +3295,7 @@ function ContainerCostModal({
   const selectedContainerVolume = parseDecimal(containerVolumeCbm);
   const volumeUsagePercent = selectedContainerVolume > 0 ? Math.min(999, roundValue((totalVolume / selectedContainerVolume) * 100, 1)) : 0;
   const totalGoodsValue = computedLines.reduce((sum, line) => sum + line.goodsValueEurBase, 0);
-  const totalGoodsValueUsd = computedLines.reduce((sum, line) => sum + (line.quantity * line.unitPriceUsd), 0);
+  const totalGoodsValueUsd = computedLines.reduce((sum, line) => sum + line.goodsValueUsdBase, 0);
   const chinaTransportEur = roundValue(parseDecimal(chinaTransportUsd) * parseDecimal(exchangeRate), 4);
 
   const resolvedCostItems = costItems.map((item) => {
