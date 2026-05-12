@@ -68,6 +68,17 @@ type ContainerCostDraftItem = {
   appliesTo: 'all' | 'scooter' | 'onderdeel' | 'samengesteld' | 'non-scooter';
 };
 
+type ScooterVolumeDraftRow = {
+  id: string;
+  model: string;
+  component: 'CBU' | 'SKD';
+  quantity: string;
+  lengthCm: string;
+  widthCm: string;
+  heightCm: string;
+  unitPriceUsd: string;
+};
+
 const containerVolumePresets = [
   { value: '20ft', label: '20ft', volumeCbm: 33.2 },
   { value: '40ft', label: '40ft', volumeCbm: 67.7 },
@@ -1099,6 +1110,10 @@ function defaultContainerCostItems() {
 
 function nextCostItemId() {
   return `cost-item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function nextScooterVolumeRowId() {
+  return `scooter-volume-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function loginNameFromEmail(email: string) {
@@ -3017,11 +3032,15 @@ function ContainerCostModal({
   const [notes, setNotes] = useState('');
   const [content, setContent] = useState('');
   const [draftLines, setDraftLines] = useState<ContainerCostImportDraftLine[]>([]);
+  const [scooterVolumeRows, setScooterVolumeRows] = useState<ScooterVolumeDraftRow[]>([
+    { id: nextScooterVolumeRowId(), model: '', component: 'CBU', quantity: '0', lengthCm: '', widthCm: '', heightCm: '', unitPriceUsd: '' },
+  ]);
   const [saving, setSaving] = useState(false);
   const normalizedContainerNumber = containerNumber.trim().toLowerCase();
   const selectedContainer = containers.find((container) => container.number.trim().toLowerCase() === normalizedContainerNumber);
   const selectedContainerId = selectedContainer?.id;
   const supplierOptions = suppliers.map((supplier) => supplier.name).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const scooterModelOptions = Array.from(new Set(scooters.map((scooter) => scooter.model.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
 
   function updateCostItem(id: string, patch: Partial<ContainerCostDraftItem>) {
     setCostItems((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
@@ -3063,11 +3082,53 @@ function ContainerCostModal({
     setCostItems(defaultContainerCostItems());
   }
 
+  function addScooterVolumeRow() {
+    setScooterVolumeRows((current) => [
+      ...current,
+      { id: nextScooterVolumeRowId(), model: '', component: 'CBU', quantity: '0', lengthCm: '', widthCm: '', heightCm: '', unitPriceUsd: '' },
+    ]);
+  }
+
+  function updateScooterVolumeRow(id: string, patch: Partial<ScooterVolumeDraftRow>) {
+    setScooterVolumeRows((current) => current.map((row) => row.id === id ? { ...row, ...patch } : row));
+  }
+
+  function removeScooterVolumeRow(id: string) {
+    setScooterVolumeRows((current) => current.length === 1
+      ? [{ id: nextScooterVolumeRowId(), model: '', component: 'CBU', quantity: '0', lengthCm: '', widthCm: '', heightCm: '', unitPriceUsd: '' }]
+      : current.filter((row) => row.id !== id));
+  }
+
   function removeCostItem(id: string) {
     setCostItems((current) => current.filter((item) => item.id !== id));
   }
 
-  const computedLines = draftLines.map((line) => {
+  const scooterDraftLines: ContainerCostImportDraftLine[] = scooterVolumeRows
+    .map((row, index): ContainerCostImportDraftLine | null => {
+      const quantity = Math.max(0, parseDecimal(row.quantity));
+      const lengthCm = Math.max(0, parseDecimal(row.lengthCm));
+      const widthCm = Math.max(0, parseDecimal(row.widthCm));
+      const heightCm = Math.max(0, parseDecimal(row.heightCm));
+      const unitVolumeCbm = roundValue((lengthCm * widthCm * heightCm) / 1000000, 4);
+
+      if (!row.model.trim() || quantity <= 0 || unitVolumeCbm <= 0) return null;
+
+      return {
+        id: `scooter-draft-${index + 1}-${row.model}-${row.component}`.replace(/[^a-z0-9-]/gi, '').toLowerCase(),
+        type: 'scooter',
+        referenceCode: `${row.model.trim()}-${row.component}`,
+        description: `${row.model.trim()} ${row.component}`,
+        quantity: formatCompactDecimal(quantity, 3),
+        volumeCbm: formatDecimal(unitVolumeCbm, 4),
+        unitPriceUsd: row.unitPriceUsd.trim() || '0',
+        componentsNote: `${row.component} - ${formatCompactDecimal(lengthCm, 1)} x ${formatCompactDecimal(widthCm, 1)} x ${formatCompactDecimal(heightCm, 1)} cm`,
+      };
+    })
+    .filter((line): line is ContainerCostImportDraftLine => Boolean(line));
+
+  const importLines = [...scooterDraftLines, ...draftLines];
+
+  const computedLines = importLines.map((line) => {
     const quantity = Math.max(1, parseDecimal(line.quantity));
     const volumeCbm = Math.max(0, parseDecimal(line.volumeCbm));
     const unitPriceUsd = Math.max(0, parseDecimal(line.unitPriceUsd));
@@ -3088,6 +3149,8 @@ function ContainerCostModal({
   });
 
   const totalVolume = computedLines.reduce((sum, line) => sum + (line.volumeCbm * line.quantity), 0);
+  const scooterVolumeTotal = scooterDraftLines.reduce((sum, line) => sum + (parseDecimal(line.volumeCbm) * parseDecimal(line.quantity)), 0);
+  const scooterCountTotal = scooterVolumeRows.reduce((sum, row) => sum + Math.max(0, parseDecimal(row.quantity)), 0);
   const selectedContainerVolume = parseDecimal(containerVolumeCbm);
   const volumeUsagePercent = selectedContainerVolume > 0 ? Math.min(999, roundValue((totalVolume / selectedContainerVolume) * 100, 1)) : 0;
   const totalGoodsValue = computedLines.reduce((sum, line) => sum + line.goodsValueEurBase, 0);
@@ -3255,6 +3318,7 @@ function ContainerCostModal({
               <div><span>Order</span><strong>{orderNumber || '-'}</strong></div>
               <div><span>Netto betaling</span><strong>EUR {formatDecimal(finalPaymentNetEur, 2)}</strong></div>
               <div><span>Container volume</span><strong>{containerVolumeCbm || '-'} cbm</strong></div>
+              <div><span>Scooters</span><strong>{formatCompactDecimal(scooterCountTotal, 0)}</strong></div>
               <div><span>Gebruikt</span><strong>{formatCompactDecimal(totalVolume, 3)} cbm</strong></div>
               <div><span>Bezetting</span><strong>{selectedContainerVolume > 0 ? `${String(volumeUsagePercent).replace('.', ',')}%` : '-'}</strong></div>
             </div>
@@ -3293,23 +3357,75 @@ function ContainerCostModal({
               <label>Containertransport China (USD)
                 <input value={chinaTransportUsd} onChange={(event) => setChinaTransportUsd(event.target.value)} placeholder="Bijv. 4200" />
               </label>
-              <label>Containertype
-                <select value={containerProfile} onChange={(event) => handleContainerProfileChange(event.target.value as (typeof containerVolumePresets)[number]['value'])}>
-                  {containerVolumePresets.map((preset) => (
-                    <option key={preset.value} value={preset.value}>
-                      {preset.label}{preset.volumeCbm > 0 ? ` - ${String(preset.volumeCbm).replace('.', ',')} cbm` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {containerProfile === 'custom' && (
-                <label>Containervolume (cbm)
-                  <input value={containerVolumeCbm} onChange={(event) => setContainerVolumeCbm(event.target.value)} />
-                </label>
-              )}
               <label className="span-2">Notities
                 <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optioneel: opmerking over containerinhoud, samengestelde sets of correcties." />
               </label>
+            </div>
+            <div className="container-volume-planner">
+              <div className="section-header-with-actions compact-header">
+                <div>
+                  <h4>Container en scooter-volume</h4>
+                  <p className="section-subtitle">Vul per model het aantal scooters, `CBU/SKD` en de afmetingen in. De app berekent daar automatisch het gebruikte volume uit.</p>
+                </div>
+                <button type="button" className="secondary-button" onClick={addScooterVolumeRow}><Plus size={16} /> Scooterregel</button>
+              </div>
+              <div className="container-volume-toolbar">
+                <label>Containertype
+                  <select value={containerProfile} onChange={(event) => handleContainerProfileChange(event.target.value as (typeof containerVolumePresets)[number]['value'])}>
+                    {containerVolumePresets.map((preset) => (
+                      <option key={preset.value} value={preset.value}>
+                        {preset.label}{preset.volumeCbm > 0 ? ` - ${String(preset.volumeCbm).replace('.', ',')} cbm` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {containerProfile === 'custom' && (
+                  <label>Containervolume (cbm)
+                    <input value={containerVolumeCbm} onChange={(event) => setContainerVolumeCbm(event.target.value)} />
+                  </label>
+                )}
+                <div className="container-volume-summary">
+                  <span>Scooter volume</span>
+                  <strong>{formatCompactDecimal(scooterVolumeTotal, 3)} cbm</strong>
+                </div>
+              </div>
+              <div className="scooter-volume-list">
+                <div className="scooter-volume-header" aria-hidden="true">
+                  <span>Model</span>
+                  <span>Component</span>
+                  <span>Aantal</span>
+                  <span>Lengte (cm)</span>
+                  <span>Breedte (cm)</span>
+                  <span>Hoogte (cm)</span>
+                  <span>USD / scooter</span>
+                  <span>Volume / stuk</span>
+                  <span></span>
+                </div>
+                {scooterVolumeRows.map((row) => {
+                  const unitVolumeCbm = roundValue((Math.max(0, parseDecimal(row.lengthCm)) * Math.max(0, parseDecimal(row.widthCm)) * Math.max(0, parseDecimal(row.heightCm))) / 1000000, 4);
+                  return (
+                    <div className="scooter-volume-row" key={row.id}>
+                      <input list="scooter-model-options" value={row.model} onChange={(event) => updateScooterVolumeRow(row.id, { model: event.target.value })} placeholder="Bijv. RSO Sense" />
+                      <select value={row.component} onChange={(event) => updateScooterVolumeRow(row.id, { component: event.target.value as ScooterVolumeDraftRow['component'] })}>
+                        <option value="CBU">CBU</option>
+                        <option value="SKD">SKD</option>
+                      </select>
+                      <input value={row.quantity} onChange={(event) => updateScooterVolumeRow(row.id, { quantity: event.target.value })} placeholder="0" />
+                      <input value={row.lengthCm} onChange={(event) => updateScooterVolumeRow(row.id, { lengthCm: event.target.value })} placeholder="0" />
+                      <input value={row.widthCm} onChange={(event) => updateScooterVolumeRow(row.id, { widthCm: event.target.value })} placeholder="0" />
+                      <input value={row.heightCm} onChange={(event) => updateScooterVolumeRow(row.id, { heightCm: event.target.value })} placeholder="0" />
+                      <input value={row.unitPriceUsd} onChange={(event) => updateScooterVolumeRow(row.id, { unitPriceUsd: event.target.value })} placeholder="0" />
+                      <div className="scooter-volume-total">{formatDecimal(unitVolumeCbm, 4)} cbm</div>
+                      <button type="button" className="danger-icon-button" onClick={() => removeScooterVolumeRow(row.id)} aria-label="Scooterregel verwijderen">
+                        <XCircle size={18} />
+                      </button>
+                    </div>
+                  );
+                })}
+                <datalist id="scooter-model-options">
+                  {scooterModelOptions.map((model) => <option key={model} value={model} />)}
+                </datalist>
+              </div>
             </div>
           </section>
 
@@ -3410,12 +3526,12 @@ function ContainerCostModal({
           <section className="product-form-subsection container-cost-card">
             <h3>Excel regels plakken</h3>
             <div className="container-content-field container-cost-paste-field">
-              <span>Gebruik tab-gescheiden kolommen in deze volgorde:</span>
+              <span>Gebruik dit blok voor onderdelen en samengestelde sets. Scooters vul je hierboven in via model, `CBU/SKD` en afmetingen.</span>
               <code>type  productcode-of-frame  omschrijving  aantal  volume_cbm  usd_stukprijs  componenten_notitie</code>
               <textarea
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
-                placeholder={'onderdeel\tA2A81023001\tSpruitstuk Piaggio 50cc 2T\t120\t0,004\t1,85\t\nscooter\tL5YBYCBA01S1154100\tRSO Sense zwart\t1\t1,85\t265\t\nsamengesteld\tKAPPENSET-S9-BLK\tKappenset S9 zwart\t12\t0,11\t36,5\tBestaat uit 7 losse panelen'}
+                placeholder={'onderdeel\tA2A81023001\tSpruitstuk Piaggio 50cc 2T\t120\t0,004\t1,85\t\nsamengesteld\tKAPPENSET-S9-BLK\tKappenset S9 zwart\t12\t0,11\t36,5\tBestaat uit 7 losse panelen'}
               />
               <div className="container-command-actions">
                 <button type="button" className="secondary-button" onClick={() => setDraftLines(parseContainerCostContent(content))}>Preview regels</button>
@@ -3435,7 +3551,7 @@ function ContainerCostModal({
               <div className="empty-state inline">
                 <CircleDollarSign size={22} />
                 <strong>Nog geen regels</strong>
-                <span>Plak Excel-regels en klik op preview om de kostprijsverdeling te zien.</span>
+                <span>Voeg scooters bovenin toe en plak onderdelen hieronder om de kostprijsverdeling te zien.</span>
               </div>
             ) : (
               <div className="table-wrap">
