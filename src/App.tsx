@@ -3315,7 +3315,7 @@ function ContainerCostModal({
             <div className="container-cost-hero-stats">
               <div><span>Container</span><strong>{containerNumber || '-'}</strong></div>
               <div><span>Order</span><strong>{orderNumber || '-'}</strong></div>
-              <div><span>Netto betaling</span><strong>EUR {formatDecimal(finalPaymentNetEur, 2)}</strong></div>
+              <div><span>China transport</span><strong>USD {formatDecimal(parseDecimal(chinaTransportUsd), 2)}</strong></div>
               <div><span>Container volume</span><strong>{containerVolumeCbm || '-'} cbm</strong></div>
               <div><span>Scooters</span><strong>{formatCompactDecimal(scooterCountTotal, 0)}</strong></div>
               <div><span>Gebruikt</span><strong>{formatCompactDecimal(totalVolume, 3)} cbm</strong></div>
@@ -3363,8 +3363,8 @@ function ContainerCostModal({
             <div className="container-volume-planner">
               <div className="section-header-with-actions compact-header">
                 <div>
-                  <h4>Container en scooter-volume</h4>
-                  <p className="section-subtitle">1 regel per model of per `CBU/SKD`-variant.</p>
+                  <h4>Scooters in container</h4>
+                  <p className="section-subtitle">Voeg per model een regel toe. Kies `CBU` of `SKD`, vul aantal en afmetingen in.</p>
                 </div>
                 <button type="button" className="secondary-button" onClick={addScooterVolumeRow}><Plus size={16} /> Model toevoegen</button>
               </div>
@@ -3384,7 +3384,7 @@ function ContainerCostModal({
                   </label>
                 )}
                 <div className="container-volume-summary">
-                  <span>Scooter volume</span>
+                  <span>Totaal scooter volume</span>
                   <strong>{formatCompactDecimal(scooterVolumeTotal, 3)} cbm</strong>
                   <small>{scooterVolumeRows.length} modelregel{ scooterVolumeRows.length === 1 ? '' : 's' }</small>
                 </div>
@@ -3392,12 +3392,12 @@ function ContainerCostModal({
               <div className="scooter-volume-list">
                 <div className="scooter-volume-header" aria-hidden="true">
                   <span>Model</span>
-                  <span>Component</span>
+                  <span>Type</span>
                   <span>Aantal</span>
                   <span>Lengte (cm)</span>
                   <span>Breedte (cm)</span>
                   <span>Hoogte (cm)</span>
-                  <span>USD / scooter</span>
+                  <span>USD / stuk</span>
                   <span>Volume / stuk</span>
                   <span></span>
                 </div>
@@ -3426,32 +3426,6 @@ function ContainerCostModal({
                   {scooterModelOptions.map((model) => <option key={model} value={model} />)}
                 </datalist>
               </div>
-            </div>
-          </section>
-
-          <section className="product-form-subsection container-cost-card">
-            <div className="section-header-with-actions compact-header">
-              <div>
-                <h3>Betaling / Exact</h3>
-                <p className="section-subtitle">Netto totaal voor koppeling aan Exact.</p>
-              </div>
-            </div>
-            <div className="form-grid">
-              <label>Goederen netto (auto)
-                <input value={formatDecimal(goodsNetEur, 2)} disabled />
-              </label>
-              <label>Logistiek netto (auto)
-                <input value={formatDecimal(logisticsNetEur, 2)} disabled />
-              </label>
-              <label>Betaling netto (auto)
-                <input value={formatDecimal(calculatedPaymentNetEur, 2)} disabled />
-              </label>
-              <label>Betaling netto override
-                <input value={paymentNetOverrideEur} onChange={(event) => setPaymentNetOverrideEur(event.target.value)} placeholder="Leeg = automatisch bedrag" />
-              </label>
-              <label className="span-2">Exact referentie
-                <input value={exactReference} onChange={(event) => setExactReference(event.target.value)} placeholder="Bijv. factuur-, boeking- of betaalreferentie" />
-              </label>
             </div>
           </section>
           </div>
