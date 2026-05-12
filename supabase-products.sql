@@ -1,6 +1,7 @@
 create table if not exists public.products (
   id text primary key,
   code text not null,
+  "supplierItemNo" text,
   description text not null,
   barcode text,
   batch text,
@@ -49,3 +50,6 @@ to authenticated
 using (true);
 
 alter publication supabase_realtime add table public.products;
+
+alter table public.products
+add column if not exists "supplierItemNo" text;

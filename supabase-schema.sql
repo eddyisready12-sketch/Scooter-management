@@ -10,6 +10,9 @@ create table if not exists dealers (
   active boolean default true
 );
 
+alter table if exists products
+add column if not exists "supplierItemNo" text;
+
 create table if not exists suppliers (
   id text primary key,
   name text not null,

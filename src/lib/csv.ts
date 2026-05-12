@@ -169,12 +169,13 @@ export function parseDealerImport(file: File): Promise<Dealer[]> {
 
 function normalizeProductRows(rows: Record<string, unknown>[]): Product[] {
   return rows.map((row) => {
-    const code = pick(row, ['code', 'artikelcode', 'productcode', 'item code']);
-    const description = pick(row, ['omschrijving', 'description', 'artikel', 'product', 'naam']);
+    const code = pick(row, ['artikelnummer', 'code', 'artikelcode', 'productcode', 'item code']);
+    const supplierItemNo = pick(row, ['item no.', 'item no', 'itemno', 'supplier item no', 'leveranciersnummer', 'supplier item']);
+    const description = pick(row, ['parts', 'omschrijving', 'description', 'artikel', 'product', 'naam']);
     const barcode = pick(row, ['barcode', 'ean', 'ean code']);
     const batch = pick(row, ['batch', 'partij', 'batchnummer', 'batch nummer']);
     const salePrice = pick(row, ['verkoopprijs', 'sale price', 'sales price', 'price']);
-    const costPrice = pick(row, ['kostprijs', 'cost price', 'purchase price']);
+    const costPrice = pick(row, ['kostprijs', 'cost price', 'purchase price', 'unit price', 'unitprice']);
     const webshopRaw = pick(row, ['webwinkel', 'webshop', 'online']);
     const articleGroup = pick(row, ['artikelgroep', 'article group', 'groep', 'group']);
     const stock = pick(row, ['voorraad', 'stock', 'inventory']);
@@ -182,11 +183,12 @@ function normalizeProductRows(rows: Record<string, unknown>[]): Product[] {
     const endDate = parseImportDate(pick(row, ['einddatum', 'enddatum', 'end date']));
     const supplier = pick(row, ['hoofdleverancier', 'leverancier', 'supplier']);
     const countryOfOrigin = pick(row, ['land van herkomst', 'country of origin', 'origin']);
-    const stableKey = code || barcode || description;
+    const stableKey = code || supplierItemNo || barcode || [supplier, description].filter(Boolean).join('-');
 
     return {
       id: `product-${stableKey.replace(/[^a-z0-9]/gi, '').toLowerCase()}`,
       code,
+      ...(supplierItemNo ? { supplierItemNo } : {}),
       description,
       ...(barcode ? { barcode } : {}),
       ...(batch ? { batch } : {}),
@@ -200,13 +202,13 @@ function normalizeProductRows(rows: Record<string, unknown>[]): Product[] {
       ...(supplier ? { supplier } : {}),
       ...(countryOfOrigin ? { countryOfOrigin } : {}),
     };
-  }).filter((product) => product.code || product.description);
+  }).filter((product) => product.code || product.supplierItemNo || product.description);
 }
 
 export function parseProductImport(file: File): Promise<Product[]> {
   const extension = file.name.split('.').pop()?.toLowerCase();
   if (extension === 'xlsx' || extension === 'xls') {
-    return readExcelRows(file, ['code', 'artikelcode', 'omschrijving', 'description', 'barcode']).then(normalizeProductRows);
+    return readExcelRows(file, ['artikelnummer', 'code', 'itemno', 'parts', 'omschrijving', 'description', 'barcode']).then(normalizeProductRows);
   }
   return readCsvRows(file).then(normalizeProductRows);
 }

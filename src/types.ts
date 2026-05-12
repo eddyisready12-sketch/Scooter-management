@@ -134,6 +134,7 @@ export type BatteryModel = {
 export type Product = {
   id: string;
   code: string;
+  supplierItemNo?: string;
   description: string;
   barcode?: string;
   batch?: string;

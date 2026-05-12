@@ -321,6 +321,52 @@ function createProductDraft(product: Product): Product {
   };
 }
 
+function articleNumberPrefix(date = new Date()) {
+  return `${String(date.getFullYear()).slice(-2)}${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function productIdFromArticleNumber(value: string) {
+  return `product-${value.replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
+}
+
+function normalizeImportedProducts(products: Product[], existingProducts: Product[]) {
+  const prefix = articleNumberPrefix();
+  let nextSequence = [...existingProducts, ...products].reduce((max, product) => {
+    const match = (product.code || '').trim().match(new RegExp(`^${prefix}(\\d+)$`));
+    if (!match) return max;
+    const sequence = Number.parseInt(match[1], 10);
+    return Number.isFinite(sequence) ? Math.max(max, sequence) : max;
+  }, 0) + 1;
+
+  const usedArticleNumbers = new Set(
+    existingProducts
+      .map((product) => product.code?.trim().toLowerCase())
+      .filter(Boolean) as string[],
+  );
+
+  return products.map((product) => {
+    const articleNumber = product.code.trim();
+    const supplierItemNo = product.supplierItemNo?.trim() || '';
+    let resolvedArticleNumber = articleNumber || supplierItemNo;
+
+    if (!resolvedArticleNumber) {
+      do {
+        resolvedArticleNumber = `${prefix}${String(nextSequence).padStart(3, '0')}`;
+        nextSequence += 1;
+      } while (usedArticleNumbers.has(resolvedArticleNumber.toLowerCase()));
+    }
+
+    usedArticleNumbers.add(resolvedArticleNumber.toLowerCase());
+
+    return {
+      ...product,
+      id: productIdFromArticleNumber(resolvedArticleNumber),
+      code: resolvedArticleNumber,
+      ...(supplierItemNo ? { supplierItemNo } : {}),
+    };
+  });
+}
+
 function PackagingMaterialIcon({
   option,
   compact = false,
@@ -1573,11 +1619,12 @@ export function App() {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
-      const products = await parseProductImport(file);
-      if (products.length === 0) {
-        setProductMessage(`Geen producten gevonden in ${file.name}. Controleer kolommen zoals Code, Omschrijving, Barcode of Artikelgroep.`);
+      const importedProducts = await parseProductImport(file);
+      if (importedProducts.length === 0) {
+        setProductMessage(`Geen producten gevonden in ${file.name}. Controleer kolommen zoals Artikelnummer, Item No., Parts of Leverancier.`);
         return;
       }
+      const products = normalizeImportedProducts(importedProducts, data.products);
       setData((current) => {
         const byId = new Map(current.products.map((product) => [product.id, product]));
         products.forEach((product) => byId.set(product.id, product));
@@ -4209,6 +4256,7 @@ function ProductsPage({
       const hasEndDate = Boolean(product.endDate?.trim());
       const inQuery = !needle || [
         product.code,
+        product.supplierItemNo,
         product.description,
         product.barcode,
         product.batch,
@@ -4565,6 +4613,7 @@ function ProductDetailModal({
       await onSave({
         ...draft,
         code: draft.code.trim(),
+        supplierItemNo: draft.supplierItemNo?.trim() || undefined,
         description: draft.description.trim(),
         barcode: draft.barcode?.trim() || undefined,
         batch: draft.batch?.trim() || undefined,
@@ -4728,6 +4777,9 @@ function ProductDetailModal({
                 <div className="form-grid">
                   <label>Artikelnummer
                     <input value={draft.code} onChange={(event) => setDraft((current) => ({ ...current, code: event.target.value }))} />
+                  </label>
+                  <label>Leveranciersnummer
+                    <input value={draft.supplierItemNo ?? ''} onChange={(event) => setDraft((current) => ({ ...current, supplierItemNo: event.target.value }))} />
                   </label>
                   <label>Barcode
                     <input value={draft.barcode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, barcode: event.target.value }))} />
