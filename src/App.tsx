@@ -4338,7 +4338,7 @@ function ProductsPage({
           </div>
         </div>
         <div className="product-toolbar">
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek op code, omschrijving, barcode of leverancier" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek op artikelnummer, omschrijving, barcode of leverancier" />
           <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
             <option value="">Alle artikelgroepen</option>
             {articleGroups.map((group) => <option key={group} value={group}>{group}</option>)}
@@ -4414,7 +4414,7 @@ function ProductsPage({
                 <tr>
                   <th>
                     <button type="button" className="column-sort-button" onClick={() => handleSort('code')}>
-                      Code {renderSortIcon('code')}
+                      Artikelnummer {renderSortIcon('code')}
                     </button>
                   </th>
                   <th>
@@ -4726,7 +4726,7 @@ function ProductDetailModal({
               <div className="product-form-subsection">
                 <h3>Identificatie</h3>
                 <div className="form-grid">
-                  <label>Code
+                  <label>Artikelnummer
                     <input value={draft.code} onChange={(event) => setDraft((current) => ({ ...current, code: event.target.value }))} />
                   </label>
                   <label>Barcode
