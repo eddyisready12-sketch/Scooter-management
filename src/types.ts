@@ -59,6 +59,7 @@ export type ContainerCostBatch = {
   supplierName?: string;
   currency: 'USD' | 'EUR';
   exchangeRate: string;
+  chinaTransportUsd?: string;
   transportCostEur: string;
   importCostEur: string;
   otherCostEur?: string;

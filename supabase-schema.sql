@@ -66,6 +66,7 @@ create table if not exists container_cost_batches (
   "supplierName" text,
   currency text not null default 'USD',
   "exchangeRate" text not null,
+  "chinaTransportUsd" text,
   "transportCostEur" text not null,
   "importCostEur" text not null,
   "otherCostEur" text,

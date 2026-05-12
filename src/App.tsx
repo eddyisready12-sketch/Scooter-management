@@ -1089,7 +1089,6 @@ function parseContainerCostContent(content: string) {
 
 function defaultContainerCostItems() {
   return [
-    { id: 'cost-item-china-transport', label: 'China transport', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
     { id: 'cost-item-freight', label: 'Freight', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
     { id: 'cost-item-destination', label: 'Destination', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
     { id: 'cost-item-road', label: 'Road', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
@@ -3011,6 +3010,7 @@ function ContainerCostModal({
   const [orderNumber, setOrderNumber] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [exchangeRate, setExchangeRate] = useState('0,92');
+  const [chinaTransportUsd, setChinaTransportUsd] = useState('0');
   const [costItems, setCostItems] = useState<ContainerCostDraftItem[]>(() => defaultContainerCostItems());
   const [paymentNetOverrideEur, setPaymentNetOverrideEur] = useState('');
   const [exactReference, setExactReference] = useState('');
@@ -3087,6 +3087,7 @@ function ContainerCostModal({
   const selectedContainerVolume = parseDecimal(containerVolumeCbm);
   const volumeUsagePercent = selectedContainerVolume > 0 ? Math.min(999, roundValue((totalVolume / selectedContainerVolume) * 100, 1)) : 0;
   const totalGoodsValue = computedLines.reduce((sum, line) => sum + line.goodsValueEurBase, 0);
+  const chinaTransportEur = roundValue(parseDecimal(chinaTransportUsd) * parseDecimal(exchangeRate), 4);
 
   const resolvedCostItems = costItems.map((item) => {
     const fixedAmount = parseDecimal(item.amountEur);
@@ -3107,7 +3108,7 @@ function ContainerCostModal({
     return { ...item, resolvedAmountEur: roundValue(dutyBase * dutyRate, 4) };
   });
 
-  const transportPool = resolvedCostItems.filter((item) => item.category === 'transport').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
+  const transportPool = chinaTransportEur + resolvedCostItems.filter((item) => item.category === 'transport').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
   const importPool = resolvedCostItems.filter((item) => item.category === 'import').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
   const otherPool = resolvedCostItems.filter((item) => item.category === 'other').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
   const logisticsNetEur = roundValue(transportPool + importPool + otherPool, 4);
@@ -3181,6 +3182,7 @@ function ContainerCostModal({
         supplierName: supplierName.trim() || undefined,
         currency: 'USD',
         exchangeRate: formatDecimal(parseDecimal(exchangeRate), 4),
+        chinaTransportUsd: parseDecimal(chinaTransportUsd) > 0 ? formatDecimal(parseDecimal(chinaTransportUsd), 2) : undefined,
         transportCostEur: formatDecimal(transportPool, 2),
         importCostEur: formatDecimal(importPool, 2),
         otherCostEur: otherPool > 0 ? formatDecimal(otherPool, 2) : undefined,
@@ -3284,6 +3286,9 @@ function ContainerCostModal({
               <label>Wisselkoers USD - EUR
                 <input value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} />
               </label>
+              <label>Containertransport China (USD)
+                <input value={chinaTransportUsd} onChange={(event) => setChinaTransportUsd(event.target.value)} placeholder="Bijv. 4200" />
+              </label>
               <label>Containertype
                 <select value={containerProfile} onChange={(event) => handleContainerProfileChange(event.target.value as (typeof containerVolumePresets)[number]['value'])}>
                   {containerVolumePresets.map((preset) => (
@@ -3293,9 +3298,11 @@ function ContainerCostModal({
                   ))}
                 </select>
               </label>
-              <label>Containervolume (cbm)
-                <input value={containerVolumeCbm} onChange={(event) => setContainerVolumeCbm(event.target.value)} />
-              </label>
+              {containerProfile === 'custom' && (
+                <label>Containervolume (cbm)
+                  <input value={containerVolumeCbm} onChange={(event) => setContainerVolumeCbm(event.target.value)} />
+                </label>
+              )}
               <label className="span-2">Notities
                 <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optioneel: opmerking over containerinhoud, samengestelde sets of correcties." />
               </label>
@@ -3322,7 +3329,7 @@ function ContainerCostModal({
               </label>
             </div>
             <div className="inline-notice">
-              <span>Containertransport China naar Nederland telt mee in de betaling aan China en wordt naar verhouding over alle scooters en onderdelen verdeeld.</span>
+              <span>Containertransport China naar Nederland vul je in USD in. De app rekent dit via de wisselkoers om naar EUR en verdeelt het naar verhouding over alle scooters en onderdelen.</span>
             </div>
           </section>
           </div>
