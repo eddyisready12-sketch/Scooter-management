@@ -1112,6 +1112,10 @@ type ContainerCostImportDraftLine = {
   componentsNote?: string;
 };
 
+function sanitizeImportedNumber(value: string) {
+  return value.replace(/[^\d,.-]/g, '').trim();
+}
+
 function parseContainerCostContent(content: string) {
   return content
     .split(/\r?\n/)
@@ -1119,6 +1123,33 @@ function parseContainerCostContent(content: string) {
     .filter(Boolean)
     .map((line, index) => {
       const columns = line.split('\t').map((item) => item.trim());
+      if (!columns.length) return null;
+
+      const headerKey = columns.map((column) => column.toLowerCase()).join('|');
+      if (headerKey.includes('ctn no') || headerKey.includes('artikelnummer') || headerKey.includes('item no')) {
+        return null;
+      }
+
+      if (columns.length >= 8) {
+        const [ctnNo, model, articleNumber, itemNo, parts, qty, unitPrice = '', _amount = '', supplier = ''] = columns;
+        const referenceCode = articleNumber || itemNo || `${model}-${parts}`.replace(/\s+/g, '-');
+        if (!referenceCode && !parts) return null;
+
+        const normalizedParts = (parts || '').toLowerCase();
+        const lineType: ContainerCostLineType = normalizedParts.includes('set') ? 'samengesteld' : 'onderdeel';
+
+        return {
+          id: `draft-${index + 1}-${referenceCode || parts}`.replace(/[^a-z0-9-]/gi, '').toLowerCase(),
+          type: lineType,
+          referenceCode,
+          description: parts || referenceCode,
+          quantity: qty || '1',
+          volumeCbm: '0',
+          unitPriceUsd: sanitizeImportedNumber(unitPrice) || '0',
+          componentsNote: [model, itemNo ? `Item No. ${itemNo}` : '', supplier, ctnNo ? `Ctn ${ctnNo}` : ''].filter(Boolean).join(' - '),
+        } satisfies ContainerCostImportDraftLine;
+      }
+
       if (columns.length < 5) return null;
       const [type, referenceCode, description, quantity, volumeCbm, unitPriceUsd = '', componentsNote = ''] = columns;
       const normalizedType = (type || 'onderdeel').toLowerCase();
@@ -1135,7 +1166,7 @@ function parseContainerCostContent(content: string) {
         description: description || referenceCode,
         quantity: quantity || '1',
         volumeCbm: volumeCbm || '0',
-        unitPriceUsd: unitPriceUsd || '0',
+        unitPriceUsd: sanitizeImportedNumber(unitPriceUsd) || '0',
         componentsNote: componentsNote || undefined,
       };
 
@@ -3546,12 +3577,12 @@ function ContainerCostModal({
           <section className="product-form-subsection container-cost-card">
             <h3>Excel regels plakken</h3>
             <div className="container-content-field container-cost-paste-field">
-              <span>Gebruik dit blok voor onderdelen en samengestelde sets. Scooters vul je hierboven in via model, `CBU/SKD` en afmetingen.</span>
-              <code>type  productcode-of-frame  omschrijving  aantal  volume_cbm  usd_stukprijs  componenten_notitie</code>
+              <span>Gebruik dit blok voor onderdelen en samengestelde sets. Je kunt nu ook rechtstreeks jouw leverancierslijst plakken met kolommen zoals `Ctn No.`, `Model`, `Artikelnummer`, `Item No.`, `Parts`, `Qty`, `Unit Price`, `Amount`, `Leverancier`.</span>
+              <code>Ctn No.  Model  Artikelnummer  Item No.  Parts  Qty  Unit Price  Amount  Leverancier</code>
               <textarea
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
-                placeholder={'onderdeel\tA2A81023001\tSpruitstuk Piaggio 50cc 2T\t120\t0,004\t1,85\t\nsamengesteld\tKAPPENSET-S9-BLK\tKappenset S9 zwart\t12\t0,11\t36,5\tBestaat uit 7 losse panelen'}
+                placeholder={'1-5\tSense 50\tA2A81023001\t\tBody sets complete (Metal pink)\t5\t83,03\t386,98\tWenling Import And Export Co., Ltd.\n37-39\tSense (quare)\t\tTX250\tFRONT HEADCOVER SQUARE Pearl blue (TX250) col\t3\t4,14\t12,42\tWenling Import And Export Co., Ltd.'}
               />
               <div className="container-command-actions">
                 <button type="button" className="secondary-button" onClick={() => setDraftLines(parseContainerCostContent(content))}>Preview regels</button>
