@@ -2417,13 +2417,13 @@ tbody tr:hover {
 }
 
 .container-cost-hero {
-  align-items: center;
+  align-items: start;
   background: #fbfcfe;
   border: 1px solid #dde5ee;
   border-radius: 10px;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+  grid-template-columns: 1fr;
   padding: 14px 16px;
 }
 
@@ -2446,7 +2446,7 @@ tbody tr:hover {
 .container-cost-hero-stats {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .container-cost-hero-stats div {
