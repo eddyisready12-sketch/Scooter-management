@@ -3310,8 +3310,8 @@ function ContainerCostModal({
         <div className="container-cost-layout">
           <section className="container-cost-hero">
             <div className="container-cost-hero-copy">
-              <strong>Werk vanuit je echte factuurregels en verdeel daarna de kostprijs.</strong>
-              <span>China-transport vul je bovenin in USD in. De factuurregels hieronder volgen de inklaringsfactuur zoals op je voorbeelden.</span>
+              <strong>Import China batch</strong>
+              <span>Kostprijs, containerinhoud en betaling in een scherm.</span>
             </div>
             <div className="container-cost-hero-stats">
               <div><span>Container</span><strong>{containerNumber || '-'}</strong></div>
@@ -3365,9 +3365,9 @@ function ContainerCostModal({
               <div className="section-header-with-actions compact-header">
                 <div>
                   <h4>Container en scooter-volume</h4>
-                  <p className="section-subtitle">Vul per model het aantal scooters, `CBU/SKD` en de afmetingen in. De app berekent daar automatisch het gebruikte volume uit.</p>
+                  <p className="section-subtitle">1 regel per model of per `CBU/SKD`-variant.</p>
                 </div>
-                <button type="button" className="secondary-button" onClick={addScooterVolumeRow}><Plus size={16} /> Scooterregel</button>
+                <button type="button" className="secondary-button" onClick={addScooterVolumeRow}><Plus size={16} /> Model toevoegen</button>
               </div>
               <div className="container-volume-toolbar">
                 <label>Containertype
@@ -3387,6 +3387,7 @@ function ContainerCostModal({
                 <div className="container-volume-summary">
                   <span>Scooter volume</span>
                   <strong>{formatCompactDecimal(scooterVolumeTotal, 3)} cbm</strong>
+                  <small>{scooterVolumeRows.length} modelregel{ scooterVolumeRows.length === 1 ? '' : 's' }</small>
                 </div>
               </div>
               <div className="scooter-volume-list">
@@ -3430,7 +3431,12 @@ function ContainerCostModal({
           </section>
 
           <section className="product-form-subsection container-cost-card">
-            <h3>Betaling / Exact</h3>
+            <div className="section-header-with-actions compact-header">
+              <div>
+                <h3>Betaling / Exact</h3>
+                <p className="section-subtitle">Netto totaal voor koppeling aan Exact.</p>
+              </div>
+            </div>
             <div className="form-grid">
               <label>Goederen netto (auto)
                 <input value={formatDecimal(goodsNetEur, 2)} disabled />
@@ -3448,9 +3454,6 @@ function ContainerCostModal({
                 <input value={exactReference} onChange={(event) => setExactReference(event.target.value)} placeholder="Bijv. factuur-, boeking- of betaalreferentie" />
               </label>
             </div>
-            <div className="inline-notice">
-              <span>Containertransport China naar Nederland vul je apart in USD in. De factuurregels hieronder zijn voor Freight, Destination, Road, Customs duties en extra posten uit de inklaringsfactuur.</span>
-            </div>
           </section>
           </div>
 
@@ -3458,16 +3461,13 @@ function ContainerCostModal({
             <div className="section-header-with-actions">
               <div>
                 <h3>Factuurregels en verdeling</h3>
-                <p className="section-subtitle">Start met dezelfde regels als op je factuur en voeg alleen extra posten toe als de nota afwijkt.</p>
+                <p className="section-subtitle">Standaardregels volgen je factuur. Voeg alleen afwijkingen toe.</p>
               </div>
-            </div>
-            <div className="container-command-actions cost-item-actions">
-              <button type="button" className="secondary-button" onClick={resetCostItemsToInvoiceTemplate}>Standaard factuurregels</button>
-              <button type="button" className="secondary-button" onClick={addFixedCostItem}><Plus size={16} /> Factuurregel</button>
-              <button type="button" className="secondary-button" onClick={addDutyCostItem}><Plus size={16} /> Douane helper</button>
-            </div>
-            <div className="inline-notice">
-              <span>Standaard staan hier: Freight, Destination, Road, Customs duties en As per specification. Alleen China-transport staat bewust apart bovenin.</span>
+              <div className="container-command-actions cost-item-actions compact-actions">
+                <button type="button" className="secondary-button" onClick={resetCostItemsToInvoiceTemplate}>Standaard factuurregels</button>
+                <button type="button" className="secondary-button" onClick={addFixedCostItem}><Plus size={16} /> Factuurregel</button>
+                <button type="button" className="secondary-button" onClick={addDutyCostItem}><Plus size={16} /> Douane helper</button>
+              </div>
             </div>
             <div className="cost-item-list">
               <div className="cost-item-header" aria-hidden="true">

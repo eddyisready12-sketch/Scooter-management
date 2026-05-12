@@ -2418,13 +2418,13 @@ tbody tr:hover {
 
 .container-cost-hero {
   align-items: center;
-  background: linear-gradient(135deg, #f5f8fd 0%, #fff8e8 100%);
+  background: #fbfcfe;
   border: 1px solid #dde5ee;
   border-radius: 10px;
   display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
-  padding: 18px;
+  gap: 12px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+  padding: 14px 16px;
 }
 
 .container-cost-hero-copy {
@@ -2434,12 +2434,13 @@ tbody tr:hover {
 
 .container-cost-hero-copy strong {
   color: #1f2d3d;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .container-cost-hero-copy span {
   color: #5f6f7f;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .container-cost-hero-stats {
@@ -2449,10 +2450,10 @@ tbody tr:hover {
 }
 
 .container-cost-hero-stats div {
-  background: rgba(255, 255, 255, 0.82);
+  background: #fff;
   border: 1px solid #dbe3ec;
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px;
 }
 
 .container-cost-hero-stats span {
@@ -2538,6 +2539,13 @@ tbody tr:hover {
   font-size: 15px;
 }
 
+.container-volume-summary small {
+  color: #65717d;
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
 .scooter-volume-list {
   display: grid;
   gap: 10px;
@@ -2584,6 +2592,12 @@ tbody tr:hover {
 
 .cost-item-actions {
   padding: 0 0 12px;
+}
+
+.compact-actions {
+  padding: 0;
+  justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .cost-item-list {
