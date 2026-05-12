@@ -58,7 +58,8 @@ create table if not exists containers (
 
 create table if not exists container_cost_batches (
   id text primary key,
-  "containerId" text not null references containers(id) on delete cascade,
+  "containerId" text references containers(id) on delete cascade,
+  "containerNumber" text not null,
   "orderNumber" text not null,
   "supplierName" text,
   currency text not null default 'USD',

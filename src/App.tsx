@@ -2949,7 +2949,7 @@ function CostBatchesPage({
                   return (
                     <tr key={batch.id}>
                       <td>{batch.orderNumber}</td>
-                      <td>{container?.number || '-'}</td>
+                      <td>{batch.containerNumber || container?.number || '-'}</td>
                       <td>{batch.supplierName || '-'}</td>
                       <td>EUR {batch.goodsNetEur || '-'}</td>
                       <td>EUR {batch.logisticsNetEur || '-'}</td>
@@ -2997,7 +2997,7 @@ function ContainerCostModal({
   onClose: () => void;
   onSave: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
 }) {
-  const [selectedContainerId, setSelectedContainerId] = useState(containers[0]?.id ?? '');
+  const [containerNumber, setContainerNumber] = useState(containers[0]?.number ?? '');
   const [orderNumber, setOrderNumber] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [exchangeRate, setExchangeRate] = useState('0,92');
@@ -3008,7 +3008,9 @@ function ContainerCostModal({
   const [content, setContent] = useState('');
   const [draftLines, setDraftLines] = useState<ContainerCostImportDraftLine[]>([]);
   const [saving, setSaving] = useState(false);
-  const selectedContainer = containers.find((container) => container.id === selectedContainerId);
+  const normalizedContainerNumber = containerNumber.trim().toLowerCase();
+  const selectedContainer = containers.find((container) => container.number.trim().toLowerCase() === normalizedContainerNumber);
+  const selectedContainerId = selectedContainer?.id;
   const supplierOptions = suppliers.map((supplier) => supplier.name).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
 
   function updateCostItem(id: string, patch: Partial<ContainerCostDraftItem>) {
@@ -3146,13 +3148,14 @@ function ContainerCostModal({
   });
 
   async function handleSave() {
-    if (!selectedContainerId || !orderNumber.trim() || calculatedLines.length === 0) return;
+    if (!containerNumber.trim() || !orderNumber.trim() || calculatedLines.length === 0) return;
     setSaving(true);
     try {
-      const batchId = stableId('container-cost-batch', `${selectedContainerId}-${orderNumber}-${Date.now()}`);
+      const batchId = stableId('container-cost-batch', `${containerNumber}-${orderNumber}-${Date.now()}`);
       const batch: ContainerCostBatch = {
         id: batchId,
         containerId: selectedContainerId,
+        containerNumber: containerNumber.trim(),
         orderNumber: orderNumber.trim(),
         supplierName: supplierName.trim() || undefined,
         currency: 'USD',
@@ -3221,7 +3224,7 @@ function ContainerCostModal({
               <span>Koppel de betaling aan Exact en verdeel China-transport naar verhouding over scooters en onderdelen.</span>
             </div>
             <div className="container-cost-hero-stats">
-              <div><span>Container</span><strong>{selectedContainer?.number || '-'}</strong></div>
+              <div><span>Container</span><strong>{containerNumber || '-'}</strong></div>
               <div><span>Order</span><strong>{orderNumber || '-'}</strong></div>
               <div><span>Netto betaling</span><strong>EUR {formatDecimal(finalPaymentNetEur, 2)}</strong></div>
             </div>
@@ -3231,11 +3234,16 @@ function ContainerCostModal({
           <section className="product-form-subsection container-cost-card">
             <h3>Container en order</h3>
             <div className="form-grid">
-              <label>Container
-                <select value={selectedContainerId} onChange={(event) => setSelectedContainerId(event.target.value)}>
-                  <option value="">Kies container</option>
-                  {containers.map((container) => <option key={container.id} value={container.id}>{container.number} - {container.invoiceNumber}</option>)}
-                </select>
+              <label>Containernummer
+                <input
+                  list="container-number-options"
+                  value={containerNumber}
+                  onChange={(event) => setContainerNumber(event.target.value)}
+                  placeholder="Bijv. FSCU8979996"
+                />
+                <datalist id="container-number-options">
+                  {containers.map((container) => <option key={container.id} value={container.number}>{container.number} - {container.invoiceNumber}</option>)}
+                </datalist>
               </label>
               <label>Ordernummer / batch onderdelen
                 <input value={orderNumber} onChange={(event) => setOrderNumber(event.target.value)} placeholder="bijv. WL-2026-041" />
@@ -3422,7 +3430,7 @@ function ContainerCostModal({
           <button
             type="button"
             className="primary-button"
-            disabled={saving || !selectedContainerId || !orderNumber.trim() || calculatedLines.length === 0}
+            disabled={saving || !containerNumber.trim() || !orderNumber.trim() || calculatedLines.length === 0}
             onClick={() => void handleSave()}
           >
             {saving ? 'Opslaan...' : 'Importbatch opslaan'}

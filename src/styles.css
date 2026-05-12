@@ -2406,7 +2406,8 @@ tbody tr:hover {
 }
 
 .container-cost-modal {
-  width: min(1180px, calc(100vw - 32px));
+  width: min(1480px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
 }
 
 .container-cost-layout {
@@ -2472,7 +2473,7 @@ tbody tr:hover {
 .container-cost-top-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
 }
 
 .container-cost-card {

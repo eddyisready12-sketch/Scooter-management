@@ -51,7 +51,8 @@ export type ContainerCostItemCategory = 'transport' | 'import' | 'other';
 
 export type ContainerCostBatch = {
   id: string;
-  containerId: string;
+  containerId?: string;
+  containerNumber: string;
   orderNumber: string;
   supplierName?: string;
   currency: 'USD' | 'EUR';
