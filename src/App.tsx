@@ -3310,7 +3310,6 @@ function ContainerCostModal({
         <div className="container-cost-layout">
           <section className="container-cost-hero">
             <div className="container-cost-hero-copy">
-              <strong>Import China batch</strong>
               <span>Kostprijs, containerinhoud en betaling in een scherm.</span>
             </div>
             <div className="container-cost-hero-stats">
