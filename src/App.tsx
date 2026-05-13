@@ -1105,6 +1105,10 @@ type ContainerCostImportDraftLine = {
   id: string;
   type: ContainerCostLineType;
   referenceCode: string;
+  articleNumber?: string;
+  supplierItemNo?: string;
+  supplierName?: string;
+  model?: string;
   description: string;
   quantity: string;
   volumeCbm: string;
@@ -1178,6 +1182,10 @@ function parseContainerCostContent(content: string) {
         id: `draft-supplier-${index + 1}-${referenceCode || parts}`.replace(/[^a-z0-9-]/gi, '').toLowerCase(),
         type: lineType,
         referenceCode,
+        articleNumber: articleNumber || undefined,
+        supplierItemNo: itemNo || undefined,
+        supplierName: supplier || undefined,
+        model: model || undefined,
         description: parts || referenceCode,
         quantity: sanitizeImportedNumber(qtyRaw) || '1',
         volumeCbm: '0',
@@ -1250,6 +1258,10 @@ function parseContainerCostContent(content: string) {
           id: `draft-${index + 1}-${referenceCode || parts}`.replace(/[^a-z0-9-]/gi, '').toLowerCase(),
           type: lineType,
           referenceCode,
+          articleNumber: articleNumber || undefined,
+          supplierItemNo: itemNo || undefined,
+          supplierName: supplier || undefined,
+          model: model || undefined,
           description: parts || referenceCode,
           quantity: sanitizeImportedNumber(columns[qtyIndex]) || '1',
           volumeCbm: '0',
@@ -3451,7 +3463,20 @@ function ContainerCostModal({
     const volumeCbm = Math.max(0, parseDecimal(line.volumeCbm));
     const unitPriceUsd = Math.max(0, parseDecimal(line.unitPriceUsd));
     const amountUsd = Math.max(0, parseDecimal(line.amountUsd));
-    const matchedProduct = products.find((product) => product.code.trim().toLowerCase() === line.referenceCode.trim().toLowerCase());
+    const referenceCodeKey = line.referenceCode.trim().toLowerCase();
+    const articleNumberKey = line.articleNumber?.trim().toLowerCase() || '';
+    const supplierItemKey = line.supplierItemNo?.trim().toLowerCase() || '';
+    const supplierNameKey = normalizedSupplierKey(line.supplierName || supplierName);
+    const matchedProduct = products.find((product) => {
+      const productCodeKey = product.code.trim().toLowerCase();
+      const productSupplierItemKey = product.supplierItemNo?.trim().toLowerCase() || '';
+      const productSupplierKey = normalizedSupplierKey(product.supplier);
+      return productCodeKey === referenceCodeKey
+        || (articleNumberKey && productCodeKey === articleNumberKey)
+        || (supplierItemKey
+          && productSupplierItemKey === supplierItemKey
+          && (!supplierNameKey || productSupplierKey === supplierNameKey));
+    });
     const matchedScooter = scooters.find((scooter) => scooter.frameNumber.trim().toLowerCase() === line.referenceCode.trim().toLowerCase());
     const goodsValueUsdBase = amountUsd > 0 ? amountUsd : roundValue(quantity * unitPriceUsd, 4);
 
@@ -3588,33 +3613,93 @@ function ContainerCostModal({
         createdAt: new Date().toISOString(),
       };
 
-      const lines: ContainerCostLine[] = calculatedLines.map((line, index) => ({
-        id: stableId('container-cost-line', `${batchId}-${line.referenceCode}-${index + 1}`),
-        batchId,
-        type: line.type,
-        referenceId: line.referenceId,
-        referenceCode: line.referenceCode,
-        description: line.normalizedDescription,
-        quantity: formatCompactDecimal(line.quantity, 3),
-        volumeCbm: formatDecimal(line.volumeCbm, 4),
-        unitPriceUsd: formatDecimal(line.unitPriceUsd, 4),
-        goodsValueEur: formatDecimal(line.goodsValueEurBase, 4),
-        allocatedTransportEur: formatDecimal(line.allocatedTransportEur, 4),
-        allocatedImportEur: formatDecimal(line.allocatedImportEur, 4),
-        allocatedOtherEur: formatDecimal(line.allocatedOtherEur, 4),
-        calculatedUnitCostEur: formatDecimal(line.calculatedUnitCostEur, 4),
-        componentsNote: line.componentsNote,
+      const autoProductDrafts = new Map<string, Product>();
+      const autoLineKeys = new Map<string, string>();
+
+      calculatedLines
+        .filter((line) => line.type !== 'scooter' && !line.matchedProduct)
+        .forEach((line) => {
+          const autoKey = [
+            line.articleNumber?.trim().toLowerCase() || '',
+            normalizedSupplierKey(line.supplierName || supplierName),
+            line.supplierItemNo?.trim().toLowerCase() || '',
+            line.normalizedDescription.trim().toLowerCase(),
+          ].join('|');
+
+          autoLineKeys.set(line.id, autoKey);
+          if (autoProductDrafts.has(autoKey)) return;
+
+          autoProductDrafts.set(autoKey, {
+            id: stableId('product', `${orderNumber.trim()}-${line.referenceCode}-${line.id}`),
+            code: line.articleNumber?.trim() || '',
+            supplierItemNo: line.supplierItemNo?.trim() || undefined,
+            description: line.normalizedDescription,
+            supplier: line.supplierName?.trim() || supplierName.trim() || undefined,
+            articleGroup: line.type === 'samengesteld' ? 'Samengesteld product' : 'Standaard - Scooter onderdelen',
+            costPrice: formatDecimal(line.calculatedUnitCostEur, 4),
+            batch: orderNumber.trim(),
+            countryOfOrigin: 'China',
+            webshop: false,
+            isNewProduct: true,
+            createdAt: new Date().toISOString(),
+          });
+        });
+
+      const normalizedCreatedProducts = normalizeImportedProducts(
+        Array.from(autoProductDrafts.values()),
+        products,
+      ).map((product) => ({
+        ...product,
+        isNewProduct: true,
+        createdAt: product.createdAt || new Date().toISOString(),
       }));
 
-      const productUpdates = calculatedLines
-        .filter((line) => line.type !== 'scooter' && line.matchedProduct)
-        .map((line) => ({
-          ...line.matchedProduct!,
-          costPrice: formatDecimal(line.calculatedUnitCostEur, 4),
-          batch: orderNumber.trim(),
-        }));
+      const createdProductsByKey = new Map(Array.from(autoProductDrafts.keys()).map((key, index) => [key, normalizedCreatedProducts[index]]));
 
-      await onSave(batch, lines, productUpdates);
+      const resolvedProductUpdates = new Map<string, Product>();
+
+      calculatedLines
+        .filter((line) => line.type !== 'scooter')
+        .forEach((line) => {
+          const createdProduct = createdProductsByKey.get(autoLineKeys.get(line.id) || '');
+          const resolvedProduct = line.matchedProduct || createdProduct;
+          if (!resolvedProduct) return;
+
+          resolvedProductUpdates.set(resolvedProduct.id, {
+            ...resolvedProduct,
+            costPrice: formatDecimal(line.calculatedUnitCostEur, 4),
+            batch: orderNumber.trim(),
+            supplier: resolvedProduct.supplier || line.supplierName?.trim() || supplierName.trim() || undefined,
+            supplierItemNo: resolvedProduct.supplierItemNo || line.supplierItemNo?.trim() || undefined,
+            isNewProduct: resolvedProduct.isNewProduct,
+            createdAt: resolvedProduct.createdAt,
+          });
+        });
+
+      const linesWithResolvedProducts: ContainerCostLine[] = calculatedLines.map((line, index) => {
+        const createdProduct = createdProductsByKey.get(autoLineKeys.get(line.id) || '');
+        const resolvedProduct = line.type === 'scooter' ? undefined : line.matchedProduct || createdProduct;
+
+        return {
+          id: stableId('container-cost-line', `${batchId}-${(resolvedProduct?.code || line.referenceCode)}-${index + 1}`),
+          batchId,
+          type: line.type,
+          referenceId: resolvedProduct?.id ?? line.referenceId,
+          referenceCode: resolvedProduct?.code || line.referenceCode,
+          description: line.normalizedDescription,
+          quantity: formatCompactDecimal(line.quantity, 3),
+          volumeCbm: formatDecimal(line.volumeCbm, 4),
+          unitPriceUsd: formatDecimal(line.unitPriceUsd, 4),
+          goodsValueEur: formatDecimal(line.goodsValueEurBase, 4),
+          allocatedTransportEur: formatDecimal(line.allocatedTransportEur, 4),
+          allocatedImportEur: formatDecimal(line.allocatedImportEur, 4),
+          allocatedOtherEur: formatDecimal(line.allocatedOtherEur, 4),
+          calculatedUnitCostEur: formatDecimal(line.calculatedUnitCostEur, 4),
+          componentsNote: line.componentsNote,
+        };
+      });
+
+      await onSave(batch, linesWithResolvedProducts, Array.from(resolvedProductUpdates.values()));
     } finally {
       setSaving(false);
     }
@@ -4470,6 +4555,7 @@ function ProductsPage({
   message: string;
 }) {
   const [query, setQuery] = useState('');
+  const [catalogView, setCatalogView] = useState<'all' | 'new'>('all');
   const [groupFilter, setGroupFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('');
@@ -4521,6 +4607,9 @@ function ProductsPage({
     return sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
   }
 
+  const scopedProducts = catalogView === 'new'
+    ? products.filter((product) => product.isNewProduct)
+    : products;
   const articleGroups = Array.from(new Set(products.map((product) => product.articleGroup).filter(Boolean) as string[]))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const productSupplierNames = products.map((product) => product.supplier).filter(Boolean) as string[];
@@ -4538,7 +4627,7 @@ function ProductsPage({
     const codeNeedle = codeFilter.trim().toLowerCase();
     const descriptionNeedle = descriptionFilter.trim().toLowerCase();
     const barcodeNeedle = barcodeFilter.trim().toLowerCase();
-    return products.filter((product) => {
+    return scopedProducts.filter((product) => {
       const supplier = product.supplier?.trim() || '';
       const normalizedImportCompanies = importCompanies.map((company) => company.trim().toLowerCase()).filter(Boolean);
       const isOwnImportProduct = normalizedImportCompanies.some((company) =>
@@ -4606,7 +4695,7 @@ function ProductsPage({
           return codeA.localeCompare(codeB, 'nl', { sensitivity: 'base', numeric: true }) * direction;
       }
     });
-  }, [products, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, ownImportOnly, lifecycleFilter, importCompanies, sortField, sortDirection]);
+  }, [scopedProducts, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, ownImportOnly, lifecycleFilter, importCompanies, sortField, sortDirection]);
 
   const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(visibleProducts.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -4632,6 +4721,28 @@ function ProductsPage({
           <div>
             <strong>Artikelen centraal beheren</strong>
             <span>Importeer jullie complete onderdelenlijst. Afbeeldingen kunnen we daarna per product toevoegen en later koppelen aan scooters, garantieclaims en onderhoud.</span>
+          </div>
+        </div>
+        <div className="product-import-groups">
+          <div className="product-import-groups-head">
+            <strong>Weergave</strong>
+            <span>Nieuwe producten zijn automatisch aangemaakte artikelen uit importstromen die je nog even wilt nalopen.</span>
+          </div>
+          <div className="product-import-tags">
+            <button
+              type="button"
+              className={`product-import-tag ${catalogView === 'all' ? 'active' : ''}`}
+              onClick={() => setCatalogView('all')}
+            >
+              Alle producten
+            </button>
+            <button
+              type="button"
+              className={`product-import-tag ${catalogView === 'new' ? 'active' : ''}`}
+              onClick={() => setCatalogView('new')}
+            >
+              Nieuwe producten ({products.filter((product) => product.isNewProduct).length})
+            </button>
           </div>
         </div>
         <div className="product-import-groups">
@@ -4725,6 +4836,11 @@ function ProductsPage({
           <span>End of life</span>
           <strong>{products.filter((product) => product.endDate?.trim()).length}</strong>
           <small>Producten met einddatum</small>
+        </article>
+        <article className="stat-card">
+          <span>Nieuw</span>
+          <strong>{products.filter((product) => product.isNewProduct).length}</strong>
+          <small>Automatisch aangemaakte producten</small>
         </article>
       </section>
       <section className="panel table-panel">
@@ -4907,6 +5023,8 @@ function ProductDetailModal({
         ...draft,
         code: draft.code.trim(),
         supplierItemNo: draft.supplierItemNo?.trim() || undefined,
+        isNewProduct: draft.isNewProduct,
+        createdAt: draft.createdAt,
         description: draft.description.trim(),
         barcode: draft.barcode?.trim() || undefined,
         batch: draft.batch?.trim() || undefined,
@@ -5079,6 +5197,14 @@ function ProductDetailModal({
                   </label>
                   <label>Omschrijving
                     <input value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} />
+                  </label>
+                  <label className="checkbox-field">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(draft.isNewProduct)}
+                      onChange={(event) => setDraft((current) => ({ ...current, isNewProduct: event.target.checked }))}
+                    />
+                    Nieuw product
                   </label>
                   <label>Batch
                     <input value={draft.batch ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batch: event.target.value }))} />

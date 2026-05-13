@@ -2,6 +2,8 @@ create table if not exists public.products (
   id text primary key,
   code text not null,
   "supplierItemNo" text,
+  "isNewProduct" boolean default false,
+  "createdAt" timestamptz default now(),
   description text not null,
   barcode text,
   batch text,
@@ -53,3 +55,9 @@ alter publication supabase_realtime add table public.products;
 
 alter table public.products
 add column if not exists "supplierItemNo" text;
+
+alter table public.products
+add column if not exists "isNewProduct" boolean default false;
+
+alter table public.products
+add column if not exists "createdAt" timestamptz default now();

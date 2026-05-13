@@ -135,6 +135,8 @@ export type Product = {
   id: string;
   code: string;
   supplierItemNo?: string;
+  isNewProduct?: boolean;
+  createdAt?: string;
   description: string;
   barcode?: string;
   batch?: string;

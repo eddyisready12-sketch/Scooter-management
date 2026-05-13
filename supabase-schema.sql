@@ -13,6 +13,12 @@ create table if not exists dealers (
 alter table if exists products
 add column if not exists "supplierItemNo" text;
 
+alter table if exists products
+add column if not exists "isNewProduct" boolean default false;
+
+alter table if exists products
+add column if not exists "createdAt" timestamptz default now();
+
 create table if not exists suppliers (
   id text primary key,
   name text not null,
