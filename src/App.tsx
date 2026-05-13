@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, Fragment, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpDown,
   BatteryCharging,
@@ -1284,6 +1284,29 @@ function parseContainerCostContent(content: string) {
   });
 
   return parsed;
+}
+
+async function readContainerCostImportFile(file: File) {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+
+  if (extension === 'xlsx' || extension === 'xls') {
+    const XLSX = await import('xlsx');
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    const firstSheet = workbook.SheetNames[0];
+    if (!firstSheet) return '';
+    const rawRows = XLSX.utils.sheet_to_json<(string | number | null)[]>(workbook.Sheets[firstSheet], {
+      header: 1,
+      defval: '',
+      raw: false,
+    });
+
+    return rawRows
+      .map((row) => row.map((cell) => String(cell ?? '').trim()).join('\t'))
+      .join('\n');
+  }
+
+  return file.text();
 }
 
 function defaultContainerCostItems() {
@@ -3208,6 +3231,7 @@ function ContainerCostModal({
   onClose: () => void;
   onSave: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
 }) {
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
   const [containerNumber, setContainerNumber] = useState(containers[0]?.number ?? '');
   const [containerProfile, setContainerProfile] = useState<(typeof containerVolumePresets)[number]['value']>('40hc');
   const [containerVolumeCbm, setContainerVolumeCbm] = useState('76,3');
@@ -3220,6 +3244,7 @@ function ContainerCostModal({
   const [exactReference, setExactReference] = useState('');
   const [notes, setNotes] = useState('');
   const [content, setContent] = useState('');
+  const [importFileName, setImportFileName] = useState('');
   const [draftLines, setDraftLines] = useState<ContainerCostImportDraftLine[]>([]);
   const [scooterVolumeRows, setScooterVolumeRows] = useState<ScooterVolumeDraftRow[]>([
     { id: nextScooterVolumeRowId(), model: '', component: 'CBU', quantity: '0', lengthCm: '', widthCm: '', heightCm: '', unitPriceUsd: '' },
@@ -3286,6 +3311,20 @@ function ContainerCostModal({
     setScooterVolumeRows((current) => current.length === 1
       ? [{ id: nextScooterVolumeRowId(), model: '', component: 'CBU', quantity: '0', lengthCm: '', widthCm: '', heightCm: '', unitPriceUsd: '' }]
       : current.filter((row) => row.id !== id));
+  }
+
+  async function handleCostImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const importedContent = await readContainerCostImportFile(file);
+      setContent(importedContent);
+      setDraftLines(parseContainerCostContent(importedContent));
+      setImportFileName(file.name);
+    } finally {
+      event.target.value = '';
+    }
   }
 
   function removeCostItem(id: string) {
@@ -3691,9 +3730,26 @@ function ContainerCostModal({
           </section>
 
           <section className="product-form-subsection container-cost-card">
-            <h3>Excel regels plakken</h3>
+            <div className="section-header-with-actions compact-header">
+              <div>
+                <h3>Excel import onderdelen</h3>
+                <p className="section-subtitle">Kies een `.xlsx`, `.xls` of `.csv` bestand. De preview hieronder wordt daarna automatisch gevuld.</p>
+              </div>
+              <div className="container-command-actions compact-actions">
+                <button type="button" className="secondary-button" onClick={() => importFileInputRef.current?.click()}>
+                  <Upload size={16} /> Excel kiezen
+                </button>
+                <input
+                  ref={importFileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv,.tsv"
+                  onChange={(event) => void handleCostImportFile(event)}
+                  hidden
+                />
+              </div>
+            </div>
             <div className="container-content-field container-cost-paste-field">
-              <span>Gebruik dit blok voor onderdelen en samengestelde sets. Je kunt nu ook rechtstreeks jouw leverancierslijst plakken met kolommen zoals `Ctn No.`, `Model`, `Artikelnummer`, `Item No.`, `Parts`, `Qty`, `Unit Price`, `Amount`, `Leverancier`.</span>
+              <span>{importFileName ? `Bestand geladen: ${importFileName}` : 'Je kunt ook nog steeds handmatig plakken, maar Excel is nu de hoofdroute.'}</span>
               <code>Ctn No.  Model  Artikelnummer  Item No.  Parts  Qty  Unit Price  Amount  Leverancier</code>
               <textarea
                 value={content}
