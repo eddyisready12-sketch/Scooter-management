@@ -1077,7 +1077,18 @@ function parseDecimal(value?: string | number | null) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
   if (!value) return 0;
   const raw = String(value).trim();
-  const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw;
+  let normalized = raw;
+
+  if (raw.includes(',') && raw.includes('.')) {
+    const lastComma = raw.lastIndexOf(',');
+    const lastDot = raw.lastIndexOf('.');
+    normalized = lastDot > lastComma
+      ? raw.replace(/,/g, '')
+      : raw.replace(/\./g, '').replace(',', '.');
+  } else if (raw.includes(',')) {
+    normalized = raw.replace(',', '.');
+  }
+
   const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
