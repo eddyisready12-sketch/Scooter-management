@@ -2084,13 +2084,15 @@ tbody tr:hover {
 .import-batch-lines-table th:nth-child(5),
 .import-batch-lines-table td:nth-child(5),
 .import-batch-lines-table th:nth-child(6),
-.import-batch-lines-table td:nth-child(6) {
+.import-batch-lines-table td:nth-child(6),
+.import-batch-lines-table th:nth-child(7),
+.import-batch-lines-table td:nth-child(7) {
   width: 11%;
 }
 
-.import-batch-lines-table th:nth-child(7),
-.import-batch-lines-table td:nth-child(7) {
-  width: 22%;
+.import-batch-lines-table th:nth-child(8),
+.import-batch-lines-table td:nth-child(8) {
+  width: 18%;
 }
 
 .import-batch-lines-table td strong,

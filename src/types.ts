@@ -141,6 +141,7 @@ export type Product = {
   barcode?: string;
   batch?: string;
   salePrice?: string;
+  purchasePrice?: string;
   costPrice?: string;
   webshop?: boolean;
   articleGroup?: string;

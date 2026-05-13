@@ -1112,6 +1112,11 @@ function roundValue(value: number, digits = 4) {
   return Math.round(value * factor) / factor;
 }
 
+function purchasePricePerUnit(goodsValueEurBase: number, quantity: number) {
+  if (quantity <= 0) return 0;
+  return roundValue(goodsValueEurBase / quantity, 4);
+}
+
 type ContainerCostImportDraftLine = {
   id: string;
   type: ContainerCostLineType;
@@ -3261,6 +3266,7 @@ function CostBatchesPage({
                                         <th>Omschrijving</th>
                                         <th>Aantal</th>
                                         <th>USD / stuk</th>
+                                        <th>Inkoopprijs / stuk</th>
                                         <th>Kostprijs / stuk</th>
                                         <th>Productkoppeling</th>
                                       </tr>
@@ -3282,6 +3288,7 @@ function CostBatchesPage({
                                             </td>
                                             <td>{line.quantity}</td>
                                             <td>USD {line.unitPriceUsd}</td>
+                                            <td>EUR {formatDecimal(purchasePricePerUnit(parseDecimal(line.goodsValueEur), parseDecimal(line.quantity)), 4)}</td>
                                             <td>EUR {line.calculatedUnitCostEur}</td>
                                             <td>
                                               {product ? (
@@ -3647,6 +3654,7 @@ function ContainerCostModal({
             description: line.normalizedDescription,
             supplier: line.supplierName?.trim() || supplierName.trim() || undefined,
             articleGroup: line.type === 'samengesteld' ? 'Samengesteld product' : 'Standaard - Scooter onderdelen',
+            purchasePrice: formatDecimal(purchasePricePerUnit(line.goodsValueEurBase, line.quantity), 4),
             costPrice: formatDecimal(line.calculatedUnitCostEur, 4),
             batch: orderNumber.trim(),
             countryOfOrigin: 'China',
@@ -3678,6 +3686,7 @@ function ContainerCostModal({
 
           resolvedProductUpdates.set(resolvedProduct.id, {
             ...resolvedProduct,
+            purchasePrice: formatDecimal(purchasePricePerUnit(line.goodsValueEurBase, line.quantity), 4),
             costPrice: formatDecimal(line.calculatedUnitCostEur, 4),
             batch: orderNumber.trim(),
             supplier: resolvedProduct.supplier || line.supplierName?.trim() || supplierName.trim() || undefined,
@@ -3972,7 +3981,7 @@ function ContainerCostModal({
                       <th>Aantal</th>
                       <th>Volume</th>
                       <th>USD / stuk</th>
-                      <th>EUR goederen</th>
+                      <th>Inkoopprijs / stuk</th>
                       <th>Transport</th>
                       <th>Invoer + overig</th>
                       <th>Kostprijs / stuk</th>
@@ -3989,7 +3998,7 @@ function ContainerCostModal({
                         <td>{formatCompactDecimal(line.quantity, 3)}</td>
                         <td>{formatCompactDecimal(line.lineVolumeTotal, 3)}</td>
                         <td>{formatDecimal(line.unitPriceUsd, 4)}</td>
-                        <td>{formatDecimal(line.goodsValueEurBase, 2)}</td>
+                        <td>{formatDecimal(purchasePricePerUnit(line.goodsValueEurBase, line.quantity), 4)}</td>
                         <td>{formatDecimal(line.allocatedTransportEur, 2)}</td>
                         <td>{formatDecimal(line.allocatedImportEur + line.allocatedOtherEur, 2)}</td>
                         <td>{formatDecimal(line.calculatedUnitCostEur, 4)}</td>
@@ -4895,6 +4904,7 @@ function ProductsPage({
                       Verkoopprijs {renderSortIcon('salePrice')}
                     </button>
                   </th>
+                  <th>Inkoopprijs</th>
                   <th>
                     <button type="button" className="column-sort-button" onClick={() => handleSort('costPrice')}>
                       Kostprijs {renderSortIcon('costPrice')}
@@ -4921,6 +4931,7 @@ function ProductsPage({
                     <td>{product.code || '-'}</td>
                     <td>{product.description || '-'}</td>
                     <td>{formatPriceValue(product.salePrice)}</td>
+                    <td>{formatPriceValue(product.purchasePrice)}</td>
                     <td>{formatPriceValue(product.costPrice)}</td>
                     <td>{product.webshop ? 'Ja' : '-'}</td>
                     <td>{displaySupplierName(supplierRecords, product.supplier) || '-'}</td>
@@ -5040,6 +5051,7 @@ function ProductDetailModal({
         barcode: draft.barcode?.trim() || undefined,
         batch: draft.batch?.trim() || undefined,
         salePrice: draft.salePrice?.trim() || undefined,
+        purchasePrice: draft.purchasePrice?.trim() || undefined,
         costPrice: draft.costPrice?.trim() || undefined,
         articleGroup: draft.articleGroup?.trim() || undefined,
         stock: draft.stock?.trim() || undefined,
@@ -5245,6 +5257,9 @@ function ProductDetailModal({
                   </label>
                   <label>Verkoopprijs
                     <input value={draft.salePrice ?? ''} onChange={(event) => setDraft((current) => ({ ...current, salePrice: event.target.value }))} />
+                  </label>
+                  <label>Inkoopprijs
+                    <input value={draft.purchasePrice ?? ''} onChange={(event) => setDraft((current) => ({ ...current, purchasePrice: event.target.value }))} />
                   </label>
                   <label>Kostprijs
                     <input value={draft.costPrice ?? ''} onChange={(event) => setDraft((current) => ({ ...current, costPrice: event.target.value }))} />

@@ -8,6 +8,7 @@ create table if not exists public.products (
   barcode text,
   batch text,
   "salePrice" text,
+  "purchasePrice" text,
   "costPrice" text,
   webshop boolean default false,
   "articleGroup" text,
@@ -61,3 +62,6 @@ add column if not exists "isNewProduct" boolean default false;
 
 alter table public.products
 add column if not exists "createdAt" timestamptz default now();
+
+alter table public.products
+add column if not exists "purchasePrice" text;
