@@ -190,6 +190,7 @@ export type Product = {
 export type Supplier = {
   id: string;
   name: string;
+  isImportCompany?: boolean;
   contactName?: string;
   email?: string;
   phone?: string;

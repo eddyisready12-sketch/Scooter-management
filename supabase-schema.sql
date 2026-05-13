@@ -39,6 +39,7 @@ create table if not exists suppliers (
 );
 
 alter table suppliers add column if not exists mobile text;
+alter table suppliers add column if not exists "isImportCompany" boolean default false;
 
 create table if not exists supplier_contacts (
   id text primary key,

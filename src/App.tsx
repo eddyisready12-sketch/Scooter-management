@@ -88,8 +88,6 @@ const containerVolumePresets = [
 ] as const;
 
 const loginStorageKey = 'rso-admin-session';
-const productImportCompaniesStorageKey = 'rso-product-import-companies';
-const defaultProductImportCompanies = ['Blanco', 'Everestt', 'JIABIN', 'Wenling', 'mortch motor'];
 const packagingMaterialOptions = [
   { value: 'Karton', label: 'Karton', recycleCode: 'PAP 20', recycleFamily: 'PAP', recycleNumber: '20', wasteStream: 'Papier en karton' },
   { value: 'Glad karton', label: 'Glad karton', recycleCode: 'PAP 21', recycleFamily: 'PAP', recycleNumber: '21', wasteStream: 'Papier en karton' },
@@ -4589,30 +4587,7 @@ function ProductsPage({
   const [pageSize, setPageSize] = useState<number | 'all'>(25);
   const [sortField, setSortField] = useState<'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate'>('code');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [importCompanies, setImportCompanies] = useState<string[]>(defaultProductImportCompanies);
-  const [newImportCompany, setNewImportCompany] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(productImportCompaniesStorageKey);
-      if (!stored) return;
-      const parsed = JSON.parse(stored);
-      if (!Array.isArray(parsed)) return;
-      const names = parsed
-        .map((value) => String(value).trim())
-        .filter(Boolean);
-      if (names.length) {
-        setImportCompanies(Array.from(new Set(names)));
-      }
-    } catch {
-      // Ignore invalid local preference payloads.
-    }
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(productImportCompaniesStorageKey, JSON.stringify(importCompanies));
-  }, [importCompanies]);
 
   function handleSort(field: 'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate') {
     if (sortField === field) {
@@ -4631,6 +4606,12 @@ function ProductsPage({
   const scopedProducts = catalogView === 'new'
     ? products.filter((product) => product.isNewProduct)
     : products;
+  const importCompanies = Array.from(new Set(
+    supplierRecords
+      .filter((supplier) => supplier.isImportCompany)
+      .map((supplier) => supplier.name.trim())
+      .filter(Boolean),
+  )).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const articleGroups = Array.from(new Set(products.map((product) => product.articleGroup).filter(Boolean) as string[]))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const productSupplierNames = products.map((product) => product.supplier).filter(Boolean) as string[];
@@ -4789,7 +4770,7 @@ function ProductsPage({
         <div className="product-import-groups">
           <div className="product-import-groups-head">
             <strong>Importbedrijf filter</strong>
-            <span>Kies hier direct een importbedrijf om de productlijst te filteren.</span>
+            <span>Deze lijst komt nu rechtstreeks uit Leveranciers die als importbedrijf zijn gemarkeerd.</span>
           </div>
           <div className="product-import-tags">
             <button
@@ -4837,45 +4818,12 @@ function ProductsPage({
           <div className="product-import-groups">
             <div className="product-import-groups-head">
               <strong>Importbedrijven beheren</strong>
-              <span>Voeg hier bedrijven toe die je later snel als filter wilt gebruiken in de productcatalogus.</span>
-            </div>
-            <div className="product-import-groups-controls">
-              <input
-                value={newImportCompany}
-                onChange={(event) => setNewImportCompany(event.target.value)}
-                placeholder="Nieuw importbedrijf"
-              />
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => {
-                  const next = newImportCompany.trim();
-                  if (!next) return;
-                  setImportCompanies((current) =>
-                    Array.from(new Set([...current, next])).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' })),
-                  );
-                  setNewImportCompany('');
-                }}
-              >
-                <Plus size={16} /> Bedrijf toevoegen
-              </button>
+              <span>Beheer dit voortaan via Leveranciers. Zet daar het vinkje `Gebruiken als importbedrijf` aan.</span>
             </div>
             <div className="product-import-tags">
+              {importCompanies.length === 0 ? <span className="product-section-hint">Nog geen importbedrijven gemarkeerd bij Leveranciers.</span> : null}
               {importCompanies.map((company) => (
-                <div key={company} className="product-import-tag product-import-tag-manage">
-                  <span>{company}</span>
-                  <button
-                    type="button"
-                    className="product-import-remove"
-                    onClick={() => {
-                      setImportCompanies((current) => current.filter((item) => item !== company));
-                      setImportCompanyFilter((current) => current === company ? '' : current);
-                    }}
-                    aria-label={`Verwijder ${company}`}
-                  >
-                    <XCircle size={16} />
-                  </button>
-                </div>
+                <span key={company} className="product-import-tag product-import-tag-static">{company}</span>
               ))}
             </div>
           </div>
@@ -5653,6 +5601,7 @@ function SuppliersPage({
 
 function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
   const name = String(form.get('name') ?? '').trim();
+  const isImportCompany = form.get('isImportCompany') === 'on';
   const contactName = String(form.get('contactName') ?? '').trim();
   const email = String(form.get('email') ?? '').trim();
   const phone = String(form.get('phone') ?? '').trim();
@@ -5667,6 +5616,7 @@ function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
   return {
     id: existing?.id ?? stableId('supplier', name || email || website || mobile),
     name,
+    isImportCompany,
     contactName: contactName || undefined,
     email: email || undefined,
     phone: phone || undefined,
@@ -5722,6 +5672,7 @@ function SupplierModal({
   onSaveContact: (contact: SupplierContact) => Promise<void>;
 }) {
   const isActive = supplier?.active !== false;
+  const isImportCompany = supplier?.isImportCompany === true;
   const [showAddContact, setShowAddContact] = useState(false);
   const [selectedContact, setSelectedContact] = useState<SupplierContact | null>(null);
   const sortedContacts = [...contacts].sort((a, b) => {
@@ -5757,6 +5708,10 @@ function SupplierModal({
           <label>Postcode<input name="postalCode" defaultValue={supplier?.postalCode ?? ''} /></label>
           <label>Plaats<input name="city" defaultValue={supplier?.city ?? ''} /></label>
           <label>Land<input name="country" defaultValue={supplier?.country ?? ''} /></label>
+          <label className="checkbox-field">
+            <input name="isImportCompany" type="checkbox" defaultChecked={isImportCompany} />
+            Gebruiken als importbedrijf
+          </label>
           <label className="span-2">Notities<textarea name="notes" defaultValue={supplier?.notes ?? ''} /></label>
         </div>
         <section className="supplier-contacts-section">
