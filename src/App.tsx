@@ -4575,11 +4575,12 @@ function ProductsPage({
   message: string;
 }) {
   const [query, setQuery] = useState('');
+  const [productsTab, setProductsTab] = useState<'catalog' | 'importCompanies'>('catalog');
   const [catalogView, setCatalogView] = useState<'all' | 'new'>('all');
   const [groupFilter, setGroupFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('');
-  const [ownImportOnly, setOwnImportOnly] = useState(false);
+  const [importCompanyFilter, setImportCompanyFilter] = useState('');
   const [lifecycleFilter, setLifecycleFilter] = useState('');
   const [codeFilter, setCodeFilter] = useState('');
   const [descriptionFilter, setDescriptionFilter] = useState('');
@@ -4649,11 +4650,11 @@ function ProductsPage({
     const barcodeNeedle = barcodeFilter.trim().toLowerCase();
     return scopedProducts.filter((product) => {
       const supplier = product.supplier?.trim() || '';
-      const normalizedImportCompanies = importCompanies.map((company) => company.trim().toLowerCase()).filter(Boolean);
-      const isOwnImportProduct = normalizedImportCompanies.some((company) =>
-        company === 'blanco'
+      const importCompanyNeedle = importCompanyFilter.trim().toLowerCase();
+      const importCompanyMatch = !importCompanyNeedle || (
+        importCompanyNeedle === 'blanco'
           ? !supplier
-          : supplier.toLowerCase().includes(company),
+          : supplier.toLowerCase().includes(importCompanyNeedle)
       );
       const hasEndDate = Boolean(product.endDate?.trim());
       const inQuery = !needle || [
@@ -4677,7 +4678,7 @@ function ProductsPage({
           ? !product.supplier?.trim()
           : product.supplier === supplierFilter || supplierRecords.some((record) => record.name === supplierFilter && supplierNameMatches(record, product.supplier))))
         && (!stockFilter || product.stock === stockFilter)
-        && (!ownImportOnly || isOwnImportProduct)
+        && importCompanyMatch
         && lifecycleMatch
     }).sort((a, b) => {
       const codeA = (a.code || '').trim();
@@ -4715,7 +4716,7 @@ function ProductsPage({
           return codeA.localeCompare(codeB, 'nl', { sensitivity: 'base', numeric: true }) * direction;
       }
     });
-  }, [scopedProducts, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, ownImportOnly, lifecycleFilter, importCompanies, sortField, sortDirection]);
+  }, [scopedProducts, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, importCompanyFilter, lifecycleFilter, sortField, sortDirection]);
 
   const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(visibleProducts.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -4737,6 +4738,26 @@ function ProductsPage({
       {message && <div className="notice">{message}</div>}
       <section className="panel maintenance-search">
         <div className="panel-title"><BriefcaseBusiness size={16} /> Productcatalogus</div>
+        <div className="product-import-groups">
+          <div className="product-import-tags">
+            <button
+              type="button"
+              className={`product-import-tag ${productsTab === 'catalog' ? 'active' : ''}`}
+              onClick={() => setProductsTab('catalog')}
+            >
+              Productcatalogus
+            </button>
+            <button
+              type="button"
+              className={`product-import-tag ${productsTab === 'importCompanies' ? 'active' : ''}`}
+              onClick={() => setProductsTab('importCompanies')}
+            >
+              Importbedrijven
+            </button>
+          </div>
+        </div>
+        {productsTab === 'catalog' ? (
+          <>
         <div className="product-intro">
           <div>
             <strong>Artikelen centraal beheren</strong>
@@ -4767,45 +4788,26 @@ function ProductsPage({
         </div>
         <div className="product-import-groups">
           <div className="product-import-groups-head">
-            <strong>Eigen import</strong>
-            <span>Deze knop filtert op alle bedrijven hieronder, inclusief blanco leveranciers als `Blanco` in de lijst staat.</span>
-          </div>
-          <div className="product-import-groups-controls">
-            <button
-              type="button"
-              className={`product-import-tag ${ownImportOnly ? 'active' : ''}`}
-              onClick={() => setOwnImportOnly((current) => !current)}
-            >
-              Eigen import
-            </button>
-            <input
-              value={newImportCompany}
-              onChange={(event) => setNewImportCompany(event.target.value)}
-              placeholder="Nieuw eigen import bedrijf"
-            />
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => {
-                const next = newImportCompany.trim();
-                if (!next) return;
-                setImportCompanies((current) =>
-                  Array.from(new Set([...current, next])).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' })),
-                );
-                setNewImportCompany('');
-              }}
-            >
-              <Plus size={16} /> Bedrijf toevoegen
-            </button>
+            <strong>Importbedrijf filter</strong>
+            <span>Kies hier direct een importbedrijf om de productlijst te filteren.</span>
           </div>
           <div className="product-import-tags">
+            <button
+              type="button"
+              className={`product-import-tag ${importCompanyFilter === '' ? 'active' : ''}`}
+              onClick={() => setImportCompanyFilter('')}
+            >
+              Alle importbedrijven
+            </button>
             {importCompanies.map((company) => (
-              <span
+              <button
                 key={company}
-                className="product-import-tag product-import-tag-static"
+                type="button"
+                className={`product-import-tag ${importCompanyFilter === company ? 'active' : ''}`}
+                onClick={() => setImportCompanyFilter(company)}
               >
                 {company}
-              </span>
+              </button>
             ))}
           </div>
         </div>
@@ -4830,7 +4832,57 @@ function ProductsPage({
             <option value="endOfLife">End of life</option>
           </select>
         </div>
+          </>
+        ) : (
+          <div className="product-import-groups">
+            <div className="product-import-groups-head">
+              <strong>Importbedrijven beheren</strong>
+              <span>Voeg hier bedrijven toe die je later snel als filter wilt gebruiken in de productcatalogus.</span>
+            </div>
+            <div className="product-import-groups-controls">
+              <input
+                value={newImportCompany}
+                onChange={(event) => setNewImportCompany(event.target.value)}
+                placeholder="Nieuw importbedrijf"
+              />
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => {
+                  const next = newImportCompany.trim();
+                  if (!next) return;
+                  setImportCompanies((current) =>
+                    Array.from(new Set([...current, next])).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' })),
+                  );
+                  setNewImportCompany('');
+                }}
+              >
+                <Plus size={16} /> Bedrijf toevoegen
+              </button>
+            </div>
+            <div className="product-import-tags">
+              {importCompanies.map((company) => (
+                <div key={company} className="product-import-tag product-import-tag-manage">
+                  <span>{company}</span>
+                  <button
+                    type="button"
+                    className="product-import-remove"
+                    onClick={() => {
+                      setImportCompanies((current) => current.filter((item) => item !== company));
+                      setImportCompanyFilter((current) => current === company ? '' : current);
+                    }}
+                    aria-label={`Verwijder ${company}`}
+                  >
+                    <XCircle size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
+      {productsTab === 'catalog' ? (
+      <>
       <section className="stats-row product-stats">
         <article className="stat-card">
           <span>Totaal</span>
@@ -4956,6 +5008,21 @@ function ProductsPage({
           </>
         )}
       </section>
+      </>
+      ) : (
+        <section className="stats-row product-stats">
+          <article className="stat-card">
+            <span>Importbedrijven</span>
+            <strong>{importCompanies.length}</strong>
+            <small>Beschikbaar als filter in Productcatalogus</small>
+          </article>
+          <article className="stat-card">
+            <span>Nieuwe producten</span>
+            <strong>{products.filter((product) => product.isNewProduct).length}</strong>
+            <small>Nog na te lopen artikelen</small>
+          </article>
+        </section>
+      )}
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}

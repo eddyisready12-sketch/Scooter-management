@@ -1216,6 +1216,28 @@ tbody tr:hover {
   cursor: default;
 }
 
+.product-import-tag-manage {
+  gap: 8px;
+  padding-right: 6px;
+}
+
+.product-import-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #b43c3c;
+  cursor: pointer;
+}
+
+.product-import-remove:hover {
+  background: #fff0f0;
+}
+
 .product-row {
   cursor: pointer;
 }
