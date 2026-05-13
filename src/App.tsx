@@ -4578,7 +4578,7 @@ function ProductsPage({
   const [groupFilter, setGroupFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('');
-  const [importCompanyFilter, setImportCompanyFilter] = useState('');
+  const [importCompanyFilter, setImportCompanyFilter] = useState<'__all__' | string>('');
   const [lifecycleFilter, setLifecycleFilter] = useState('');
   const [codeFilter, setCodeFilter] = useState('');
   const [descriptionFilter, setDescriptionFilter] = useState('');
@@ -4631,12 +4631,20 @@ function ProductsPage({
     const barcodeNeedle = barcodeFilter.trim().toLowerCase();
     return scopedProducts.filter((product) => {
       const supplier = product.supplier?.trim() || '';
+      const normalizedImportCompanies = importCompanies.map((company) => company.trim().toLowerCase()).filter(Boolean);
+      const isImportCompanyProduct = normalizedImportCompanies.some((company) =>
+        company === 'blanco'
+          ? !supplier
+          : supplier.toLowerCase().includes(company),
+      );
       const importCompanyNeedle = importCompanyFilter.trim().toLowerCase();
-      const importCompanyMatch = !importCompanyNeedle || (
+      const importCompanyMatch = importCompanyFilter === '__all__'
+        ? isImportCompanyProduct
+        : !importCompanyNeedle || (
         importCompanyNeedle === 'blanco'
           ? !supplier
           : supplier.toLowerCase().includes(importCompanyNeedle)
-      );
+        );
       const hasEndDate = Boolean(product.endDate?.trim());
       const inQuery = !needle || [
         product.code,
@@ -4775,8 +4783,8 @@ function ProductsPage({
           <div className="product-import-tags">
             <button
               type="button"
-              className={`product-import-tag ${importCompanyFilter === '' ? 'active' : ''}`}
-              onClick={() => setImportCompanyFilter('')}
+              className={`product-import-tag ${importCompanyFilter === '__all__' ? 'active' : ''}`}
+              onClick={() => setImportCompanyFilter((current) => current === '__all__' ? '' : '__all__')}
             >
               Alle importbedrijven
             </button>
@@ -4785,11 +4793,20 @@ function ProductsPage({
                 key={company}
                 type="button"
                 className={`product-import-tag ${importCompanyFilter === company ? 'active' : ''}`}
-                onClick={() => setImportCompanyFilter(company)}
+                onClick={() => setImportCompanyFilter((current) => current === company ? '' : company)}
               >
                 {company}
               </button>
             ))}
+          </div>
+          <div className="product-table-intro compact">
+            <span>
+              {importCompanyFilter === '__all__'
+                ? `Filter actief: alle importbedrijven`
+                : importCompanyFilter
+                ? `Filter actief: ${importCompanyFilter}`
+                : `Geen importbedrijf-filter actief. ${importCompanies.length} importbedrijven beschikbaar.`}
+            </span>
           </div>
         </div>
         <div className="product-toolbar">
