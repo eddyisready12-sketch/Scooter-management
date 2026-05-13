@@ -2010,6 +2010,99 @@ tbody tr:hover {
   background: #f8fbff;
 }
 
+.batch-summary-row {
+  cursor: pointer;
+}
+
+.batch-summary-row:hover {
+  background: #f8fbff;
+}
+
+.batch-summary-row.is-expanded {
+  background: #f8fbff;
+}
+
+.batch-detail-row td {
+  padding: 0;
+  background: #f8fbff;
+}
+
+.inline-expand-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+.import-batch-details {
+  padding: 16px 18px 18px;
+  border-top: 1px solid #dce1e6;
+}
+
+.import-batch-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.import-batch-meta .record-row {
+  width: 100%;
+  border: 1px solid #dce1e6;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.import-batch-lines-table {
+  min-width: 980px;
+}
+
+.import-batch-lines-table th:first-child,
+.import-batch-lines-table td:first-child {
+  width: 12%;
+}
+
+.import-batch-lines-table th:nth-child(2),
+.import-batch-lines-table td:nth-child(2) {
+  width: 16%;
+}
+
+.import-batch-lines-table th:nth-child(3),
+.import-batch-lines-table td:nth-child(3) {
+  width: 28%;
+}
+
+.import-batch-lines-table th:nth-child(4),
+.import-batch-lines-table td:nth-child(4),
+.import-batch-lines-table th:nth-child(5),
+.import-batch-lines-table td:nth-child(5),
+.import-batch-lines-table th:nth-child(6),
+.import-batch-lines-table td:nth-child(6) {
+  width: 11%;
+}
+
+.import-batch-lines-table th:nth-child(7),
+.import-batch-lines-table td:nth-child(7) {
+  width: 22%;
+}
+
+.import-batch-lines-table td strong,
+.import-batch-lines-table td small {
+  display: block;
+}
+
+.import-batch-lines-table td small {
+  margin-top: 3px;
+  color: #667381;
+}
+
 .container-scooter-table-wrap {
   overflow-x: auto;
 }

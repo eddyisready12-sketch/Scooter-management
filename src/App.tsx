@@ -3123,6 +3123,7 @@ function CostBatchesPage({
   onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
 }) {
   const [showCostModal, setShowCostModal] = useState(false);
+  const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const sortedBatches = [...data.containerCostBatches].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
@@ -3180,18 +3181,107 @@ function CostBatchesPage({
               <tbody>
                 {sortedBatches.slice(0, 25).map((batch) => {
                   const container = data.containers.find((item) => item.id === batch.containerId);
+                  const lines = data.containerCostLines.filter((line) => line.batchId === batch.id);
+                  const isExpanded = expandedBatchId === batch.id;
                   return (
-                    <tr key={batch.id}>
-                      <td>{batch.orderNumber}</td>
-                      <td>{batch.containerNumber || container?.number || '-'}</td>
-                      <td>{batch.supplierName || '-'}</td>
-                      <td>EUR {batch.goodsNetEur || '-'}</td>
-                      <td>EUR {batch.logisticsNetEur || '-'}</td>
-                      <td>EUR {batch.paymentNetEur || '-'}</td>
-                      <td>EUR {batch.transportCostEur}</td>
-                      <td>EUR {batch.importCostEur}</td>
-                      <td>{formatDate(batch.createdAt)}</td>
-                    </tr>
+                    <Fragment key={batch.id}>
+                      <tr
+                        className={`batch-summary-row${isExpanded ? ' is-expanded' : ''}`}
+                        onClick={() => setExpandedBatchId(isExpanded ? null : batch.id)}
+                      >
+                        <td>
+                          <button type="button" className="inline-expand-button">
+                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            <span>{batch.orderNumber}</span>
+                          </button>
+                        </td>
+                        <td>{batch.containerNumber || container?.number || '-'}</td>
+                        <td>{batch.supplierName || '-'}</td>
+                        <td>EUR {batch.goodsNetEur || '-'}</td>
+                        <td>EUR {batch.logisticsNetEur || '-'}</td>
+                        <td>EUR {batch.paymentNetEur || '-'}</td>
+                        <td>EUR {batch.transportCostEur}</td>
+                        <td>EUR {batch.importCostEur}</td>
+                        <td>{formatDate(batch.createdAt)}</td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="batch-detail-row">
+                          <td colSpan={9}>
+                            <div className="import-batch-details">
+                              <div className="import-batch-meta">
+                                <div className="record-row">
+                                  <span>Importregels</span>
+                                  <strong>{lines.length}</strong>
+                                </div>
+                                <div className="record-row">
+                                  <span>Container</span>
+                                  <strong>{batch.containerNumber || container?.number || '-'}</strong>
+                                </div>
+                                <div className="record-row">
+                                  <span>Leverancier</span>
+                                  <strong>{batch.supplierName || '-'}</strong>
+                                </div>
+                              </div>
+                              {lines.length === 0 ? (
+                                <div className="empty-state inline compact">
+                                  <CircleDollarSign size={18} />
+                                  <strong>Geen regels gevonden</strong>
+                                  <span>Deze importbatch heeft nog geen opgeslagen detailregels.</span>
+                                </div>
+                              ) : (
+                                <div className="container-scooter-table-wrap">
+                                  <table className="container-scooter-table import-batch-lines-table">
+                                    <thead>
+                                      <tr>
+                                        <th>Type</th>
+                                        <th>Referentie</th>
+                                        <th>Omschrijving</th>
+                                        <th>Aantal</th>
+                                        <th>USD / stuk</th>
+                                        <th>Kostprijs / stuk</th>
+                                        <th>Productkoppeling</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {lines.map((line) => {
+                                        const product = data.products.find((item) => (
+                                          item.id === line.referenceId
+                                          || item.code === line.referenceCode
+                                          || item.supplierItemNo === line.referenceCode
+                                        ));
+                                        return (
+                                          <tr key={line.id}>
+                                            <td>{line.type}</td>
+                                            <td>{line.referenceCode}</td>
+                                            <td>
+                                              <strong>{line.description}</strong>
+                                              {line.componentsNote ? <small>{line.componentsNote}</small> : null}
+                                            </td>
+                                            <td>{line.quantity}</td>
+                                            <td>USD {line.unitPriceUsd}</td>
+                                            <td>EUR {line.calculatedUnitCostEur}</td>
+                                            <td>
+                                              {product ? (
+                                                <>
+                                                  <strong>{product.code}</strong>
+                                                  <small>{product.description}</small>
+                                                </>
+                                              ) : (
+                                                <small>Nog niet gekoppeld</small>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>
