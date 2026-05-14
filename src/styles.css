@@ -2840,6 +2840,23 @@ tbody tr:hover {
   white-space: nowrap;
 }
 
+.table-help-label {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.table-help-icon {
+  align-items: center;
+  color: #7a8794;
+  cursor: help;
+  display: inline-flex;
+}
+
+.table-help-icon svg {
+  display: block;
+}
+
 .container-cost-table th:nth-child(2),
 .container-cost-table td:nth-child(2) {
   min-width: 220px;
