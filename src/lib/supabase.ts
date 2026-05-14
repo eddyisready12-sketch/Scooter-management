@@ -105,6 +105,63 @@ function normalizeSupplierContact(row: Record<string, unknown>): SupplierContact
   };
 }
 
+function normalizeSupplier(row: Record<string, unknown>): Supplier {
+  return {
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    isImportCompany: Boolean(row.isImportCompany ?? row.is_import_company ?? false),
+    contactName: row.contactName ? String(row.contactName) : row.contact_name ? String(row.contact_name) : undefined,
+    email: row.email ? String(row.email) : undefined,
+    phone: row.phone ? String(row.phone) : undefined,
+    mobile: row.mobile ? String(row.mobile) : undefined,
+    website: row.website ? String(row.website) : undefined,
+    address: row.address ? String(row.address) : undefined,
+    postalCode: row.postalCode ? String(row.postalCode) : row.postal_code ? String(row.postal_code) : undefined,
+    city: row.city ? String(row.city) : undefined,
+    country: row.country ? String(row.country) : undefined,
+    notes: row.notes ? String(row.notes) : undefined,
+    active: row.active === false ? false : true,
+  };
+}
+
+function supplierToDatabase(supplier: Supplier) {
+  return {
+    id: supplier.id,
+    name: supplier.name,
+    is_import_company: supplier.isImportCompany ?? false,
+    contact_name: supplier.contactName,
+    email: supplier.email,
+    phone: supplier.phone,
+    mobile: supplier.mobile,
+    website: supplier.website,
+    address: supplier.address,
+    postal_code: supplier.postalCode,
+    city: supplier.city,
+    country: supplier.country,
+    notes: supplier.notes,
+    active: supplier.active ?? true,
+  };
+}
+
+function supplierToLegacyDatabase(supplier: Supplier) {
+  return {
+    id: supplier.id,
+    name: supplier.name,
+    isImportCompany: supplier.isImportCompany ?? false,
+    contactName: supplier.contactName,
+    email: supplier.email,
+    phone: supplier.phone,
+    mobile: supplier.mobile,
+    website: supplier.website,
+    address: supplier.address,
+    postalCode: supplier.postalCode,
+    city: supplier.city,
+    country: supplier.country,
+    notes: supplier.notes,
+    active: supplier.active ?? true,
+  };
+}
+
 function supplierContactToDatabase(contact: SupplierContact) {
   return {
     id: contact.id,
@@ -144,6 +201,9 @@ export async function loadSupabaseData(): Promise<Partial<AppData>> {
     Object.entries(tableMap).map(async ([key, table]) => {
       try {
         const data = await loadAllRows(table);
+        if (key === 'suppliers') {
+          return [key, data.map(normalizeSupplier)] as const;
+        }
         if (key === 'supplierContacts') {
           return [key, data.map(normalizeSupplierContact)] as const;
         }
@@ -249,27 +309,37 @@ export async function upsertProducts(products: Product[]) {
 export async function upsertSuppliers(suppliers: Supplier[]) {
   if (!supabase || suppliers.length === 0) return;
 
-  let payload = suppliers.map((supplier) => ({ ...supplier }) as Record<string, unknown>);
-  const removedColumns = new Set<string>();
+  const payloadVariants = [
+    suppliers.map(supplierToDatabase) as Record<string, unknown>[],
+    suppliers.map(supplierToLegacyDatabase) as Record<string, unknown>[],
+  ];
 
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const { error } = await supabase
-      .from('suppliers')
-      .upsert(payload);
+  let lastError: Error | null = null;
 
-    if (!error) return;
+  for (const basePayload of payloadVariants) {
+    let payload = basePayload;
+    const removedColumns = new Set<string>();
 
-    const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
-    if (!missingColumn || removedColumns.has(missingColumn)) throw error;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const { error } = await supabase
+        .from('suppliers')
+        .upsert(payload);
 
-    removedColumns.add(missingColumn);
-    payload = payload.map((record) => {
-      const { [missingColumn]: _removed, ...rest } = record;
-      return rest;
-    });
+      if (!error) return;
+
+      lastError = error;
+      const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
+      if (!missingColumn || removedColumns.has(missingColumn)) break;
+
+      removedColumns.add(missingColumn);
+      payload = payload.map((record) => {
+        const { [missingColumn]: _removed, ...rest } = record;
+        return rest;
+      });
+    }
   }
 
-  throw new Error('Leverancier opslaan mislukt: Supabase schema mist meerdere leverancierkolommen.');
+  throw lastError ?? new Error('Leverancier opslaan mislukt: Supabase schema mist meerdere leverancierkolommen.');
 }
 
 export async function upsertSupplierContacts(contacts: SupplierContact[]) {
