@@ -316,6 +316,15 @@ export async function upsertSuppliers(suppliers: Supplier[]) {
 
   let lastError: Error | null = null;
 
+  for (const payload of payloadVariants) {
+    const { error } = await supabase
+      .from('suppliers')
+      .upsert(payload);
+
+    if (!error) return;
+    lastError = error;
+  }
+
   for (const basePayload of payloadVariants) {
     let payload = basePayload;
     const removedColumns = new Set<string>();
