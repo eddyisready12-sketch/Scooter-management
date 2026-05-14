@@ -2587,6 +2587,20 @@ function Dashboard({ data, onNavigate }: {
   onNavigate: (view: View) => void;
 }) {
   const dashboardLinks = views.filter(({ id }) => id !== 'dashboard');
+  const dashboardDescriptions: Record<View, string> = {
+    dashboard: 'Startoverzicht',
+    batteries: 'Beheer accugegevens',
+    containers: 'Bekijk containerplanning',
+    costBatches: 'Bereken importkostprijzen',
+    scooters: 'Bekijk scooterdossiers',
+    sales: 'Bekijk verkoopoverzicht',
+    products: 'Beheer productcatalogus',
+    suppliers: 'Beheer leveranciers',
+    dealers: 'Beheer dealers',
+    warranty: 'Bekijk garantieclaims',
+    maintenance: 'Plan onderhoud',
+    search: 'Zoek door dossiers',
+  };
   return (
     <>
       <div className="page-title-row">
@@ -2605,7 +2619,7 @@ function Dashboard({ data, onNavigate }: {
               <span className="dashboard-link-icon"><Icon size={20} /></span>
               <span className="dashboard-link-copy">
                 <strong>{label}</strong>
-                <small>Open {label.toLowerCase()}</small>
+                <small>{dashboardDescriptions[id]}</small>
               </span>
             </button>
           ))}
