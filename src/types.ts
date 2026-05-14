@@ -51,6 +51,7 @@ export type ContainerCostItemCategory = 'transport' | 'import' | 'other';
 
 export type ContainerCostBatch = {
   id: string;
+  status?: 'Concept' | 'Definitief';
   containerId?: string;
   containerNumber: string;
   containerProfile?: string;

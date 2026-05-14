@@ -71,6 +71,7 @@ create table if not exists containers (
 
 create table if not exists container_cost_batches (
   id text primary key,
+  status text default 'Concept',
   "containerId" text references containers(id) on delete cascade,
   "containerNumber" text not null,
   "containerProfile" text,

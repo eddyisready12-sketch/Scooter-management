@@ -253,11 +253,27 @@ export async function upsertContainers(containers: Container[]) {
 export async function upsertContainerCostBatches(batches: ContainerCostBatch[]) {
   if (!supabase || batches.length === 0) return;
 
-  const { error } = await supabase
-    .from('container_cost_batches')
-    .upsert(batches);
+  let payload = batches.map((batch) => ({ ...batch }) as Record<string, unknown>);
+  const removedColumns = new Set<string>();
 
-  if (error) throw error;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await supabase
+      .from('container_cost_batches')
+      .upsert(payload);
+
+    if (!error) return;
+
+    const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
+    if (!missingColumn || removedColumns.has(missingColumn)) throw error;
+
+    removedColumns.add(missingColumn);
+    payload = payload.map((record) => {
+      const { [missingColumn]: _removed, ...rest } = record;
+      return rest;
+    });
+  }
+
+  throw new Error('Importbatch opslaan mislukt: Supabase schema mist meerdere batchkolommen.');
 }
 
 export async function upsertContainerCostLines(lines: ContainerCostLine[]) {
@@ -268,6 +284,27 @@ export async function upsertContainerCostLines(lines: ContainerCostLine[]) {
     .upsert(lines);
 
   if (error) throw error;
+}
+
+export async function replaceContainerCostLines(batchId: string, lines: ContainerCostLine[]) {
+  if (!supabase || !batchId) return;
+
+  const { error: deleteError } = await supabase
+    .from('container_cost_lines')
+    .delete()
+    .eq('batchId', batchId);
+
+  if (deleteError) {
+    const legacyDelete = await supabase
+      .from('container_cost_lines')
+      .delete()
+      .eq('batch_id', batchId);
+
+    if (legacyDelete.error) throw deleteError;
+  }
+
+  if (lines.length === 0) return;
+  await upsertContainerCostLines(lines);
 }
 
 export async function upsertDealers(dealers: Dealer[]) {

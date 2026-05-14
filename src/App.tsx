@@ -38,7 +38,7 @@ import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Product, ProductPackagingLayer, Scooter, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
@@ -1369,6 +1369,86 @@ function nextAirMailCostRowId() {
   return `air-mail-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function emptyAirMailRows(): AirMailCostDraftRow[] {
+  return [{ id: nextAirMailCostRowId(), label: 'Luchtpost / FEDEX', amountUsd: '0' }];
+}
+
+function emptyScooterVolumeRows(): ScooterVolumeDraftRow[] {
+  return [{ id: nextScooterVolumeRowId(), model: '', component: 'CBU', quantity: '0', lengthCm: '', widthCm: '', heightCm: '', unitPriceUsd: '' }];
+}
+
+function parseInitialScooterVolumeRows(lines?: ContainerCostLine[]): ScooterVolumeDraftRow[] {
+  const scooterLines = (lines ?? []).filter((line) => line.type === 'scooter');
+  if (scooterLines.length === 0) return emptyScooterVolumeRows();
+
+  return scooterLines.map((line, index) => {
+    const dimensionMatch = line.componentsNote?.match(/(CBU|SKD)\s*-\s*([\d.,]+)\s*x\s*([\d.,]+)\s*x\s*([\d.,]+)\s*cm/i);
+    const component = (dimensionMatch?.[1]?.toUpperCase() === 'SKD' ? 'SKD' : 'CBU') as ScooterVolumeDraftRow['component'];
+
+    return {
+      id: `scooter-volume-existing-${index + 1}-${line.referenceCode}`.replace(/[^a-z0-9-]/gi, '').toLowerCase(),
+      model: line.referenceCode.replace(/-(CBU|SKD)$/i, '') || line.description.replace(/\s+(CBU|SKD)$/i, ''),
+      component,
+      quantity: line.quantity || '0',
+      lengthCm: dimensionMatch?.[2]?.replace('.', ',') || '',
+      widthCm: dimensionMatch?.[3]?.replace('.', ',') || '',
+      heightCm: dimensionMatch?.[4]?.replace('.', ',') || '',
+      unitPriceUsd: line.unitPriceUsd || '',
+    };
+  });
+}
+
+function parseBatchCostItems(
+  batch?: ContainerCostBatch,
+): {
+  costItems: ContainerCostDraftItem[];
+  airMailRows: AirMailCostDraftRow[];
+} {
+  if (!batch?.costItemsJson) {
+    return { costItems: defaultContainerCostItems(), airMailRows: emptyAirMailRows() };
+  }
+
+  try {
+    const parsed = JSON.parse(batch.costItemsJson) as Array<Partial<ResolvedContainerCostItem>>;
+    const exchangeRate = parseDecimal(batch.exchangeRate || '0');
+    const costItems: ContainerCostDraftItem[] = [];
+    const airMailRows: AirMailCostDraftRow[] = [];
+
+    parsed.forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      const resolvedAmount = parseDecimal(String(item.resolvedAmountEur ?? item.amountEur ?? '0'));
+      const normalizedItem: ContainerCostDraftItem = {
+        id: String(item.id ?? nextCostItemId()),
+        label: String(item.label ?? 'Factuurregel'),
+        category: (item.category as ContainerCostDraftItem['category']) || 'other',
+        mode: (item.mode as ContainerCostAllocationMode) || 'value',
+        kind: item.kind === 'duty' ? 'duty' : 'fixed',
+        amountEur: item.kind === 'duty' ? '0' : formatDecimal(resolvedAmount, 2),
+        dutyRate: String(item.dutyRate ?? '0'),
+        appliesTo: (item.appliesTo as ContainerCostDraftItem['appliesTo']) || 'all',
+      };
+
+      if (String(item.id ?? '').startsWith('airmail-')) {
+        airMailRows.push({
+          id: nextAirMailCostRowId(),
+          label: normalizedItem.label,
+          amountUsd: exchangeRate > 0 ? formatDecimal(resolvedAmount / exchangeRate, 2) : '0',
+        });
+        return;
+      }
+
+      costItems.push(normalizedItem);
+    });
+
+    return {
+      costItems: costItems.length > 0 ? costItems : defaultContainerCostItems(),
+      airMailRows: airMailRows.length > 0 ? airMailRows : emptyAirMailRows(),
+    };
+  } catch {
+    return { costItems: defaultContainerCostItems(), airMailRows: emptyAirMailRows() };
+  }
+}
+
 function loginNameFromEmail(email: string) {
   const localPart = email.split('@')[0] || 'Gebruiker';
   return localPart
@@ -1867,6 +1947,9 @@ export function App() {
         const productMap = new Map(current.products.map((item) => [item.id, item]));
 
         batchMap.set(batch.id, batch);
+        current.containerCostLines
+          .filter((line) => line.batchId === batch.id)
+          .forEach((line) => lineMap.delete(line.id));
         lines.forEach((line) => lineMap.set(line.id, line));
         productUpdates.forEach((product) => productMap.set(product.id, product));
 
@@ -1879,7 +1962,7 @@ export function App() {
       });
 
       await upsertContainerCostBatches([batch]);
-      await upsertContainerCostLines(lines);
+      await replaceContainerCostLines(batch.id, lines);
       if (productUpdates.length > 0) {
         await upsertProducts(productUpdates);
       }
@@ -3165,8 +3248,11 @@ function CostBatchesPage({
 }) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
+  const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const sortedBatches = [...data.containerCostBatches].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const editingBatch = editingBatchId ? data.containerCostBatches.find((batch) => batch.id === editingBatchId) : undefined;
+  const editingBatchLines = editingBatch ? data.containerCostLines.filter((line) => line.batchId === editingBatch.id) : [];
 
   return (
     <>
@@ -3181,7 +3267,7 @@ function CostBatchesPage({
           <span className="panel-title-label"><FileText size={16} /> Import China tools</span>
         </div>
         <div className="container-tool-grid single">
-          <button type="button" className="container-tool-tile finance" onClick={() => setShowCostModal(true)}>
+          <button type="button" className="container-tool-tile finance" onClick={() => { setEditingBatchId(null); setShowCostModal(true); }}>
             <span className="container-tool-icon"><CircleDollarSign size={20} /></span>
             <span className="container-tool-copy">
               <strong>Nieuwe importbatch</strong>
@@ -3214,6 +3300,7 @@ function CostBatchesPage({
                   <th>Goederen netto</th>
                   <th>Logistiek netto</th>
                   <th>Betaling netto</th>
+                  <th>Status</th>
                   <th>Transport</th>
                   <th>Invoer</th>
                   <th>Datum</th>
@@ -3241,13 +3328,14 @@ function CostBatchesPage({
                         <td>EUR {batch.goodsNetEur || '-'}</td>
                         <td>EUR {batch.logisticsNetEur || '-'}</td>
                         <td>EUR {batch.paymentNetEur || '-'}</td>
+                        <td>{batch.status || 'Concept'}</td>
                         <td>EUR {batch.transportCostEur}</td>
                         <td>EUR {batch.importCostEur}</td>
                         <td>{formatDate(batch.createdAt)}</td>
                       </tr>
                       {isExpanded && (
                         <tr className="batch-detail-row">
-                          <td colSpan={9}>
+                          <td colSpan={10}>
                             <div className="import-batch-details">
                               <div className="import-batch-meta">
                                 <div className="record-row">
@@ -3262,6 +3350,23 @@ function CostBatchesPage({
                                   <span>Leverancier</span>
                                   <strong>{batch.supplierName || '-'}</strong>
                                 </div>
+                                <div className="record-row">
+                                  <span>Status</span>
+                                  <strong>{batch.status || 'Concept'}</strong>
+                                </div>
+                              </div>
+                              <div className="container-command-actions">
+                                <button
+                                  type="button"
+                                  className="secondary-button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setEditingBatchId(batch.id);
+                                    setShowCostModal(true);
+                                  }}
+                                >
+                                  Bewerken
+                                </button>
                               </div>
                               {lines.length === 0 ? (
                                 <div className="empty-state inline compact">
@@ -3338,10 +3443,13 @@ function CostBatchesPage({
           products={data.products}
           scooters={data.scooters}
           suppliers={data.suppliers}
-          onClose={() => setShowCostModal(false)}
+          initialBatch={editingBatch}
+          initialLines={editingBatchLines}
+          onClose={() => { setShowCostModal(false); setEditingBatchId(null); }}
           onSave={async (batch, lines, productUpdates) => {
             await onSaveCostBatch(batch, lines, productUpdates);
             setShowCostModal(false);
+            setEditingBatchId(null);
           }}
         />
       )}
@@ -3354,6 +3462,8 @@ function ContainerCostModal({
   products,
   scooters,
   suppliers,
+  initialBatch,
+  initialLines,
   onClose,
   onSave,
 }: {
@@ -3361,30 +3471,42 @@ function ContainerCostModal({
   products: Product[];
   scooters: Scooter[];
   suppliers: Supplier[];
+  initialBatch?: ContainerCostBatch;
+  initialLines?: ContainerCostLine[];
   onClose: () => void;
   onSave: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
 }) {
+  const initialCostItemState = parseBatchCostItems(initialBatch);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
-  const [containerNumber, setContainerNumber] = useState(containers[0]?.number ?? '');
-  const [containerProfile, setContainerProfile] = useState<(typeof containerVolumePresets)[number]['value']>('40hc');
-  const [containerVolumeCbm, setContainerVolumeCbm] = useState('76,3');
-  const [orderNumber, setOrderNumber] = useState('');
-  const [supplierName, setSupplierName] = useState('');
-  const [exchangeRate, setExchangeRate] = useState('0,92');
-  const [chinaTransportUsd, setChinaTransportUsd] = useState('0');
-  const [airMailRows, setAirMailRows] = useState<AirMailCostDraftRow[]>([
-    { id: nextAirMailCostRowId(), label: 'Luchtpost / FEDEX', amountUsd: '0' },
-  ]);
-  const [costItems, setCostItems] = useState<ContainerCostDraftItem[]>(() => defaultContainerCostItems());
-  const [paymentNetOverrideEur, setPaymentNetOverrideEur] = useState('');
-  const [exactReference, setExactReference] = useState('');
-  const [notes, setNotes] = useState('');
+  const [batchStatus, setBatchStatus] = useState<'Concept' | 'Definitief'>(initialBatch?.status || 'Concept');
+  const [containerNumber, setContainerNumber] = useState(initialBatch?.containerNumber ?? containers[0]?.number ?? '');
+  const [containerProfile, setContainerProfile] = useState<(typeof containerVolumePresets)[number]['value']>((initialBatch?.containerProfile as (typeof containerVolumePresets)[number]['value']) || '40hc');
+  const [containerVolumeCbm, setContainerVolumeCbm] = useState(initialBatch?.containerVolumeCbm ?? '76,3');
+  const [orderNumber, setOrderNumber] = useState(initialBatch?.orderNumber ?? '');
+  const [supplierName, setSupplierName] = useState(initialBatch?.supplierName ?? '');
+  const [exchangeRate, setExchangeRate] = useState(initialBatch?.exchangeRate ? String(initialBatch.exchangeRate).replace('.', ',') : '0,92');
+  const [chinaTransportUsd, setChinaTransportUsd] = useState(initialBatch?.chinaTransportUsd ?? '0');
+  const [airMailRows, setAirMailRows] = useState<AirMailCostDraftRow[]>(initialCostItemState.airMailRows);
+  const [costItems, setCostItems] = useState<ContainerCostDraftItem[]>(() => initialCostItemState.costItems);
+  const [paymentNetOverrideEur, setPaymentNetOverrideEur] = useState(initialBatch?.paymentNetOverrideEur ? String(initialBatch.paymentNetOverrideEur).replace('.', ',') : '');
+  const [exactReference, setExactReference] = useState(initialBatch?.exactReference ?? '');
+  const [notes, setNotes] = useState(initialBatch?.notes ?? '');
   const [content, setContent] = useState('');
   const [importFileName, setImportFileName] = useState('');
-  const [draftLines, setDraftLines] = useState<ContainerCostImportDraftLine[]>([]);
-  const [scooterVolumeRows, setScooterVolumeRows] = useState<ScooterVolumeDraftRow[]>([
-    { id: nextScooterVolumeRowId(), model: '', component: 'CBU', quantity: '0', lengthCm: '', widthCm: '', heightCm: '', unitPriceUsd: '' },
-  ]);
+  const [draftLines, setDraftLines] = useState<ContainerCostImportDraftLine[]>(
+    () => (initialLines ?? []).filter((line) => line.type !== 'scooter').map((line, index) => ({
+      id: `draft-existing-${index + 1}-${line.referenceCode}`.replace(/[^a-z0-9-]/gi, '').toLowerCase(),
+      type: line.type,
+      referenceCode: line.referenceCode,
+      description: line.description,
+      quantity: line.quantity,
+      volumeCbm: line.volumeCbm,
+      unitPriceUsd: line.unitPriceUsd,
+      amountUsd: formatDecimal(parseDecimal(line.unitPriceUsd) * parseDecimal(line.quantity), 4),
+      componentsNote: line.componentsNote,
+    })),
+  );
+  const [scooterVolumeRows, setScooterVolumeRows] = useState<ScooterVolumeDraftRow[]>(() => parseInitialScooterVolumeRows(initialLines));
   const [saving, setSaving] = useState(false);
   const normalizedContainerNumber = containerNumber.trim().toLowerCase();
   const selectedContainer = containers.find((container) => container.number.trim().toLowerCase() === normalizedContainerNumber);
@@ -3435,7 +3557,7 @@ function ContainerCostModal({
   function addScooterVolumeRow() {
     setScooterVolumeRows((current) => [
       ...current,
-      { id: nextScooterVolumeRowId(), model: '', component: 'CBU', quantity: '0', lengthCm: '', widthCm: '', heightCm: '', unitPriceUsd: '' },
+      { ...emptyScooterVolumeRows()[0] },
     ]);
   }
 
@@ -3445,7 +3567,7 @@ function ContainerCostModal({
 
   function removeScooterVolumeRow(id: string) {
     setScooterVolumeRows((current) => current.length === 1
-      ? [{ id: nextScooterVolumeRowId(), model: '', component: 'CBU', quantity: '0', lengthCm: '', widthCm: '', heightCm: '', unitPriceUsd: '' }]
+      ? emptyScooterVolumeRows()
       : current.filter((row) => row.id !== id));
   }
 
@@ -3462,7 +3584,7 @@ function ContainerCostModal({
 
   function removeAirMailRow(id: string) {
     setAirMailRows((current) => current.length === 1
-      ? [{ id: nextAirMailCostRowId(), label: 'Luchtpost / FEDEX', amountUsd: '0' }]
+      ? emptyAirMailRows()
       : current.filter((row) => row.id !== id));
   }
 
@@ -3547,8 +3669,12 @@ function ContainerCostModal({
   });
 
   const totalVolume = computedLines.reduce((sum, line) => sum + (line.volumeCbm * line.quantity), 0);
-  const scooterVolumeTotal = scooterDraftLines.reduce((sum, line) => sum + (parseDecimal(line.volumeCbm) * parseDecimal(line.quantity)), 0);
-  const scooterCountTotal = scooterVolumeRows.reduce((sum, row) => sum + Math.max(0, parseDecimal(row.quantity)), 0);
+  const scooterVolumeTotal = computedLines
+    .filter((line) => line.type === 'scooter')
+    .reduce((sum, line) => sum + (line.volumeCbm * line.quantity), 0);
+  const scooterCountTotal = computedLines
+    .filter((line) => line.type === 'scooter')
+    .reduce((sum, line) => sum + line.quantity, 0);
   const selectedContainerVolume = parseDecimal(containerVolumeCbm);
   const volumeUsagePercent = selectedContainerVolume > 0 ? Math.min(999, roundValue((totalVolume / selectedContainerVolume) * 100, 1)) : 0;
   const totalGoodsValue = computedLines.reduce((sum, line) => sum + line.goodsValueEurBase, 0);
@@ -3652,9 +3778,10 @@ function ContainerCostModal({
     if (!containerNumber.trim() || !orderNumber.trim() || calculatedLines.length === 0) return;
     setSaving(true);
     try {
-      const batchId = stableId('container-cost-batch', `${containerNumber}-${orderNumber}-${Date.now()}`);
+      const batchId = initialBatch?.id ?? stableId('container-cost-batch', `${containerNumber}-${orderNumber}-${Date.now()}`);
       const batch: ContainerCostBatch = {
         id: batchId,
+        status: batchStatus,
         containerId: selectedContainerId,
         containerNumber: containerNumber.trim(),
         containerProfile: containerProfile,
@@ -3676,7 +3803,7 @@ function ContainerCostModal({
         paymentNetOverrideEur: paymentNetOverrideEur.trim() ? formatDecimal(parseDecimal(paymentNetOverrideEur), 2) : undefined,
         exactReference: exactReference.trim() || undefined,
         notes: notes.trim() || undefined,
-        createdAt: new Date().toISOString(),
+        createdAt: initialBatch?.createdAt || new Date().toISOString(),
       };
 
       const autoProductDrafts = new Map<string, Product>();
@@ -3779,7 +3906,7 @@ function ContainerCostModal({
         <div className="modal-header">
           <div>
             <span>Containers</span>
-            <h2>Import China batch</h2>
+            <h2>{initialBatch ? 'Import China batch bewerken' : 'Import China batch'}</h2>
           </div>
           <button type="button" onClick={onClose}>Close</button>
         </div>
@@ -3791,6 +3918,7 @@ function ContainerCostModal({
             <div className="container-cost-hero-stats">
               <div><span>Container</span><strong>{containerNumber || '-'}</strong></div>
               <div><span>Order</span><strong>{orderNumber || '-'}</strong></div>
+              <div><span>Status</span><strong>{batchStatus}</strong></div>
               <div><span>China transport</span><strong>USD {formatDecimal(parseDecimal(chinaTransportUsd), 2)}</strong></div>
               <div><span>Container volume</span><strong>{containerVolumeCbm || '-'} cbm</strong></div>
               <div><span>Scooters</span><strong>{formatCompactDecimal(scooterCountTotal, 0)}</strong></div>
@@ -3803,6 +3931,12 @@ function ContainerCostModal({
           <section className="product-form-subsection container-cost-card">
             <h3>Container en order</h3>
             <div className="form-grid">
+              <label>Status
+                <select value={batchStatus} onChange={(event) => setBatchStatus(event.target.value as 'Concept' | 'Definitief')}>
+                  <option value="Concept">Concept</option>
+                  <option value="Definitief">Definitief</option>
+                </select>
+              </label>
               <label>Containernummer
                 <input
                   list="container-number-options"
@@ -4100,7 +4234,7 @@ function ContainerCostModal({
             disabled={saving || !containerNumber.trim() || !orderNumber.trim() || calculatedLines.length === 0}
             onClick={() => void handleSave()}
           >
-            {saving ? 'Opslaan...' : 'Importbatch opslaan'}
+            {saving ? 'Opslaan...' : initialBatch ? 'Importbatch bijwerken' : 'Importbatch opslaan'}
           </button>
         </div>
       </div>
