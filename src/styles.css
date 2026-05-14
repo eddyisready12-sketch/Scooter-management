@@ -2892,10 +2892,57 @@ tbody tr:hover {
   color: #7a8794;
   cursor: help;
   display: inline-flex;
+  position: relative;
 }
 
 .table-help-icon svg {
   display: block;
+}
+
+.table-help-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  min-width: 220px;
+  max-width: 280px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #17202a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  z-index: 20;
+}
+
+.table-help-icon::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #17202a;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  z-index: 20;
+}
+
+.table-help-icon:hover::after,
+.table-help-icon:hover::before,
+.table-help-icon:focus-visible::after,
+.table-help-icon:focus-visible::before {
+  opacity: 1;
 }
 
 .container-cost-table th:nth-child(2),

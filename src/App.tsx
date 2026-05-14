@@ -4053,15 +4053,15 @@ function ContainerCostModal({
                 <table className="container-cost-table">
                   <thead>
                     <tr>
-                      <th><span className="table-help-label">Type<span className="table-help-icon" title="Geeft aan of de regel een scooter, onderdeel of samengesteld product is."><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Referentie<span className="table-help-icon" title="Artikelnummer, leveranciersnummer of modelcode van deze regel."><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Aantal<span className="table-help-icon" title="Het totale aantal stuks binnen deze regel."><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Volume<span className="table-help-icon" title="Totale volume van deze regel, niet per stuk."><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">USD / stuk<span className="table-help-icon" title="De inkoopprijs per stuk in USD, direct uit de bronlijst of scooterregel."><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Inkoopprijs / stuk<span className="table-help-icon" title="Alleen de omgerekende productprijs per stuk van USD naar EUR, zonder extra kosten."><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Transport / stuk<span className="table-help-icon" title="Het transportdeel per stuk, zoals containertransport en luchtpost."><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Invoer + overig / stuk<span className="table-help-icon" title="Het aandeel per stuk van douane, inklaring en overige factuurregels."><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Kostprijs / stuk<span className="table-help-icon" title="De totale kostprijs per stuk: inkoopprijs plus transport plus invoer en overige kosten."><CircleHelp size={14} /></span></span></th>
+                      <th>Type</th>
+                      <th>Referentie</th>
+                      <th>Aantal</th>
+                      <th>Volume</th>
+                      <th>USD / stuk</th>
+                      <th><span className="table-help-label">Inkoopprijs / stuk<span className="table-help-icon" data-tooltip="Alleen de omgerekende productprijs per stuk van USD naar EUR, zonder extra kosten."><CircleHelp size={14} /></span></span></th>
+                      <th><span className="table-help-label">Transport / stuk<span className="table-help-icon" data-tooltip="Het transportdeel per stuk, zoals containertransport en luchtpost."><CircleHelp size={14} /></span></span></th>
+                      <th><span className="table-help-label">Invoer + overig / stuk<span className="table-help-icon" data-tooltip="Het aandeel per stuk van douane, inklaring en overige factuurregels."><CircleHelp size={14} /></span></span></th>
+                      <th><span className="table-help-label">Kostprijs / stuk<span className="table-help-icon" data-tooltip="De totale kostprijs per stuk: inkoopprijs plus transport plus invoer en overige kosten."><CircleHelp size={14} /></span></span></th>
                     </tr>
                   </thead>
                   <tbody>
