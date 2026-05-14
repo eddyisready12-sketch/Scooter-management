@@ -4148,8 +4148,6 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
     color: '',
     status: '',
   });
-  const [importTarget, setImportTarget] = useState<ImportTarget>('scooters');
-  const [importStatus, setImportStatus] = useState<ImportScooterStatus>('file');
   const [showLatestRegistered, setShowLatestRegistered] = useState(false);
   const cards: Array<{ label: ScooterStatus; icon: typeof Bike }> = [
     { label: 'Beschikbaar', icon: Bike },
@@ -4184,35 +4182,6 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
             <div><span>{label}</span><strong>{countByStatus(data.scooters, label)}</strong></div>
           </button>
         ))}
-        <section className="stat-card scooter-import-tile">
-          <div className="scooter-import-tile-header">
-            <span className="panel-title-label"><Upload size={16} /> Importeren</span>
-            <small>Scooters en dealers</small>
-          </div>
-          <div className="scooter-import-tile-controls">
-            <label>
-              Import naar
-              <select value={importTarget} onChange={(event) => setImportTarget(event.target.value as ImportTarget)}>
-                <option value="scooters">Scooters voorraadblok</option>
-                <option value="scooterUpdates">Scooters bijwerken</option>
-                <option value="dealers">Dealers blok</option>
-              </select>
-            </label>
-            {importTarget === 'scooters' && (
-              <label>
-                Scooter status
-                <select value={importStatus} onChange={(event) => setImportStatus(event.target.value as ImportScooterStatus)}>
-                  <option value="file">Status uit bestand</option>
-                  {Object.keys(statusColor).map((status) => <option value={status} key={status}>{status}</option>)}
-                </select>
-              </label>
-            )}
-            <label className="upload-button scooter-import-upload">
-              <Upload size={16} /> CSV / Excel
-              <input type="file" accept=".csv,.xlsx,.xls" onChange={(event) => onImport(importTarget, importStatus, event)} />
-            </label>
-          </div>
-        </section>
       </div>
       <section className="panel dashboard-registered-panel">
         <button
