@@ -4216,11 +4216,11 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
   const [showLatestRegistered, setShowLatestRegistered] = useState(false);
   const cards: Array<{ label: ScooterStatus; icon: typeof Bike }> = [
     { label: 'Beschikbaar', icon: Bike },
+    { label: 'In consignatie', icon: BriefcaseBusiness },
     { label: 'Verkocht dealer', icon: Wrench },
     { label: 'Verkocht klant', icon: Wrench },
     { label: 'Af te leveren', icon: PackagePlus },
     { label: 'Nog onderweg', icon: Boxes },
-    { label: 'In consignatie', icon: BriefcaseBusiness },
     { label: 'In optie', icon: CalendarDays },
   ];
   const latestRegisteredScooters = [...data.scooters]
