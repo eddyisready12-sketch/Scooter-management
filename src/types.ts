@@ -150,6 +150,7 @@ export type Product = {
   startDate?: string;
   endDate?: string;
   supplier?: string;
+  importCompany?: string;
   countryOfOrigin?: string;
   imageUrl?: string;
   brand?: string;

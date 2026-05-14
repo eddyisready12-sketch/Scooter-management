@@ -22,6 +22,9 @@ add column if not exists "createdAt" timestamptz default now();
 alter table if exists products
 add column if not exists "purchasePrice" text;
 
+alter table if exists products
+add column if not exists "importCompany" text;
+
 create table if not exists suppliers (
   id text primary key,
   name text not null,

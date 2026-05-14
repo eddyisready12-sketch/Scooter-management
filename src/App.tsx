@@ -3828,6 +3828,7 @@ function ContainerCostModal({
             supplierItemNo: line.supplierItemNo?.trim() || undefined,
             description: line.normalizedDescription,
             supplier: line.supplierName?.trim() || supplierName.trim() || undefined,
+            importCompany: line.supplierName?.trim() || supplierName.trim() || undefined,
             articleGroup: line.type === 'samengesteld' ? 'Samengesteld product' : 'Standaard - Scooter onderdelen',
             purchasePrice: formatDecimal(purchasePricePerUnit(line.goodsValueEurBase, line.quantity), 4),
             costPrice: formatDecimal(line.calculatedUnitCostEur, 4),
@@ -3865,6 +3866,7 @@ function ContainerCostModal({
             costPrice: formatDecimal(line.calculatedUnitCostEur, 4),
             batch: orderNumber.trim(),
             supplier: resolvedProduct.supplier || line.supplierName?.trim() || supplierName.trim() || undefined,
+            importCompany: resolvedProduct.importCompany || line.supplierName?.trim() || supplierName.trim() || undefined,
             supplierItemNo: resolvedProduct.supplierItemNo || line.supplierItemNo?.trim() || undefined,
             isNewProduct: resolvedProduct.isNewProduct,
             createdAt: resolvedProduct.createdAt,
@@ -4813,19 +4815,20 @@ function ProductsPage({
     const barcodeNeedle = barcodeFilter.trim().toLowerCase();
     return scopedProducts.filter((product) => {
       const supplier = product.supplier?.trim() || '';
+      const importCompany = product.importCompany?.trim() || '';
       const normalizedImportCompanies = importCompanies.map((company) => company.trim().toLowerCase()).filter(Boolean);
       const isImportCompanyProduct = normalizedImportCompanies.some((company) =>
         company === 'blanco'
-          ? !supplier
-          : supplier.toLowerCase().includes(company),
+          ? !importCompany && !supplier
+          : (importCompany || supplier).toLowerCase().includes(company),
       );
       const importCompanyNeedle = importCompanyFilter.trim().toLowerCase();
       const importCompanyMatch = importCompanyFilter === '__all__'
         ? isImportCompanyProduct
         : !importCompanyNeedle || (
         importCompanyNeedle === 'blanco'
-          ? !supplier
-          : supplier.toLowerCase().includes(importCompanyNeedle)
+          ? !importCompany && !supplier
+          : (importCompany || supplier).toLowerCase().includes(importCompanyNeedle)
         );
       const hasEndDate = Boolean(product.endDate?.trim());
       const inQuery = !needle || [
@@ -5223,6 +5226,11 @@ function ProductDetailModal({
     ...suppliers,
   ].filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const importCompanyOptions = supplierRecords
+    .filter((supplier) => supplier.isImportCompany)
+    .map((supplier) => supplier.name.trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
 
   function applySupplierManufacturer(supplierName: string) {
     const supplier = supplierRecords.find((item) => item.name === supplierName);
@@ -5237,6 +5245,23 @@ function ProductDetailModal({
         manufacturerPostalCode: supplier.postalCode || current.manufacturerPostalCode,
         manufacturerCity: supplier.city || current.manufacturerCity,
         manufacturerCountry: supplier.country || current.manufacturerCountry,
+      } : {}),
+    }));
+  }
+
+  function applyImportCompanyDetails(importCompanyName: string) {
+    const supplier = supplierRecords.find((item) => item.name === importCompanyName && item.isImportCompany);
+    setDraft((current) => ({
+      ...current,
+      importCompany: importCompanyName || undefined,
+      ...(supplier ? {
+        importerName: supplier.name || current.importerName,
+        importerEmail: supplier.email || current.importerEmail,
+        importerAddress: supplier.address || current.importerAddress,
+        importerWebsite: supplier.website || current.importerWebsite,
+        importerPostalCode: supplier.postalCode || current.importerPostalCode,
+        importerCity: supplier.city || current.importerCity,
+        importerCountry: supplier.country || current.importerCountry,
       } : {}),
     }));
   }
@@ -5275,6 +5300,7 @@ function ProductDetailModal({
         startDate: draft.startDate?.trim() || undefined,
         endDate: draft.endDate?.trim() || undefined,
         supplier: selectedSupplierName.trim() || undefined,
+        importCompany: draft.importCompany?.trim() || undefined,
         countryOfOrigin: draft.countryOfOrigin?.trim() || undefined,
         imageUrl: draft.imageUrl?.trim() || undefined,
         brand: draft.brand?.trim() || undefined,
@@ -5466,6 +5492,12 @@ function ProductDetailModal({
                       {supplierOptions.map((supplier) => <option key={supplier} value={supplier}>{supplier}</option>)}
                     </select>
                   </label>
+                  <label>Importbedrijf
+                    <select value={draft.importCompany ?? ''} onChange={(event) => applyImportCompanyDetails(event.target.value)}>
+                      <option value="">Geen importbedrijf</option>
+                      {importCompanyOptions.map((company) => <option key={company} value={company}>{company}</option>)}
+                    </select>
+                  </label>
                   <label>Webwinkel
                     <select value={draft.webshop ? 'ja' : 'nee'} onChange={(event) => setDraft((current) => ({ ...current, webshop: event.target.value === 'ja' }))}>
                       <option value="ja">Ja</option>
@@ -5558,6 +5590,9 @@ function ProductDetailModal({
               </div>
               <div className="product-form-subsection">
                 <h3>Importeur / EU-verantwoordelijke</h3>
+                <div className="product-table-intro compact">
+                  <span>Deze velden worden automatisch gevuld vanuit het gekozen importbedrijf, maar blijven handmatig aanpasbaar.</span>
+                </div>
                 <div className="form-grid">
                   <label>Importeur naam
                     <input value={draft.importerName ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerName: event.target.value }))} />
