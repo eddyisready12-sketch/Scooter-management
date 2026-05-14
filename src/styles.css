@@ -204,6 +204,10 @@ h2 {
   margin-bottom: 14px;
 }
 
+.scooter-status-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
 .stats-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -396,6 +400,33 @@ h2 {
   text-align: left;
 }
 
+.scooter-status-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 92px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.scooter-status-card > div:last-child {
+  display: grid;
+  gap: 4px;
+}
+
+.scooter-status-card span {
+  margin-bottom: 0;
+  color: #0075ff;
+  font-size: 14px;
+}
+
+.scooter-status-card strong {
+  color: #0f172a;
+  font-size: 30px;
+  line-height: 1;
+}
+
 .stat-button:hover,
 .stat-button.selected {
   border-color: #0075ff;
@@ -418,8 +449,9 @@ h2 {
   place-items: center;
   width: 58px;
   height: 58px;
-  border-radius: 4px;
+  border-radius: 8px;
   color: #fff;
+  flex: 0 0 58px;
 }
 
 .pink { background: #dc1f6d; }

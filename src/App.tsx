@@ -4171,10 +4171,10 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
     <>
       <h1>Scooters</h1>
       <ExpandableNotice message={message} details={messageDetails} />
-      <div className="stat-grid">
+      <div className="stat-grid scooter-status-grid">
         {cards.map(({ label, icon: Icon }) => (
           <button
-            className={`stat-card stat-button ${statusFilter === label ? 'selected' : ''}`}
+            className={`stat-card stat-button scooter-status-card ${statusFilter === label ? 'selected' : ''}`}
             key={label}
             onClick={() => setStatusFilter(statusFilter === label ? 'all' : label)}
           >
