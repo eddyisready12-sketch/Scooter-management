@@ -4799,6 +4799,7 @@ function ProductsPage({
   const [stockFilter, setStockFilter] = useState('');
   const [importCompanyFilter, setImportCompanyFilter] = useState<'__all__' | string>('');
   const [lifecycleFilter, setLifecycleFilter] = useState('');
+  const [availableFromFilter, setAvailableFromFilter] = useState('');
   const [codeFilter, setCodeFilter] = useState('');
   const [descriptionFilter, setDescriptionFilter] = useState('');
   const [barcodeFilter, setBarcodeFilter] = useState('');
@@ -4864,6 +4865,9 @@ function ProductsPage({
           ? !supplier
           : supplier.toLowerCase().includes(importCompanyNeedle)
         );
+      const productAvailableFrom = rdwDateToInputDate(product.startDate || product.createdAt);
+      const availableFromMatch = !availableFromFilter
+        || (productAvailableFrom && productAvailableFrom >= availableFromFilter);
       const hasEndDate = Boolean(product.endDate?.trim());
       const inQuery = !needle || [
         product.code,
@@ -4887,6 +4891,7 @@ function ProductsPage({
           : product.supplier === supplierFilter || supplierRecords.some((record) => record.name === supplierFilter && supplierNameMatches(record, product.supplier))))
         && (!stockFilter || product.stock === stockFilter)
         && importCompanyMatch
+        && availableFromMatch
         && lifecycleMatch
     }).sort((a, b) => {
       const codeA = (a.code || '').trim();
@@ -4924,7 +4929,7 @@ function ProductsPage({
           return codeA.localeCompare(codeB, 'nl', { sensitivity: 'base', numeric: true }) * direction;
       }
     });
-  }, [scopedProducts, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, importCompanyFilter, lifecycleFilter, sortField, sortDirection]);
+  }, [scopedProducts, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, importCompanyFilter, lifecycleFilter, availableFromFilter, sortField, sortDirection]);
 
   const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(visibleProducts.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -5051,6 +5056,10 @@ function ProductsPage({
             <option value="active">Actief</option>
             <option value="endOfLife">End of life</option>
           </select>
+          <label className="product-date-filter">
+            <span>Toegevoegd / beschikbaar vanaf</span>
+            <input type="date" value={availableFromFilter} onChange={(event) => setAvailableFromFilter(event.target.value)} />
+          </label>
         </div>
           </>
         ) : (

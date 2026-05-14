@@ -1183,7 +1183,7 @@ tbody tr:hover {
 
 .product-toolbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1.3fr) repeat(5, minmax(180px, 0.8fr));
+  grid-template-columns: minmax(260px, 1.3fr) repeat(6, minmax(180px, 0.8fr));
   gap: 12px;
   padding: 14px 16px 16px;
 }
@@ -1191,6 +1191,20 @@ tbody tr:hover {
 .product-toolbar input,
 .product-toolbar select {
   width: 100%;
+}
+
+.product-date-filter {
+  display: grid;
+  gap: 6px;
+  color: #233246;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.product-date-filter span {
+  color: #5c6b7c;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .product-search-field {
