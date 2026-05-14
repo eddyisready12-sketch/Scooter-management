@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, MaintenanceRecord, Product, Scooter, Supplier, SupplierContact, WarrantyPart } from '../types';
+import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, Scooter, Supplier, SupplierContact, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -58,6 +58,7 @@ const tableMap: Record<keyof AppData, string> = {
   dealers: 'dealers',
   products: 'products',
   suppliers: 'suppliers',
+  importers: 'importers',
   supplierContacts: 'supplier_contacts',
   batteries: 'batteries',
   batteryModels: 'battery_models',
@@ -110,10 +111,26 @@ function normalizeSupplier(row: Record<string, unknown>): Supplier {
     id: String(row.id ?? ''),
     name: String(row.name ?? ''),
     isImportCompany: Boolean(row.isImportCompany ?? row.is_import_company ?? false),
+    importerId: row.importerId ? String(row.importerId) : row.importer_id ? String(row.importer_id) : undefined,
     contactName: row.contactName ? String(row.contactName) : row.contact_name ? String(row.contact_name) : undefined,
     email: row.email ? String(row.email) : undefined,
     phone: row.phone ? String(row.phone) : undefined,
     mobile: row.mobile ? String(row.mobile) : undefined,
+    website: row.website ? String(row.website) : undefined,
+    address: row.address ? String(row.address) : undefined,
+    postalCode: row.postalCode ? String(row.postalCode) : row.postal_code ? String(row.postal_code) : undefined,
+    city: row.city ? String(row.city) : undefined,
+    country: row.country ? String(row.country) : undefined,
+    notes: row.notes ? String(row.notes) : undefined,
+    active: row.active === false ? false : true,
+  };
+}
+
+function normalizeImporter(row: Record<string, unknown>): Importer {
+  return {
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    email: row.email ? String(row.email) : undefined,
     website: row.website ? String(row.website) : undefined,
     address: row.address ? String(row.address) : undefined,
     postalCode: row.postalCode ? String(row.postalCode) : row.postal_code ? String(row.postal_code) : undefined,
@@ -129,6 +146,7 @@ function supplierToDatabase(supplier: Supplier) {
     id: supplier.id,
     name: supplier.name,
     is_import_company: supplier.isImportCompany ?? false,
+    importer_id: supplier.importerId,
     contact_name: supplier.contactName,
     email: supplier.email,
     phone: supplier.phone,
@@ -148,6 +166,7 @@ function supplierToLegacyDatabase(supplier: Supplier) {
     id: supplier.id,
     name: supplier.name,
     isImportCompany: supplier.isImportCompany ?? false,
+    importerId: supplier.importerId,
     contactName: supplier.contactName,
     email: supplier.email,
     phone: supplier.phone,
@@ -159,6 +178,36 @@ function supplierToLegacyDatabase(supplier: Supplier) {
     country: supplier.country,
     notes: supplier.notes,
     active: supplier.active ?? true,
+  };
+}
+
+function importerToDatabase(importer: Importer) {
+  return {
+    id: importer.id,
+    name: importer.name,
+    email: importer.email,
+    website: importer.website,
+    address: importer.address,
+    postal_code: importer.postalCode,
+    city: importer.city,
+    country: importer.country,
+    notes: importer.notes,
+    active: importer.active ?? true,
+  };
+}
+
+function importerToLegacyDatabase(importer: Importer) {
+  return {
+    id: importer.id,
+    name: importer.name,
+    email: importer.email,
+    website: importer.website,
+    address: importer.address,
+    postalCode: importer.postalCode,
+    city: importer.city,
+    country: importer.country,
+    notes: importer.notes,
+    active: importer.active ?? true,
   };
 }
 
@@ -203,6 +252,9 @@ export async function loadSupabaseData(): Promise<Partial<AppData>> {
         const data = await loadAllRows(table);
         if (key === 'suppliers') {
           return [key, data.map(normalizeSupplier)] as const;
+        }
+        if (key === 'importers') {
+          return [key, data.map(normalizeImporter)] as const;
         }
         if (key === 'supplierContacts') {
           return [key, data.map(normalizeSupplierContact)] as const;
@@ -386,6 +438,51 @@ export async function upsertSuppliers(suppliers: Supplier[]) {
   }
 
   throw lastError ?? new Error('Leverancier opslaan mislukt: Supabase schema mist meerdere leverancierkolommen.');
+}
+
+export async function upsertImporters(importers: Importer[]) {
+  if (!supabase || importers.length === 0) return;
+
+  const payloadVariants = [
+    importers.map(importerToDatabase) as Record<string, unknown>[],
+    importers.map(importerToLegacyDatabase) as Record<string, unknown>[],
+  ];
+
+  let lastError: Error | null = null;
+
+  for (const payload of payloadVariants) {
+    const { error } = await supabase
+      .from('importers')
+      .upsert(payload);
+
+    if (!error) return;
+    lastError = error;
+  }
+
+  for (const basePayload of payloadVariants) {
+    let payload = basePayload;
+    const removedColumns = new Set<string>();
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const { error } = await supabase
+        .from('importers')
+        .upsert(payload);
+
+      if (!error) return;
+
+      lastError = error;
+      const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
+      if (!missingColumn || removedColumns.has(missingColumn)) break;
+
+      removedColumns.add(missingColumn);
+      payload = payload.map((record) => {
+        const { [missingColumn]: _removed, ...rest } = record;
+        return rest;
+      });
+    }
+  }
+
+  throw lastError ?? new Error('Importeur opslaan mislukt.');
 }
 
 export async function upsertSupplierContacts(contacts: SupplierContact[]) {

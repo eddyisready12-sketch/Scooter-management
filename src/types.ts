@@ -58,6 +58,14 @@ export type ContainerCostBatch = {
   containerVolumeCbm?: string;
   orderNumber: string;
   supplierName?: string;
+  importerId?: string;
+  importerName?: string;
+  importerAddress?: string;
+  importerPostalCode?: string;
+  importerCity?: string;
+  importerCountry?: string;
+  importerEmail?: string;
+  importerWebsite?: string;
   currency: 'USD' | 'EUR';
   exchangeRate: string;
   chinaTransportUsd?: string;
@@ -193,10 +201,24 @@ export type Supplier = {
   id: string;
   name: string;
   isImportCompany?: boolean;
+  importerId?: string;
   contactName?: string;
   email?: string;
   phone?: string;
   mobile?: string;
+  website?: string;
+  address?: string;
+  postalCode?: string;
+  city?: string;
+  country?: string;
+  notes?: string;
+  active?: boolean;
+};
+
+export type Importer = {
+  id: string;
+  name: string;
+  email?: string;
   website?: string;
   address?: string;
   postalCode?: string;
@@ -284,6 +306,7 @@ export type AppData = {
   dealers: Dealer[];
   products: Product[];
   suppliers: Supplier[];
+  importers: Importer[];
   supplierContacts: SupplierContact[];
   batteries: Battery[];
   batteryModels: BatteryModel[];

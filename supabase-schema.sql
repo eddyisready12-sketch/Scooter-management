@@ -25,9 +25,23 @@ add column if not exists "purchasePrice" text;
 alter table if exists products
 add column if not exists "importCompany" text;
 
+create table if not exists importers (
+  id text primary key,
+  name text not null,
+  email text,
+  website text,
+  address text,
+  postal_code text,
+  city text,
+  country text,
+  notes text,
+  active boolean default true
+);
+
 create table if not exists suppliers (
   id text primary key,
   name text not null,
+  importer_id text references importers(id),
   "contactName" text,
   email text,
   phone text,
@@ -43,6 +57,7 @@ create table if not exists suppliers (
 
 alter table suppliers add column if not exists mobile text;
 alter table suppliers add column if not exists "isImportCompany" boolean default false;
+alter table suppliers add column if not exists importer_id text references importers(id);
 
 create table if not exists supplier_contacts (
   id text primary key,
@@ -81,6 +96,14 @@ create table if not exists container_cost_batches (
   "containerVolumeCbm" text,
   "orderNumber" text not null,
   "supplierName" text,
+  "importerId" text references importers(id),
+  "importerName" text,
+  "importerAddress" text,
+  "importerPostalCode" text,
+  "importerCity" text,
+  "importerCountry" text,
+  "importerEmail" text,
+  "importerWebsite" text,
   currency text not null default 'USD',
   "exchangeRate" text not null,
   "chinaTransportUsd" text,

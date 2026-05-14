@@ -38,8 +38,8 @@ import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, MaintenanceRecord, Product, ProductPackagingLayer, Scooter, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
+import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingLayer, Scooter, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
@@ -2015,6 +2015,20 @@ export function App() {
     }
   }
 
+  async function upsertImporterRecord(importer: Importer) {
+    try {
+      setData((current) => {
+        const byId = new Map(current.importers.map((item) => [item.id, item]));
+        byId.set(importer.id, importer);
+        return { ...current, importers: Array.from(byId.values()) };
+      });
+      await upsertImporters([importer]);
+      setSupplierMessage(`${importer.name} is opgeslagen als importeur / EU-verantwoordelijke.`);
+    } catch (error) {
+      setSupplierMessage(`Importeur opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   async function importSuppliersFromProducts() {
     const productSupplierNames = Array.from(new Set(
       data.products
@@ -2576,12 +2590,13 @@ export function App() {
             <ProductsPage
               products={data.products}
               supplierRecords={data.suppliers}
+              importers={data.importers}
               onImport={handleProductImport}
               onUpdateProduct={updateProduct}
               message={productMessage}
             />
           )}
-          {view === 'suppliers' && <SuppliersPage suppliers={data.suppliers} supplierContacts={data.supplierContacts} products={data.products} onSaveSupplier={upsertSupplierRecord} onSaveSupplierContact={upsertSupplierContactRecord} onImportFromProducts={importSuppliersFromProducts} message={supplierMessage} />}
+          {view === 'suppliers' && <SuppliersPage suppliers={data.suppliers} importers={data.importers} supplierContacts={data.supplierContacts} products={data.products} onSaveSupplier={upsertSupplierRecord} onSaveImporter={upsertImporterRecord} onSaveSupplierContact={upsertSupplierContactRecord} onImportFromProducts={importSuppliersFromProducts} message={supplierMessage} />}
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} products={data.products} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
@@ -3351,6 +3366,10 @@ function CostBatchesPage({
                                   <strong>{batch.supplierName || '-'}</strong>
                                 </div>
                                 <div className="record-row">
+                                  <span>Importeur</span>
+                                  <strong>{batch.importerName || '-'}</strong>
+                                </div>
+                                <div className="record-row">
                                   <span>Status</span>
                                   <strong>{batch.status || 'Concept'}</strong>
                                 </div>
@@ -3443,6 +3462,7 @@ function CostBatchesPage({
           products={data.products}
           scooters={data.scooters}
           suppliers={data.suppliers}
+          importers={data.importers}
           initialBatch={editingBatch}
           initialLines={editingBatchLines}
           onClose={() => { setShowCostModal(false); setEditingBatchId(null); }}
@@ -3462,6 +3482,7 @@ function ContainerCostModal({
   products,
   scooters,
   suppliers,
+  importers,
   initialBatch,
   initialLines,
   onClose,
@@ -3471,6 +3492,7 @@ function ContainerCostModal({
   products: Product[];
   scooters: Scooter[];
   suppliers: Supplier[];
+  importers: Importer[];
   initialBatch?: ContainerCostBatch;
   initialLines?: ContainerCostLine[];
   onClose: () => void;
@@ -3511,6 +3533,8 @@ function ContainerCostModal({
   const normalizedContainerNumber = containerNumber.trim().toLowerCase();
   const selectedContainer = containers.find((container) => container.number.trim().toLowerCase() === normalizedContainerNumber);
   const selectedContainerId = selectedContainer?.id;
+  const selectedSupplierRecord = suppliers.find((supplier) => supplierNameMatches(supplier, supplierName));
+  const linkedImporter = importers.find((importer) => importer.id === selectedSupplierRecord?.importerId);
   const supplierOptions = suppliers.map((supplier) => supplier.name).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const scooterModelOptions = Array.from(new Set(scooters.map((scooter) => scooter.model.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
 
@@ -3788,6 +3812,14 @@ function ContainerCostModal({
         containerVolumeCbm: containerVolumeCbm.trim() || undefined,
         orderNumber: orderNumber.trim(),
         supplierName: supplierName.trim() || undefined,
+        importerId: linkedImporter?.id,
+        importerName: linkedImporter?.name,
+        importerAddress: linkedImporter?.address,
+        importerPostalCode: linkedImporter?.postalCode,
+        importerCity: linkedImporter?.city,
+        importerCountry: linkedImporter?.country,
+        importerEmail: linkedImporter?.email,
+        importerWebsite: linkedImporter?.website,
         currency: 'USD',
         exchangeRate: formatDecimal(parseDecimal(exchangeRate), 4),
         chinaTransportUsd: parseDecimal(chinaTransportUsd) > 0 ? formatDecimal(parseDecimal(chinaTransportUsd), 2) : undefined,
@@ -3828,7 +3860,6 @@ function ContainerCostModal({
             supplierItemNo: line.supplierItemNo?.trim() || undefined,
             description: line.normalizedDescription,
             supplier: line.supplierName?.trim() || supplierName.trim() || undefined,
-            importCompany: line.supplierName?.trim() || supplierName.trim() || undefined,
             articleGroup: line.type === 'samengesteld' ? 'Samengesteld product' : 'Standaard - Scooter onderdelen',
             purchasePrice: formatDecimal(purchasePricePerUnit(line.goodsValueEurBase, line.quantity), 4),
             costPrice: formatDecimal(line.calculatedUnitCostEur, 4),
@@ -3866,7 +3897,6 @@ function ContainerCostModal({
             costPrice: formatDecimal(line.calculatedUnitCostEur, 4),
             batch: orderNumber.trim(),
             supplier: resolvedProduct.supplier || line.supplierName?.trim() || supplierName.trim() || undefined,
-            importCompany: resolvedProduct.importCompany || line.supplierName?.trim() || supplierName.trim() || undefined,
             supplierItemNo: resolvedProduct.supplierItemNo || line.supplierItemNo?.trim() || undefined,
             isNewProduct: resolvedProduct.isNewProduct,
             createdAt: resolvedProduct.createdAt,
@@ -3958,6 +3988,9 @@ function ContainerCostModal({
                 <datalist id="supplier-cost-options">
                   {supplierOptions.map((option) => <option key={option} value={option} />)}
                 </datalist>
+              </label>
+              <label>Importeur / EU-verantwoordelijke
+                <input value={linkedImporter?.name ?? ''} placeholder="Automatisch via fabrikant" readOnly />
               </label>
               <label>Valuta
                 <input value="USD" disabled />
@@ -4746,12 +4779,14 @@ function BatteryDetailModal({ battery, batteryModels, dealers, scooters, onClose
 function ProductsPage({
   products,
   supplierRecords,
+  importers,
   onImport,
   onUpdateProduct,
   message,
 }: {
   products: Product[];
   supplierRecords: Supplier[];
+  importers: Importer[];
   onImport: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   onUpdateProduct: (product: Product) => Promise<void>;
   message: string;
@@ -4815,20 +4850,19 @@ function ProductsPage({
     const barcodeNeedle = barcodeFilter.trim().toLowerCase();
     return scopedProducts.filter((product) => {
       const supplier = product.supplier?.trim() || '';
-      const importCompany = product.importCompany?.trim() || '';
       const normalizedImportCompanies = importCompanies.map((company) => company.trim().toLowerCase()).filter(Boolean);
       const isImportCompanyProduct = normalizedImportCompanies.some((company) =>
         company === 'blanco'
-          ? !importCompany && !supplier
-          : (importCompany || supplier).toLowerCase().includes(company),
+          ? !supplier
+          : supplier.toLowerCase().includes(company),
       );
       const importCompanyNeedle = importCompanyFilter.trim().toLowerCase();
       const importCompanyMatch = importCompanyFilter === '__all__'
         ? isImportCompanyProduct
         : !importCompanyNeedle || (
         importCompanyNeedle === 'blanco'
-          ? !importCompany && !supplier
-          : (importCompany || supplier).toLowerCase().includes(importCompanyNeedle)
+          ? !supplier
+          : supplier.toLowerCase().includes(importCompanyNeedle)
         );
       const hasEndDate = Boolean(product.endDate?.trim());
       const inQuery = !needle || [
@@ -4926,7 +4960,7 @@ function ProductsPage({
               className={`product-import-tag ${productsTab === 'importCompanies' ? 'active' : ''}`}
               onClick={() => setProductsTab('importCompanies')}
             >
-              Importbedrijven
+              Fabrikanten
             </button>
           </div>
         </div>
@@ -4962,8 +4996,8 @@ function ProductsPage({
         </div>
         <div className="product-import-groups">
           <div className="product-import-groups-head">
-            <strong>Importbedrijf filter</strong>
-            <span>Deze lijst komt nu rechtstreeks uit Leveranciers die als importbedrijf zijn gemarkeerd.</span>
+            <strong>Fabrikant filter</strong>
+            <span>Deze lijst komt uit leveranciers die je wilt gebruiken binnen Eigen import.</span>
           </div>
           <div className="product-import-tags">
             <button
@@ -4971,7 +5005,7 @@ function ProductsPage({
               className={`product-import-tag ${importCompanyFilter === '__all__' ? 'active' : ''}`}
               onClick={() => setImportCompanyFilter((current) => current === '__all__' ? '' : '__all__')}
             >
-              Alle importbedrijven
+              Alle fabrikanten
             </button>
             {importCompanies.map((company) => (
               <button
@@ -4987,10 +5021,10 @@ function ProductsPage({
           <div className="product-table-intro compact">
             <span>
               {importCompanyFilter === '__all__'
-                ? `Filter actief: alle importbedrijven`
+                ? `Filter actief: alle fabrikanten`
                 : importCompanyFilter
                 ? `Filter actief: ${importCompanyFilter}`
-                : `Geen importbedrijf-filter actief. ${importCompanies.length} importbedrijven beschikbaar.`}
+                : `Geen fabrikant-filter actief. ${importCompanies.length} fabrikanten beschikbaar.`}
             </span>
           </div>
         </div>
@@ -5181,6 +5215,7 @@ function ProductsPage({
           product={selectedProduct}
           suppliers={suppliers}
           supplierRecords={supplierRecords}
+          importers={importers}
           onClose={() => setSelectedProduct(null)}
           onSave={async (nextProduct) => {
             await onUpdateProduct(nextProduct);
@@ -5196,12 +5231,14 @@ function ProductDetailModal({
   product,
   suppliers,
   supplierRecords,
+  importers,
   onClose,
   onSave,
 }: {
   product: Product;
   suppliers: string[];
   supplierRecords: Supplier[];
+  importers: Importer[];
   onClose: () => void;
   onSave: (product: Product) => Promise<void>;
 }) {
@@ -5212,8 +5249,25 @@ function ProductDetailModal({
   const [dymoMessage, setDymoMessage] = useState('');
 
   useEffect(() => {
-    setDraft(createProductDraft(product));
-  }, [product]);
+    const nextDraft = createProductDraft(product);
+    const selectedSupplier = nextDraft.supplier
+      ? supplierRecords.find((supplier) => supplierNameMatches(supplier, nextDraft.supplier))
+      : undefined;
+    const linkedImporter = importers.find((importer) => importer.id === selectedSupplier?.importerId);
+
+    setDraft({
+      ...nextDraft,
+      ...(linkedImporter ? {
+        importerName: nextDraft.importerName || linkedImporter.name,
+        importerEmail: nextDraft.importerEmail || linkedImporter.email,
+        importerAddress: nextDraft.importerAddress || linkedImporter.address,
+        importerWebsite: nextDraft.importerWebsite || linkedImporter.website,
+        importerPostalCode: nextDraft.importerPostalCode || linkedImporter.postalCode,
+        importerCity: nextDraft.importerCity || linkedImporter.city,
+        importerCountry: nextDraft.importerCountry || linkedImporter.country,
+      } : {}),
+    });
+  }, [product, supplierRecords, importers]);
 
   const packagingLayers = draft.packagingLayers ?? normalizePackagingLayers(draft);
   const derivedPackagingWasteStream = summarizePackagingWasteStream(
@@ -5226,14 +5280,10 @@ function ProductDetailModal({
     ...suppliers,
   ].filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
-  const importCompanyOptions = supplierRecords
-    .filter((supplier) => supplier.isImportCompany)
-    .map((supplier) => supplier.name.trim())
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
 
   function applySupplierManufacturer(supplierName: string) {
     const supplier = supplierRecords.find((item) => item.name === supplierName);
+    const linkedImporter = importers.find((importer) => importer.id === supplier?.importerId);
     setDraft((current) => ({
       ...current,
       supplier: supplierName || undefined,
@@ -5246,22 +5296,14 @@ function ProductDetailModal({
         manufacturerCity: supplier.city || current.manufacturerCity,
         manufacturerCountry: supplier.country || current.manufacturerCountry,
       } : {}),
-    }));
-  }
-
-  function applyImportCompanyDetails(importCompanyName: string) {
-    const supplier = supplierRecords.find((item) => item.name === importCompanyName && item.isImportCompany);
-    setDraft((current) => ({
-      ...current,
-      importCompany: importCompanyName || undefined,
-      ...(supplier ? {
-        importerName: supplier.name || current.importerName,
-        importerEmail: supplier.email || current.importerEmail,
-        importerAddress: supplier.address || current.importerAddress,
-        importerWebsite: supplier.website || current.importerWebsite,
-        importerPostalCode: supplier.postalCode || current.importerPostalCode,
-        importerCity: supplier.city || current.importerCity,
-        importerCountry: supplier.country || current.importerCountry,
+      ...(linkedImporter ? {
+        importerName: linkedImporter.name || current.importerName,
+        importerEmail: linkedImporter.email || current.importerEmail,
+        importerAddress: linkedImporter.address || current.importerAddress,
+        importerWebsite: linkedImporter.website || current.importerWebsite,
+        importerPostalCode: linkedImporter.postalCode || current.importerPostalCode,
+        importerCity: linkedImporter.city || current.importerCity,
+        importerCountry: linkedImporter.country || current.importerCountry,
       } : {}),
     }));
   }
@@ -5300,7 +5342,6 @@ function ProductDetailModal({
         startDate: draft.startDate?.trim() || undefined,
         endDate: draft.endDate?.trim() || undefined,
         supplier: selectedSupplierName.trim() || undefined,
-        importCompany: draft.importCompany?.trim() || undefined,
         countryOfOrigin: draft.countryOfOrigin?.trim() || undefined,
         imageUrl: draft.imageUrl?.trim() || undefined,
         brand: draft.brand?.trim() || undefined,
@@ -5492,12 +5533,6 @@ function ProductDetailModal({
                       {supplierOptions.map((supplier) => <option key={supplier} value={supplier}>{supplier}</option>)}
                     </select>
                   </label>
-                  <label>Importbedrijf
-                    <select value={draft.importCompany ?? ''} onChange={(event) => applyImportCompanyDetails(event.target.value)}>
-                      <option value="">Geen importbedrijf</option>
-                      {importCompanyOptions.map((company) => <option key={company} value={company}>{company}</option>)}
-                    </select>
-                  </label>
                   <label>Webwinkel
                     <select value={draft.webshop ? 'ja' : 'nee'} onChange={(event) => setDraft((current) => ({ ...current, webshop: event.target.value === 'ja' }))}>
                       <option value="ja">Ja</option>
@@ -5591,7 +5626,7 @@ function ProductDetailModal({
               <div className="product-form-subsection">
                 <h3>Importeur / EU-verantwoordelijke</h3>
                 <div className="product-table-intro compact">
-                  <span>Deze velden worden automatisch gevuld vanuit het gekozen importbedrijf, maar blijven handmatig aanpasbaar.</span>
+                  <span>Deze velden worden automatisch gevuld vanuit jullie eigen importeurprofiel, maar blijven handmatig aanpasbaar.</span>
                 </div>
                 <div className="form-grid">
                   <label>Importeur naam
@@ -5738,24 +5773,35 @@ function ProductDetailModal({
 
 function SuppliersPage({
   suppliers,
+  importers,
   supplierContacts,
   products,
   onSaveSupplier,
+  onSaveImporter,
   onSaveSupplierContact,
   onImportFromProducts,
   message,
 }: {
   suppliers: Supplier[];
+  importers: Importer[];
   supplierContacts: SupplierContact[];
   products: Product[];
   onSaveSupplier: (supplier: Supplier) => Promise<void>;
+  onSaveImporter: (importer: Importer) => Promise<void>;
   onSaveSupplierContact: (contact: SupplierContact) => Promise<void>;
   onImportFromProducts: () => Promise<void>;
   message: string;
 }) {
   const [showAddSupplier, setShowAddSupplier] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [showAddImporter, setShowAddImporter] = useState(false);
+  const [selectedImporter, setSelectedImporter] = useState<Importer | null>(null);
   const sortedSuppliers = [...suppliers].sort((a, b) => {
+    const activeRank = Number(b.active !== false) - Number(a.active !== false);
+    if (activeRank !== 0) return activeRank;
+    return a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' });
+  });
+  const sortedImporters = [...importers].sort((a, b) => {
     const activeRank = Number(b.active !== false) - Number(a.active !== false);
     if (activeRank !== 0) return activeRank;
     return a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' });
@@ -5776,6 +5822,7 @@ function SuppliersPage({
         </div>
         <div className="header-actions">
           <button className="secondary-button" onClick={() => void onImportFromProducts()}><DatabaseZap size={16} /> Uit producten halen</button>
+          <button className="secondary-button" onClick={() => setShowAddImporter(true)}><Plus size={16} /> Importeur</button>
           <button className="secondary-button" onClick={() => setShowAddSupplier(true)}><Plus size={16} /> Leverancier</button>
         </div>
       </div>
@@ -5807,9 +5854,37 @@ function SuppliersPage({
           </div>
         )}
       </section>
+      <section className="panel table-panel">
+        <div className="panel-title"><ShieldCheck size={16} /> Importeurs / EU-verantwoordelijke</div>
+        {sortedImporters.length === 0 ? (
+          <div className="empty-state inline"><ShieldCheck size={22} /><strong>Nog geen importeurs aangemaakt</strong><span>Maak hier jullie eigen importeursprofielen aan en koppel ze daarna aan fabrikanten.</span></div>
+        ) : (
+          <div className="dealer-table supplier-table">
+            <div className="dealer-table-header supplier-table-header">
+              <span>Importeur</span>
+              <span>Plaats</span>
+              <span>Land</span>
+              <span>Gekoppelde fabrikanten</span>
+              <span>Actief</span>
+            </div>
+            {sortedImporters.map((importer) => (
+              <button className="dealer-table-row supplier-table-row" key={importer.id} onClick={() => setSelectedImporter(importer)}>
+                <span>{importer.name}</span>
+                <span>{importer.city || '-'}</span>
+                <span>{importer.country || '-'}</span>
+                <span>{suppliers.filter((supplier) => supplier.importerId === importer.id).length}</span>
+                <span className={importer.active === false ? 'inactive-status' : 'active-status'}>
+                  {importer.active === false ? '-' : <CheckCircle2 size={18} aria-label="Actief" />}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
       {showAddSupplier && (
         <SupplierModal
           title="Nieuwe leverancier"
+          importers={sortedImporters}
           contacts={[]}
           onClose={() => setShowAddSupplier(false)}
           onSave={async (supplier) => {
@@ -5823,6 +5898,7 @@ function SuppliersPage({
         <SupplierModal
           supplier={selectedSupplier}
           title={selectedSupplier.name}
+          importers={sortedImporters}
           contacts={supplierContacts.filter((contact) => contact.supplierId === selectedSupplier.id)}
           onClose={() => setSelectedSupplier(null)}
           onSave={async (supplier) => {
@@ -5830,6 +5906,27 @@ function SuppliersPage({
             setSelectedSupplier(supplier);
           }}
           onSaveContact={onSaveSupplierContact}
+        />
+      )}
+      {showAddImporter && (
+        <ImporterModal
+          title="Nieuwe importeur"
+          onClose={() => setShowAddImporter(false)}
+          onSave={async (importer) => {
+            await onSaveImporter(importer);
+            setShowAddImporter(false);
+          }}
+        />
+      )}
+      {selectedImporter && (
+        <ImporterModal
+          importer={selectedImporter}
+          title={selectedImporter.name}
+          onClose={() => setSelectedImporter(null)}
+          onSave={async (importer) => {
+            await onSaveImporter(importer);
+            setSelectedImporter(importer);
+          }}
         />
       )}
     </>
@@ -5848,12 +5945,14 @@ function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
   const postalCode = String(form.get('postalCode') ?? '').trim();
   const city = String(form.get('city') ?? '').trim();
   const country = String(form.get('country') ?? '').trim();
+  const importerId = String(form.get('importerId') ?? '').trim();
   const notes = String(form.get('notes') ?? '').trim();
 
   return {
     id: existing?.id ?? stableId('supplier', name || email || website || mobile),
     name,
     isImportCompany,
+    importerId: importerId || undefined,
     contactName: contactName || undefined,
     email: email || undefined,
     phone: phone || undefined,
@@ -5865,6 +5964,31 @@ function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
     country: country || undefined,
     notes: notes || undefined,
     active: existing?.active ?? true,
+  };
+}
+
+function importerFromForm(form: FormData, existing?: Importer): Importer {
+  const name = String(form.get('name') ?? '').trim();
+  const email = String(form.get('email') ?? '').trim();
+  const website = String(form.get('website') ?? '').trim();
+  const address = String(form.get('address') ?? '').trim();
+  const postalCode = String(form.get('postalCode') ?? '').trim();
+  const city = String(form.get('city') ?? '').trim();
+  const country = String(form.get('country') ?? '').trim();
+  const notes = String(form.get('notes') ?? '').trim();
+  const active = form.get('active') === 'on';
+
+  return {
+    id: existing?.id ?? stableId('importer', name || email || website || address),
+    name,
+    email: email || undefined,
+    website: website || undefined,
+    address: address || undefined,
+    postalCode: postalCode || undefined,
+    city: city || undefined,
+    country: country || undefined,
+    notes: notes || undefined,
+    active,
   };
 }
 
@@ -5896,6 +6020,7 @@ function supplierContactFromForm(form: FormData, supplierId: string, existing?: 
 function SupplierModal({
   supplier,
   title,
+  importers,
   contacts,
   onClose,
   onSave,
@@ -5903,6 +6028,7 @@ function SupplierModal({
 }: {
   supplier?: Supplier;
   title: string;
+  importers: Importer[];
   contacts: SupplierContact[];
   onClose: () => void;
   onSave: (supplier: Supplier) => Promise<void>;
@@ -5917,6 +6043,9 @@ function SupplierModal({
     if (primaryRank !== 0) return primaryRank;
     return a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' });
   });
+  const importerOptions = importers
+    .filter((importer) => importer.active !== false || importer.id === supplier?.importerId)
+    .sort((a, b) => a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' }));
 
   async function submitSupplier(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -5945,9 +6074,15 @@ function SupplierModal({
           <label>Postcode<input name="postalCode" defaultValue={supplier?.postalCode ?? ''} /></label>
           <label>Plaats<input name="city" defaultValue={supplier?.city ?? ''} /></label>
           <label>Land<input name="country" defaultValue={supplier?.country ?? ''} /></label>
+          <label>Importeur / EU-verantwoordelijke
+            <select name="importerId" defaultValue={supplier?.importerId ?? ''}>
+              <option value="">Geen gekoppelde importeur</option>
+              {importerOptions.map((importer) => <option key={importer.id} value={importer.id}>{importer.name}</option>)}
+            </select>
+          </label>
           <label className="checkbox-field">
             <input name="isImportCompany" type="checkbox" defaultChecked={isImportCompany} />
-            Gebruiken als importbedrijf
+            Tonen bij Eigen import
           </label>
           <label className="span-2">Notities<textarea name="notes" defaultValue={supplier?.notes ?? ''} /></label>
         </div>
@@ -6018,6 +6153,57 @@ function SupplierModal({
         />
       )}
     </>
+  );
+}
+
+function ImporterModal({
+  importer,
+  title,
+  onClose,
+  onSave,
+}: {
+  importer?: Importer;
+  title: string;
+  onClose: () => void;
+  onSave: (importer: Importer) => Promise<void>;
+}) {
+  const isActive = importer?.active !== false;
+
+  async function submitImporter(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSave(importerFromForm(new FormData(event.currentTarget), importer));
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <form className="modal-card dealer-modal" onSubmit={submitImporter} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <span>Importeur / EU-verantwoordelijke</span>
+            <h2>{title}</h2>
+          </div>
+          <button type="button" onClick={onClose}>Close</button>
+        </div>
+        <div className="form-grid">
+          <label>Bedrijfsnaam*<input name="name" defaultValue={importer?.name ?? ''} required /></label>
+          <label>E-mail<input name="email" type="email" defaultValue={importer?.email ?? ''} /></label>
+          <label>Website<input name="website" defaultValue={importer?.website ?? ''} /></label>
+          <label>Straat + huisnummer<input name="address" defaultValue={importer?.address ?? ''} /></label>
+          <label>Postcode<input name="postalCode" defaultValue={importer?.postalCode ?? ''} /></label>
+          <label>Plaats<input name="city" defaultValue={importer?.city ?? ''} /></label>
+          <label>Land<input name="country" defaultValue={importer?.country ?? ''} /></label>
+          <label className="checkbox-field">
+            <input name="active" type="checkbox" defaultChecked={isActive} />
+            Actief
+          </label>
+          <label className="span-2">Notities<textarea name="notes" defaultValue={importer?.notes ?? ''} /></label>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="secondary-button" onClick={onClose}>Annuleren</button>
+          <button className="primary-button" type="submit">Opslaan</button>
+        </div>
+      </form>
+    </div>
   );
 }
 

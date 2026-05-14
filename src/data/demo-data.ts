@@ -60,6 +60,7 @@ export const demoData: AppData = {
   dealers,
   products: [],
   suppliers: [],
+  importers: [],
   supplierContacts: [],
   batteries: [
     { id: 'b1', lotNumber: 'ASFC18-221026N001', model: 'JD60V30AH', spec: '60V 30Ah 1800Wh', scooterFrame: scooters[0].frameNumber, status: 'Beschikbaar', chargeDate: '2023-07-10' },
