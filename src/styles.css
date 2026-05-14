@@ -2658,6 +2658,39 @@ tbody tr:hover {
   margin-bottom: 8px;
 }
 
+.container-cost-subsection {
+  display: grid;
+  gap: 10px;
+}
+
+.airmail-row-list {
+  display: grid;
+  gap: 10px;
+}
+
+.airmail-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(140px, 180px) minmax(120px, 150px) 40px;
+}
+
+.airmail-row-total {
+  background: #f7fafc;
+  border: 1px solid #dde5ee;
+  border-radius: 8px;
+  color: #17202a;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.product-table-intro.compact {
+  padding: 0;
+}
+
 .container-volume-planner {
   margin-top: 14px;
   border-top: 1px solid #e5eaf0;
@@ -3644,6 +3677,14 @@ dd {
 
   .cost-item-header {
     display: none;
+  }
+
+  .airmail-row {
+    grid-template-columns: 1fr;
+  }
+
+  .airmail-row-total {
+    text-align: left;
   }
 
   .cost-item-total {

@@ -68,6 +68,10 @@ type ContainerCostDraftItem = {
   appliesTo: 'all' | 'scooter' | 'onderdeel' | 'samengesteld' | 'non-scooter';
 };
 
+type ResolvedContainerCostItem = ContainerCostDraftItem & {
+  resolvedAmountEur: number;
+};
+
 type ScooterVolumeDraftRow = {
   id: string;
   model: string;
@@ -77,6 +81,12 @@ type ScooterVolumeDraftRow = {
   widthCm: string;
   heightCm: string;
   unitPriceUsd: string;
+};
+
+type AirMailCostDraftRow = {
+  id: string;
+  label: string;
+  amountUsd: string;
 };
 
 const containerVolumePresets = [
@@ -1352,6 +1362,10 @@ function nextCostItemId() {
 
 function nextScooterVolumeRowId() {
   return `scooter-volume-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function nextAirMailCostRowId() {
+  return `air-mail-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function loginNameFromEmail(email: string) {
@@ -3357,6 +3371,9 @@ function ContainerCostModal({
   const [supplierName, setSupplierName] = useState('');
   const [exchangeRate, setExchangeRate] = useState('0,92');
   const [chinaTransportUsd, setChinaTransportUsd] = useState('0');
+  const [airMailRows, setAirMailRows] = useState<AirMailCostDraftRow[]>([
+    { id: nextAirMailCostRowId(), label: 'Luchtpost / FEDEX', amountUsd: '0' },
+  ]);
   const [costItems, setCostItems] = useState<ContainerCostDraftItem[]>(() => defaultContainerCostItems());
   const [paymentNetOverrideEur, setPaymentNetOverrideEur] = useState('');
   const [exactReference, setExactReference] = useState('');
@@ -3428,6 +3445,23 @@ function ContainerCostModal({
   function removeScooterVolumeRow(id: string) {
     setScooterVolumeRows((current) => current.length === 1
       ? [{ id: nextScooterVolumeRowId(), model: '', component: 'CBU', quantity: '0', lengthCm: '', widthCm: '', heightCm: '', unitPriceUsd: '' }]
+      : current.filter((row) => row.id !== id));
+  }
+
+  function addAirMailRow() {
+    setAirMailRows((current) => [
+      ...current,
+      { id: nextAirMailCostRowId(), label: `Luchtpost ${current.length + 1}`, amountUsd: '0' },
+    ]);
+  }
+
+  function updateAirMailRow(id: string, patch: Partial<AirMailCostDraftRow>) {
+    setAirMailRows((current) => current.map((row) => row.id === id ? { ...row, ...patch } : row));
+  }
+
+  function removeAirMailRow(id: string) {
+    setAirMailRows((current) => current.length === 1
+      ? [{ id: nextAirMailCostRowId(), label: 'Luchtpost / FEDEX', amountUsd: '0' }]
       : current.filter((row) => row.id !== id));
   }
 
@@ -3519,8 +3553,25 @@ function ContainerCostModal({
   const totalGoodsValue = computedLines.reduce((sum, line) => sum + line.goodsValueEurBase, 0);
   const totalGoodsValueUsd = computedLines.reduce((sum, line) => sum + line.goodsValueUsdBase, 0);
   const chinaTransportEur = roundValue(parseDecimal(chinaTransportUsd) * parseDecimal(exchangeRate), 4);
+  const airMailTransportItems: ResolvedContainerCostItem[] = airMailRows.flatMap((row, index) => {
+      const amountUsd = parseDecimal(row.amountUsd);
+      if (amountUsd <= 0) return [];
+      return [{
+        id: `airmail-${row.id}`,
+        label: row.label.trim() || `Luchtpost ${index + 1}`,
+        category: 'transport' as const,
+        mode: 'value' as const,
+        kind: 'fixed' as const,
+        amountEur: '0',
+        dutyRate: '0',
+        appliesTo: 'non-scooter' as const,
+        resolvedAmountEur: roundValue(amountUsd * parseDecimal(exchangeRate), 4),
+      }];
+    });
+  const totalAirMailUsd = airMailRows.reduce((sum, row) => sum + parseDecimal(row.amountUsd), 0);
+  const totalAirMailEur = airMailTransportItems.reduce((sum, item) => sum + item.resolvedAmountEur, 0);
 
-  const resolvedCostItems = costItems.map((item) => {
+  const resolvedCostItems: ResolvedContainerCostItem[] = costItems.map((item) => {
     const fixedAmount = parseDecimal(item.amountEur);
     if (item.kind === 'fixed') {
       return { ...item, resolvedAmountEur: fixedAmount };
@@ -3538,10 +3589,11 @@ function ContainerCostModal({
 
     return { ...item, resolvedAmountEur: roundValue(dutyBase * dutyRate, 4) };
   });
+  const allResolvedCostItems: ResolvedContainerCostItem[] = [...resolvedCostItems, ...airMailTransportItems];
 
-  const transportPool = chinaTransportEur + resolvedCostItems.filter((item) => item.category === 'transport').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
-  const importPool = resolvedCostItems.filter((item) => item.category === 'import').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
-  const otherPool = resolvedCostItems.filter((item) => item.category === 'other').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
+  const transportPool = chinaTransportEur + allResolvedCostItems.filter((item) => item.category === 'transport').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
+  const importPool = allResolvedCostItems.filter((item) => item.category === 'import').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
+  const otherPool = allResolvedCostItems.filter((item) => item.category === 'other').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
   const logisticsNetEur = roundValue(transportPool + importPool + otherPool, 4);
   const goodsNetEur = roundValue(totalGoodsValue, 4);
   const calculatedPaymentNetEur = roundValue(goodsNetEur + logisticsNetEur, 4);
@@ -3562,18 +3614,15 @@ function ContainerCostModal({
     let allocatedImportEur = 0;
     let allocatedOtherEur = 0;
 
-    resolvedCostItems.forEach((item) => {
+    allResolvedCostItems.forEach((item) => {
+      const applies = item.appliesTo === 'all'
+        || (item.appliesTo === 'scooter' && line.type === 'scooter')
+        || (item.appliesTo === 'onderdeel' && line.type === 'onderdeel')
+        || (item.appliesTo === 'samengesteld' && line.type === 'samengesteld')
+        || (item.appliesTo === 'non-scooter' && line.type !== 'scooter');
       const itemShare = item.kind === 'duty'
-        ? (
-          item.appliesTo === 'all'
-          || (item.appliesTo === 'scooter' && line.type === 'scooter')
-          || (item.appliesTo === 'onderdeel' && line.type === 'onderdeel')
-          || (item.appliesTo === 'samengesteld' && line.type === 'samengesteld')
-          || (item.appliesTo === 'non-scooter' && line.type !== 'scooter')
-            ? valueShare
-            : 0
-        )
-        : item.mode === 'volume' ? volumeShare : valueShare;
+        ? (applies ? valueShare : 0)
+        : (applies ? (item.mode === 'volume' ? volumeShare : valueShare) : 0);
       const allocation = roundValue(item.resolvedAmountEur * itemShare, 4);
 
       if (item.category === 'transport') allocatedTransportEur += allocation;
@@ -3619,7 +3668,7 @@ function ContainerCostModal({
         otherCostEur: otherPool > 0 ? formatDecimal(otherPool, 2) : undefined,
         transportAllocationMode: 'volume',
         importAllocationMode: 'value',
-        costItemsJson: JSON.stringify(resolvedCostItems.map(({ resolvedAmountEur, ...item }) => ({ ...item, resolvedAmountEur: formatDecimal(resolvedAmountEur, 4) }))),
+        costItemsJson: JSON.stringify(allResolvedCostItems.map(({ resolvedAmountEur, ...item }) => ({ ...item, resolvedAmountEur: formatDecimal(resolvedAmountEur, 4) }))),
         goodsNetEur: formatDecimal(goodsNetEur, 2),
         logisticsNetEur: formatDecimal(logisticsNetEur, 2),
         paymentNetEur: formatDecimal(finalPaymentNetEur, 2),
@@ -3782,6 +3831,32 @@ function ContainerCostModal({
               <label>Containertransport China (USD)
                 <input value={chinaTransportUsd} onChange={(event) => setChinaTransportUsd(event.target.value)} placeholder="Bijv. 4200" />
               </label>
+            </div>
+            <div className="product-form-subsection container-cost-subsection">
+              <div className="section-header-with-actions compact-header">
+                <div>
+                  <h4>Luchtpost</h4>
+                  <p className="section-subtitle">Voeg USD verzendkosten toe die alleen over de onderdelen worden verdeeld.</p>
+                </div>
+                <button type="button" className="secondary-button" onClick={addAirMailRow}><Plus size={16} /> Regel toevoegen</button>
+              </div>
+              <div className="airmail-row-list">
+                {airMailRows.map((row) => (
+                  <div className="airmail-row" key={row.id}>
+                    <input value={row.label} onChange={(event) => updateAirMailRow(row.id, { label: event.target.value })} placeholder="Bijv. FEDEX onderdelen" />
+                    <input value={row.amountUsd} onChange={(event) => updateAirMailRow(row.id, { amountUsd: event.target.value })} placeholder="USD bedrag" />
+                    <div className="airmail-row-total">EUR {formatDecimal(parseDecimal(row.amountUsd) * parseDecimal(exchangeRate), 2)}</div>
+                    <button type="button" className="danger-icon-button" onClick={() => removeAirMailRow(row.id)} aria-label="Luchtpostregel verwijderen">
+                      <XCircle size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="product-table-intro compact">
+                <span>Totaal luchtpost: USD {formatDecimal(totalAirMailUsd, 2)} / EUR {formatDecimal(totalAirMailEur, 2)}</span>
+              </div>
+            </div>
+            <div className="form-grid">
               <label className="span-2">Notities
                 <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optioneel: opmerking over containerinhoud, samengestelde sets of correcties." />
               </label>
