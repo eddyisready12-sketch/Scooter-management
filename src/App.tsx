@@ -102,7 +102,7 @@ const packagingLayerNames = ['Primair', 'Secundair', 'Tertiair', 'Quaternair', '
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
-  { id: 'batteries', label: "Accu's", icon: BatteryCharging },
+  { id: 'batteries', label: 'Accu', icon: BatteryCharging },
   { id: 'containers', label: 'Containers', icon: Boxes },
   { id: 'costBatches', label: 'Import China', icon: FileText },
   { id: 'dealers', label: 'Dealers', icon: UsersRound },
@@ -2589,8 +2589,8 @@ function Dashboard({ data, onNavigate }: {
   const dashboardLinks = views.filter(({ id }) => id !== 'dashboard');
   const dashboardDescriptions: Record<View, string> = {
     dashboard: 'Startoverzicht',
-    batteries: 'Beheer accugegevens',
-    containers: 'Bekijk containerplanning',
+    batteries: 'Beheer accu',
+    containers: '',
     costBatches: 'Bereken importkostprijzen',
     scooters: 'Bekijk scooterdossiers',
     sales: 'Bekijk verkoopoverzicht',
@@ -2619,7 +2619,7 @@ function Dashboard({ data, onNavigate }: {
               <span className="dashboard-link-icon"><Icon size={20} /></span>
               <span className="dashboard-link-copy">
                 <strong>{label}</strong>
-                <small>{dashboardDescriptions[id]}</small>
+                {dashboardDescriptions[id] ? <small>{dashboardDescriptions[id]}</small> : null}
               </span>
             </button>
           ))}
