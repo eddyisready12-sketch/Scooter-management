@@ -4046,6 +4046,9 @@ function ContainerCostModal({
               </div>
             ) : (
               <div className="table-wrap">
+                <div className="product-table-intro compact">
+                  <span>Alle bedragen in deze tabel zijn per stuk. Alleen volume is het totale volume per regel.</span>
+                </div>
                 <table className="container-cost-table">
                   <thead>
                     <tr>
@@ -4055,8 +4058,8 @@ function ContainerCostModal({
                       <th>Volume</th>
                       <th>USD / stuk</th>
                       <th>Inkoopprijs / stuk</th>
-                      <th>Transport</th>
-                      <th>Invoer + overig</th>
+                      <th>Transport / stuk</th>
+                      <th>Invoer + overig / stuk</th>
                       <th>Kostprijs / stuk</th>
                     </tr>
                   </thead>
@@ -4072,8 +4075,8 @@ function ContainerCostModal({
                         <td>{formatCompactDecimal(line.lineVolumeTotal, 3)}</td>
                         <td>{formatDecimal(line.unitPriceUsd, 4)}</td>
                         <td>{formatDecimal(purchasePricePerUnit(line.goodsValueEurBase, line.quantity), 4)}</td>
-                        <td>{formatDecimal(line.allocatedTransportEur, 2)}</td>
-                        <td>{formatDecimal(line.allocatedImportEur + line.allocatedOtherEur, 2)}</td>
+                        <td>{formatDecimal(line.quantity > 0 ? line.allocatedTransportEur / line.quantity : 0, 4)}</td>
+                        <td>{formatDecimal(line.quantity > 0 ? (line.allocatedImportEur + line.allocatedOtherEur) / line.quantity : 0, 4)}</td>
                         <td>{formatDecimal(line.calculatedUnitCostEur, 4)}</td>
                       </tr>
                     ))}
