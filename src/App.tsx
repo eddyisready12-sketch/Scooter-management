@@ -4992,7 +4992,10 @@ function ProductsPage({
           </div>
         </div>
         <div className="product-toolbar">
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek op artikelnummer, omschrijving, barcode of leverancier" />
+          <div className="product-search-field">
+            <Search size={16} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek op artikelnummer, omschrijving, barcode of leverancier" />
+          </div>
           <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
             <option value="">Alle artikelgroepen</option>
             {articleGroups.map((group) => <option key={group} value={group}>{group}</option>)}

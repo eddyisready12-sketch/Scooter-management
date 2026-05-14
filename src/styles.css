@@ -1193,6 +1193,40 @@ tbody tr:hover {
   width: 100%;
 }
 
+.product-search-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  border: 1px solid #93b4e8;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 0 12px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+.product-search-field svg {
+  flex: 0 0 auto;
+  color: #2563eb;
+}
+
+.product-search-field input {
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #122033;
+}
+
+.product-search-field input::placeholder {
+  color: #5c6b7c;
+}
+
+.product-search-field:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
 .product-import-groups {
   display: grid;
   gap: 12px;
