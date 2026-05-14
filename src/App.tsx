@@ -1340,7 +1340,8 @@ function defaultContainerCostItems() {
     { id: 'cost-item-freight', label: 'Freight', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
     { id: 'cost-item-destination', label: 'Destination', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
     { id: 'cost-item-road', label: 'Road', category: 'transport', mode: 'volume', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
-    { id: 'cost-item-customs', label: 'Customs duties', category: 'import', mode: 'value', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
+    { id: 'cost-item-customs-scooters', label: 'Customs duties scooters', category: 'import', mode: 'value', kind: 'duty', amountEur: '0', dutyRate: '8', appliesTo: 'scooter' },
+    { id: 'cost-item-customs-onderdelen', label: 'Customs duties onderdelen', category: 'import', mode: 'value', kind: 'duty', amountEur: '0', dutyRate: '3,7', appliesTo: 'non-scooter' },
     { id: 'cost-item-specification', label: 'As per specification', category: 'other', mode: 'value', kind: 'fixed', amountEur: '0', dutyRate: '0', appliesTo: 'all' },
   ] satisfies ContainerCostDraftItem[];
 }
