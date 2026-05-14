@@ -6271,12 +6271,12 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
         <article className="stat-card">
           <span>Claimwaarde</span>
           <strong>{formatCurrency(totalClaimValue ? totalClaimValue.toFixed(2) : '')}</strong>
-          <small>Totaal onderdelenbedrag</small>
+          <small>Onderdelen totaal</small>
         </article>
         <article className="stat-card">
           <span>Verlopen garantie</span>
           <strong>{expiredClaims}</strong>
-          <small>Claims buiten garantietermijn</small>
+          <small>Buiten garantietermijn</small>
         </article>
       </section>
       <div className="two-col warranty-layout">
@@ -6371,7 +6371,7 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
                           )}
                         </div>
                       </label>
-                      <button type="button" className="icon-button danger-button" onClick={() => removeClaimItemRow(index)} aria-label={`Onderdeel ${index + 1} verwijderen`}>
+                      <button type="button" className="icon-button danger-button warranty-item-remove" onClick={() => removeClaimItemRow(index)} aria-label={`Onderdeel ${index + 1} verwijderen`}>
                         <XCircle size={16} />
                       </button>
                     </div>

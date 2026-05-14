@@ -1861,6 +1861,18 @@ tbody tr:hover {
   font-size: 18px;
 }
 
+.warranty-stats .stat-card {
+  align-content: center;
+  display: grid;
+  gap: 4px;
+  min-height: 88px;
+}
+
+.warranty-stats .stat-card span,
+.warranty-stats .stat-card small {
+  margin: 0;
+}
+
 .warranty-layout {
   align-items: start;
 }
@@ -1904,15 +1916,16 @@ tbody tr:hover {
 .warranty-item-row {
   display: grid;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 44px 12px 12px;
   border: 1px solid #dce1e6;
   border-radius: 6px;
   background: #f8fafc;
+  position: relative;
 }
 
 .warranty-item-primary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   align-items: end;
 }
@@ -1990,6 +2003,12 @@ tbody tr:hover {
 .danger-button:hover {
   background: #fff3f3;
   color: #a91d1d;
+}
+
+.warranty-item-remove {
+  position: absolute;
+  top: 10px;
+  right: 10px;
 }
 
 @media (max-width: 920px) {
