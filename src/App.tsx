@@ -6297,23 +6297,33 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
                 <small>{warrantyItemsForClaim(claim).length} onderdeel{warrantyItemsForClaim(claim).length === 1 ? '' : 'en'} - totaal {formatCurrency(warrantyTotalPrice(claim))}</small>
                 <small>{claim.mileage || '0'} km - ouderdom {claim.age || '-'}</small>
               </button>
-              <label className="compact-select-label">
-                Status
-                <select value={claim.status} onChange={(event) => updateWarranty({ ...claim, status: event.target.value as WarrantyPart['status'] })}>
-                  {warrantyStatuses.map((status) => <option key={status}>{status}</option>)}
-                </select>
-              </label>
-              <small>Garantie tot {formatDate(claim.warrantyUntil)}</small>
+              <div className="claim-row-side">
+                <label className="compact-select-label">
+                  Status
+                  <select value={claim.status} onChange={(event) => updateWarranty({ ...claim, status: event.target.value as WarrantyPart['status'] })}>
+                    {warrantyStatuses.map((status) => <option key={status}>{status}</option>)}
+                  </select>
+                </label>
+                <small className="claim-row-date">Garantie tot {formatDate(claim.warrantyUntil)}</small>
+              </div>
             </div>
           ))}
         </section>
         <form className="panel form-panel" onSubmit={handleWarrantySubmit}>
           <div className="panel-title"><ClipboardList size={16} /> Nieuwe garantieaanvraag</div>
           <div className="form-grid warranty-form-grid">
+            <div className="wide-field form-section-label">
+              <strong>Scooter en dealer</strong>
+              <span>Kies eerst de scooter en dealer, daarna vullen we de claimgegevens aan.</span>
+            </div>
             <label>Scooter<select name="scooterFrame" value={selectedFrame} onChange={(event) => handleScooterChange(event.target.value)}><option value="">Selecteer...</option>{data.scooters.map((s) => <option key={s.id} value={s.frameNumber}>{s.frameNumber}</option>)}</select></label>
             <label>Dealer<select name="dealerId" value={selectedDealerId} onChange={(event) => setSelectedDealerId(event.target.value)}><option value="">Selecteer...</option>{data.dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
             <label>Kenteken<input name="licensePlate" value={licensePlate} onChange={(event) => handleLicensePlateChange(event.target.value)} /></label>
             <label>Kilometerstand<input name="mileage" inputMode="numeric" /></label>
+            <div className="wide-field form-section-label">
+              <strong>Claimgegevens</strong>
+              <span>Leg de claimdatum, status en garantietermijn vast.</span>
+            </div>
             <label>Ouderdom<input name="age" value={calculatedAge === '-' ? '' : calculatedAge} readOnly placeholder="Eerste tenaamstelling ontbreekt" /></label>
             <label>Claim date<input name="claimDate" type="date" required /></label>
             <label>Status<select name="status" defaultValue="Open">{warrantyStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
