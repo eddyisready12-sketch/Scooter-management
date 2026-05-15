@@ -3474,10 +3474,13 @@ function CostBatchesPage({
                                         return (
                                           <tr key={line.id}>
                                             <td>{line.type}</td>
-                                            <td>
+                                            <td className="import-batch-description-cell">
                                               <strong>{line.description}</strong>
-                                              <small>Referentie: {line.referenceCode}</small>
-                                              {product ? <small>Product: {product.code} - {product.description}</small> : <small>Nog niet gekoppeld</small>}
+                                              <div className="import-batch-line-meta">
+                                                <span><b>Ref</b> {line.referenceCode}</span>
+                                                {product ? <span><b>Product</b> {product.code}</span> : <span>Nog niet gekoppeld</span>}
+                                              </div>
+                                              {product ? <small>{product.description}</small> : null}
                                               {line.componentsNote ? <small>{line.componentsNote}</small> : null}
                                             </td>
                                             <td>{line.quantity}</td>
