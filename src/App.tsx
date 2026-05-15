@@ -3471,17 +3471,17 @@ function CostBatchesPage({
                                           || item.code === line.referenceCode
                                           || item.supplierItemNo === line.referenceCode
                                         ));
+                                        const metaBits = [
+                                          `Ref: ${line.referenceCode}`,
+                                          product ? `Product: ${product.code}` : 'Nog niet gekoppeld',
+                                          line.componentsNote,
+                                        ].filter(Boolean) as string[];
                                         return (
                                           <tr key={line.id}>
                                             <td>{line.type}</td>
                                             <td className="import-batch-description-cell">
                                               <strong>{line.description}</strong>
-                                              <div className="import-batch-line-meta">
-                                                <span><b>Ref</b> {line.referenceCode}</span>
-                                                {product ? <span><b>Product</b> {product.code}</span> : <span>Nog niet gekoppeld</span>}
-                                              </div>
-                                              {product ? <small>{product.description}</small> : null}
-                                              {line.componentsNote ? <small>{line.componentsNote}</small> : null}
+                                              <small>{metaBits.join(' • ')}</small>
                                             </td>
                                             <td>{line.quantity}</td>
                                             <td>{line.unitPriceUsd}</td>
