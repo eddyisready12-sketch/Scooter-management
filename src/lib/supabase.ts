@@ -346,14 +346,12 @@ export async function replaceContainerCostLines(batchId: string, lines: Containe
     .delete()
     .eq('batchId', batchId);
 
-  if (deleteError) {
-    const legacyDelete = await supabase
-      .from('container_cost_lines')
-      .delete()
-      .eq('batch_id', batchId);
+  const { error: legacyDeleteError } = await supabase
+    .from('container_cost_lines')
+    .delete()
+    .eq('batch_id', batchId);
 
-    if (legacyDelete.error) throw deleteError;
-  }
+  if (deleteError && legacyDeleteError) throw deleteError;
 
   if (lines.length === 0) return;
   await upsertContainerCostLines(lines);

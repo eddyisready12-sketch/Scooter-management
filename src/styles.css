@@ -2258,7 +2258,7 @@ tbody tr:hover {
 }
 
 .import-batch-description-meta {
-  display: flex;
+  display: flex !important;
   flex-wrap: wrap;
   gap: 4px 14px;
   width: 100%;

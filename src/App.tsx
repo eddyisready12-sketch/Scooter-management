@@ -1126,6 +1126,26 @@ function purchasePricePerUnit(goodsValueEurBase: number, quantity: number) {
   return roundValue(goodsValueEurBase / quantity, 4);
 }
 
+function dedupeContainerCostLines(lines: ContainerCostLine[]) {
+  const byLineKey = new Map<string, ContainerCostLine>();
+
+  lines.forEach((line) => {
+    const lineKey = [
+      line.batchId,
+      line.type,
+      line.referenceCode.trim().toLowerCase(),
+      line.description.trim().toLowerCase(),
+      line.quantity,
+      line.unitPriceUsd,
+      line.componentsNote?.trim().toLowerCase() || '',
+    ].join('|');
+
+    byLineKey.set(lineKey, line);
+  });
+
+  return Array.from(byLineKey.values());
+}
+
 type ContainerCostImportDraftLine = {
   id: string;
   type: ContainerCostLineType;
@@ -1941,6 +1961,8 @@ export function App() {
 
   async function saveContainerCostBatch(batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) {
     try {
+      const uniqueLines = dedupeContainerCostLines(lines);
+
       setData((current) => {
         const batchMap = new Map(current.containerCostBatches.map((item) => [item.id, item]));
         const lineMap = new Map(current.containerCostLines.map((item) => [item.id, item]));
@@ -1950,7 +1972,7 @@ export function App() {
         current.containerCostLines
           .filter((line) => line.batchId === batch.id)
           .forEach((line) => lineMap.delete(line.id));
-        lines.forEach((line) => lineMap.set(line.id, line));
+        uniqueLines.forEach((line) => lineMap.set(line.id, line));
         productUpdates.forEach((product) => productMap.set(product.id, product));
 
         return {
@@ -1962,11 +1984,11 @@ export function App() {
       });
 
       await upsertContainerCostBatches([batch]);
-      await replaceContainerCostLines(batch.id, lines);
+      await replaceContainerCostLines(batch.id, uniqueLines);
       if (productUpdates.length > 0) {
         await upsertProducts(productUpdates);
       }
-      showCsvMessage(`${lines.length} kostprijsregels opgeslagen voor order ${batch.orderNumber}.`);
+      showCsvMessage(`${uniqueLines.length} kostprijsregels opgeslagen voor order ${batch.orderNumber}.`);
     } catch (error) {
       showCsvMessage(`Container kostprijs opslaan mislukt: ${importErrorMessage(error)}`);
     }
@@ -3321,7 +3343,11 @@ function CostBatchesPage({
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const sortedBatches = [...data.containerCostBatches].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const editingBatch = editingBatchId ? data.containerCostBatches.find((batch) => batch.id === editingBatchId) : undefined;
-  const editingBatchLines = editingBatch ? data.containerCostLines.filter((line) => line.batchId === editingBatch.id) : [];
+  const visibleContainerCostLines = useMemo(
+    () => dedupeContainerCostLines(data.containerCostLines),
+    [data.containerCostLines],
+  );
+  const editingBatchLines = editingBatch ? visibleContainerCostLines.filter((line) => line.batchId === editingBatch.id) : [];
 
   return (
     <>
@@ -3347,7 +3373,7 @@ function CostBatchesPage({
       </section>
       <section className="panel sales-summary">
         <div><span>Importbatches</span><strong>{data.containerCostBatches.length}</strong></div>
-        <div><span>Importregels</span><strong>{data.containerCostLines.length}</strong></div>
+        <div><span>Importregels</span><strong>{visibleContainerCostLines.length}</strong></div>
         <div><span>Laatste order</span><strong>{sortedBatches[0]?.orderNumber || '-'}</strong></div>
       </section>
       <section className="panel table-panel">
@@ -3376,7 +3402,7 @@ function CostBatchesPage({
               <tbody>
                 {sortedBatches.slice(0, 25).map((batch) => {
                   const container = data.containers.find((item) => item.id === batch.containerId);
-                  const lines = data.containerCostLines.filter((line) => line.batchId === batch.id);
+                  const lines = visibleContainerCostLines.filter((line) => line.batchId === batch.id);
                   const isExpanded = expandedBatchId === batch.id;
                   return (
                     <Fragment key={batch.id}>
