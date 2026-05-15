@@ -3481,7 +3481,13 @@ function CostBatchesPage({
                                             <td>{line.type}</td>
                                             <td className="import-batch-description-cell">
                                               <strong>{line.description}</strong>
-                                              <small>{metaBits.join(' • ')}</small>
+                                              <small className="import-batch-description-meta">
+                                                {metaBits.map((bit) => (
+                                                  <span key={bit.label}>
+                                                    <b>{bit.label}:</b> {bit.value}
+                                                  </span>
+                                                ))}
+                                              </small>
                                             </td>
                                             <td>{line.quantity}</td>
                                             <td>{line.unitPriceUsd}</td>
