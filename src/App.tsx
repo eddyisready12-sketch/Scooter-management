@@ -4396,8 +4396,7 @@ function ContainerCostModal({
                           <td>{formatDecimal(line.unitPriceUsd, 4)}</td>
                           <td>{formatDecimal(purchasePricePerUnit(line.goodsValueEurBase, line.quantity), 4)}</td>
                           <td className="duty-preview-cell">
-                            <strong>{formatDecimal(line.quantity > 0 ? line.allocatedImportEur / line.quantity : 0, 4)}</strong>
-                            <small>Tarief {formatCompactDecimal(importDutyRate, 2)}%</small>
+                            {formatDecimal(line.quantity > 0 ? line.allocatedImportEur / line.quantity : 0, 4)} <span>({formatCompactDecimal(importDutyRate, 2)}%)</span>
                           </td>
                           <td>{formatDecimal(line.quantity > 0 ? line.allocatedTransportEur / line.quantity : 0, 4)}</td>
                           <td>{formatDecimal(line.quantity > 0 ? line.allocatedOtherEur / line.quantity : 0, 4)}</td>

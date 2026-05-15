@@ -3059,19 +3059,14 @@ tbody tr:hover {
 }
 
 .container-cost-table .duty-preview-cell {
-  min-width: 112px;
-}
-
-.container-cost-table .duty-preview-cell strong {
   font-variant-numeric: tabular-nums;
+  min-width: 118px;
 }
 
-.container-cost-table .duty-preview-cell small {
+.container-cost-table .duty-preview-cell span {
   color: #7a8794;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.2;
-  margin-top: 6px;
 }
 
 .container-content-field {
