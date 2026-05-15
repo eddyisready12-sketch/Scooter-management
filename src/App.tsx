@@ -3903,6 +3903,21 @@ function ContainerCostModal({
     };
   });
 
+  function importDutyRateForLine(line: (typeof calculatedLines)[number]) {
+    return allResolvedCostItems
+      .filter((item) => {
+        const applies = item.category === 'import' && item.kind === 'duty' && (
+          item.appliesTo === 'all'
+          || (item.appliesTo === 'scooter' && line.type === 'scooter')
+          || (item.appliesTo === 'onderdeel' && line.type === 'onderdeel')
+          || (item.appliesTo === 'samengesteld' && line.type === 'samengesteld')
+          || (item.appliesTo === 'non-scooter' && line.type !== 'scooter')
+        );
+        return applies;
+      })
+      .reduce((sum, item) => sum + parseDecimal(item.dutyRate), 0);
+  }
+
   async function handleSave() {
     if (!containerNumber.trim() || !orderNumber.trim() || calculatedLines.length === 0) return;
     setSaving(true);
@@ -4333,28 +4348,36 @@ function ContainerCostModal({
                       <th>Volume</th>
                       <th>USD / stuk</th>
                       <th><span className="table-help-label">Inkoopprijs / stuk<span className="table-help-icon" title="Alleen de omgerekende productprijs per stuk van USD naar EUR, zonder extra kosten." aria-label="Uitleg inkoopprijs per stuk"><CircleHelp size={14} /></span></span></th>
+                      <th><span className="table-help-label">Invoer % / stuk<span className="table-help-icon" title="Het douanetarief-bedrag per stuk op basis van het invoerpercentage voor scooter, onderdeel of set." aria-label="Uitleg invoerpercentage per stuk"><CircleHelp size={14} /></span></span></th>
                       <th><span className="table-help-label">Transport / stuk<span className="table-help-icon" title="Het transportdeel per stuk, zoals containertransport en luchtpost." aria-label="Uitleg transport per stuk"><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Invoer + overig / stuk<span className="table-help-icon" title="Het aandeel per stuk van douane, inklaring en overige factuurregels." aria-label="Uitleg invoer en overig per stuk"><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Kostprijs / stuk<span className="table-help-icon" title="De totale kostprijs per stuk: inkoopprijs plus transport plus invoer en overige kosten." aria-label="Uitleg kostprijs per stuk"><CircleHelp size={14} /></span></span></th>
+                      <th><span className="table-help-label">Overig / stuk<span className="table-help-icon" title="Het aandeel per stuk van overige factuurregels, zoals specificatie- of kredietkosten." aria-label="Uitleg overige kosten per stuk"><CircleHelp size={14} /></span></span></th>
+                      <th><span className="table-help-label">Kostprijs / stuk<span className="table-help-icon" title="De totale kostprijs per stuk: inkoopprijs plus invoer, transport en overige kosten." aria-label="Uitleg kostprijs per stuk"><CircleHelp size={14} /></span></span></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {calculatedLines.map((line) => (
-                      <tr key={line.id}>
-                        <td>{line.type}</td>
-                        <td>
-                          <strong>{line.referenceCode}</strong>
-                          <small>{line.normalizedDescription}</small>
-                        </td>
-                        <td>{formatCompactDecimal(line.quantity, 3)}</td>
-                        <td>{formatCompactDecimal(line.lineVolumeTotal, 3)}</td>
-                        <td>{formatDecimal(line.unitPriceUsd, 4)}</td>
-                        <td>{formatDecimal(purchasePricePerUnit(line.goodsValueEurBase, line.quantity), 4)}</td>
-                        <td>{formatDecimal(line.quantity > 0 ? line.allocatedTransportEur / line.quantity : 0, 4)}</td>
-                        <td>{formatDecimal(line.quantity > 0 ? (line.allocatedImportEur + line.allocatedOtherEur) / line.quantity : 0, 4)}</td>
-                        <td>{formatDecimal(line.calculatedUnitCostEur, 4)}</td>
-                      </tr>
-                    ))}
+                    {calculatedLines.map((line) => {
+                      const importDutyRate = importDutyRateForLine(line);
+                      return (
+                        <tr key={line.id}>
+                          <td>{line.type}</td>
+                          <td>
+                            <strong>{line.referenceCode}</strong>
+                            <small>{line.normalizedDescription}</small>
+                          </td>
+                          <td>{formatCompactDecimal(line.quantity, 3)}</td>
+                          <td>{formatCompactDecimal(line.lineVolumeTotal, 3)}</td>
+                          <td>{formatDecimal(line.unitPriceUsd, 4)}</td>
+                          <td>{formatDecimal(purchasePricePerUnit(line.goodsValueEurBase, line.quantity), 4)}</td>
+                          <td>
+                            <strong>{formatDecimal(line.quantity > 0 ? line.allocatedImportEur / line.quantity : 0, 4)}</strong>
+                            <small>{formatCompactDecimal(importDutyRate, 2)}%</small>
+                          </td>
+                          <td>{formatDecimal(line.quantity > 0 ? line.allocatedTransportEur / line.quantity : 0, 4)}</td>
+                          <td>{formatDecimal(line.quantity > 0 ? line.allocatedOtherEur / line.quantity : 0, 4)}</td>
+                          <td>{formatDecimal(line.calculatedUnitCostEur, 4)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

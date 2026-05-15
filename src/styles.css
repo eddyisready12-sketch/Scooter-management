@@ -2990,7 +2990,7 @@ tbody tr:hover {
 }
 
 .container-cost-table {
-  min-width: 1120px;
+  min-width: 1240px;
   table-layout: auto;
   width: 100%;
 }
@@ -3046,7 +3046,9 @@ tbody tr:hover {
 .container-cost-table th:nth-child(8),
 .container-cost-table td:nth-child(8),
 .container-cost-table th:nth-child(9),
-.container-cost-table td:nth-child(9) {
+.container-cost-table td:nth-child(9),
+.container-cost-table th:nth-child(10),
+.container-cost-table td:nth-child(10) {
   text-align: right;
 }
 
