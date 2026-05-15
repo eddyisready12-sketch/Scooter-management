@@ -3803,6 +3803,19 @@ function ContainerCostModal({
     });
   const totalAirMailUsd = airMailRows.reduce((sum, row) => sum + parseDecimal(row.amountUsd), 0);
   const totalAirMailEur = airMailTransportItems.reduce((sum, item) => sum + item.resolvedAmountEur, 0);
+  const chinaTransportItem: ResolvedContainerCostItem | null = chinaTransportEur > 0
+    ? {
+      id: 'china-transport',
+      label: 'Containertransport China',
+      category: 'transport',
+      mode: 'volume',
+      kind: 'fixed',
+      amountEur: formatDecimal(chinaTransportEur, 4),
+      dutyRate: '0',
+      appliesTo: 'all',
+      resolvedAmountEur: chinaTransportEur,
+    }
+    : null;
 
   const resolvedCostItems: ResolvedContainerCostItem[] = costItems.map((item) => {
     const fixedAmount = parseDecimal(item.amountEur);
@@ -3822,9 +3835,13 @@ function ContainerCostModal({
 
     return { ...item, resolvedAmountEur: roundValue(dutyBase * dutyRate, 4) };
   });
-  const allResolvedCostItems: ResolvedContainerCostItem[] = [...resolvedCostItems, ...airMailTransportItems];
+  const allResolvedCostItems: ResolvedContainerCostItem[] = [
+    ...(chinaTransportItem ? [chinaTransportItem] : []),
+    ...resolvedCostItems,
+    ...airMailTransportItems,
+  ];
 
-  const transportPool = chinaTransportEur + allResolvedCostItems.filter((item) => item.category === 'transport').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
+  const transportPool = allResolvedCostItems.filter((item) => item.category === 'transport').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
   const importPool = allResolvedCostItems.filter((item) => item.category === 'import').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
   const otherPool = allResolvedCostItems.filter((item) => item.category === 'other').reduce((sum, item) => sum + item.resolvedAmountEur, 0);
   const logisticsNetEur = roundValue(transportPool + importPool + otherPool, 4);
@@ -3853,9 +3870,15 @@ function ContainerCostModal({
         || (item.appliesTo === 'onderdeel' && line.type === 'onderdeel')
         || (item.appliesTo === 'samengesteld' && line.type === 'samengesteld')
         || (item.appliesTo === 'non-scooter' && line.type !== 'scooter');
+      const containerVolumeShare = selectedContainerVolume > 0
+        ? lineVolumeTotal / selectedContainerVolume
+        : volumeShare;
+      const volumeAllocationShare = item.category === 'transport'
+        ? containerVolumeShare
+        : volumeShare;
       const itemShare = item.kind === 'duty'
         ? (applies ? valueShare : 0)
-        : (applies ? (item.mode === 'volume' ? volumeShare : valueShare) : 0);
+        : (applies ? (item.mode === 'volume' ? volumeAllocationShare : valueShare) : 0);
       const allocation = roundValue(item.resolvedAmountEur * itemShare, 4);
 
       if (item.category === 'transport') allocatedTransportEur += allocation;
