@@ -3856,29 +3856,56 @@ function ContainerCostModal({
     setContainerVolumeCbm(formatCompactDecimal(preset.volumeCbm, 1).replace('.', ','));
   }
 
+  function costItemAppliesToLine(item: ResolvedContainerCostItem, line: (typeof computedLines)[number]) {
+    return item.appliesTo === 'all'
+      || (item.appliesTo === 'scooter' && line.type === 'scooter')
+      || (item.appliesTo === 'onderdeel' && line.type === 'onderdeel')
+      || (item.appliesTo === 'samengesteld' && line.type === 'samengesteld')
+      || (item.appliesTo === 'non-scooter' && line.type !== 'scooter');
+  }
+
   const calculatedLines = computedLines.map((line) => {
     const lineVolumeTotal = line.volumeCbm * line.quantity;
     const volumeShare = totalVolume > 0 ? lineVolumeTotal / totalVolume : 0;
-    const valueShare = totalGoodsValue > 0 ? line.goodsValueEurBase / totalGoodsValue : 0;
     let allocatedTransportEur = 0;
     let allocatedImportEur = 0;
     let allocatedOtherEur = 0;
 
     allResolvedCostItems.forEach((item) => {
-      const applies = item.appliesTo === 'all'
-        || (item.appliesTo === 'scooter' && line.type === 'scooter')
-        || (item.appliesTo === 'onderdeel' && line.type === 'onderdeel')
-        || (item.appliesTo === 'samengesteld' && line.type === 'samengesteld')
-        || (item.appliesTo === 'non-scooter' && line.type !== 'scooter');
-      const containerVolumeShare = selectedContainerVolume > 0
-        ? lineVolumeTotal / selectedContainerVolume
-        : volumeShare;
-      const volumeAllocationShare = item.category === 'transport'
-        ? containerVolumeShare
-        : volumeShare;
-      const itemShare = item.kind === 'duty'
-        ? (applies ? valueShare : 0)
-        : (applies ? (item.mode === 'volume' ? volumeAllocationShare : valueShare) : 0);
+      const applies = costItemAppliesToLine(item, line);
+      const applicableValueTotal = applies
+        ? computedLines
+          .filter((targetLine) => costItemAppliesToLine(item, targetLine))
+          .reduce((sum, targetLine) => sum + targetLine.goodsValueEurBase, 0)
+        : 0;
+      const applicableValueShare = applicableValueTotal > 0 ? line.goodsValueEurBase / applicableValueTotal : 0;
+      let itemShare = 0;
+
+      if (applies && item.category === 'transport' && item.kind !== 'duty' && item.mode === 'volume') {
+        const applicableScooterVolume = computedLines
+          .filter((targetLine) => targetLine.type === 'scooter' && costItemAppliesToLine(item, targetLine))
+          .reduce((sum, targetLine) => sum + (targetLine.volumeCbm * targetLine.quantity), 0);
+        const scooterOccupiedShare = selectedContainerVolume > 0
+          ? Math.min(1, applicableScooterVolume / selectedContainerVolume)
+          : 0;
+
+        if (line.type === 'scooter') {
+          itemShare = selectedContainerVolume > 0
+            ? lineVolumeTotal / selectedContainerVolume
+            : (applicableScooterVolume > 0 ? lineVolumeTotal / applicableScooterVolume : 0);
+        } else {
+          const nonScooterTransportShare = selectedContainerVolume > 0 ? Math.max(0, 1 - scooterOccupiedShare) : 1;
+          const applicableNonScooterValue = computedLines
+            .filter((targetLine) => targetLine.type !== 'scooter' && costItemAppliesToLine(item, targetLine))
+            .reduce((sum, targetLine) => sum + targetLine.goodsValueEurBase, 0);
+          const nonScooterValueShare = applicableNonScooterValue > 0 ? line.goodsValueEurBase / applicableNonScooterValue : 0;
+          itemShare = nonScooterTransportShare * nonScooterValueShare;
+        }
+      } else if (applies && item.kind === 'duty') {
+        itemShare = applicableValueShare;
+      } else if (applies) {
+        itemShare = item.mode === 'volume' ? volumeShare : applicableValueShare;
+      }
       const allocation = roundValue(item.resolvedAmountEur * itemShare, 4);
 
       if (item.category === 'transport') allocatedTransportEur += allocation;
