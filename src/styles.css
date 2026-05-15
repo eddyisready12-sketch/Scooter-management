@@ -2257,6 +2257,24 @@ tbody tr:hover {
   margin-bottom: 4px;
 }
 
+.import-batch-description-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  width: 100%;
+}
+
+.import-batch-description-meta span {
+  color: #667381;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.import-batch-description-meta b {
+  color: #425160;
+  font-weight: 700;
+}
+
 .import-batch-lines-table td small {
   color: #667381;
   line-height: 1.35;

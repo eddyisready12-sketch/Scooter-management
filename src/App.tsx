@@ -3472,10 +3472,10 @@ function CostBatchesPage({
                                           || item.supplierItemNo === line.referenceCode
                                         ));
                                         const metaBits = [
-                                          `Ref: ${line.referenceCode}`,
-                                          product ? `Product: ${product.code}` : 'Nog niet gekoppeld',
-                                          line.componentsNote,
-                                        ].filter(Boolean) as string[];
+                                          { label: 'Ref', value: line.referenceCode },
+                                          { label: 'Product', value: product ? product.code : 'Nog niet gekoppeld' },
+                                          line.componentsNote ? { label: 'Info', value: line.componentsNote } : null,
+                                        ].filter(Boolean) as Array<{ label: string; value: string }>;
                                         return (
                                           <tr key={line.id}>
                                             <td>{line.type}</td>
