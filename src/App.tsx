@@ -3370,8 +3370,6 @@ function CostBatchesPage({
                   <th>Logistiek netto</th>
                   <th>Betaling netto</th>
                   <th>Status</th>
-                  <th>Transport</th>
-                  <th>Invoer</th>
                   <th>Datum</th>
                 </tr>
               </thead>
@@ -3398,34 +3396,40 @@ function CostBatchesPage({
                         <td>EUR {batch.logisticsNetEur || '-'}</td>
                         <td>EUR {batch.paymentNetEur || '-'}</td>
                         <td>{batch.status || 'Concept'}</td>
-                        <td>EUR {batch.transportCostEur}</td>
-                        <td>EUR {batch.importCostEur}</td>
                         <td>{formatDate(batch.createdAt)}</td>
                       </tr>
                       {isExpanded && (
                         <tr className="batch-detail-row">
-                          <td colSpan={10}>
+                          <td colSpan={8}>
                             <div className="import-batch-details">
-                              <div className="import-batch-meta">
-                                <div className="record-row">
+                              <div className="import-batch-meta compact">
+                                <div className="record-row compact">
                                   <span>Importregels</span>
                                   <strong>{lines.length}</strong>
                                 </div>
-                                <div className="record-row">
+                                <div className="record-row compact">
                                   <span>Container</span>
                                   <strong>{batch.containerNumber || container?.number || '-'}</strong>
                                 </div>
-                                <div className="record-row">
+                                <div className="record-row compact">
                                   <span>Leverancier</span>
                                   <strong>{batch.supplierName || '-'}</strong>
                                 </div>
-                                <div className="record-row">
+                                <div className="record-row compact">
                                   <span>Importeur</span>
                                   <strong>{batch.importerName || '-'}</strong>
                                 </div>
-                                <div className="record-row">
+                                <div className="record-row compact">
                                   <span>Status</span>
                                   <strong>{batch.status || 'Concept'}</strong>
+                                </div>
+                                <div className="record-row compact">
+                                  <span>Transport</span>
+                                  <strong>EUR {batch.transportCostEur}</strong>
+                                </div>
+                                <div className="record-row compact">
+                                  <span>Invoer</span>
+                                  <strong>EUR {batch.importCostEur}</strong>
                                 </div>
                               </div>
                               <div className="container-command-actions">
@@ -3453,13 +3457,11 @@ function CostBatchesPage({
                                     <thead>
                                       <tr>
                                         <th>Type</th>
-                                        <th>Referentie</th>
                                         <th>Omschrijving</th>
                                         <th>Aantal</th>
                                         <th>Prijs / stuk (USD)</th>
                                         <th>Inkoopprijs / stuk (EUR)</th>
                                         <th>Kostprijs / stuk (EUR)</th>
-                                        <th>Productkoppeling</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -3472,25 +3474,16 @@ function CostBatchesPage({
                                         return (
                                           <tr key={line.id}>
                                             <td>{line.type}</td>
-                                            <td>{line.referenceCode}</td>
                                             <td>
                                               <strong>{line.description}</strong>
+                                              <small>Referentie: {line.referenceCode}</small>
+                                              {product ? <small>Product: {product.code} - {product.description}</small> : <small>Nog niet gekoppeld</small>}
                                               {line.componentsNote ? <small>{line.componentsNote}</small> : null}
                                             </td>
                                             <td>{line.quantity}</td>
                                             <td>{line.unitPriceUsd}</td>
                                             <td>{formatDecimal(purchasePricePerUnit(parseDecimal(line.goodsValueEur), parseDecimal(line.quantity)), 4)}</td>
                                             <td>{line.calculatedUnitCostEur}</td>
-                                            <td>
-                                              {product ? (
-                                                <>
-                                                  <strong>{product.code}</strong>
-                                                  <small>{product.description}</small>
-                                                </>
-                                              ) : (
-                                                <small>Nog niet gekoppeld</small>
-                                              )}
-                                            </td>
                                           </tr>
                                         );
                                       })}

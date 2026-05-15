@@ -2195,6 +2195,11 @@ tbody tr:hover {
   margin-bottom: 16px;
 }
 
+.import-batch-meta.compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
 .import-batch-meta .record-row {
   width: 100%;
   border: 1px solid #dce1e6;
@@ -2203,8 +2208,20 @@ tbody tr:hover {
   padding: 10px 12px;
 }
 
+.import-batch-meta .record-row.compact {
+  padding: 8px 10px;
+}
+
+.import-batch-meta .record-row.compact span {
+  font-size: 12px;
+}
+
+.import-batch-meta .record-row.compact strong {
+  font-size: 14px;
+}
+
 .import-batch-lines-table {
-  min-width: 980px;
+  min-width: 760px;
 }
 
 .import-batch-lines-table th:first-child,
@@ -2214,12 +2231,12 @@ tbody tr:hover {
 
 .import-batch-lines-table th:nth-child(2),
 .import-batch-lines-table td:nth-child(2) {
-  width: 16%;
+  width: 40%;
 }
 
 .import-batch-lines-table th:nth-child(3),
 .import-batch-lines-table td:nth-child(3) {
-  width: 28%;
+  width: 10%;
 }
 
 .import-batch-lines-table th:nth-child(4),
@@ -2227,15 +2244,8 @@ tbody tr:hover {
 .import-batch-lines-table th:nth-child(5),
 .import-batch-lines-table td:nth-child(5),
 .import-batch-lines-table th:nth-child(6),
-.import-batch-lines-table td:nth-child(6),
-.import-batch-lines-table th:nth-child(7),
-.import-batch-lines-table td:nth-child(7) {
-  width: 11%;
-}
-
-.import-batch-lines-table th:nth-child(8),
-.import-batch-lines-table td:nth-child(8) {
-  width: 18%;
+.import-batch-lines-table td:nth-child(6) {
+  width: 12%;
 }
 
 .import-batch-lines-table td strong,
@@ -2250,6 +2260,15 @@ tbody tr:hover {
 
 .container-scooter-table-wrap {
   overflow-x: auto;
+}
+
+.import-batch-lines-table th,
+.import-batch-lines-table td {
+  white-space: nowrap;
+}
+
+.import-batch-lines-table td:nth-child(2) {
+  white-space: normal;
 }
 
 .container-scooter-table {
