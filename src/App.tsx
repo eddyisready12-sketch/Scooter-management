@@ -4281,10 +4281,10 @@ function ContainerCostModal({
                       <th>Aantal</th>
                       <th>Volume</th>
                       <th>USD / stuk</th>
-                      <th><span className="table-help-label">Inkoopprijs / stuk<span className="table-help-icon" data-tooltip="Alleen de omgerekende productprijs per stuk van USD naar EUR, zonder extra kosten."><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Transport / stuk<span className="table-help-icon" data-tooltip="Het transportdeel per stuk, zoals containertransport en luchtpost."><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Invoer + overig / stuk<span className="table-help-icon" data-tooltip="Het aandeel per stuk van douane, inklaring en overige factuurregels."><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Kostprijs / stuk<span className="table-help-icon" data-tooltip="De totale kostprijs per stuk: inkoopprijs plus transport plus invoer en overige kosten."><CircleHelp size={14} /></span></span></th>
+                      <th><span className="table-help-label">Inkoopprijs / stuk<span className="table-help-icon" title="Alleen de omgerekende productprijs per stuk van USD naar EUR, zonder extra kosten." aria-label="Uitleg inkoopprijs per stuk"><CircleHelp size={14} /></span></span></th>
+                      <th><span className="table-help-label">Transport / stuk<span className="table-help-icon" title="Het transportdeel per stuk, zoals containertransport en luchtpost." aria-label="Uitleg transport per stuk"><CircleHelp size={14} /></span></span></th>
+                      <th><span className="table-help-label">Invoer + overig / stuk<span className="table-help-icon" title="Het aandeel per stuk van douane, inklaring en overige factuurregels." aria-label="Uitleg invoer en overig per stuk"><CircleHelp size={14} /></span></span></th>
+                      <th><span className="table-help-label">Kostprijs / stuk<span className="table-help-icon" title="De totale kostprijs per stuk: inkoopprijs plus transport plus invoer en overige kosten." aria-label="Uitleg kostprijs per stuk"><CircleHelp size={14} /></span></span></th>
                     </tr>
                   </thead>
                   <tbody>
