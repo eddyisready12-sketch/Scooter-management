@@ -168,10 +168,14 @@ create table if not exists scooters (
   "rdwExecution" text,
   "batteryNumber" text,
   "invoiceNumber" text,
+  "isUnpacked" boolean default false,
   "arrivedAt" timestamptz,
   "deliveredAt" timestamptz,
   "soldAt" timestamptz
 );
+
+alter table scooters
+add column if not exists "isUnpacked" boolean default false;
 
 create table if not exists batteries (
   id text primary key,

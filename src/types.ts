@@ -29,6 +29,7 @@ export type Scooter = {
   rdwExecution?: string;
   batteryNumber?: string;
   invoiceNumber?: string;
+  isUnpacked?: boolean;
   arrivedAt?: string;
   deliveredAt?: string;
   soldAt?: string;

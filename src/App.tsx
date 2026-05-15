@@ -2906,6 +2906,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
   const [page, setPage] = useState(1);
   const [rdwChecking, setRdwChecking] = useState(false);
   const [rdwCheckMessage, setRdwCheckMessage] = useState('');
+  const [sortOrder, setSortOrder] = useState('model-asc');
   const [columnFilters, setColumnFilters] = useState({
     model: '',
     frame: '',
@@ -2917,6 +2918,16 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     invoice: '',
     registration: '',
   });
+  const modelOptions = Array.from(new Set(
+    scooters
+      .map((scooter) => scooter.model?.trim())
+      .filter(Boolean),
+  )).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const colorOptions = Array.from(new Set(
+    scooters
+      .map((scooter) => scooter.color?.trim())
+      .filter(Boolean),
+  )).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const dealerOptions = Array.from(new Set(
     scooters
       .map((scooter) => dealerName(dealers, scooter.dealerId))
@@ -2926,9 +2937,9 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     const dealer = dealerName(dealers, scooter.dealerId);
     const registrationComplete = isRegistrationComplete(scooter);
     return (
-      scooter.model.toLowerCase().includes(columnFilters.model.toLowerCase()) &&
+      (!columnFilters.model || scooter.model === columnFilters.model) &&
       scooter.frameNumber.toLowerCase().includes(columnFilters.frame.toLowerCase()) &&
-      scooter.color.toLowerCase().includes(columnFilters.color.toLowerCase()) &&
+      (!columnFilters.color || scooter.color === columnFilters.color) &&
       (scooter.licensePlate || '').toLowerCase().includes(columnFilters.licensePlate.toLowerCase()) &&
       (!columnFilters.speed || normalizeSpeedValue(scooter.speed) === columnFilters.speed) &&
       (!columnFilters.status || scooter.status === columnFilters.status) &&
@@ -2937,16 +2948,35 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
       (!columnFilters.registration || (columnFilters.registration === 'complete' ? registrationComplete : !registrationComplete))
     );
   });
+  const sortedRows = [...filteredRows].sort((a, b) => {
+    switch (sortOrder) {
+      case 'model-desc':
+        return b.model.localeCompare(a.model, 'nl', { sensitivity: 'base' }) || a.frameNumber.localeCompare(b.frameNumber, 'nl', { sensitivity: 'base' });
+      case 'color-asc':
+        return a.color.localeCompare(b.color, 'nl', { sensitivity: 'base' }) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'color-desc':
+        return b.color.localeCompare(a.color, 'nl', { sensitivity: 'base' }) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'speed-high':
+        return Number(normalizeSpeedValue(b.speed) || 0) - Number(normalizeSpeedValue(a.speed) || 0) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'speed-low':
+        return Number(normalizeSpeedValue(a.speed) || 0) - Number(normalizeSpeedValue(b.speed) || 0) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'newest-added':
+        return new Date(b.arrivedAt || 0).getTime() - new Date(a.arrivedAt || 0).getTime() || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'model-asc':
+      default:
+        return a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' }) || a.frameNumber.localeCompare(b.frameNumber, 'nl', { sensitivity: 'base' });
+    }
+  });
   const speedOptions = speedOptionsFromScooters(scooters);
-  const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(sortedRows.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const visibleScooters = pageSize === 'all'
-    ? filteredRows
-    : filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const firstEntry = filteredRows.length === 0 ? 0 : pageSize === 'all' ? 1 : (safePage - 1) * pageSize + 1;
-  const lastEntry = pageSize === 'all' ? filteredRows.length : Math.min(safePage * pageSize, filteredRows.length);
+    ? sortedRows
+    : sortedRows.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const firstEntry = sortedRows.length === 0 ? 0 : pageSize === 'all' ? 1 : (safePage - 1) * pageSize + 1;
+  const lastEntry = pageSize === 'all' ? sortedRows.length : Math.min(safePage * pageSize, sortedRows.length);
 
-  const exportRows = filteredRows.map((scooter) => ({
+  const exportRows = sortedRows.map((scooter) => ({
     Model: scooter.model,
     'Frame #': scooter.frameNumber,
     Kleur: scooter.color,
@@ -2955,6 +2985,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     Status: scooter.status,
     Dealer: dealerName(dealers, scooter.dealerId) || '-',
     Factuur: scooter.invoiceNumber || '-',
+    Uitgepakt: scooter.isUnpacked ? 'Ja' : 'Nee',
     Tenaam: isRegistrationComplete(scooter) ? 'Ja' : 'Nee',
   }));
 
@@ -3081,17 +3112,38 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
               <option value="all">Alles</option>
             </select>
           </label>
+          <label>Sorteer:
+            <select value={sortOrder} onChange={(event) => { setSortOrder(event.target.value); setPage(1); }}>
+              <option value="model-asc">Model A-Z</option>
+              <option value="model-desc">Model Z-A</option>
+              <option value="color-asc">Kleur A-Z</option>
+              <option value="color-desc">Kleur Z-A</option>
+              <option value="speed-high">Snelheid hoog-laag</option>
+              <option value="speed-low">Snelheid laag-hoog</option>
+              <option value="newest-added">Nieuwste eerst</option>
+            </select>
+          </label>
           <label>Search: <input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></label>
         </div>
       </div>
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Model</th><th>Frame #</th><th>Kleur</th><th>Kenteken</th><th>Snelheid</th><th>Status</th><th>Dealer</th><th>Factuur</th><th>Tenaam</th></tr>
+            <tr><th>Model</th><th>Frame #</th><th>Kleur</th><th>Kenteken</th><th>Snelheid</th><th>Status</th><th>Dealer</th><th>Factuur</th><th>Uitgepakt</th><th>Tenaam</th></tr>
             <tr className="filter-row">
-              <th><input value={columnFilters.model} onChange={(event) => setColumnFilter('model', event.target.value)} aria-label="Filter model" /></th>
+              <th>
+                <select value={columnFilters.model} onChange={(event) => setColumnFilter('model', event.target.value)} aria-label="Filter model">
+                  <option value="">Alle</option>
+                  {modelOptions.map((model) => <option key={model} value={model}>{model}</option>)}
+                </select>
+              </th>
               <th><input value={columnFilters.frame} onChange={(event) => setColumnFilter('frame', event.target.value)} aria-label="Filter frame" /></th>
-              <th><input value={columnFilters.color} onChange={(event) => setColumnFilter('color', event.target.value)} aria-label="Filter kleur" /></th>
+              <th>
+                <select value={columnFilters.color} onChange={(event) => setColumnFilter('color', event.target.value)} aria-label="Filter kleur">
+                  <option value="">Alle</option>
+                  {colorOptions.map((color) => <option key={color} value={color}>{color}</option>)}
+                </select>
+              </th>
               <th><input value={columnFilters.licensePlate} onChange={(event) => setColumnFilter('licensePlate', event.target.value)} aria-label="Filter kenteken" /></th>
               <th><select value={columnFilters.speed} onChange={(event) => setColumnFilter('speed', event.target.value)} aria-label="Filter snelheid"><option value="">Alle</option>{speedOptions.map((speed) => <option value={speed} key={speed}>{speed}</option>)}</select></th>
               <th><select value={columnFilters.status} onChange={(event) => setColumnFilter('status', event.target.value)} aria-label="Filter status"><option value="">Alle</option>{Object.keys(statusColor).map((status) => <option value={status} key={status}>{status}</option>)}</select></th>
@@ -3102,6 +3154,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
                 </select>
               </th>
               <th><input value={columnFilters.invoice} onChange={(event) => setColumnFilter('invoice', event.target.value)} aria-label="Filter factuur" /></th>
+              <th></th>
               <th><select value={columnFilters.registration} onChange={(event) => setColumnFilter('registration', event.target.value)} aria-label="Filter tenaamstelling"><option value="">Alle</option><option value="complete">Compleet</option><option value="missing">Mist data</option></select></th>
             </tr>
           </thead>
@@ -3116,6 +3169,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
                 <td>{scooter.status}</td>
                 <td>{dealerName(dealers, scooter.dealerId) || '-'}</td>
                 <td>{scooter.invoiceNumber || '-'}</td>
+                <td className="registration-cell">{scooter.isUnpacked ? <CheckCircle2 className="registration-check" size={18} aria-label="Uitgepakt" /> : '-'}</td>
                 <td className="registration-cell">{isRegistrationComplete(scooter) ? <CheckCircle2 className="registration-check" size={18} aria-label="Tenaamgesteld" /> : '-'}</td>
               </tr>
             ))}
@@ -3123,7 +3177,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
         </table>
       </div>
       <div className="table-footer">
-        <span>Showing {firstEntry} to {lastEntry} of {filteredRows.length} entries</span>
+        <span>Showing {firstEntry} to {lastEntry} of {sortedRows.length} entries</span>
         {pageSize !== 'all' && (
           <div className="pagination">
             <button disabled={safePage <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button>
@@ -7299,6 +7353,7 @@ function ScooterDrawer({
               <dt>Kenteken</dt><dd>{scooter.licensePlate || '-'}</dd>
               <dt>Factuur</dt><dd>{scooter.invoiceNumber || '-'}</dd>
               <dt>Status</dt><dd>{scooter.status}</dd>
+              <dt>Uitgepakt</dt><dd>{scooter.isUnpacked ? <span className="registration-badge"><CheckCircle2 size={16} /> Ja</span> : 'Nee'}</dd>
               <dt>Dealer</dt><dd>{dealerName(dealers, scooter.dealerId) || '-'}</dd>
             </dl>
           </section>
@@ -7311,6 +7366,10 @@ function ScooterDrawer({
               <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{Object.keys(statusColor).map((status) => <option key={status}>{status}</option>)}</select></label>
               <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value })}><option value="">Geen dealer</option>{dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
               <label>Factuur<input value={draft.invoiceNumber ?? ''} onChange={(e) => setDraft({ ...draft, invoiceNumber: e.target.value })} /></label>
+              <label className="checkbox-field">
+                <input type="checkbox" checked={Boolean(draft.isUnpacked)} onChange={(e) => setDraft({ ...draft, isUnpacked: e.target.checked })} />
+                Uitgepakt
+              </label>
             </div>
             <div className="drawer-actions">
               <button className="primary-button" onClick={() => onUpdate(draft)}>Verander gegevens</button>
