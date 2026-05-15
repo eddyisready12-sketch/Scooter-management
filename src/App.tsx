@@ -3456,9 +3456,9 @@ function CostBatchesPage({
                                         <th>Referentie</th>
                                         <th>Omschrijving</th>
                                         <th>Aantal</th>
-                                        <th>USD / stuk</th>
-                                        <th>Inkoopprijs / stuk</th>
-                                        <th>Kostprijs / stuk</th>
+                                        <th>Prijs / stuk (USD)</th>
+                                        <th>Inkoopprijs / stuk (EUR)</th>
+                                        <th>Kostprijs / stuk (EUR)</th>
                                         <th>Productkoppeling</th>
                                       </tr>
                                     </thead>
@@ -3478,9 +3478,9 @@ function CostBatchesPage({
                                               {line.componentsNote ? <small>{line.componentsNote}</small> : null}
                                             </td>
                                             <td>{line.quantity}</td>
-                                            <td>USD {line.unitPriceUsd}</td>
-                                            <td>EUR {formatDecimal(purchasePricePerUnit(parseDecimal(line.goodsValueEur), parseDecimal(line.quantity)), 4)}</td>
-                                            <td>EUR {line.calculatedUnitCostEur}</td>
+                                            <td>{line.unitPriceUsd}</td>
+                                            <td>{formatDecimal(purchasePricePerUnit(parseDecimal(line.goodsValueEur), parseDecimal(line.quantity)), 4)}</td>
+                                            <td>{line.calculatedUnitCostEur}</td>
                                             <td>
                                               {product ? (
                                                 <>
