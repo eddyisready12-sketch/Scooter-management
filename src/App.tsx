@@ -4375,7 +4375,7 @@ function ContainerCostModal({
                       <th>Volume</th>
                       <th>USD / stuk</th>
                       <th><span className="table-help-label">Inkoopprijs / stuk<span className="table-help-icon" title="Alleen de omgerekende productprijs per stuk van USD naar EUR, zonder extra kosten." aria-label="Uitleg inkoopprijs per stuk"><CircleHelp size={14} /></span></span></th>
-                      <th><span className="table-help-label">Invoer % / stuk<span className="table-help-icon" title="Het douanetarief-bedrag per stuk op basis van het invoerpercentage voor scooter, onderdeel of set." aria-label="Uitleg invoerpercentage per stuk"><CircleHelp size={14} /></span></span></th>
+                      <th><span className="table-help-label">Invoer / stuk<span className="table-help-icon" title="Het douanetarief-bedrag per stuk op basis van het invoerpercentage voor scooter, onderdeel of set." aria-label="Uitleg invoer per stuk"><CircleHelp size={14} /></span></span></th>
                       <th><span className="table-help-label">Transport / stuk<span className="table-help-icon" title="Het transportdeel per stuk, zoals containertransport en luchtpost." aria-label="Uitleg transport per stuk"><CircleHelp size={14} /></span></span></th>
                       <th><span className="table-help-label">Overig / stuk<span className="table-help-icon" title="Het aandeel per stuk van overige factuurregels, zoals specificatie- of kredietkosten." aria-label="Uitleg overige kosten per stuk"><CircleHelp size={14} /></span></span></th>
                       <th><span className="table-help-label">Kostprijs / stuk<span className="table-help-icon" title="De totale kostprijs per stuk: inkoopprijs plus invoer, transport en overige kosten." aria-label="Uitleg kostprijs per stuk"><CircleHelp size={14} /></span></span></th>
@@ -4395,9 +4395,9 @@ function ContainerCostModal({
                           <td>{formatCompactDecimal(line.lineVolumeTotal, 3)}</td>
                           <td>{formatDecimal(line.unitPriceUsd, 4)}</td>
                           <td>{formatDecimal(purchasePricePerUnit(line.goodsValueEurBase, line.quantity), 4)}</td>
-                          <td>
+                          <td className="duty-preview-cell">
                             <strong>{formatDecimal(line.quantity > 0 ? line.allocatedImportEur / line.quantity : 0, 4)}</strong>
-                            <small>{formatCompactDecimal(importDutyRate, 2)}%</small>
+                            <small>Tarief {formatCompactDecimal(importDutyRate, 2)}%</small>
                           </td>
                           <td>{formatDecimal(line.quantity > 0 ? line.allocatedTransportEur / line.quantity : 0, 4)}</td>
                           <td>{formatDecimal(line.quantity > 0 ? line.allocatedOtherEur / line.quantity : 0, 4)}</td>
