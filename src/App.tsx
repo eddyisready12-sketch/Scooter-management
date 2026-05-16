@@ -318,7 +318,7 @@ function sumPackagingLayerWeights(layers: ProductPackagingLayer[]): string | und
   }, 0);
 
   if (total <= 0) return undefined;
-  return Number.isInteger(total) ? String(total) : total.toFixed(2).replace('.', ',');
+  return formatDecimal(total, 8);
 }
 
 function unitsPerPackageFromProduct(product: Product) {
@@ -444,14 +444,14 @@ function buildPackagingRegistrationsForBatch(
         productBarcode: product.barcode,
         quantity: line.quantity,
         packagingUnit: product.packagingUnit || '1',
-        packagesCount: formatDecimal(packagesCount, 2),
-        unitsPerPackage: formatDecimal(unitsPerPackage, 2),
+        packagesCount: formatDecimal(packagesCount, 8),
+        unitsPerPackage: formatDecimal(unitsPerPackage, 8),
         layerName: layer.name || packagingLayerNames[index] || `Laag ${index + 1}`,
         material,
         recycleCode: layer.recycleCode,
         wasteStream,
         weightGramsPerUnit,
-        totalWeightGrams: formatDecimal(totalWeightGrams, 2),
+        totalWeightGrams: formatDecimal(totalWeightGrams, 8),
         source: 'product_snapshot',
         registeredAt: new Date().toISOString(),
       };
@@ -6256,7 +6256,12 @@ function ProductDetailModal({
                             </div>
                             <div className="packaging-layer-field">
                               <span className="packaging-layer-mobile-label">Gewicht (g)</span>
-                              <input value={layer.weightGrams ?? ''} onChange={(event) => updatePackagingLayer(index, { weightGrams: event.target.value || undefined })} />
+                              <input
+                                value={layer.weightGrams ?? ''}
+                                inputMode="decimal"
+                                placeholder="0,00000000"
+                                onChange={(event) => updatePackagingLayer(index, { weightGrams: event.target.value || undefined })}
+                              />
                             </div>
                             <div className="packaging-layer-preview">
                               <span className="packaging-layer-mobile-label">Labelicoon</span>
