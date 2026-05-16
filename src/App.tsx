@@ -2019,6 +2019,9 @@ export function App() {
   async function saveContainerCostBatch(batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) {
     try {
       const uniqueLines = dedupeContainerCostLines(lines);
+      const existingLineIds = data.containerCostLines
+        .filter((line) => line.batchId === batch.id)
+        .map((line) => line.id);
 
       setData((current) => {
         const batchMap = new Map(current.containerCostBatches.map((item) => [item.id, item]));
@@ -2041,7 +2044,7 @@ export function App() {
       });
 
       await upsertContainerCostBatches([batch]);
-      await replaceContainerCostLines(batch.id, uniqueLines);
+      await replaceContainerCostLines(batch.id, uniqueLines, existingLineIds);
       if (productUpdates.length > 0) {
         await upsertProducts(productUpdates);
       }

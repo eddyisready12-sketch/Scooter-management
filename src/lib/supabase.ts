@@ -338,8 +338,17 @@ export async function upsertContainerCostLines(lines: ContainerCostLine[]) {
   if (error) throw error;
 }
 
-export async function replaceContainerCostLines(batchId: string, lines: ContainerCostLine[]) {
+export async function replaceContainerCostLines(batchId: string, lines: ContainerCostLine[], existingLineIds: string[] = []) {
   if (!supabase || !batchId) return;
+
+  if (existingLineIds.length > 0) {
+    const { error: idDeleteError } = await supabase
+      .from('container_cost_lines')
+      .delete()
+      .in('id', existingLineIds);
+
+    if (idDeleteError) throw idDeleteError;
+  }
 
   const { error: deleteError } = await supabase
     .from('container_cost_lines')
