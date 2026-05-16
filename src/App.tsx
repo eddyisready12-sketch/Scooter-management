@@ -3747,14 +3747,20 @@ function ContainerCostModal({
     const articleNumberKey = line.articleNumber?.trim().toLowerCase() || '';
     const supplierItemKey = line.supplierItemNo?.trim().toLowerCase() || '';
     const supplierNameKey = normalizedSupplierKey(line.supplierName || supplierName);
+    const descriptionKey = line.description.trim().toLowerCase();
     const matchedProduct = products.find((product) => {
       const productCodeKey = product.code.trim().toLowerCase();
       const productSupplierItemKey = product.supplierItemNo?.trim().toLowerCase() || '';
       const productSupplierKey = normalizedSupplierKey(product.supplier);
+      const productDescriptionKey = product.description.trim().toLowerCase();
       return productCodeKey === referenceCodeKey
         || (articleNumberKey && productCodeKey === articleNumberKey)
         || (supplierItemKey
           && productSupplierItemKey === supplierItemKey
+          && (!supplierNameKey || productSupplierKey === supplierNameKey))
+        || (!articleNumberKey
+          && !supplierItemKey
+          && productDescriptionKey === descriptionKey
           && (!supplierNameKey || productSupplierKey === supplierNameKey));
     });
     const matchedScooter = scooters.find((scooter) => scooter.frameNumber.trim().toLowerCase() === line.referenceCode.trim().toLowerCase());
