@@ -2268,6 +2268,36 @@ tbody tr:hover {
   margin-bottom: 6px;
 }
 
+.import-product-title {
+  display: block;
+  border: 0;
+  background: transparent;
+  color: #1f3448;
+  padding: 0;
+  margin: 0 0 6px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+
+.import-product-number {
+  border: 0;
+  background: transparent;
+  color: #425160;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.import-product-title:hover,
+.import-product-number:hover {
+  color: #0075ff;
+  text-decoration: underline;
+}
+
 .import-batch-description-meta {
   display: grid !important;
   gap: 4px;

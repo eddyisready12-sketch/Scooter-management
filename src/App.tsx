@@ -1783,6 +1783,7 @@ export function App() {
   const [data, setData] = useState<AppData>(demoData);
   const [query, setQuery] = useState('');
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [csvMessage, setCsvMessage] = useState('');
   const [csvMessageDetails, setCsvMessageDetails] = useState<string[]>([]);
   const [dealerImportMessage, setDealerImportMessage] = useState('');
@@ -1856,6 +1857,14 @@ export function App() {
         .some((value) => String(value).toLowerCase().includes(needle))),
     );
   }, [data.dealers, data.scooters, query, statusFilter]);
+
+  const productModalSuppliers = useMemo(() => {
+    const productSupplierNames = data.products.map((product) => product.supplier).filter(Boolean) as string[];
+    return Array.from(new Set([
+      ...data.suppliers.map((supplier) => supplier.name).filter(Boolean),
+      ...productSupplierNames.filter((supplierName) => !data.suppliers.some((supplier) => supplierNameMatches(supplier, supplierName))),
+    ])).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  }, [data.products, data.suppliers]);
 
   async function importScooterFile(file: File, statusOverride?: ScooterStatus) {
     try {
@@ -2664,7 +2673,7 @@ export function App() {
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
-          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} />}
+          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={setSelectedProduct} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
@@ -2672,9 +2681,8 @@ export function App() {
             <ProductsPage
               products={data.products}
               supplierRecords={data.suppliers}
-              importers={data.importers}
               onImport={handleProductImport}
-              onUpdateProduct={updateProduct}
+              onSelectProduct={setSelectedProduct}
               message={productMessage}
             />
           )}
@@ -2698,6 +2706,19 @@ export function App() {
           onAddDocument={addDocument}
           onOpenDocument={openDocument}
           onDownloadDocument={downloadDocument}
+        />
+      )}
+      {selectedProduct && (
+        <ProductDetailModal
+          product={selectedProduct}
+          suppliers={productModalSuppliers}
+          supplierRecords={data.suppliers}
+          importers={data.importers}
+          onClose={() => setSelectedProduct(null)}
+          onSave={async (nextProduct) => {
+            await updateProduct(nextProduct);
+            setSelectedProduct(nextProduct);
+          }}
         />
       )}
     </div>
@@ -3393,9 +3414,11 @@ function Containers({
 function CostBatchesPage({
   data,
   onSaveCostBatch,
+  onSelectProduct,
 }: {
   data: AppData;
   onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
+  onSelectProduct: (product: Product) => void;
 }) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
@@ -3570,10 +3593,37 @@ function CostBatchesPage({
                                           <tr key={line.id}>
                                             <td>{line.type}</td>
                                             <td className="import-batch-description-cell">
-                                              <strong>{line.description}</strong>
+                                              {product ? (
+                                                <button
+                                                  type="button"
+                                                  className="import-product-title"
+                                                  onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    onSelectProduct(product);
+                                                  }}
+                                                >
+                                                  {line.description}
+                                                </button>
+                                              ) : (
+                                                <strong>{line.description}</strong>
+                                              )}
                                               <small className="import-batch-description-meta">
                                                 <span className="import-batch-meta-line">
-                                                  <span><b>Productnummer:</b> {line.referenceCode}</span>
+                                                  <span>
+                                                    <b>Productnummer:</b>{' '}
+                                                    {product ? (
+                                                      <button
+                                                        type="button"
+                                                        className="import-product-number"
+                                                        onClick={(event) => {
+                                                          event.stopPropagation();
+                                                          onSelectProduct(product);
+                                                        }}
+                                                      >
+                                                        {line.referenceCode}
+                                                      </button>
+                                                    ) : line.referenceCode}
+                                                  </span>
                                                   {oemInfo ? <span><b>OEM No.:</b> {oemInfo}</span> : null}
                                                 </span>
                                                 {modelInfo ? (
@@ -5023,16 +5073,14 @@ function BatteryDetailModal({ battery, batteryModels, dealers, scooters, onClose
 function ProductsPage({
   products,
   supplierRecords,
-  importers,
   onImport,
-  onUpdateProduct,
+  onSelectProduct,
   message,
 }: {
   products: Product[];
   supplierRecords: Supplier[];
-  importers: Importer[];
   onImport: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
-  onUpdateProduct: (product: Product) => Promise<void>;
+  onSelectProduct: (product: Product) => void;
   message: string;
 }) {
   const [query, setQuery] = useState('');
@@ -5051,7 +5099,6 @@ function ProductsPage({
   const [pageSize, setPageSize] = useState<number | 'all'>(25);
   const [sortField, setSortField] = useState<'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate'>('code');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   function handleSort(field: 'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate') {
     if (sortField === field) {
@@ -5419,7 +5466,7 @@ function ProductsPage({
               </thead>
               <tbody>
                 {pagedProducts.map((product) => (
-                  <tr key={product.id} className="product-row" onClick={() => setSelectedProduct(product)}>
+                  <tr key={product.id} className="product-row" onClick={() => onSelectProduct(product)}>
                     <td>{product.code || '-'}</td>
                     <td>{product.description || '-'}</td>
                     <td>{formatPriceValue(product.salePrice)}</td>
@@ -5462,19 +5509,6 @@ function ProductsPage({
             <small>Nog na te lopen artikelen</small>
           </article>
         </section>
-      )}
-      {selectedProduct && (
-        <ProductDetailModal
-          product={selectedProduct}
-          suppliers={suppliers}
-          supplierRecords={supplierRecords}
-          importers={importers}
-          onClose={() => setSelectedProduct(null)}
-          onSave={async (nextProduct) => {
-            await onUpdateProduct(nextProduct);
-            setSelectedProduct(nextProduct);
-          }}
-        />
       )}
     </>
   );
