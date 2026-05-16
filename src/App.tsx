@@ -38,8 +38,8 @@ import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingLayer, Scooter, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
+import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, replaceProductPackagingRegistrations, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
@@ -328,6 +328,61 @@ function createProductDraft(product: Product): Product {
     packagingWasteStream: derivedWasteStream ?? product.packagingWasteStream,
     packagingWeightTotalGrams: derivedTotalWeight ?? asOptionalTrimmedString(product.packagingWeightTotalGrams),
   };
+}
+
+function findProductForCostLine(products: Product[], line: ContainerCostLine) {
+  return products.find((item) => (
+    item.id === line.referenceId
+    || item.code === line.referenceCode
+    || item.supplierItemNo === line.referenceCode
+  ));
+}
+
+function buildPackagingRegistrationsForBatch(
+  batch: ContainerCostBatch,
+  lines: ContainerCostLine[],
+  products: Product[],
+): ProductPackagingRegistration[] {
+  return lines.flatMap((line) => {
+    const product = findProductForCostLine(products, line);
+    if (!product) return [];
+
+    const quantity = parseDecimal(line.quantity);
+    const layersWithValues = normalizePackagingLayers(product)
+      .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
+    const layers = layersWithValues.length > 0
+      ? layersWithValues
+      : [{ name: 'Onbekend', material: 'Onbekend', weightGrams: '0' }];
+
+    return layers.map((layer, index) => {
+      const material = layer.material || 'Onbekend';
+      const weightGramsPerUnit = layer.weightGrams || '0';
+      const totalWeightGrams = parseDecimal(weightGramsPerUnit) * quantity;
+      const wasteStream = findPackagingMaterialOption(material)?.wasteStream;
+
+      return {
+        id: stableId('product-packaging-registration', `${batch.id}-${line.id}-${index + 1}`),
+        batchId: batch.id,
+        batchOrderNumber: batch.orderNumber,
+        containerNumber: batch.containerNumber,
+        containerCostLineId: line.id,
+        productId: product.id,
+        productCode: product.code || line.referenceCode,
+        productDescription: product.description || line.description,
+        productBarcode: product.barcode,
+        quantity: line.quantity,
+        packagingUnit: product.packagingUnit,
+        layerName: layer.name || packagingLayerNames[index] || `Laag ${index + 1}`,
+        material,
+        recycleCode: layer.recycleCode,
+        wasteStream,
+        weightGramsPerUnit,
+        totalWeightGrams: formatDecimal(totalWeightGrams, 2),
+        source: 'product_snapshot',
+        registeredAt: new Date().toISOString(),
+      };
+    });
+  });
 }
 
 function articleNumberPrefix(date = new Date()) {
@@ -2028,6 +2083,13 @@ export function App() {
   async function saveContainerCostBatch(batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) {
     try {
       const uniqueLines = dedupeContainerCostLines(lines);
+      const productsForRegistrationMap = new Map(data.products.map((product) => [product.id, product]));
+      productUpdates.forEach((product) => productsForRegistrationMap.set(product.id, product));
+      const packagingRegistrations = buildPackagingRegistrationsForBatch(
+        batch,
+        uniqueLines,
+        Array.from(productsForRegistrationMap.values()),
+      );
       const existingLineIds = data.containerCostLines
         .filter((line) => line.batchId === batch.id)
         .map((line) => line.id);
@@ -2048,16 +2110,21 @@ export function App() {
           ...current,
           containerCostBatches: Array.from(batchMap.values()),
           containerCostLines: Array.from(lineMap.values()),
+          productPackagingRegistrations: [
+            ...current.productPackagingRegistrations.filter((registration) => registration.batchId !== batch.id),
+            ...packagingRegistrations,
+          ],
           products: Array.from(productMap.values()),
         };
       });
 
       await upsertContainerCostBatches([batch]);
       await replaceContainerCostLines(batch.id, uniqueLines, existingLineIds);
+      await replaceProductPackagingRegistrations(batch.id, packagingRegistrations);
       if (productUpdates.length > 0) {
         await upsertProducts(productUpdates);
       }
-      showCsvMessage(`${uniqueLines.length} kostprijsregels opgeslagen voor order ${batch.orderNumber}.`);
+      showCsvMessage(`${uniqueLines.length} kostprijsregels opgeslagen voor order ${batch.orderNumber}. ${packagingRegistrations.length} verpakkingsregistraties bijgewerkt.`);
     } catch (error) {
       showCsvMessage(`Container kostprijs opslaan mislukt: ${importErrorMessage(error)}`);
     }
@@ -3576,11 +3643,7 @@ function CostBatchesPage({
                                     </thead>
                                     <tbody>
                                       {lines.map((line) => {
-                                        const product = data.products.find((item) => (
-                                          item.id === line.referenceId
-                                          || item.code === line.referenceCode
-                                          || item.supplierItemNo === line.referenceCode
-                                        ));
+                                        const product = findProductForCostLine(data.products, line);
                                         const componentParts = line.componentsNote
                                           ?.split(' - ')
                                           .map((part) => part.trim())

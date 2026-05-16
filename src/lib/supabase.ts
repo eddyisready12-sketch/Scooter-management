@@ -349,6 +349,19 @@ export async function upsertProductPackagingRegistrations(registrations: Product
   if (error) throw error;
 }
 
+export async function replaceProductPackagingRegistrations(batchId: string, registrations: ProductPackagingRegistration[]) {
+  if (!supabase || !batchId) return;
+
+  const { error: deleteError } = await supabase
+    .from('product_packaging_registrations')
+    .delete()
+    .eq('batchId', batchId);
+
+  if (deleteError) throw deleteError;
+
+  await upsertProductPackagingRegistrations(registrations);
+}
+
 export async function replaceContainerCostLines(batchId: string, lines: ContainerCostLine[], existingLineIds: string[] = []) {
   if (!supabase || !batchId) return;
 
