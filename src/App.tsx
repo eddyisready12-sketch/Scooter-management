@@ -3881,25 +3881,28 @@ function ContainerCostModal({
       const applicableValueShare = applicableValueTotal > 0 ? line.goodsValueEurBase / applicableValueTotal : 0;
       let itemShare = 0;
 
-      if (applies && item.category === 'transport' && item.kind !== 'duty' && item.mode === 'volume') {
+      if (applies && (item.category === 'transport' || item.category === 'other') && item.kind !== 'duty' && item.mode === 'volume') {
         const applicableScooterVolume = computedLines
           .filter((targetLine) => targetLine.type === 'scooter' && costItemAppliesToLine(item, targetLine))
           .reduce((sum, targetLine) => sum + (targetLine.volumeCbm * targetLine.quantity), 0);
         const scooterOccupiedShare = selectedContainerVolume > 0
           ? Math.min(1, applicableScooterVolume / selectedContainerVolume)
           : 0;
+        const applicableNonScooterValue = computedLines
+          .filter((targetLine) => targetLine.type !== 'scooter' && costItemAppliesToLine(item, targetLine))
+          .reduce((sum, targetLine) => sum + targetLine.goodsValueEurBase, 0);
+        const hasScooterTarget = applicableScooterVolume > 0;
+        const hasNonScooterTarget = applicableNonScooterValue > 0;
+        const splitByContainerOccupancy = selectedContainerVolume > 0 && hasScooterTarget && hasNonScooterTarget;
 
         if (line.type === 'scooter') {
-          itemShare = selectedContainerVolume > 0
+          itemShare = splitByContainerOccupancy
             ? lineVolumeTotal / selectedContainerVolume
             : (applicableScooterVolume > 0 ? lineVolumeTotal / applicableScooterVolume : 0);
         } else {
-          const nonScooterTransportShare = selectedContainerVolume > 0 ? Math.max(0, 1 - scooterOccupiedShare) : 1;
-          const applicableNonScooterValue = computedLines
-            .filter((targetLine) => targetLine.type !== 'scooter' && costItemAppliesToLine(item, targetLine))
-            .reduce((sum, targetLine) => sum + targetLine.goodsValueEurBase, 0);
+          const nonScooterPoolShare = splitByContainerOccupancy ? Math.max(0, 1 - scooterOccupiedShare) : 1;
           const nonScooterValueShare = applicableNonScooterValue > 0 ? line.goodsValueEurBase / applicableNonScooterValue : 0;
-          itemShare = nonScooterTransportShare * nonScooterValueShare;
+          itemShare = nonScooterPoolShare * nonScooterValueShare;
         }
       } else if (applies && item.kind === 'duty') {
         itemShare = applicableValueShare;
