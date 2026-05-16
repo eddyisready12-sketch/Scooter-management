@@ -1436,6 +1436,7 @@ function parseBatchCostItems(
 
     parsed.forEach((item) => {
       if (!item || typeof item !== 'object') return;
+      if (String(item.id ?? '') === 'china-transport') return;
       const resolvedAmount = parseDecimal(String(item.resolvedAmountEur ?? item.amountEur ?? '0'));
       const normalizedItem: ContainerCostDraftItem = {
         id: String(item.id ?? nextCostItemId()),
@@ -3978,7 +3979,7 @@ function ContainerCostModal({
         otherCostEur: otherPool > 0 ? formatDecimal(otherPool, 2) : undefined,
         transportAllocationMode: 'volume',
         importAllocationMode: 'value',
-        costItemsJson: JSON.stringify(allResolvedCostItems.map(({ resolvedAmountEur, ...item }) => ({ ...item, resolvedAmountEur: formatDecimal(resolvedAmountEur, 4) }))),
+        costItemsJson: JSON.stringify([...resolvedCostItems, ...airMailTransportItems].map(({ resolvedAmountEur, ...item }) => ({ ...item, resolvedAmountEur: formatDecimal(resolvedAmountEur, 4) }))),
         goodsNetEur: formatDecimal(goodsNetEur, 2),
         logisticsNetEur: formatDecimal(logisticsNetEur, 2),
         paymentNetEur: formatDecimal(finalPaymentNetEur, 2),
