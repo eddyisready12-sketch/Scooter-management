@@ -1092,23 +1092,31 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
 }
 
 async function getAvailableDymoPrinter() {
+  const hosts = ['localhost', '127.0.0.1'];
   const ports = Array.from({ length: 10 }, (_, index) => 41951 + index);
+  const failedEndpoints: string[] = [];
 
-  for (const port of ports) {
-    const dymo = new Dymo({ hostname: '127.0.0.1', port });
-    const result = await dymo.getPrinters();
-    if (!result.success) continue;
-    const printers = result.data as DymoBrowserPrinter[];
-    const printer = printers.find((item) => item.connected && item.name.includes('LabelWriter 450'))
-      ?? printers.find((item) => item.connected && item.name.includes('LabelWriter'))
-      ?? printers.find((item) => item.connected)
-      ?? printers.find((item) => item.name);
-    if (printer?.name) {
-      return { dymo, printerName: printer.name, port };
+  for (const hostname of hosts) {
+    for (const port of ports) {
+      const dymo = new Dymo({ hostname, port });
+      const result = await dymo.getPrinters();
+      if (!result.success) {
+        failedEndpoints.push(`${hostname}:${port}`);
+        continue;
+      }
+      const printers = result.data as DymoBrowserPrinter[];
+      const printer = printers.find((item) => item.connected && item.name.includes('LabelWriter 450'))
+        ?? printers.find((item) => item.connected && item.name.includes('LabelWriter'))
+        ?? printers.find((item) => item.connected)
+        ?? printers.find((item) => item.name);
+      if (printer?.name) {
+        return { dymo, printerName: printer.name, port };
+      }
+      failedEndpoints.push(`${hostname}:${port} zonder printer`);
     }
   }
 
-  throw new Error('Geen actieve DYMO Connect webservice of LabelWriter printer gevonden op deze pc.');
+  throw new Error(`Geen actieve DYMO Connect webservice of LabelWriter printer gevonden. Getest: ${failedEndpoints.slice(0, 6).join(', ')}.`);
 }
 
 async function printScooterDymoLabel(scooter: Scooter, dealer?: Dealer) {
