@@ -38,7 +38,7 @@ import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, replaceProductPackagingRegistrations, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, replaceProductPackagingRegistrations, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
@@ -2130,6 +2130,34 @@ export function App() {
     }
   }
 
+  async function printBatchProductLabel(batch: ContainerCostBatch, line: ContainerCostLine, product: Product, quantity: number) {
+    const batchCode = batch.orderNumber || batch.containerNumber || line.batchId;
+    const labelProduct: Product = {
+      ...product,
+      batch: product.batch?.trim() || batchCode,
+      batchNumber: product.batchNumber?.trim() || batchCode,
+      traceabilityCode: product.traceabilityCode?.trim() || `${batchCode}-${product.code || line.referenceCode}`,
+    };
+
+    const printerName = await printProductDymoLabel(labelProduct, quantity);
+    const printedAt = new Date().toISOString();
+    const registrations = buildPackagingRegistrationsForBatch(batch, [line], [labelProduct])
+      .map((registration) => ({
+        ...registration,
+        labelPrintedAt: printedAt,
+        labelPrintCount: String(quantity),
+      }));
+
+    setData((current) => {
+      const registrationMap = new Map(current.productPackagingRegistrations.map((registration) => [registration.id, registration]));
+      registrations.forEach((registration) => registrationMap.set(registration.id, registration));
+      return { ...current, productPackagingRegistrations: Array.from(registrationMap.values()) };
+    });
+    await upsertProductPackagingRegistrations(registrations);
+
+    return printerName;
+  }
+
   async function upsertSupplierRecord(supplier: Supplier) {
     try {
       let productsToUpdate: Product[] = [];
@@ -2740,7 +2768,7 @@ export function App() {
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
-          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={setSelectedProduct} />}
+          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={setSelectedProduct} onPrintProductLabel={printBatchProductLabel} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
@@ -3482,14 +3510,18 @@ function CostBatchesPage({
   data,
   onSaveCostBatch,
   onSelectProduct,
+  onPrintProductLabel,
 }: {
   data: AppData;
   onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
   onSelectProduct: (product: Product) => void;
+  onPrintProductLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product: Product, quantity: number) => Promise<string>;
 }) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
+  const [printingLineId, setPrintingLineId] = useState<string | null>(null);
+  const [printMessage, setPrintMessage] = useState('');
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const sortedBatches = [...data.containerCostBatches].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const editingBatch = editingBatchId ? data.containerCostBatches.find((batch) => batch.id === editingBatchId) : undefined;
@@ -3498,6 +3530,32 @@ function CostBatchesPage({
     [data.containerCostLines],
   );
   const editingBatchLines = editingBatch ? visibleContainerCostLines.filter((line) => line.batchId === editingBatch.id) : [];
+
+  async function handleBatchLinePrint(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
+    if (!product) {
+      setPrintMessage(`Geen gekoppeld product gevonden voor ${line.referenceCode}.`);
+      return;
+    }
+
+    const quantityAnswer = window.prompt('Hoeveel productlabels wil je printen?', '1');
+    if (quantityAnswer === null) return;
+    const quantity = Number(quantityAnswer.replace(',', '.'));
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+      setPrintMessage('Vul een heel aantal labels in tussen 1 en 100.');
+      return;
+    }
+
+    setPrintingLineId(line.id);
+    setPrintMessage('');
+    try {
+      const printerName = await onPrintProductLabel(batch, line, product, quantity);
+      setPrintMessage(`${quantity} label${quantity === 1 ? '' : 's'} geprint voor ${product.code || line.referenceCode} via ${printerName}.`);
+    } catch (error) {
+      setPrintMessage(`Label printen mislukt: ${importErrorMessage(error)}`);
+    } finally {
+      setPrintingLineId(null);
+    }
+  }
 
   return (
     <>
@@ -3528,6 +3586,7 @@ function CostBatchesPage({
       </section>
       <section className="panel table-panel">
         <div className="panel-title"><span className="panel-title-label"><CircleDollarSign size={16} /> Recente importbatches</span></div>
+        {printMessage && <div className="notice compact">{printMessage}</div>}
         {sortedBatches.length === 0 ? (
           <div className="empty-state inline">
             <CircleDollarSign size={22} />
@@ -3639,6 +3698,7 @@ function CostBatchesPage({
                                         <th>Prijs / stuk (USD)</th>
                                         <th>Inkoopprijs / stuk (EUR)</th>
                                         <th>Kostprijs / stuk (EUR)</th>
+                                        <th>Label</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -3711,6 +3771,21 @@ function CostBatchesPage({
                                             <td>{line.unitPriceUsd}</td>
                                             <td>{formatDecimal(purchasePricePerUnit(parseDecimal(line.goodsValueEur), parseDecimal(line.quantity)), 4)}</td>
                                             <td>{line.calculatedUnitCostEur}</td>
+                                            <td className="import-batch-label-cell">
+                                              <button
+                                                type="button"
+                                                className="icon-button import-label-print-button"
+                                                disabled={!product || printingLineId === line.id}
+                                                title={product ? 'Productlabel printen' : 'Geen gekoppeld product'}
+                                                aria-label={product ? `Productlabel printen voor ${line.referenceCode}` : `Geen gekoppeld product voor ${line.referenceCode}`}
+                                                onClick={(event) => {
+                                                  event.stopPropagation();
+                                                  void handleBatchLinePrint(batch, line, product);
+                                                }}
+                                              >
+                                                <Printer size={16} />
+                                              </button>
+                                            </td>
                                           </tr>
                                         );
                                       })}
