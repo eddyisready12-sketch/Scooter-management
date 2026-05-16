@@ -2264,13 +2264,19 @@ tbody tr:hover {
 }
 
 .import-batch-description-meta {
-  display: flex !important;
-  flex-wrap: wrap;
-  gap: 5px 16px;
+  display: grid !important;
+  gap: 4px;
   width: 100%;
 }
 
-.import-batch-description-meta span {
+.import-batch-meta-line {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.import-batch-description-meta span,
+.import-batch-meta-line span {
   color: #667381;
   font-size: 12px;
   line-height: 1.35;

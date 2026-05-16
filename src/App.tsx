@@ -3565,25 +3565,27 @@ function CostBatchesPage({
                                         const oemInfo = componentParts.find((part) => part.startsWith('Item No.'))?.replace(/^Item No\.\s*/i, '');
                                         const ctnInfo = componentParts.find((part) => part.startsWith('Ctn'))?.replace(/^Ctn\s*/i, '');
                                         const supplierInfo = componentParts.find((part) => part.includes('Import') || part.includes('Limited') || part.includes('Co., Ltd.'));
-                                        const metaBits = [
-                                          { label: 'Ref', value: line.referenceCode },
-                                          product && product.code !== line.referenceCode ? { label: 'Product', value: product.code } : null,
-                                          modelInfo ? { label: 'Model', value: modelInfo } : null,
-                                          oemInfo ? { label: 'OEM No.', value: oemInfo } : null,
-                                          ctnInfo ? { label: 'Ctn', value: ctnInfo } : null,
-                                          supplierInfo ? { label: 'Supplier', value: supplierInfo } : null,
-                                        ].filter(Boolean) as Array<{ label: string; value: string }>;
                                         return (
                                           <tr key={line.id}>
                                             <td>{line.type}</td>
                                             <td className="import-batch-description-cell">
                                               <strong>{line.description}</strong>
                                               <small className="import-batch-description-meta">
-                                                {metaBits.map((bit) => (
-                                                  <span key={bit.label}>
-                                                    <b>{bit.label}:</b> {bit.value}
+                                                <span className="import-batch-meta-line">
+                                                  <span><b>Productnummer:</b> {line.referenceCode}</span>
+                                                  {oemInfo ? <span><b>OEM No.:</b> {oemInfo}</span> : null}
+                                                  {ctnInfo ? <span><b>Ctn:</b> {ctnInfo}</span> : null}
+                                                </span>
+                                                {modelInfo ? (
+                                                  <span className="import-batch-meta-line">
+                                                    <span><b>Model:</b> {modelInfo}</span>
                                                   </span>
-                                                ))}
+                                                ) : null}
+                                                {supplierInfo ? (
+                                                  <span className="import-batch-meta-line">
+                                                    <span><b>Supplier:</b> {supplierInfo}</span>
+                                                  </span>
+                                                ) : null}
                                               </small>
                                             </td>
                                             <td>{line.quantity}</td>
