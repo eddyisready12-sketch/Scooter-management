@@ -3557,11 +3557,21 @@ function CostBatchesPage({
                                           || item.code === line.referenceCode
                                           || item.supplierItemNo === line.referenceCode
                                         ));
-                                        const normalizedComponentsNote = line.componentsNote?.replace(/\bItem No\./gi, 'OEM No.') ?? '';
+                                        const componentParts = line.componentsNote
+                                          ?.split(' - ')
+                                          .map((part) => part.trim())
+                                          .filter(Boolean) ?? [];
+                                        const modelInfo = componentParts.find((part) => !part.startsWith('Item No.') && !part.startsWith('Ctn') && !part.includes('Import') && !part.includes('Limited') && !part.includes('Co., Ltd.'));
+                                        const oemInfo = componentParts.find((part) => part.startsWith('Item No.'))?.replace(/^Item No\.\s*/i, '');
+                                        const ctnInfo = componentParts.find((part) => part.startsWith('Ctn'))?.replace(/^Ctn\s*/i, '');
+                                        const supplierInfo = componentParts.find((part) => part.includes('Import') || part.includes('Limited') || part.includes('Co., Ltd.'));
                                         const metaBits = [
                                           { label: 'Ref', value: line.referenceCode },
                                           product && product.code !== line.referenceCode ? { label: 'Product', value: product.code } : null,
-                                          normalizedComponentsNote ? { label: 'Info', value: normalizedComponentsNote } : null,
+                                          modelInfo ? { label: 'Model', value: modelInfo } : null,
+                                          oemInfo ? { label: 'OEM No.', value: oemInfo } : null,
+                                          ctnInfo ? { label: 'Ctn', value: ctnInfo } : null,
+                                          supplierInfo ? { label: 'Supplier', value: supplierInfo } : null,
                                         ].filter(Boolean) as Array<{ label: string; value: string }>;
                                         return (
                                           <tr key={line.id}>
