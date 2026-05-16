@@ -2184,11 +2184,20 @@ export function App() {
       const uniqueLines = dedupeContainerCostLines(lines);
       const productsForRegistrationMap = new Map(data.products.map((product) => [product.id, product]));
       productUpdates.forEach((product) => productsForRegistrationMap.set(product.id, product));
-      const packagingRegistrations = buildPackagingRegistrationsForBatch(
+      const freshPackagingRegistrations = buildPackagingRegistrationsForBatch(
         batch,
         uniqueLines,
         Array.from(productsForRegistrationMap.values()),
       );
+      const existingPackagingRegistrationsById = new Map(data.productPackagingRegistrations.map((registration) => [registration.id, registration]));
+      const packagingRegistrations = freshPackagingRegistrations.map((registration) => {
+        const existingRegistration = existingPackagingRegistrationsById.get(registration.id);
+        return {
+          ...registration,
+          labelPrintedAt: existingRegistration?.labelPrintedAt,
+          labelPrintCount: existingRegistration?.labelPrintCount,
+        };
+      });
       const existingLineIds = data.containerCostLines
         .filter((line) => line.batchId === batch.id)
         .map((line) => line.id);
