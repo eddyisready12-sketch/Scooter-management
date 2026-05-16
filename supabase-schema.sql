@@ -146,6 +146,37 @@ on container_cost_batches("containerId");
 create index if not exists container_cost_lines_batch_idx
 on container_cost_lines("batchId");
 
+create table if not exists product_packaging_registrations (
+  id text primary key,
+  "batchId" text not null references container_cost_batches(id) on delete cascade,
+  "batchOrderNumber" text,
+  "containerNumber" text,
+  "containerCostLineId" text references container_cost_lines(id) on delete set null,
+  "productId" text,
+  "productCode" text not null,
+  "productDescription" text not null,
+  "productBarcode" text,
+  quantity text not null,
+  "packagingUnit" text,
+  "layerName" text not null,
+  material text not null,
+  "recycleCode" text,
+  "wasteStream" text,
+  "weightGramsPerUnit" text not null,
+  "totalWeightGrams" text not null,
+  source text default 'product_snapshot',
+  "registeredAt" timestamptz default now(),
+  "labelPrintedAt" timestamptz,
+  "labelPrintCount" text,
+  notes text
+);
+
+create index if not exists product_packaging_registrations_batch_idx
+on product_packaging_registrations("batchId");
+
+create index if not exists product_packaging_registrations_product_idx
+on product_packaging_registrations("productCode");
+
 create table if not exists scooters (
   id text primary key,
   "frameNumber" text unique not null,
@@ -250,6 +281,7 @@ alter publication supabase_realtime add table scooters;
 alter publication supabase_realtime add table containers;
 alter publication supabase_realtime add table container_cost_batches;
 alter publication supabase_realtime add table container_cost_lines;
+alter publication supabase_realtime add table product_packaging_registrations;
 alter publication supabase_realtime add table dealers;
 alter publication supabase_realtime add table suppliers;
 alter publication supabase_realtime add table supplier_contacts;
@@ -265,6 +297,7 @@ alter table supplier_contacts enable row level security;
 alter table scooters enable row level security;
 alter table container_cost_batches enable row level security;
 alter table container_cost_lines enable row level security;
+alter table product_packaging_registrations enable row level security;
 alter table batteries enable row level security;
 alter table battery_models enable row level security;
 alter table warranty_parts enable row level security;
@@ -370,6 +403,10 @@ drop policy if exists "Allow authenticated update container cost batches" on con
 drop policy if exists "Allow authenticated read container cost lines" on container_cost_lines;
 drop policy if exists "Allow authenticated insert container cost lines" on container_cost_lines;
 drop policy if exists "Allow authenticated update container cost lines" on container_cost_lines;
+drop policy if exists "Allow authenticated read product packaging registrations" on product_packaging_registrations;
+drop policy if exists "Allow authenticated insert product packaging registrations" on product_packaging_registrations;
+drop policy if exists "Allow authenticated update product packaging registrations" on product_packaging_registrations;
+drop policy if exists "Allow authenticated delete product packaging registrations" on product_packaging_registrations;
 
 create policy "Allow authenticated read container cost batches"
 on container_cost_batches
@@ -408,6 +445,31 @@ for update
 to authenticated
 using (true)
 with check (true);
+
+create policy "Allow authenticated read product packaging registrations"
+on product_packaging_registrations
+for select
+to authenticated
+using (true);
+
+create policy "Allow authenticated insert product packaging registrations"
+on product_packaging_registrations
+for insert
+to authenticated
+with check (true);
+
+create policy "Allow authenticated update product packaging registrations"
+on product_packaging_registrations
+for update
+to authenticated
+using (true)
+with check (true);
+
+create policy "Allow authenticated delete product packaging registrations"
+on product_packaging_registrations
+for delete
+to authenticated
+using (true);
 
 create policy "Allow public read batteries"
 on batteries

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, Scooter, Supplier, SupplierContact, WarrantyPart } from '../types';
+import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, Supplier, SupplierContact, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -55,6 +55,7 @@ const tableMap: Record<keyof AppData, string> = {
   containers: 'containers',
   containerCostBatches: 'container_cost_batches',
   containerCostLines: 'container_cost_lines',
+  productPackagingRegistrations: 'product_packaging_registrations',
   dealers: 'dealers',
   products: 'products',
   suppliers: 'suppliers',
@@ -334,6 +335,16 @@ export async function upsertContainerCostLines(lines: ContainerCostLine[]) {
   const { error } = await supabase
     .from('container_cost_lines')
     .upsert(lines);
+
+  if (error) throw error;
+}
+
+export async function upsertProductPackagingRegistrations(registrations: ProductPackagingRegistration[]) {
+  if (!supabase || registrations.length === 0) return;
+
+  const { error } = await supabase
+    .from('product_packaging_registrations')
+    .upsert(registrations);
 
   if (error) throw error;
 }

@@ -250,6 +250,31 @@ export type ProductPackagingLayer = {
   weightGrams?: string;
 };
 
+export type ProductPackagingRegistration = {
+  id: string;
+  batchId: string;
+  batchOrderNumber?: string;
+  containerNumber?: string;
+  containerCostLineId?: string;
+  productId?: string;
+  productCode: string;
+  productDescription: string;
+  productBarcode?: string;
+  quantity: string;
+  packagingUnit?: string;
+  layerName: string;
+  material: string;
+  recycleCode?: string;
+  wasteStream?: string;
+  weightGramsPerUnit: string;
+  totalWeightGrams: string;
+  source?: 'product_snapshot' | 'batch_override' | 'manual';
+  registeredAt?: string;
+  labelPrintedAt?: string;
+  labelPrintCount?: string;
+  notes?: string;
+};
+
 export type WarrantyPart = {
   id: string;
   claimNumber?: string;
@@ -304,6 +329,7 @@ export type AppData = {
   containers: Container[];
   containerCostBatches: ContainerCostBatch[];
   containerCostLines: ContainerCostLine[];
+  productPackagingRegistrations: ProductPackagingRegistration[];
   dealers: Dealer[];
   products: Product[];
   suppliers: Supplier[];
