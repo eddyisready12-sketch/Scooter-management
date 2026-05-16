@@ -3544,6 +3544,7 @@ function CostBatchesPage({
                                       <tr>
                                         <th>Type</th>
                                         <th>Omschrijving</th>
+                                        <th>EAN</th>
                                         <th>Aantal</th>
                                         <th>Prijs / stuk (USD)</th>
                                         <th>Inkoopprijs / stuk (EUR)</th>
@@ -3574,7 +3575,6 @@ function CostBatchesPage({
                                                 <span className="import-batch-meta-line">
                                                   <span><b>Productnummer:</b> {line.referenceCode}</span>
                                                   {oemInfo ? <span><b>OEM No.:</b> {oemInfo}</span> : null}
-                                                  {ctnInfo ? <span><b>Ctn:</b> {ctnInfo}</span> : null}
                                                 </span>
                                                 {modelInfo ? (
                                                   <span className="import-batch-meta-line">
@@ -3586,8 +3586,14 @@ function CostBatchesPage({
                                                     <span><b>Supplier:</b> {supplierInfo}</span>
                                                   </span>
                                                 ) : null}
+                                                {ctnInfo ? (
+                                                  <span className="import-batch-meta-line">
+                                                    <span><b>Ctn:</b> {ctnInfo}</span>
+                                                  </span>
+                                                ) : null}
                                               </small>
                                             </td>
+                                            <td>{product?.barcode || '-'}</td>
                                             <td>{line.quantity}</td>
                                             <td>{line.unitPriceUsd}</td>
                                             <td>{formatDecimal(purchasePricePerUnit(parseDecimal(line.goodsValueEur), parseDecimal(line.quantity)), 4)}</td>
