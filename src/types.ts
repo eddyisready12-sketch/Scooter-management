@@ -103,6 +103,7 @@ export type ContainerCostLine = {
   allocatedOtherEur: string;
   calculatedUnitCostEur: string;
   componentsNote?: string;
+  purchaseOrderAdded?: boolean;
 };
 
 export type Dealer = {

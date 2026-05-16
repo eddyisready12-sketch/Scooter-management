@@ -2221,7 +2221,7 @@ tbody tr:hover {
 }
 
 .import-batch-lines-table {
-  min-width: 1040px;
+  min-width: 1120px;
 }
 
 .import-batch-lines-table th:first-child,
@@ -2255,6 +2255,11 @@ tbody tr:hover {
 
 .import-batch-lines-table th:nth-child(8),
 .import-batch-lines-table td:nth-child(8) {
+  width: 8%;
+}
+
+.import-batch-lines-table th:nth-child(9),
+.import-batch-lines-table td:nth-child(9) {
   width: 6%;
 }
 
@@ -2306,6 +2311,24 @@ tbody tr:hover {
 .import-batch-label-cell {
   text-align: center;
   white-space: nowrap;
+}
+
+.import-batch-order-cell {
+  text-align: center;
+}
+
+.import-order-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+}
+
+.import-order-checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: #14b875;
 }
 
 .import-label-print-button {
@@ -2456,6 +2479,11 @@ tbody tr:hover {
 
 .container-scooter-table.import-batch-lines-table th:nth-child(8),
 .container-scooter-table.import-batch-lines-table td:nth-child(8) {
+  width: 8%;
+}
+
+.container-scooter-table.import-batch-lines-table th:nth-child(9),
+.container-scooter-table.import-batch-lines-table td:nth-child(9) {
   width: 6%;
 }
 

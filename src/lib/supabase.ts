@@ -332,11 +332,27 @@ export async function upsertContainerCostBatches(batches: ContainerCostBatch[]) 
 export async function upsertContainerCostLines(lines: ContainerCostLine[]) {
   if (!supabase || lines.length === 0) return;
 
-  const { error } = await supabase
-    .from('container_cost_lines')
-    .upsert(lines);
+  let payload = lines.map((line) => ({ ...line }) as Record<string, unknown>);
+  const removedColumns = new Set<string>();
 
-  if (error) throw error;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const { error } = await supabase
+      .from('container_cost_lines')
+      .upsert(payload);
+
+    if (!error) return;
+
+    const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
+    if (!missingColumn || removedColumns.has(missingColumn)) throw error;
+
+    removedColumns.add(missingColumn);
+    payload = payload.map((record) => {
+      const { [missingColumn]: _removed, ...rest } = record;
+      return rest;
+    });
+  }
+
+  throw new Error('Importregel opslaan mislukt: Supabase schema mist meerdere kolommen.');
 }
 
 export async function upsertProductPackagingRegistrations(registrations: ProductPackagingRegistration[]) {

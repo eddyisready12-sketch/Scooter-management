@@ -2258,6 +2258,24 @@ export function App() {
     return printerName;
   }
 
+  async function togglePurchaseOrderLine(line: ContainerCostLine, purchaseOrderAdded: boolean) {
+    const updatedLine = { ...line, purchaseOrderAdded };
+    setData((current) => ({
+      ...current,
+      containerCostLines: current.containerCostLines.map((item) => item.id === line.id ? updatedLine : item),
+    }));
+
+    try {
+      await upsertContainerCostLines([updatedLine]);
+    } catch (error) {
+      setData((current) => ({
+        ...current,
+        containerCostLines: current.containerCostLines.map((item) => item.id === line.id ? line : item),
+      }));
+      showCsvMessage(`Bestellijst status opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   async function upsertSupplierRecord(supplier: Supplier) {
     try {
       let productsToUpdate: Product[] = [];
@@ -2868,7 +2886,7 @@ export function App() {
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
-          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} />}
+          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onTogglePurchaseOrderLine={togglePurchaseOrderLine} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
@@ -3624,11 +3642,13 @@ function CostBatchesPage({
   onSaveCostBatch,
   onSelectProduct,
   onOpenBatchLabelProduct,
+  onTogglePurchaseOrderLine,
 }: {
   data: AppData;
   onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
   onSelectProduct: (product: Product, tab?: ProductModalTab) => void;
   onOpenBatchLabelProduct: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
+  onTogglePurchaseOrderLine: (line: ContainerCostLine, purchaseOrderAdded: boolean) => Promise<void>;
 }) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
@@ -3784,6 +3804,7 @@ function CostBatchesPage({
                                         <th>Prijs / stuk (USD)</th>
                                         <th>Inkoopprijs / stuk (EUR)</th>
                                         <th>Kostprijs / stuk (EUR)</th>
+                                        <th>Bestellijst</th>
                                         <th>Label</th>
                                       </tr>
                                     </thead>
@@ -3862,6 +3883,18 @@ function CostBatchesPage({
                                             <td>{line.unitPriceUsd}</td>
                                             <td>{formatDecimal(purchasePricePerUnit(parseDecimal(line.goodsValueEur), parseDecimal(line.quantity)), 4)}</td>
                                             <td>{line.calculatedUnitCostEur}</td>
+                                            <td className="import-batch-order-cell">
+                                              <label className="import-order-checkbox" title="Toegevoegd aan bestellijst">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={Boolean(line.purchaseOrderAdded)}
+                                                  onChange={(event) => {
+                                                    void onTogglePurchaseOrderLine(line, event.target.checked);
+                                                  }}
+                                                />
+                                                <span className="sr-only">Toegevoegd aan bestellijst</span>
+                                              </label>
+                                            </td>
                                             <td className="import-batch-label-cell">
                                               <button
                                                 type="button"
@@ -4423,9 +4456,11 @@ function ContainerCostModal({
       const linesWithResolvedProducts: ContainerCostLine[] = calculatedLines.map((line, index) => {
         const createdProduct = createdProductsByKey.get(autoLineKeys.get(line.id) || '');
         const resolvedProduct = line.type === 'scooter' ? undefined : line.matchedProduct || createdProduct;
+        const lineId = stableId('container-cost-line', `${batchId}-${(resolvedProduct?.code || line.referenceCode)}-${index + 1}`);
+        const previousLine = initialLines?.find((item) => item.id === lineId);
 
         return {
-          id: stableId('container-cost-line', `${batchId}-${(resolvedProduct?.code || line.referenceCode)}-${index + 1}`),
+          id: lineId,
           batchId,
           type: line.type,
           referenceId: resolvedProduct?.id ?? line.referenceId,
@@ -4440,6 +4475,7 @@ function ContainerCostModal({
           allocatedOtherEur: formatDecimal(line.allocatedOtherEur, 4),
           calculatedUnitCostEur: formatDecimal(line.calculatedUnitCostEur, 4),
           componentsNote: line.componentsNote,
+          purchaseOrderAdded: previousLine?.purchaseOrderAdded ?? false,
         };
       });
 

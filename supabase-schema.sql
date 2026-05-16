@@ -137,8 +137,12 @@ create table if not exists container_cost_lines (
   "allocatedImportEur" text not null,
   "allocatedOtherEur" text not null,
   "calculatedUnitCostEur" text not null,
-  "componentsNote" text
+  "componentsNote" text,
+  "purchaseOrderAdded" boolean default false
 );
+
+alter table if exists container_cost_lines
+add column if not exists "purchaseOrderAdded" boolean default false;
 
 create index if not exists container_cost_batches_container_idx
 on container_cost_batches("containerId");
