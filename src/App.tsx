@@ -4001,8 +4001,9 @@ function ContainerCostModal({
       calculatedLines
         .filter((line) => line.type !== 'scooter' && !line.matchedProduct)
         .forEach((line) => {
+          const resolvedArticleNumber = line.articleNumber?.trim() || line.referenceCode.trim();
           const autoKey = [
-            line.articleNumber?.trim().toLowerCase() || '',
+            resolvedArticleNumber.toLowerCase(),
             normalizedSupplierKey(line.supplierName || supplierName),
             line.supplierItemNo?.trim().toLowerCase() || '',
             line.normalizedDescription.trim().toLowerCase(),
@@ -4013,7 +4014,7 @@ function ContainerCostModal({
 
           autoProductDrafts.set(autoKey, {
             id: stableId('product', `${orderNumber.trim()}-${line.referenceCode}-${line.id}`),
-            code: line.articleNumber?.trim() || '',
+            code: resolvedArticleNumber,
             supplierItemNo: line.supplierItemNo?.trim() || undefined,
             description: line.normalizedDescription,
             supplier: line.supplierName?.trim() || supplierName.trim() || undefined,
