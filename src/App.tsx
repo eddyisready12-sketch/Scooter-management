@@ -3557,10 +3557,11 @@ function CostBatchesPage({
                                           || item.code === line.referenceCode
                                           || item.supplierItemNo === line.referenceCode
                                         ));
+                                        const normalizedComponentsNote = line.componentsNote?.replace(/\bItem No\./gi, 'OEM No.') ?? '';
                                         const metaBits = [
                                           { label: 'Ref', value: line.referenceCode },
-                                          { label: 'Product', value: product ? product.code : 'Nog niet gekoppeld' },
-                                          line.componentsNote ? { label: 'Info', value: line.componentsNote } : null,
+                                          product && product.code !== line.referenceCode ? { label: 'Product', value: product.code } : null,
+                                          normalizedComponentsNote ? { label: 'Info', value: normalizedComponentsNote } : null,
                                         ].filter(Boolean) as Array<{ label: string; value: string }>;
                                         return (
                                           <tr key={line.id}>

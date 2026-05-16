@@ -2253,14 +2253,20 @@ tbody tr:hover {
   display: block;
 }
 
+.import-batch-description-cell {
+  min-width: 360px;
+}
+
 .import-batch-description-cell strong {
-  margin-bottom: 4px;
+  font-size: 14px;
+  line-height: 1.35;
+  margin-bottom: 6px;
 }
 
 .import-batch-description-meta {
   display: flex !important;
   flex-wrap: wrap;
-  gap: 4px 14px;
+  gap: 5px 16px;
   width: 100%;
 }
 
