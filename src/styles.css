@@ -2305,10 +2305,12 @@ tbody tr:hover {
 
 .import-batch-label-cell {
   text-align: center;
+  white-space: nowrap;
 }
 
 .import-label-print-button {
-  margin: 0 auto;
+  display: inline-grid;
+  margin: 0 6px 0 auto;
   border: 1px solid #cbd7e3;
   background: #fff;
   color: #1f3448;
@@ -2318,6 +2320,12 @@ tbody tr:hover {
   color: #0075ff;
   border-color: #8bbcff;
   background: #f4f9ff;
+}
+
+.import-label-printed-check {
+  display: inline-block;
+  color: #14b875;
+  vertical-align: middle;
 }
 
 .import-batch-description-meta {

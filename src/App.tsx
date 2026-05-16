@@ -44,6 +44,12 @@ import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocation
 type View = 'dashboard' | 'containers' | 'costBatches' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
+type ProductModalTab = 'basic' | 'gpsr' | 'packaging';
+type PendingBatchLabelPrint = {
+  batch: ContainerCostBatch;
+  line: ContainerCostLine;
+  product?: Product;
+};
 type SearchField = 'frameNumber' | 'engineNumber' | 'licensePlate';
 type ScooterPanelFilters = {
   speed: string;
@@ -1905,6 +1911,8 @@ export function App() {
   const [query, setQuery] = useState('');
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProductTab, setSelectedProductTab] = useState<ProductModalTab>('basic');
+  const [pendingBatchLabelPrint, setPendingBatchLabelPrint] = useState<PendingBatchLabelPrint | null>(null);
   const [csvMessage, setCsvMessage] = useState('');
   const [csvMessageDetails, setCsvMessageDetails] = useState<string[]>([]);
   const [dealerImportMessage, setDealerImportMessage] = useState('');
@@ -2137,13 +2145,28 @@ export function App() {
     try {
       setData((current) => ({
         ...current,
-        products: current.products.map((product) => product.id === updatedProduct.id ? updatedProduct : product),
+        products: current.products.some((product) => product.id === updatedProduct.id)
+          ? current.products.map((product) => product.id === updatedProduct.id ? updatedProduct : product)
+          : [...current.products, updatedProduct],
       }));
       await upsertProducts([updatedProduct]);
       setProductMessage(`Product ${updatedProduct.code} bijgewerkt.`);
     } catch (error) {
       setProductMessage(`Product opslaan mislukt: ${importErrorMessage(error)}`);
     }
+  }
+
+  function openProduct(product: Product, tab: ProductModalTab = 'basic') {
+    setPendingBatchLabelPrint(null);
+    setSelectedProductTab(tab);
+    setSelectedProduct(product);
+  }
+
+  function openBatchLabelProduct(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
+    const labelProduct = productFromCostLine(line, product);
+    setPendingBatchLabelPrint({ batch, line, product });
+    setSelectedProductTab('packaging');
+    setSelectedProduct(labelProduct);
   }
 
   async function saveContainerCostBatch(batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) {
@@ -2835,7 +2858,7 @@ export function App() {
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
-          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={setSelectedProduct} onPrintProductLabel={printBatchProductLabel} />}
+          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
@@ -2844,7 +2867,7 @@ export function App() {
               products={data.products}
               supplierRecords={data.suppliers}
               onImport={handleProductImport}
-              onSelectProduct={setSelectedProduct}
+              onSelectProduct={openProduct}
               message={productMessage}
             />
           )}
@@ -2876,11 +2899,24 @@ export function App() {
           suppliers={productModalSuppliers}
           supplierRecords={data.suppliers}
           importers={data.importers}
-          onClose={() => setSelectedProduct(null)}
+          initialTab={selectedProductTab}
+          onClose={() => {
+            setSelectedProduct(null);
+            setPendingBatchLabelPrint(null);
+            setSelectedProductTab('basic');
+          }}
           onSave={async (nextProduct) => {
             await updateProduct(nextProduct);
             setSelectedProduct(nextProduct);
           }}
+          onPrintLabel={pendingBatchLabelPrint ? async (product, quantity) => {
+            return printBatchProductLabel(
+              pendingBatchLabelPrint.batch,
+              pendingBatchLabelPrint.line,
+              product,
+              quantity,
+            );
+          } : undefined}
         />
       )}
     </div>
@@ -3577,17 +3613,16 @@ function CostBatchesPage({
   data,
   onSaveCostBatch,
   onSelectProduct,
-  onPrintProductLabel,
+  onOpenBatchLabelProduct,
 }: {
   data: AppData;
   onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
-  onSelectProduct: (product: Product) => void;
-  onPrintProductLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, quantity: number) => Promise<string>;
+  onSelectProduct: (product: Product, tab?: ProductModalTab) => void;
+  onOpenBatchLabelProduct: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
 }) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
-  const [printingLineId, setPrintingLineId] = useState<string | null>(null);
   const [printMessage, setPrintMessage] = useState('');
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const sortedBatches = [...data.containerCostBatches].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
@@ -3597,27 +3632,6 @@ function CostBatchesPage({
     [data.containerCostLines],
   );
   const editingBatchLines = editingBatch ? visibleContainerCostLines.filter((line) => line.batchId === editingBatch.id) : [];
-
-  async function handleBatchLinePrint(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
-    const quantityAnswer = window.prompt('Hoeveel productlabels wil je printen?', '1');
-    if (quantityAnswer === null) return;
-    const quantity = Number(quantityAnswer.replace(',', '.'));
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
-      setPrintMessage('Vul een heel aantal labels in tussen 1 en 100.');
-      return;
-    }
-
-    setPrintingLineId(line.id);
-    setPrintMessage('');
-    try {
-      const printerName = await onPrintProductLabel(batch, line, product, quantity);
-      setPrintMessage(`${quantity} label${quantity === 1 ? '' : 's'} geprint voor ${product?.code || line.referenceCode} via ${printerName}.`);
-    } catch (error) {
-      setPrintMessage(`Label printen mislukt: ${importErrorMessage(error)}`);
-    } finally {
-      setPrintingLineId(null);
-    }
-  }
 
   return (
     <>
@@ -3774,6 +3788,11 @@ function CostBatchesPage({
                                         const oemInfo = componentParts.find((part) => part.startsWith('Item No.'))?.replace(/^Item No\.\s*/i, '');
                                         const ctnInfo = componentParts.find((part) => part.startsWith('Ctn'))?.replace(/^Ctn\s*/i, '');
                                         const supplierInfo = componentParts.find((part) => part.includes('Import') || part.includes('Limited') || part.includes('Co., Ltd.'));
+                                        const isPrinted = data.productPackagingRegistrations.some((registration) =>
+                                          registration.batchId === batch.id
+                                          && registration.containerCostLineId === line.id
+                                          && Boolean(registration.labelPrintedAt),
+                                        );
                                         return (
                                           <tr key={line.id}>
                                             <td>{line.type}</td>
@@ -3837,16 +3856,17 @@ function CostBatchesPage({
                                               <button
                                                 type="button"
                                                 className="icon-button import-label-print-button"
-                                                disabled={printingLineId === line.id}
                                                 title={product ? 'Productlabel printen' : 'Productlabel printen vanaf batchregel'}
                                                 aria-label={`Productlabel printen voor ${line.referenceCode}`}
                                                 onClick={(event) => {
                                                   event.stopPropagation();
-                                                  void handleBatchLinePrint(batch, line, product);
+                                                  setPrintMessage('');
+                                                  onOpenBatchLabelProduct(batch, line, product);
                                                 }}
                                               >
                                                 <Printer size={16} />
                                               </button>
+                                              {isPrinted ? <CheckCircle2 className="import-label-printed-check" size={17} aria-label="Label geprint" /> : null}
                                             </td>
                                           </tr>
                                         );
@@ -5719,19 +5739,23 @@ function ProductDetailModal({
   suppliers,
   supplierRecords,
   importers,
+  initialTab = 'basic',
   onClose,
   onSave,
+  onPrintLabel,
 }: {
   product: Product;
   suppliers: string[];
   supplierRecords: Supplier[];
   importers: Importer[];
+  initialTab?: ProductModalTab;
   onClose: () => void;
   onSave: (product: Product) => Promise<void>;
+  onPrintLabel?: (product: Product, quantity: number) => Promise<string>;
 }) {
   const [draft, setDraft] = useState<Product>(() => createProductDraft(product));
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'basic' | 'gpsr' | 'packaging'>('basic');
+  const [activeTab, setActiveTab] = useState<ProductModalTab>(initialTab);
   const [dymoPrinting, setDymoPrinting] = useState(false);
   const [dymoMessage, setDymoMessage] = useState('');
 
@@ -5754,7 +5778,8 @@ function ProductDetailModal({
         importerCountry: nextDraft.importerCountry || linkedImporter.country,
       } : {}),
     });
-  }, [product, supplierRecords, importers]);
+    setActiveTab(initialTab);
+  }, [product, supplierRecords, importers, initialTab]);
 
   const packagingLayers = draft.packagingLayers ?? normalizePackagingLayers(draft);
   const derivedPackagingWasteStream = summarizePackagingWasteStream(
@@ -5936,7 +5961,9 @@ function ProductDetailModal({
     setDymoPrinting(true);
     setDymoMessage('');
     try {
-      const printerName = await printProductDymoLabel(draft, quantity);
+      const printerName = onPrintLabel
+        ? await onPrintLabel(draft, quantity)
+        : await printProductDymoLabel(draft, quantity);
       setDymoMessage(`${quantity} productlabel${quantity === 1 ? '' : 's'} verstuurd naar ${printerName}.`);
     } catch (error) {
       setDymoMessage(`DYMO print mislukt: ${importErrorMessage(error)}`);
