@@ -321,6 +321,11 @@ function sumPackagingLayerWeights(layers: ProductPackagingLayer[]): string | und
   return Number.isInteger(total) ? String(total) : total.toFixed(2).replace('.', ',');
 }
 
+function unitsPerPackageFromProduct(product: Product) {
+  const parsed = parseDecimal(product.packagingUnit);
+  return parsed > 0 ? parsed : 1;
+}
+
 function createProductDraft(product: Product): Product {
   const packagingLayers = normalizePackagingLayers(product);
   const derivedWasteStream = summarizePackagingWasteStream(
@@ -332,6 +337,7 @@ function createProductDraft(product: Product): Product {
     ...product,
     packagingLayers,
     packagingWasteStream: derivedWasteStream ?? product.packagingWasteStream,
+    packagingUnit: asOptionalTrimmedString(product.packagingUnit) || '1',
     packagingWeightTotalGrams: derivedTotalWeight ?? asOptionalTrimmedString(product.packagingWeightTotalGrams),
   };
 }
@@ -412,6 +418,8 @@ function buildPackagingRegistrationsForBatch(
     const product = productFromCostLine(line, findProductForCostLine(products, line));
 
     const quantity = parseDecimal(line.quantity);
+    const unitsPerPackage = unitsPerPackageFromProduct(product);
+    const packagesCount = unitsPerPackage > 0 ? Math.ceil(quantity / unitsPerPackage) : quantity;
     const layersWithValues = normalizePackagingLayers(product)
       .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
     const layers = layersWithValues.length > 0
@@ -421,7 +429,7 @@ function buildPackagingRegistrationsForBatch(
     return layers.map((layer, index) => {
       const material = layer.material || 'Onbekend';
       const weightGramsPerUnit = layer.weightGrams || '0';
-      const totalWeightGrams = parseDecimal(weightGramsPerUnit) * quantity;
+      const totalWeightGrams = parseDecimal(weightGramsPerUnit) * packagesCount;
       const wasteStream = findPackagingMaterialOption(material)?.wasteStream;
 
       return {
@@ -435,7 +443,9 @@ function buildPackagingRegistrationsForBatch(
         productDescription: product.description || line.description,
         productBarcode: product.barcode,
         quantity: line.quantity,
-        packagingUnit: product.packagingUnit,
+        packagingUnit: product.packagingUnit || '1',
+        packagesCount: formatDecimal(packagesCount, 2),
+        unitsPerPackage: formatDecimal(unitsPerPackage, 2),
         layerName: layer.name || packagingLayerNames[index] || `Laag ${index + 1}`,
         material,
         recycleCode: layer.recycleCode,
@@ -5879,7 +5889,7 @@ function ProductDetailModal({
         importerCountry: draft.importerCountry?.trim() || undefined,
         importerEmail: draft.importerEmail?.trim() || undefined,
         importerWebsite: draft.importerWebsite?.trim() || undefined,
-        packagingUnit: draft.packagingUnit?.trim() || undefined,
+        packagingUnit: String(Math.max(1, parseDecimal(draft.packagingUnit) || 1)),
         packagingLayers: normalizedLayers,
         packagingMaterialPrimary: primaryLayer?.material,
           packagingMaterialSecondary: secondaryLayer?.material,
@@ -6189,8 +6199,13 @@ function ProductDetailModal({
                     </button>
                   </div>
                   <div className="packaging-meta-grid">
-                    <label>Verpakkingseenheid
-                      <input value={draft.packagingUnit ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingUnit: event.target.value }))} />
+                    <label>Stuks per verpakking
+                      <input
+                        value={draft.packagingUnit ?? '1'}
+                        inputMode="decimal"
+                        placeholder="1"
+                        onChange={(event) => setDraft((current) => ({ ...current, packagingUnit: event.target.value }))}
+                      />
                     </label>
                     <label>Afvalstromen
                       <input value={derivedPackagingWasteStream ?? ''} readOnly />
@@ -6202,7 +6217,7 @@ function ProductDetailModal({
                 </div>
                 <div className="product-form-subsection">
                   <h3>Verpakkingslagen</h3>
-                  <p className="product-section-hint">Voeg per product tot 5 verpakkingslagen toe. Afvalstromen worden automatisch samengevat op basis van alle gekozen materialen.</p>
+                  <p className="product-section-hint">Vul het gewicht per verpakking in. Bij 5 stuks per verpakking telt de registratie het aantal verpakkingen, niet het aantal losse producten.</p>
                   <div className="packaging-layer-table-header">
                     <span>Laag</span>
                     <span>Verpakkingsmateriaal</span>

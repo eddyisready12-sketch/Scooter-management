@@ -158,6 +158,8 @@ create table if not exists product_packaging_registrations (
   "productBarcode" text,
   quantity text not null,
   "packagingUnit" text,
+  "packagesCount" text,
+  "unitsPerPackage" text,
   "layerName" text not null,
   material text not null,
   "recycleCode" text,
@@ -170,6 +172,12 @@ create table if not exists product_packaging_registrations (
   "labelPrintCount" text,
   notes text
 );
+
+alter table if exists product_packaging_registrations
+add column if not exists "packagesCount" text;
+
+alter table if exists product_packaging_registrations
+add column if not exists "unitsPerPackage" text;
 
 create index if not exists product_packaging_registrations_batch_idx
 on product_packaging_registrations("batchId");

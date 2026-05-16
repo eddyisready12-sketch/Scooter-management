@@ -262,6 +262,8 @@ export type ProductPackagingRegistration = {
   productBarcode?: string;
   quantity: string;
   packagingUnit?: string;
+  packagesCount?: string;
+  unitsPerPackage?: string;
   layerName: string;
   material: string;
   recycleCode?: string;
