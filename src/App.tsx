@@ -1162,6 +1162,62 @@ type ContainerCostImportDraftLine = {
   componentsNote?: string;
 };
 
+function mergeContainerCostDraftLines(lines: ContainerCostImportDraftLine[]) {
+  const groups = new Map<string, {
+    first: ContainerCostImportDraftLine;
+    quantity: number;
+    amountUsd: number;
+    totalVolumeCbm: number;
+    notes: string[];
+    count: number;
+  }>();
+
+  lines.forEach((line) => {
+    const quantity = Math.max(0, parseDecimal(line.quantity));
+    const unitPriceUsd = Math.max(0, parseDecimal(line.unitPriceUsd));
+    const amountUsd = Math.max(0, parseDecimal(line.amountUsd));
+    const volumeCbm = Math.max(0, parseDecimal(line.volumeCbm));
+    const key = [
+      line.type,
+      line.referenceCode.trim().toLowerCase(),
+      line.articleNumber?.trim().toLowerCase() || '',
+      line.supplierItemNo?.trim().toLowerCase() || '',
+      normalizedSupplierKey(line.supplierName),
+      line.description.trim().toLowerCase(),
+      formatDecimal(unitPriceUsd, 4),
+    ].join('|');
+    const existing = groups.get(key);
+    const nextAmountUsd = amountUsd > 0 ? amountUsd : roundValue(quantity * unitPriceUsd, 4);
+    const note = line.componentsNote?.trim();
+
+    if (existing) {
+      existing.quantity += quantity;
+      existing.amountUsd += nextAmountUsd;
+      existing.totalVolumeCbm += volumeCbm * quantity;
+      existing.count += 1;
+      if (note && !existing.notes.includes(note)) existing.notes.push(note);
+      return;
+    }
+
+    groups.set(key, {
+      first: line,
+      quantity,
+      amountUsd: nextAmountUsd,
+      totalVolumeCbm: volumeCbm * quantity,
+      notes: note ? [note] : [],
+      count: 1,
+    });
+  });
+
+  return Array.from(groups.values()).map(({ first, quantity, amountUsd, totalVolumeCbm, notes, count }) => ({
+    ...first,
+    quantity: formatCompactDecimal(quantity, 3),
+    volumeCbm: quantity > 0 ? formatDecimal(totalVolumeCbm / quantity, 4) : first.volumeCbm,
+    amountUsd: amountUsd > 0 ? formatDecimal(amountUsd, 4) : undefined,
+    componentsNote: notes.length > 1 ? `${notes[0]} + ${count - 1} regels samengevoegd` : notes[0],
+  }));
+}
+
 function sanitizeImportedNumber(value: string) {
   return value.replace(/[^\d,.-]/g, '').trim();
 }
@@ -3736,7 +3792,8 @@ function ContainerCostModal({
     })
     .filter((line): line is ContainerCostImportDraftLine => Boolean(line));
 
-  const importLines = [...scooterDraftLines, ...draftLines];
+  const mergedDraftLines = mergeContainerCostDraftLines(draftLines);
+  const importLines = [...scooterDraftLines, ...mergedDraftLines];
 
   const computedLines = importLines.map((line) => {
     const quantity = Math.max(1, parseDecimal(line.quantity));
