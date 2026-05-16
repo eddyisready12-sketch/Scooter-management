@@ -338,14 +338,72 @@ function findProductForCostLine(products: Product[], line: ContainerCostLine) {
   ));
 }
 
+function productFromCostLine(line: ContainerCostLine, product?: Product): Product {
+  return {
+    id: product?.id || line.referenceId || stableId('product', line.referenceCode || line.id),
+    code: product?.code || line.referenceCode,
+    supplierItemNo: product?.supplierItemNo,
+    isNewProduct: product?.isNewProduct,
+    createdAt: product?.createdAt,
+    description: product?.description || line.description,
+    barcode: product?.barcode,
+    batch: product?.batch,
+    salePrice: product?.salePrice,
+    purchasePrice: product?.purchasePrice,
+    costPrice: product?.costPrice || line.calculatedUnitCostEur,
+    webshop: product?.webshop,
+    articleGroup: product?.articleGroup,
+    stock: product?.stock,
+    startDate: product?.startDate,
+    endDate: product?.endDate,
+    supplier: product?.supplier,
+    importCompany: product?.importCompany,
+    countryOfOrigin: product?.countryOfOrigin,
+    imageUrl: product?.imageUrl,
+    brand: product?.brand,
+    labelTitle: product?.labelTitle,
+    shortDescription: product?.shortDescription,
+    batchNumber: product?.batchNumber,
+    serialNumber: product?.serialNumber,
+    traceabilityCode: product?.traceabilityCode,
+    qrUrl: product?.qrUrl,
+    warning: product?.warning,
+    safetyInfo: product?.safetyInfo,
+    manufacturerName: product?.manufacturerName,
+    manufacturerAddress: product?.manufacturerAddress,
+    manufacturerPostalCode: product?.manufacturerPostalCode,
+    manufacturerCity: product?.manufacturerCity,
+    manufacturerCountry: product?.manufacturerCountry,
+    manufacturerEmail: product?.manufacturerEmail,
+    manufacturerWebsite: product?.manufacturerWebsite,
+    importerName: product?.importerName,
+    importerAddress: product?.importerAddress,
+    importerPostalCode: product?.importerPostalCode,
+    importerCity: product?.importerCity,
+    importerCountry: product?.importerCountry,
+    importerEmail: product?.importerEmail,
+    importerWebsite: product?.importerWebsite,
+    packagingUnit: product?.packagingUnit,
+    packagingLayers: product?.packagingLayers,
+    packagingMaterialPrimary: product?.packagingMaterialPrimary,
+    packagingMaterialSecondary: product?.packagingMaterialSecondary,
+    packagingRecycleCodePrimary: product?.packagingRecycleCodePrimary,
+    packagingRecycleCodeSecondary: product?.packagingRecycleCodeSecondary,
+    packagingWasteStream: product?.packagingWasteStream,
+    packagingNotes: product?.packagingNotes,
+    packagingWeightPrimaryGrams: product?.packagingWeightPrimaryGrams,
+    packagingWeightSecondaryGrams: product?.packagingWeightSecondaryGrams,
+    packagingWeightTotalGrams: product?.packagingWeightTotalGrams,
+  };
+}
+
 function buildPackagingRegistrationsForBatch(
   batch: ContainerCostBatch,
   lines: ContainerCostLine[],
   products: Product[],
 ): ProductPackagingRegistration[] {
   return lines.flatMap((line) => {
-    const product = findProductForCostLine(products, line);
-    if (!product) return [];
+    const product = productFromCostLine(line, findProductForCostLine(products, line));
 
     const quantity = parseDecimal(line.quantity);
     const layersWithValues = normalizePackagingLayers(product)
@@ -2130,13 +2188,14 @@ export function App() {
     }
   }
 
-  async function printBatchProductLabel(batch: ContainerCostBatch, line: ContainerCostLine, product: Product, quantity: number) {
+  async function printBatchProductLabel(batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, quantity: number) {
     const batchCode = batch.orderNumber || batch.containerNumber || line.batchId;
+    const sourceProduct = productFromCostLine(line, product);
     const labelProduct: Product = {
-      ...product,
-      batch: product.batch?.trim() || batchCode,
-      batchNumber: product.batchNumber?.trim() || batchCode,
-      traceabilityCode: product.traceabilityCode?.trim() || `${batchCode}-${product.code || line.referenceCode}`,
+      ...sourceProduct,
+      batch: sourceProduct.batch?.trim() || batchCode,
+      batchNumber: sourceProduct.batchNumber?.trim() || batchCode,
+      traceabilityCode: sourceProduct.traceabilityCode?.trim() || `${batchCode}-${sourceProduct.code || line.referenceCode}`,
     };
 
     const printerName = await printProductDymoLabel(labelProduct, quantity);
@@ -3515,7 +3574,7 @@ function CostBatchesPage({
   data: AppData;
   onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
   onSelectProduct: (product: Product) => void;
-  onPrintProductLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product: Product, quantity: number) => Promise<string>;
+  onPrintProductLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, quantity: number) => Promise<string>;
 }) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
@@ -3532,11 +3591,6 @@ function CostBatchesPage({
   const editingBatchLines = editingBatch ? visibleContainerCostLines.filter((line) => line.batchId === editingBatch.id) : [];
 
   async function handleBatchLinePrint(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
-    if (!product) {
-      setPrintMessage(`Geen gekoppeld product gevonden voor ${line.referenceCode}.`);
-      return;
-    }
-
     const quantityAnswer = window.prompt('Hoeveel productlabels wil je printen?', '1');
     if (quantityAnswer === null) return;
     const quantity = Number(quantityAnswer.replace(',', '.'));
@@ -3549,7 +3603,7 @@ function CostBatchesPage({
     setPrintMessage('');
     try {
       const printerName = await onPrintProductLabel(batch, line, product, quantity);
-      setPrintMessage(`${quantity} label${quantity === 1 ? '' : 's'} geprint voor ${product.code || line.referenceCode} via ${printerName}.`);
+      setPrintMessage(`${quantity} label${quantity === 1 ? '' : 's'} geprint voor ${product?.code || line.referenceCode} via ${printerName}.`);
     } catch (error) {
       setPrintMessage(`Label printen mislukt: ${importErrorMessage(error)}`);
     } finally {
@@ -3775,9 +3829,9 @@ function CostBatchesPage({
                                               <button
                                                 type="button"
                                                 className="icon-button import-label-print-button"
-                                                disabled={!product || printingLineId === line.id}
-                                                title={product ? 'Productlabel printen' : 'Geen gekoppeld product'}
-                                                aria-label={product ? `Productlabel printen voor ${line.referenceCode}` : `Geen gekoppeld product voor ${line.referenceCode}`}
+                                                disabled={printingLineId === line.id}
+                                                title={product ? 'Productlabel printen' : 'Productlabel printen vanaf batchregel'}
+                                                aria-label={`Productlabel printen voor ${line.referenceCode}`}
                                                 onClick={(event) => {
                                                   event.stopPropagation();
                                                   void handleBatchLinePrint(batch, line, product);
