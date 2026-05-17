@@ -2221,46 +2221,49 @@ tbody tr:hover {
 }
 
 .import-batch-lines-table {
-  min-width: 1120px;
+  min-width: 1280px;
 }
 
 .import-batch-lines-table th:first-child,
 .import-batch-lines-table td:first-child {
-  width: 10%;
+  width: 8%;
 }
 
 .import-batch-lines-table th:nth-child(2),
 .import-batch-lines-table td:nth-child(2) {
-  width: 31%;
+  width: 29%;
 }
 
 .import-batch-lines-table th:nth-child(3),
 .import-batch-lines-table td:nth-child(3) {
-  width: 12%;
+  width: 10%;
 }
 
 .import-batch-lines-table th:nth-child(4),
 .import-batch-lines-table td:nth-child(4) {
-  width: 8%;
+  width: 7%;
 }
 
 .import-batch-lines-table th:nth-child(5),
-.import-batch-lines-table td:nth-child(5),
+.import-batch-lines-table td:nth-child(5) {
+  width: 10%;
+}
+
 .import-batch-lines-table th:nth-child(6),
 .import-batch-lines-table td:nth-child(6),
 .import-batch-lines-table th:nth-child(7),
 .import-batch-lines-table td:nth-child(7) {
-  width: 11%;
+  width: 12%;
 }
 
 .import-batch-lines-table th:nth-child(8),
 .import-batch-lines-table td:nth-child(8) {
-  width: 8%;
+  width: 7%;
 }
 
 .import-batch-lines-table th:nth-child(9),
 .import-batch-lines-table td:nth-child(9) {
-  width: 6%;
+  width: 5%;
 }
 
 .import-batch-lines-table td strong,
@@ -2386,9 +2389,18 @@ tbody tr:hover {
 
 .import-batch-lines-table th,
 .import-batch-lines-table td {
-  white-space: nowrap;
   padding-top: 14px;
   padding-bottom: 14px;
+}
+
+.import-batch-lines-table td {
+  white-space: nowrap;
+}
+
+.import-batch-lines-table th {
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .import-batch-lines-table td:nth-child(2) {
@@ -2450,41 +2462,44 @@ tbody tr:hover {
 
 .container-scooter-table.import-batch-lines-table th:first-child,
 .container-scooter-table.import-batch-lines-table td:first-child {
-  width: 10%;
+  width: 8%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(2),
 .container-scooter-table.import-batch-lines-table td:nth-child(2) {
-  width: 31%;
+  width: 29%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(3),
 .container-scooter-table.import-batch-lines-table td:nth-child(3) {
-  width: 12%;
+  width: 10%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(4),
 .container-scooter-table.import-batch-lines-table td:nth-child(4) {
-  width: 8%;
+  width: 7%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(5),
-.container-scooter-table.import-batch-lines-table td:nth-child(5),
+.container-scooter-table.import-batch-lines-table td:nth-child(5) {
+  width: 10%;
+}
+
 .container-scooter-table.import-batch-lines-table th:nth-child(6),
 .container-scooter-table.import-batch-lines-table td:nth-child(6),
 .container-scooter-table.import-batch-lines-table th:nth-child(7),
 .container-scooter-table.import-batch-lines-table td:nth-child(7) {
-  width: 11%;
+  width: 12%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(8),
 .container-scooter-table.import-batch-lines-table td:nth-child(8) {
-  width: 8%;
+  width: 7%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(9),
 .container-scooter-table.import-batch-lines-table td:nth-child(9) {
-  width: 6%;
+  width: 5%;
 }
 
 .status-pill.compact {
