@@ -5819,6 +5819,7 @@ function ProductDetailModal({
   const [activeTab, setActiveTab] = useState<ProductModalTab>(initialTab);
   const [dymoPrinting, setDymoPrinting] = useState(false);
   const [dymoMessage, setDymoMessage] = useState('');
+  const [productImageFailed, setProductImageFailed] = useState(false);
 
   useEffect(() => {
     const nextDraft = createProductDraft(product);
@@ -5842,6 +5843,10 @@ function ProductDetailModal({
     setActiveTab(initialTab);
   }, [product, supplierRecords, importers, initialTab]);
 
+  useEffect(() => {
+    setProductImageFailed(false);
+  }, [draft.imageUrl]);
+
   const packagingLayers = draft.packagingLayers ?? normalizePackagingLayers(draft);
   const derivedPackagingWasteStream = summarizePackagingWasteStream(
     packagingLayers.map((layer) => layer.material).filter(Boolean) as string[],
@@ -5853,6 +5858,7 @@ function ProductDetailModal({
     ...suppliers,
   ].filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const productImageUrl = draft.imageUrl?.trim() || '';
 
   function applySupplierManufacturer(supplierName: string) {
     const supplier = supplierRecords.find((item) => item.name === supplierName);
@@ -6140,9 +6146,25 @@ function ProductDetailModal({
                   <label>Einddatum
                     <input type="date" value={rdwDateToInputDate(draft.endDate)} onChange={(event) => setDraft((current) => ({ ...current, endDate: event.target.value || undefined }))} />
                   </label>
-                  <label className="span-2">Afbeelding URL
-                    <input value={draft.imageUrl ?? ''} onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.target.value }))} />
-                  </label>
+                  <div className="span-2 product-image-field">
+                    <label>Afbeelding URL
+                      <input value={draft.imageUrl ?? ''} onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.target.value }))} />
+                    </label>
+                    {productImageUrl ? (
+                      <div className="product-image-preview">
+                        {productImageFailed ? (
+                          <span>Afbeelding kan niet geladen worden.</span>
+                        ) : (
+                          <img
+                            src={productImageUrl}
+                            alt={draft.description || draft.code}
+                            referrerPolicy="no-referrer"
+                            onError={() => setProductImageFailed(true)}
+                          />
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>
