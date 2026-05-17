@@ -4332,7 +4332,9 @@ function ContainerCostModal({
     })
     .filter((line): line is ContainerCostImportDraftLine => Boolean(line));
 
-  const mergedDraftLines = mergeContainerCostDraftLines(draftLines);
+  const mergedDraftLines = initialBatch && !importFileName
+    ? draftLines
+    : mergeContainerCostDraftLines(draftLines);
   const importLines = [...scooterDraftLines, ...mergedDraftLines];
 
   const computedLines = importLines.map((line) => {
