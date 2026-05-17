@@ -41,7 +41,7 @@ import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseP
 import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
-type View = 'dashboard' | 'containers' | 'costBatches' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
+type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
 type ProductModalTab = 'basic' | 'gpsr' | 'packaging';
@@ -126,6 +126,7 @@ const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'batteries', label: 'Accu', icon: BatteryCharging },
   { id: 'containers', label: 'Containers', icon: Boxes },
   { id: 'costBatches', label: 'Import China', icon: FileText },
+  { id: 'packaging', label: 'Verpakking', icon: PackagePlus },
   { id: 'dealers', label: 'Dealers', icon: UsersRound },
   { id: 'warranty', label: 'Garantie claims', icon: ShieldCheck },
   { id: 'suppliers', label: 'Leveranciers', icon: Factory },
@@ -2939,6 +2940,7 @@ export function App() {
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
           {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
+          {view === 'packaging' && <PackagingOverviewPage registrations={data.productPackagingRegistrations} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
@@ -3103,6 +3105,241 @@ function Dashboard({ data, onNavigate }: {
               </span>
             </button>
           ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function PackagingOverviewPage({ registrations }: { registrations: ProductPackagingRegistration[] }) {
+  const [batchFilter, setBatchFilter] = useState('all');
+  const [materialFilter, setMaterialFilter] = useState('all');
+  const filteredRegistrations = useMemo(() => registrations.filter((registration) =>
+    (batchFilter === 'all' || registration.batchOrderNumber === batchFilter) &&
+    (materialFilter === 'all' || registration.material === materialFilter),
+  ), [batchFilter, materialFilter, registrations]);
+  const totalWeightKg = filteredRegistrations.reduce((total, registration) => total + parseDecimal(registration.totalWeightGrams) / 1000, 0);
+  const uniqueProducts = new Set(filteredRegistrations.map((registration) => registration.productCode).filter(Boolean)).size;
+  const batchOptions = Array.from(new Set(registrations.map((registration) => registration.batchOrderNumber).filter(Boolean) as string[])).sort();
+  const materialOptions = Array.from(new Set(registrations.map((registration) => registration.material).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const materialRows = useMemo(() => {
+    const groups = new Map<string, {
+      material: string;
+      recycleCode?: string;
+      wasteStream?: string;
+      weightKg: number;
+      packages: number;
+      products: Set<string>;
+      rows: number;
+    }>();
+    filteredRegistrations.forEach((registration) => {
+      const key = `${registration.material || 'Onbekend'}|${registration.recycleCode || ''}|${registration.wasteStream || ''}`;
+      const group = groups.get(key) ?? {
+        material: registration.material || 'Onbekend',
+        recycleCode: registration.recycleCode,
+        wasteStream: registration.wasteStream,
+        weightKg: 0,
+        packages: 0,
+        products: new Set<string>(),
+        rows: 0,
+      };
+      group.weightKg += parseDecimal(registration.totalWeightGrams) / 1000;
+      group.packages += parseDecimal(registration.packagesCount);
+      if (registration.productCode) group.products.add(registration.productCode);
+      group.rows += 1;
+      groups.set(key, group);
+    });
+    return Array.from(groups.values()).sort((a, b) => b.weightKg - a.weightKg);
+  }, [filteredRegistrations]);
+  const stickerRows = useMemo(() => {
+    const groups = new Map<string, { material: string; rows: number; products: Set<string> }>();
+    filteredRegistrations.forEach((registration) => {
+      const material = registration.productStickerMaterial || 'Niet ingevuld';
+      const group = groups.get(material) ?? { material, rows: 0, products: new Set<string>() };
+      group.rows += 1;
+      if (registration.productCode) group.products.add(registration.productCode);
+      groups.set(material, group);
+    });
+    return Array.from(groups.values()).sort((a, b) => a.material.localeCompare(b.material, 'nl', { sensitivity: 'base' }));
+  }, [filteredRegistrations]);
+
+  function csvEscape(value: string) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+
+  function exportPackagingCsv() {
+    const headers = [
+      'Batch',
+      'Container',
+      'Productnummer',
+      'Omschrijving',
+      'Aantal',
+      'Verpakkingseenheid',
+      'Aantal verpakkingen',
+      'Component',
+      'Materiaal',
+      'Recyclecode',
+      'Afvalstroom',
+      'Productsticker',
+      'Gewicht per verpakking (g)',
+      'Totaal gewicht (kg)',
+      '% PCR',
+      'Recyclebaarheidsklasse',
+      'Rol',
+      'Geregistreerd op',
+    ];
+    const rows = filteredRegistrations.map((registration) => [
+      registration.batchOrderNumber ?? '',
+      registration.containerNumber ?? '',
+      registration.productCode,
+      registration.productDescription,
+      registration.quantity,
+      registration.packagingUnit ?? '',
+      registration.packagesCount ?? '',
+      registration.layerName,
+      registration.material,
+      registration.recycleCode ?? '',
+      registration.wasteStream ?? '',
+      registration.productStickerMaterial ?? '',
+      registration.weightGramsPerUnit,
+      formatDecimal(parseDecimal(registration.totalWeightGrams) / 1000, 8),
+      registration.recycledContentPercent ?? '',
+      registration.recyclabilityClass ?? '',
+      registration.packagingRole ?? '',
+      registration.registeredAt ? formatDate(registration.registeredAt) : '',
+    ]);
+    const csv = [headers, ...rows].map((row) => row.map((value) => csvEscape(String(value))).join(';')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `verpakkingsregistratie-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  return (
+    <>
+      <div className="page-title-row">
+        <div>
+          <h1>Verpakkingsregistratie</h1>
+          <span>Overzicht per materiaal, productsticker en batch</span>
+        </div>
+      </div>
+      <section className="stat-grid packaging-overview-stats">
+        <div className="stat-card"><PackagePlus size={22} /><div><span>Registratieregels</span><strong>{filteredRegistrations.length}</strong></div></div>
+        <div className="stat-card"><Boxes size={22} /><div><span>Totaal gewicht</span><strong>{formatDecimal(totalWeightKg, 8)} kg</strong></div></div>
+        <div className="stat-card"><BriefcaseBusiness size={22} /><div><span>Producten</span><strong>{uniqueProducts}</strong></div></div>
+        <div className="stat-card"><FileText size={22} /><div><span>Batches</span><strong>{batchOptions.length}</strong></div></div>
+      </section>
+      <section className="panel">
+        <div className="panel-title">
+          <span className="panel-title-label"><PackagePlus size={16} /> Filters en export</span>
+          <button type="button" className="secondary-button panel-title-action" disabled={filteredRegistrations.length === 0} onClick={exportPackagingCsv}>CSV export</button>
+        </div>
+        <div className="packaging-overview-toolbar">
+          <label>Batch
+            <select value={batchFilter} onChange={(event) => setBatchFilter(event.target.value)}>
+              <option value="all">Alle batches</option>
+              {batchOptions.map((batch) => <option key={batch} value={batch}>{batch}</option>)}
+            </select>
+          </label>
+          <label>Materiaal
+            <select value={materialFilter} onChange={(event) => setMaterialFilter(event.target.value)}>
+              <option value="all">Alle materialen</option>
+              {materialOptions.map((material) => <option key={material} value={material}>{material}</option>)}
+            </select>
+          </label>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-title"><span className="panel-title-label"><PackagePlus size={16} /> Totalen per materiaal</span></div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Materiaal</th>
+                <th>Recyclecode</th>
+                <th>Afvalstroom</th>
+                <th>Gewicht kg</th>
+                <th>Verpakkingen</th>
+                <th>Producten</th>
+              </tr>
+            </thead>
+            <tbody>
+              {materialRows.length === 0 ? (
+                <tr><td colSpan={6}>Nog geen verpakkingsregistraties.</td></tr>
+              ) : materialRows.map((row) => (
+                <tr key={`${row.material}-${row.recycleCode}-${row.wasteStream}`}>
+                  <td>{row.material}</td>
+                  <td>{row.recycleCode || '-'}</td>
+                  <td>{row.wasteStream || '-'}</td>
+                  <td>{formatDecimal(row.weightKg, 8)}</td>
+                  <td>{formatDecimal(row.packages, 8)}</td>
+                  <td>{row.products.size}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-title"><span className="panel-title-label"><FileText size={16} /> Productstickers</span></div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Productsticker</th>
+                <th>Registratieregels</th>
+                <th>Producten</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stickerRows.length === 0 ? (
+                <tr><td colSpan={3}>Nog geen productstickers geregistreerd.</td></tr>
+              ) : stickerRows.map((row) => (
+                <tr key={row.material}>
+                  <td>{row.material}</td>
+                  <td>{row.rows}</td>
+                  <td>{row.products.size}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-title"><span className="panel-title-label"><ClipboardList size={16} /> Detailregels</span></div>
+        <div className="table-wrap packaging-overview-details">
+          <table>
+            <thead>
+              <tr>
+                <th>Batch</th>
+                <th>Product</th>
+                <th>Component</th>
+                <th>Materiaal</th>
+                <th>Sticker</th>
+                <th>Verpakkingen</th>
+                <th>Gewicht kg</th>
+                <th>Datum</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRegistrations.length === 0 ? (
+                <tr><td colSpan={8}>Nog geen detailregels.</td></tr>
+              ) : filteredRegistrations.map((registration) => (
+                <tr key={registration.id}>
+                  <td>{registration.batchOrderNumber || '-'}</td>
+                  <td><strong>{registration.productCode}</strong><br /><small>{registration.productDescription}</small></td>
+                  <td>{registration.layerName}</td>
+                  <td>{registration.material}<br /><small>{registration.recycleCode || '-'}</small></td>
+                  <td>{registration.productStickerMaterial || '-'}</td>
+                  <td>{registration.packagesCount || '-'}</td>
+                  <td>{formatDecimal(parseDecimal(registration.totalWeightGrams) / 1000, 8)}</td>
+                  <td>{registration.registeredAt ? formatDate(registration.registeredAt) : '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
     </>

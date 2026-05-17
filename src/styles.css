@@ -246,6 +246,33 @@ h2 {
   box-shadow: 0 0 0 2px rgba(0, 117, 255, 0.12);
 }
 
+.packaging-overview-toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.packaging-overview-toolbar label {
+  display: grid;
+  gap: 6px;
+  color: #4f5b66;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.packaging-overview-details {
+  max-height: 560px;
+  overflow: auto;
+}
+
+.packaging-overview-details thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+}
+
 .dashboard-link-icon {
   display: grid;
   place-items: center;
