@@ -3727,6 +3727,7 @@ function CostBatchesPage({
                 {sortedBatches.slice(0, 25).map((batch) => {
                   const container = data.containers.find((item) => item.id === batch.containerId);
                   const lines = visibleContainerCostLines.filter((line) => line.batchId === batch.id);
+                  const purchaseOrderAddedCount = lines.filter((line) => line.purchaseOrderAdded).length;
                   const isExpanded = expandedBatchId === batch.id;
                   return (
                     <Fragment key={batch.id}>
@@ -3802,7 +3803,7 @@ function CostBatchesPage({
                                   <span>Deze importbatch heeft nog geen opgeslagen detailregels.</span>
                                 </div>
                               ) : (
-                                <div className="container-scooter-table-wrap">
+                                <div className="container-scooter-table-wrap import-batch-lines-wrap">
                                   <table className="container-scooter-table import-batch-lines-table">
                                     <thead>
                                       <tr>
@@ -3813,7 +3814,12 @@ function CostBatchesPage({
                                         <th>Prijs / stuk (USD)</th>
                                         <th>Inkoopprijs / stuk (EUR)</th>
                                         <th>Kostprijs / stuk (EUR)</th>
-                                        <th>Bestellijst</th>
+                                        <th>
+                                          <span className="import-batch-header-stack">
+                                            <span>Bestellijst</span>
+                                            <span>{purchaseOrderAddedCount}/{lines.length}</span>
+                                          </span>
+                                        </th>
                                         <th>Label</th>
                                       </tr>
                                     </thead>

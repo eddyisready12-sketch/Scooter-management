@@ -2387,6 +2387,13 @@ tbody tr:hover {
   overflow-x: auto;
 }
 
+.import-batch-lines-wrap {
+  max-height: min(68vh, 720px);
+  overflow: auto;
+  border: 1px solid #dce1e6;
+  border-radius: 8px;
+}
+
 .import-batch-lines-table th,
 .import-batch-lines-table td {
   padding-top: 14px;
@@ -2398,9 +2405,25 @@ tbody tr:hover {
 }
 
 .import-batch-lines-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f6f8fa;
   line-height: 1.25;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.import-batch-header-stack {
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+}
+
+.import-batch-header-stack span:last-child {
+  color: #17202a;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .import-batch-lines-table td:nth-child(2) {
