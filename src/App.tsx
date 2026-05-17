@@ -38,7 +38,7 @@ import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, replaceProductPackagingRegistrations, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
@@ -2190,22 +2190,6 @@ export function App() {
   async function saveContainerCostBatch(batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) {
     try {
       const uniqueLines = dedupeContainerCostLines(lines);
-      const productsForRegistrationMap = new Map(data.products.map((product) => [product.id, product]));
-      productUpdates.forEach((product) => productsForRegistrationMap.set(product.id, product));
-      const freshPackagingRegistrations = buildPackagingRegistrationsForBatch(
-        batch,
-        uniqueLines,
-        Array.from(productsForRegistrationMap.values()),
-      );
-      const existingPackagingRegistrationsById = new Map(data.productPackagingRegistrations.map((registration) => [registration.id, registration]));
-      const packagingRegistrations = freshPackagingRegistrations.map((registration) => {
-        const existingRegistration = existingPackagingRegistrationsById.get(registration.id);
-        return {
-          ...registration,
-          labelPrintedAt: existingRegistration?.labelPrintedAt,
-          labelPrintCount: existingRegistration?.labelPrintCount,
-        };
-      });
       const existingLineIds = data.containerCostLines
         .filter((line) => line.batchId === batch.id)
         .map((line) => line.id);
@@ -2226,21 +2210,16 @@ export function App() {
           ...current,
           containerCostBatches: Array.from(batchMap.values()),
           containerCostLines: Array.from(lineMap.values()),
-          productPackagingRegistrations: [
-            ...current.productPackagingRegistrations.filter((registration) => registration.batchId !== batch.id),
-            ...packagingRegistrations,
-          ],
           products: Array.from(productMap.values()),
         };
       });
 
       await upsertContainerCostBatches([batch]);
       await replaceContainerCostLines(batch.id, uniqueLines, existingLineIds);
-      await replaceProductPackagingRegistrations(batch.id, packagingRegistrations);
       if (productUpdates.length > 0) {
         await upsertProducts(productUpdates);
       }
-      showCsvMessage(`${uniqueLines.length} kostprijsregels opgeslagen voor order ${batch.orderNumber}. ${packagingRegistrations.length} verpakkingsregistraties bijgewerkt.`);
+      showCsvMessage(`${uniqueLines.length} kostprijsregels opgeslagen voor order ${batch.orderNumber}.`);
     } catch (error) {
       showCsvMessage(`Container kostprijs opslaan mislukt: ${importErrorMessage(error)}`);
     }
