@@ -5,7 +5,8 @@ export type ScooterStatus =
   | 'Af te leveren'
   | 'Nog onderweg'
   | 'In consignatie'
-  | 'In optie';
+  | 'In optie'
+  | 'Overig';
 
 export type Scooter = {
   id: string;

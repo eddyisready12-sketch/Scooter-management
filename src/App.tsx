@@ -140,6 +140,7 @@ const statusColor: Record<ScooterStatus, string> = {
   'Nog onderweg': 'slate',
   'In consignatie': 'violet',
   'In optie': 'orange',
+  Overig: 'slate',
 };
 
 const maintenancePackages = {
@@ -157,6 +158,10 @@ const warrantyStatuses: WarrantyPart['status'][] = ['Open', 'In behandeling', 'G
 
 function countByStatus(scooters: Scooter[], status: ScooterStatus) {
   return scooters.filter((scooter) => scooter.status === status).length;
+}
+
+function scooterStatusLabel(status: ScooterStatus) {
+  return status === 'Af te leveren' ? 'Verkocht zonder kenteken' : status;
 }
 
 function formatDate(value?: string) {
@@ -3484,7 +3489,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
               </th>
               <th><input value={columnFilters.licensePlate} onChange={(event) => setColumnFilter('licensePlate', event.target.value)} aria-label="Filter kenteken" /></th>
               <th><select value={columnFilters.speed} onChange={(event) => setColumnFilter('speed', event.target.value)} aria-label="Filter snelheid"><option value="">Alle</option>{speedOptions.map((speed) => <option value={speed} key={speed}>{speed}</option>)}</select></th>
-              <th><select value={columnFilters.status} onChange={(event) => setColumnFilter('status', event.target.value)} aria-label="Filter status"><option value="">Alle</option>{Object.keys(statusColor).map((status) => <option value={status} key={status}>{status}</option>)}</select></th>
+              <th><select value={columnFilters.status} onChange={(event) => setColumnFilter('status', event.target.value)} aria-label="Filter status"><option value="">Alle</option>{(Object.keys(statusColor) as ScooterStatus[]).map((status) => <option value={status} key={status}>{scooterStatusLabel(status)}</option>)}</select></th>
               <th>
                 <select value={columnFilters.dealer} onChange={(event) => setColumnFilter('dealer', event.target.value)} aria-label="Filter dealer">
                   <option value="">Alle</option>
@@ -4949,7 +4954,7 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
   setStatusFilter: (status: ScooterStatus | 'all') => void;
   onBulkRdwCheck: (scooters: Scooter[]) => Promise<string>;
 }) {
-  const groups = ['Beschikbaar', 'In optie', 'Af te leveren', 'Nog onderweg', 'In consignatie', 'Verkocht klant', 'Verkocht dealer'] as ScooterStatus[];
+  const groups = ['Beschikbaar', 'In optie', 'Af te leveren', 'Nog onderweg', 'In consignatie', 'Verkocht klant', 'Verkocht dealer', 'Overig'] as ScooterStatus[];
   const [searchField, setSearchField] = useState<SearchField>('frameNumber');
   const [panelFilters, setPanelFilters] = useState<ScooterPanelFilters>({
     speed: '',
@@ -4958,14 +4963,15 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
     status: '',
   });
   const [showLatestRegistered, setShowLatestRegistered] = useState(false);
-  const cards: Array<{ label: ScooterStatus; icon: typeof Bike }> = [
-    { label: 'Beschikbaar', icon: Bike },
-    { label: 'In consignatie', icon: BriefcaseBusiness },
-    { label: 'Verkocht dealer', icon: Wrench },
-    { label: 'Verkocht klant', icon: Wrench },
-    { label: 'Af te leveren', icon: PackagePlus },
-    { label: 'Nog onderweg', icon: Boxes },
-    { label: 'In optie', icon: CalendarDays },
+  const cards: Array<{ status: ScooterStatus; label: string; icon: typeof Bike }> = [
+    { status: 'Beschikbaar', label: 'Beschikbaar', icon: Bike },
+    { status: 'In consignatie', label: 'In consignatie', icon: BriefcaseBusiness },
+    { status: 'Verkocht dealer', label: 'Verkocht dealer', icon: Wrench },
+    { status: 'Verkocht klant', label: 'Verkocht klant', icon: Wrench },
+    { status: 'Af te leveren', label: 'Verkocht zonder kenteken', icon: PackagePlus },
+    { status: 'Nog onderweg', label: 'Nog onderweg', icon: Boxes },
+    { status: 'In optie', label: 'In optie', icon: CalendarDays },
+    { status: 'Overig', label: 'Overig', icon: CircleHelp },
   ];
   const latestRegisteredScooters = [...data.scooters]
     .filter((scooter) => isRegistrationComplete(scooter))
@@ -4981,14 +4987,14 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
       <h1>Scooters</h1>
       <ExpandableNotice message={message} details={messageDetails} />
       <div className="stat-grid scooter-status-grid">
-        {cards.map(({ label, icon: Icon }) => (
+        {cards.map(({ status, label, icon: Icon }) => (
           <button
-            className={`stat-card stat-button scooter-status-card ${statusFilter === label ? 'selected' : ''}`}
-            key={label}
-            onClick={() => setStatusFilter(statusFilter === label ? 'all' : label)}
+            className={`stat-card stat-button scooter-status-card ${statusFilter === status ? 'selected' : ''}`}
+            key={status}
+            onClick={() => setStatusFilter(statusFilter === status ? 'all' : status)}
           >
-            <div className={`stat-icon ${statusColor[label]}`}><Icon size={24} /></div>
-            <div><span>{label}</span><strong>{countByStatus(data.scooters, label)}</strong></div>
+            <div className={`stat-icon ${statusColor[status]}`}><Icon size={24} /></div>
+            <div><span>{label}</span><strong>{countByStatus(data.scooters, status)}</strong></div>
           </button>
         ))}
       </div>
@@ -5024,7 +5030,7 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
       </section>
       {statusFilter !== 'all' && (
         <div className="filter-notice">
-          Gefilterd op <strong>{statusFilter}</strong>
+          Gefilterd op <strong>{scooterStatusLabel(statusFilter)}</strong>
           <button onClick={() => setStatusFilter('all')}>Toon alles</button>
         </div>
       )}
@@ -5035,7 +5041,7 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
           query={query}
           setQuery={setQuery}
           onSelect={onSelect}
-          title={`Scooters: ${statusFilter} (${scooters.length})`}
+          title={`Scooters: ${scooterStatusLabel(statusFilter)} (${scooters.length})`}
           onBulkRdwCheck={statusFilter === 'Verkocht dealer' || statusFilter === 'Verkocht klant' ? onBulkRdwCheck : undefined}
         />
       )}
@@ -5051,7 +5057,7 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
       <div className="card-grid">
         {groups.map((status) => (
           <section className="panel compact-list" key={status}>
-            <div className="panel-title"><Bike size={16} /> Recent {status.toLowerCase()}</div>
+            <div className="panel-title"><Bike size={16} /> Recent {scooterStatusLabel(status).toLowerCase()}</div>
             {visibleScooters.filter((s) => s.status === status).slice(0, 5).map((scooter) => (
               <button key={scooter.id} className="record-row" onClick={() => onSelect(scooter)}>
                 <span>{scooter.frameNumber}</span>
@@ -7700,7 +7706,7 @@ function SearchPanel({
           </select>
           <select value={panelFilters.status} onChange={(event) => setPanelFilters({ ...panelFilters, status: event.target.value })}>
             <option value="">Alle statussen</option>
-            {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+            {statusOptions.map((status) => <option key={status} value={status}>{scooterStatusLabel(status)}</option>)}
           </select>
         </div>
       </div>
@@ -7909,7 +7915,7 @@ function ScooterDrawer({
               <label>Kleur<input value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })} /></label>
               <label>Snelheid<input value={draft.speed} onChange={(e) => setDraft({ ...draft, speed: e.target.value })} /></label>
               <label>Kenteken<input value={draft.licensePlate ?? ''} onChange={(e) => setDraft({ ...draft, licensePlate: e.target.value })} /></label>
-              <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{Object.keys(statusColor).map((status) => <option key={status}>{status}</option>)}</select></label>
+              <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{(Object.keys(statusColor) as ScooterStatus[]).map((status) => <option key={status} value={status}>{scooterStatusLabel(status)}</option>)}</select></label>
               <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value })}><option value="">Geen dealer</option>{dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
               <label>Factuur<input value={draft.invoiceNumber ?? ''} onChange={(e) => setDraft({ ...draft, invoiceNumber: e.target.value })} /></label>
               <label className="checkbox-field">

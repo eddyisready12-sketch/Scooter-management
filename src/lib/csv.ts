@@ -64,6 +64,7 @@ function normalizeStatus(value: string): ScooterStatus {
   if (status.includes('onderweg')) return 'Nog onderweg';
   if (status.includes('consign')) return 'In consignatie';
   if (status.includes('optie')) return 'In optie';
+  if (status.includes('overig') || status.includes('other')) return 'Overig';
   return statusFallback;
 }
 
