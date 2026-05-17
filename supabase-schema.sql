@@ -432,6 +432,7 @@ drop policy if exists "Allow authenticated update container cost batches" on con
 drop policy if exists "Allow authenticated read container cost lines" on container_cost_lines;
 drop policy if exists "Allow authenticated insert container cost lines" on container_cost_lines;
 drop policy if exists "Allow authenticated update container cost lines" on container_cost_lines;
+drop policy if exists "Allow authenticated delete container cost lines" on container_cost_lines;
 drop policy if exists "Allow authenticated read product packaging registrations" on product_packaging_registrations;
 drop policy if exists "Allow authenticated insert product packaging registrations" on product_packaging_registrations;
 drop policy if exists "Allow authenticated update product packaging registrations" on product_packaging_registrations;
@@ -474,6 +475,12 @@ for update
 to authenticated
 using (true)
 with check (true);
+
+create policy "Allow authenticated delete container cost lines"
+on container_cost_lines
+for delete
+to authenticated
+using (true);
 
 create policy "Allow authenticated read product packaging registrations"
 on product_packaging_registrations
