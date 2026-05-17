@@ -6055,20 +6055,6 @@ function ProductDetailModal({
           </div>
         </div>
         <section className="panel form-panel product-form-shell">
-          {productImageUrl ? (
-            <div className="product-top-image-preview">
-              {productImageFailed ? (
-                <span>Afbeelding kan niet geladen worden.</span>
-              ) : (
-                <img
-                  src={productImageUrl}
-                  alt={draft.description || draft.code}
-                  referrerPolicy="no-referrer"
-                  onError={() => setProductImageFailed(true)}
-                />
-              )}
-            </div>
-          ) : null}
           <div className="product-tab-bar top-attached">
             <button type="button" className={`product-tab-button${activeTab === 'basic' ? ' active' : ''}`} onClick={() => setActiveTab('basic')}>
               <span className="panel-title-label"><BriefcaseBusiness size={16} /> Product informatie</span>
@@ -6087,36 +6073,54 @@ function ProductDetailModal({
             <div className="product-section-body">
               <div className="product-form-subsection">
                 <h3>Identificatie</h3>
-                <div className="form-grid">
-                  <label>Artikelnummer
-                    <input value={draft.code} onChange={(event) => setDraft((current) => ({ ...current, code: event.target.value }))} />
-                  </label>
-                  <label>Leveranciersnummer
-                    <input value={draft.supplierItemNo ?? ''} onChange={(event) => setDraft((current) => ({ ...current, supplierItemNo: event.target.value }))} />
-                  </label>
-                  <label>Barcode
-                    <input value={draft.barcode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, barcode: event.target.value }))} />
-                  </label>
-                  <label>Omschrijving
-                    <input value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} />
-                  </label>
-                  <label className="checkbox-field">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(draft.isNewProduct)}
-                      onChange={(event) => setDraft((current) => ({ ...current, isNewProduct: event.target.checked }))}
-                    />
-                    Nieuw product
-                  </label>
-                  <label>Batch
-                    <input value={draft.batch ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batch: event.target.value }))} />
-                  </label>
-                  <label>Merk
-                    <input value={draft.brand ?? ''} onChange={(event) => setDraft((current) => ({ ...current, brand: event.target.value }))} />
-                  </label>
-                  <label>Artikelgroep
-                    <input value={draft.articleGroup ?? ''} onChange={(event) => setDraft((current) => ({ ...current, articleGroup: event.target.value }))} />
-                  </label>
+                <div className="product-identification-layout">
+                  <div className="form-grid">
+                    <label>Artikelnummer
+                      <input value={draft.code} onChange={(event) => setDraft((current) => ({ ...current, code: event.target.value }))} />
+                    </label>
+                    <label>Leveranciersnummer
+                      <input value={draft.supplierItemNo ?? ''} onChange={(event) => setDraft((current) => ({ ...current, supplierItemNo: event.target.value }))} />
+                    </label>
+                    <label>Barcode
+                      <input value={draft.barcode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, barcode: event.target.value }))} />
+                    </label>
+                    <label>Omschrijving
+                      <input value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} />
+                    </label>
+                    <label className="checkbox-field">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(draft.isNewProduct)}
+                        onChange={(event) => setDraft((current) => ({ ...current, isNewProduct: event.target.checked }))}
+                      />
+                      Nieuw product
+                    </label>
+                    <label>Batch
+                      <input value={draft.batch ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batch: event.target.value }))} />
+                    </label>
+                    <label>Merk
+                      <input value={draft.brand ?? ''} onChange={(event) => setDraft((current) => ({ ...current, brand: event.target.value }))} />
+                    </label>
+                    <label>Artikelgroep
+                      <input value={draft.articleGroup ?? ''} onChange={(event) => setDraft((current) => ({ ...current, articleGroup: event.target.value }))} />
+                    </label>
+                  </div>
+                  <div className="product-image-card">
+                    {productImageUrl ? (
+                      productImageFailed ? (
+                        <span>Afbeelding kan niet geladen worden.</span>
+                      ) : (
+                        <img
+                          src={productImageUrl}
+                          alt={draft.description || draft.code}
+                          referrerPolicy="no-referrer"
+                          onError={() => setProductImageFailed(true)}
+                        />
+                      )
+                    ) : (
+                      <span>Geen afbeelding</span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="product-form-subsection">

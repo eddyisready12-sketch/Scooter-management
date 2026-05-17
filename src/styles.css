@@ -1631,27 +1631,36 @@ tbody tr:hover {
   grid-column: 1 / -1;
 }
 
-.product-top-image-preview {
+.product-identification-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 18px;
+  align-items: start;
+}
+
+.product-identification-layout .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.product-image-card {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 124px;
-  height: 96px;
-  margin: 14px 16px 0 auto;
-  padding: 8px;
+  min-height: 180px;
+  padding: 12px;
   border: 1px solid #dce1e6;
   border-radius: 8px;
   background: #f8fafc;
 }
 
-.product-top-image-preview img {
+.product-image-card img {
   display: block;
   max-width: 100%;
-  max-height: 100%;
+  max-height: 220px;
   object-fit: contain;
 }
 
-.product-top-image-preview span {
+.product-image-card span {
   color: #667381;
   text-align: center;
   font-size: 13px;
