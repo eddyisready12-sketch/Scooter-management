@@ -1003,6 +1003,73 @@ tbody tr:hover {
   grid-template-columns: 1fr;
 }
 
+.import-tool-tabs {
+  display: inline-flex;
+  gap: 6px;
+  margin: 10px 16px 0;
+  padding: 4px;
+  border: 1px solid #dce1e6;
+  border-radius: 8px;
+  background: #f6f8fa;
+}
+
+.import-tool-tabs button {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #425160;
+  padding: 8px 12px;
+  font-weight: 800;
+}
+
+.import-tool-tabs button.active {
+  background: #fff;
+  color: #0075ff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.scooter-packaging-tool {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.scooter-packaging-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(90px, 0.55fr) repeat(4, minmax(110px, 0.7fr)) auto auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.scooter-packaging-form label {
+  display: grid;
+  gap: 6px;
+  color: #425160;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.scooter-packaging-form .packaging-lining-checkbox {
+  min-height: 38px;
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.scooter-packaging-form .packaging-lining-checkbox input {
+  width: auto;
+}
+
+.scooter-packaging-table-wrap {
+  margin: 0;
+}
+
+.scooter-packaging-table th,
+.scooter-packaging-table td {
+  white-space: nowrap;
+}
+
 .container-tool-tile {
   align-items: flex-start;
   background: linear-gradient(180deg, #fdfefe 0%, #f3f8ff 100%);

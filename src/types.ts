@@ -107,6 +107,19 @@ export type ContainerCostLine = {
   purchaseOrderAdded?: boolean;
 };
 
+export type ScooterPackagingSpec = {
+  id: string;
+  model: string;
+  component: 'CBU' | 'SKD';
+  lengthCm: string;
+  widthCm: string;
+  heightCm: string;
+  hasLining?: boolean;
+  boxWeightKg?: string;
+  notes?: string;
+  updatedAt?: string;
+};
+
 export type Dealer = {
   id: string;
   name: string;
@@ -333,6 +346,7 @@ export type AppData = {
   containers: Container[];
   containerCostBatches: ContainerCostBatch[];
   containerCostLines: ContainerCostLine[];
+  scooterPackagingSpecs: ScooterPackagingSpec[];
   productPackagingRegistrations: ProductPackagingRegistration[];
   dealers: Dealer[];
   products: Product[];

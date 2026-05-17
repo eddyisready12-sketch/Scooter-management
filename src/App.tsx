@@ -38,8 +38,8 @@ import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, replaceProductPackagingRegistrations, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
+import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, replaceProductPackagingRegistrations, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
@@ -2290,6 +2290,31 @@ export function App() {
     }
   }
 
+  async function saveScooterPackagingSpec(spec: ScooterPackagingSpec) {
+    const normalizedSpec: ScooterPackagingSpec = {
+      ...spec,
+      model: spec.model.trim(),
+      lengthCm: spec.lengthCm.trim(),
+      widthCm: spec.widthCm.trim(),
+      heightCm: spec.heightCm.trim(),
+      boxWeightKg: spec.boxWeightKg?.trim() || undefined,
+      notes: spec.notes?.trim() || undefined,
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await upsertScooterPackagingSpecs([normalizedSpec]);
+      setData((current) => {
+        const specMap = new Map(current.scooterPackagingSpecs.map((item) => [item.id, item]));
+        specMap.set(normalizedSpec.id, normalizedSpec);
+        return { ...current, scooterPackagingSpecs: Array.from(specMap.values()) };
+      });
+      showCsvMessage(`Verpakking voor ${normalizedSpec.model} ${normalizedSpec.component} opgeslagen.`);
+    } catch (error) {
+      showCsvMessage(`Scooter verpakking opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   async function upsertSupplierRecord(supplier: Supplier) {
     try {
       let productsToUpdate: Product[] = [];
@@ -2900,7 +2925,7 @@ export function App() {
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
-          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onTogglePurchaseOrderLine={togglePurchaseOrderLine} />}
+          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
@@ -3657,25 +3682,67 @@ function CostBatchesPage({
   onSelectProduct,
   onOpenBatchLabelProduct,
   onTogglePurchaseOrderLine,
+  onSaveScooterPackagingSpec,
 }: {
   data: AppData;
   onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
   onSelectProduct: (product: Product, tab?: ProductModalTab) => void;
   onOpenBatchLabelProduct: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
   onTogglePurchaseOrderLine: (line: ContainerCostLine, purchaseOrderAdded: boolean) => Promise<void>;
+  onSaveScooterPackagingSpec: (spec: ScooterPackagingSpec) => Promise<void>;
 }) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [printMessage, setPrintMessage] = useState('');
+  const [importToolTab, setImportToolTab] = useState<'batch' | 'scooterPackaging'>('batch');
+  const [packagingDraft, setPackagingDraft] = useState<ScooterPackagingSpec>({
+    id: '',
+    model: '',
+    component: 'SKD',
+    lengthCm: '',
+    widthCm: '',
+    heightCm: '',
+    hasLining: false,
+    boxWeightKg: '',
+  });
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const sortedBatches = [...data.containerCostBatches].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const sortedPackagingSpecs = [...data.scooterPackagingSpecs].sort((a, b) =>
+    a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' }) || a.component.localeCompare(b.component),
+  );
+  const scooterModelOptions = Array.from(new Set([
+    ...data.scooters.map((scooter) => scooter.model.trim()).filter(Boolean),
+    ...data.scooterPackagingSpecs.map((spec) => spec.model.trim()).filter(Boolean),
+  ])).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const editingBatch = editingBatchId ? data.containerCostBatches.find((batch) => batch.id === editingBatchId) : undefined;
   const visibleContainerCostLines = useMemo(
     () => dedupeContainerCostLines(data.containerCostLines),
     [data.containerCostLines],
   );
   const editingBatchLines = editingBatch ? visibleContainerCostLines.filter((line) => line.batchId === editingBatch.id) : [];
+
+  function savePackagingDraft(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const model = packagingDraft.model.trim();
+    if (!model) return;
+
+    void onSaveScooterPackagingSpec({
+      ...packagingDraft,
+      id: packagingDraft.id || stableId('scooter-packaging-spec', `${model}-${packagingDraft.component}`),
+      model,
+    });
+    setPackagingDraft({
+      id: '',
+      model: '',
+      component: packagingDraft.component,
+      lengthCm: '',
+      widthCm: '',
+      heightCm: '',
+      hasLining: false,
+      boxWeightKg: '',
+    });
+  }
 
   return (
     <>
@@ -3689,15 +3756,101 @@ function CostBatchesPage({
         <div className="panel-title">
           <span className="panel-title-label"><FileText size={16} /> Import China tools</span>
         </div>
-        <div className="container-tool-grid single">
-          <button type="button" className="container-tool-tile finance" onClick={() => { setEditingBatchId(null); setShowCostModal(true); }}>
-            <span className="container-tool-icon"><CircleDollarSign size={20} /></span>
-            <span className="container-tool-copy">
-              <strong>Nieuwe importbatch</strong>
-              <small>Transport, inklaring en douane over scooters en onderdelen verdelen en wegschrijven naar kostprijs.</small>
-            </span>
+        <div className="import-tool-tabs">
+          <button type="button" className={importToolTab === 'batch' ? 'active' : ''} onClick={() => setImportToolTab('batch')}>
+            Nieuwe importbatch
+          </button>
+          <button type="button" className={importToolTab === 'scooterPackaging' ? 'active' : ''} onClick={() => setImportToolTab('scooterPackaging')}>
+            Verpakking scooter
           </button>
         </div>
+        {importToolTab === 'batch' ? (
+          <div className="container-tool-grid single">
+            <button type="button" className="container-tool-tile finance" onClick={() => { setEditingBatchId(null); setShowCostModal(true); }}>
+              <span className="container-tool-icon"><CircleDollarSign size={20} /></span>
+              <span className="container-tool-copy">
+                <strong>Nieuwe importbatch</strong>
+                <small>Transport, inklaring en douane over scooters en onderdelen verdelen en wegschrijven naar kostprijs.</small>
+              </span>
+            </button>
+          </div>
+        ) : (
+          <div className="scooter-packaging-tool">
+            <form className="scooter-packaging-form" onSubmit={savePackagingDraft}>
+              <label>Model
+                <input list="scooter-packaging-model-options" value={packagingDraft.model} onChange={(event) => setPackagingDraft((current) => ({ ...current, model: event.target.value }))} placeholder="Bijv. Sense" required />
+              </label>
+              <label>Type
+                <select value={packagingDraft.component} onChange={(event) => setPackagingDraft((current) => ({ ...current, component: event.target.value as ScooterPackagingSpec['component'] }))}>
+                  <option value="CBU">CBU</option>
+                  <option value="SKD">SKD</option>
+                </select>
+              </label>
+              <label>Lengte (cm)
+                <input value={packagingDraft.lengthCm} onChange={(event) => setPackagingDraft((current) => ({ ...current, lengthCm: event.target.value }))} placeholder="0" required />
+              </label>
+              <label>Breedte (cm)
+                <input value={packagingDraft.widthCm} onChange={(event) => setPackagingDraft((current) => ({ ...current, widthCm: event.target.value }))} placeholder="0" required />
+              </label>
+              <label>Hoogte (cm)
+                <input value={packagingDraft.heightCm} onChange={(event) => setPackagingDraft((current) => ({ ...current, heightCm: event.target.value }))} placeholder="0" required />
+              </label>
+              <label>Gewicht doos (kg)
+                <input value={packagingDraft.boxWeightKg ?? ''} onChange={(event) => setPackagingDraft((current) => ({ ...current, boxWeightKg: event.target.value }))} placeholder="0" />
+              </label>
+              <label className="checkbox-field packaging-lining-checkbox">
+                <input type="checkbox" checked={Boolean(packagingDraft.hasLining)} onChange={(event) => setPackagingDraft((current) => ({ ...current, hasLining: event.target.checked }))} />
+                Met voering
+              </label>
+              <button className="primary-button" type="submit">Opslaan</button>
+              <datalist id="scooter-packaging-model-options">
+                {scooterModelOptions.map((model) => <option key={model} value={model} />)}
+              </datalist>
+            </form>
+            <div className="table-wrap scooter-packaging-table-wrap">
+              <table className="scooter-packaging-table">
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <th>Type</th>
+                    <th>Lengte</th>
+                    <th>Breedte</th>
+                    <th>Hoogte</th>
+                    <th>Volume</th>
+                    <th>Voering</th>
+                    <th>Doosgewicht</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedPackagingSpecs.map((spec) => {
+                    const volumeCbm = roundValue((parseDecimal(spec.lengthCm) * parseDecimal(spec.widthCm) * parseDecimal(spec.heightCm)) / 1000000, 4);
+                    return (
+                      <tr key={spec.id}>
+                        <td><strong>{spec.model}</strong></td>
+                        <td>{spec.component}</td>
+                        <td>{spec.lengthCm} cm</td>
+                        <td>{spec.widthCm} cm</td>
+                        <td>{spec.heightCm} cm</td>
+                        <td>{formatDecimal(volumeCbm, 4)} cbm</td>
+                        <td>{spec.hasLining ? 'Ja' : 'Nee'}</td>
+                        <td>{spec.boxWeightKg ? `${spec.boxWeightKg} kg` : '-'}</td>
+                        <td>
+                          <button type="button" className="secondary-button compact-button" onClick={() => setPackagingDraft(spec)}>
+                            Bewerken
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {sortedPackagingSpecs.length === 0 ? (
+                    <tr><td colSpan={9}>Nog geen scooterverpakkingen opgeslagen.</td></tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </section>
       <section className="panel sales-summary">
         <div><span>Importbatches</span><strong>{data.containerCostBatches.length}</strong></div>
@@ -3955,6 +4108,7 @@ function CostBatchesPage({
           containers={sortedContainers}
           products={data.products}
           scooters={data.scooters}
+          scooterPackagingSpecs={data.scooterPackagingSpecs}
           suppliers={data.suppliers}
           importers={data.importers}
           initialBatch={editingBatch}
@@ -3975,6 +4129,7 @@ function ContainerCostModal({
   containers,
   products,
   scooters,
+  scooterPackagingSpecs,
   suppliers,
   importers,
   initialBatch,
@@ -3985,6 +4140,7 @@ function ContainerCostModal({
   containers: Container[];
   products: Product[];
   scooters: Scooter[];
+  scooterPackagingSpecs: ScooterPackagingSpec[];
   suppliers: Supplier[];
   importers: Importer[];
   initialBatch?: ContainerCostBatch;
@@ -4080,7 +4236,23 @@ function ContainerCostModal({
   }
 
   function updateScooterVolumeRow(id: string, patch: Partial<ScooterVolumeDraftRow>) {
-    setScooterVolumeRows((current) => current.map((row) => row.id === id ? { ...row, ...patch } : row));
+    setScooterVolumeRows((current) => current.map((row) => {
+      if (row.id !== id) return row;
+      const nextRow = { ...row, ...patch };
+      const matchingSpec = scooterPackagingSpecs.find((spec) =>
+        normalizedSupplierKey(spec.model) === normalizedSupplierKey(nextRow.model)
+        && spec.component === nextRow.component,
+      );
+
+      if (!matchingSpec || (!('model' in patch) && !('component' in patch))) return nextRow;
+
+      return {
+        ...nextRow,
+        lengthCm: matchingSpec.lengthCm,
+        widthCm: matchingSpec.widthCm,
+        heightCm: matchingSpec.heightCm,
+      };
+    }));
   }
 
   function removeScooterVolumeRow(id: string) {

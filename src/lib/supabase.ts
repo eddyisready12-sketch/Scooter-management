@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, Supplier, SupplierContact, WarrantyPart } from '../types';
+import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -55,6 +55,7 @@ const tableMap: Record<keyof AppData, string> = {
   containers: 'containers',
   containerCostBatches: 'container_cost_batches',
   containerCostLines: 'container_cost_lines',
+  scooterPackagingSpecs: 'scooter_packaging_specs',
   productPackagingRegistrations: 'product_packaging_registrations',
   dealers: 'dealers',
   products: 'products',
@@ -353,6 +354,16 @@ export async function upsertContainerCostLines(lines: ContainerCostLine[]) {
   }
 
   throw new Error('Importregel opslaan mislukt: Supabase schema mist meerdere kolommen.');
+}
+
+export async function upsertScooterPackagingSpecs(specs: ScooterPackagingSpec[]) {
+  if (!supabase || specs.length === 0) return;
+
+  const { error } = await supabase
+    .from('scooter_packaging_specs')
+    .upsert(specs);
+
+  if (error) throw error;
 }
 
 export async function upsertProductPackagingRegistrations(registrations: ProductPackagingRegistration[]) {

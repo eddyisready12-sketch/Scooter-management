@@ -150,6 +150,22 @@ on container_cost_batches("containerId");
 create index if not exists container_cost_lines_batch_idx
 on container_cost_lines("batchId");
 
+create table if not exists scooter_packaging_specs (
+  id text primary key,
+  model text not null,
+  component text not null,
+  "lengthCm" text not null,
+  "widthCm" text not null,
+  "heightCm" text not null,
+  "hasLining" boolean default false,
+  "boxWeightKg" text,
+  notes text,
+  "updatedAt" timestamptz default now()
+);
+
+create unique index if not exists scooter_packaging_specs_model_component_idx
+on scooter_packaging_specs(lower(model), component);
+
 create table if not exists product_packaging_registrations (
   id text primary key,
   "batchId" text not null references container_cost_batches(id) on delete cascade,
