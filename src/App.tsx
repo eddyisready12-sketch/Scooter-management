@@ -2310,8 +2310,10 @@ export function App() {
         return { ...current, scooterPackagingSpecs: Array.from(specMap.values()) };
       });
       showCsvMessage(`Verpakking voor ${normalizedSpec.model} ${normalizedSpec.component} opgeslagen.`);
+      return true;
     } catch (error) {
       showCsvMessage(`Scooter verpakking opslaan mislukt: ${importErrorMessage(error)}`);
+      return false;
     }
   }
 
@@ -3689,12 +3691,13 @@ function CostBatchesPage({
   onSelectProduct: (product: Product, tab?: ProductModalTab) => void;
   onOpenBatchLabelProduct: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
   onTogglePurchaseOrderLine: (line: ContainerCostLine, purchaseOrderAdded: boolean) => Promise<void>;
-  onSaveScooterPackagingSpec: (spec: ScooterPackagingSpec) => Promise<void>;
+  onSaveScooterPackagingSpec: (spec: ScooterPackagingSpec) => Promise<boolean>;
 }) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [printMessage, setPrintMessage] = useState('');
+  const [packagingMessage, setPackagingMessage] = useState('');
   const [importToolTab, setImportToolTab] = useState<'batch' | 'scooterPackaging'>('batch');
   const [packagingDraft, setPackagingDraft] = useState<ScooterPackagingSpec>({
     id: '',
@@ -3722,16 +3725,25 @@ function CostBatchesPage({
   );
   const editingBatchLines = editingBatch ? visibleContainerCostLines.filter((line) => line.batchId === editingBatch.id) : [];
 
-  function savePackagingDraft(event: FormEvent<HTMLFormElement>) {
+  async function savePackagingDraft(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const model = packagingDraft.model.trim();
-    if (!model) return;
+    if (!model) {
+      setPackagingMessage('Vul eerst een model in.');
+      return;
+    }
 
-    void onSaveScooterPackagingSpec({
+    setPackagingMessage('Opslaan...');
+    const saved = await onSaveScooterPackagingSpec({
       ...packagingDraft,
       id: packagingDraft.id || stableId('scooter-packaging-spec', `${model}-${packagingDraft.component}`),
       model,
     });
+    if (!saved) {
+      setPackagingMessage('Opslaan mislukt. Controleer of de Supabase tabel bestaat en RLS schrijven toestaat.');
+      return;
+    }
+    setPackagingMessage(`Verpakking voor ${model} ${packagingDraft.component} opgeslagen.`);
     setPackagingDraft({
       id: '',
       model: '',
@@ -3776,6 +3788,7 @@ function CostBatchesPage({
           </div>
         ) : (
           <div className="scooter-packaging-tool">
+            {packagingMessage ? <div className="notice compact">{packagingMessage}</div> : null}
             <form className="scooter-packaging-form" onSubmit={savePackagingDraft}>
               <label>Model
                 <input list="scooter-packaging-model-options" value={packagingDraft.model} onChange={(event) => setPackagingDraft((current) => ({ ...current, model: event.target.value }))} placeholder="Bijv. Sense" required />
