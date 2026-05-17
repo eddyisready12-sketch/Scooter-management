@@ -326,6 +326,7 @@ alter table scooters enable row level security;
 alter table container_cost_batches enable row level security;
 alter table container_cost_lines enable row level security;
 alter table product_packaging_registrations enable row level security;
+alter table scooter_packaging_specs enable row level security;
 alter table batteries enable row level security;
 alter table battery_models enable row level security;
 alter table warranty_parts enable row level security;
@@ -495,6 +496,36 @@ with check (true);
 
 create policy "Allow authenticated delete product packaging registrations"
 on product_packaging_registrations
+for delete
+to authenticated
+using (true);
+
+drop policy if exists "Allow authenticated read scooter packaging specs" on scooter_packaging_specs;
+drop policy if exists "Allow authenticated insert scooter packaging specs" on scooter_packaging_specs;
+drop policy if exists "Allow authenticated update scooter packaging specs" on scooter_packaging_specs;
+drop policy if exists "Allow authenticated delete scooter packaging specs" on scooter_packaging_specs;
+
+create policy "Allow authenticated read scooter packaging specs"
+on scooter_packaging_specs
+for select
+to authenticated
+using (true);
+
+create policy "Allow authenticated insert scooter packaging specs"
+on scooter_packaging_specs
+for insert
+to authenticated
+with check (true);
+
+create policy "Allow authenticated update scooter packaging specs"
+on scooter_packaging_specs
+for update
+to authenticated
+using (true)
+with check (true);
+
+create policy "Allow authenticated delete scooter packaging specs"
+on scooter_packaging_specs
 for delete
 to authenticated
 using (true);
