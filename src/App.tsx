@@ -39,7 +39,7 @@ import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
 import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
+import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
@@ -120,6 +120,9 @@ const packagingLayerNames = ['01. Omverpakking', '02. Binnenzak', '03. Label / s
 const packagingRoleOptions = ['Primair', 'Secundair', 'Tertiair'] as const;
 const recyclabilityClassOptions = ['Klasse A', 'Klasse B', 'Klasse C', 'Klasse D', 'Klasse E'] as const;
 const productStickerMaterialOptions = ['Geen', 'Papier', 'Plastic PP'] as const;
+const batchPackagingScopeOptions: BatchPackagingScope[] = ['Eigen import', 'EU-import', 'Binnenlandse inkoop'];
+const batchPackagingReportingModeOptions: BatchPackagingReportingMode[] = ['Alles registreren', 'Alleen SUP', 'Vrijgesteld'];
+const batchPackagingExactSourceOptions: BatchPackagingExactSource[] = ['Ordernummer', 'Batchnummer', 'Handmatig'];
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -1701,6 +1704,33 @@ function parseBatchCostItems(
   }
 }
 
+function parseBatchPackagingCompliance(batch?: ContainerCostBatch): BatchPackagingComplianceConfig {
+  if (!batch?.packagingComplianceJson) {
+    return {
+      scope: 'Eigen import',
+      reportingMode: 'Alles registreren',
+      exactSource: 'Ordernummer',
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(batch.packagingComplianceJson) as Partial<BatchPackagingComplianceConfig>;
+    return {
+      scope: parsed.scope || 'Eigen import',
+      reportingMode: parsed.reportingMode || 'Alles registreren',
+      exactSource: parsed.exactSource || 'Ordernummer',
+      profileName: asOptionalTrimmedString(parsed.profileName),
+      notes: asOptionalTrimmedString(parsed.notes),
+    };
+  } catch {
+    return {
+      scope: 'Eigen import',
+      reportingMode: 'Alles registreren',
+      exactSource: 'Ordernummer',
+    };
+  }
+}
+
 function loginNameFromEmail(email: string) {
   const localPart = email.split('@')[0] || 'Gebruiker';
   return localPart
@@ -2940,7 +2970,7 @@ export function App() {
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
           {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
-          {view === 'packaging' && <PackagingOverviewPage registrations={data.productPackagingRegistrations} />}
+          {view === 'packaging' && <PackagingOverviewPage registrations={data.productPackagingRegistrations} batches={data.containerCostBatches} />}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
@@ -3111,13 +3141,19 @@ function Dashboard({ data, onNavigate }: {
   );
 }
 
-function PackagingOverviewPage({ registrations }: { registrations: ProductPackagingRegistration[] }) {
+function PackagingOverviewPage({ registrations, batches }: { registrations: ProductPackagingRegistration[]; batches: ContainerCostBatch[] }) {
   const [batchFilter, setBatchFilter] = useState('all');
   const [materialFilter, setMaterialFilter] = useState('all');
-  const filteredRegistrations = useMemo(() => registrations.filter((registration) =>
-    (batchFilter === 'all' || registration.batchOrderNumber === batchFilter) &&
-    (materialFilter === 'all' || registration.material === materialFilter),
-  ), [batchFilter, materialFilter, registrations]);
+  const [reportingFilter, setReportingFilter] = useState('all');
+  const batchComplianceMap = useMemo(() => new Map(
+    batches.map((batch) => [batch.id, parseBatchPackagingCompliance(batch)]),
+  ), [batches]);
+  const filteredRegistrations = useMemo(() => registrations.filter((registration) => {
+    const compliance = batchComplianceMap.get(registration.batchId);
+    return (batchFilter === 'all' || registration.batchOrderNumber === batchFilter) &&
+      (materialFilter === 'all' || registration.material === materialFilter) &&
+      (reportingFilter === 'all' || (compliance?.reportingMode || 'Alles registreren') === reportingFilter);
+  }), [batchComplianceMap, batchFilter, materialFilter, registrations, reportingFilter]);
   const totalWeightKg = filteredRegistrations.reduce((total, registration) => total + parseDecimal(registration.totalWeightGrams) / 1000, 0);
   const uniqueProducts = new Set(filteredRegistrations.map((registration) => registration.productCode).filter(Boolean)).size;
   const batchOptions = Array.from(new Set(registrations.map((registration) => registration.batchOrderNumber).filter(Boolean) as string[])).sort();
@@ -3162,6 +3198,21 @@ function PackagingOverviewPage({ registrations }: { registrations: ProductPackag
     });
     return Array.from(groups.values()).sort((a, b) => a.material.localeCompare(b.material, 'nl', { sensitivity: 'base' }));
   }, [filteredRegistrations]);
+  const complianceRows = useMemo(() => {
+    const groups = new Map<string, { scope: string; reportingMode: string; rows: number; weightKg: number; batches: Set<string> }>();
+    filteredRegistrations.forEach((registration) => {
+      const compliance = batchComplianceMap.get(registration.batchId);
+      const scope = compliance?.scope || 'Eigen import';
+      const reportingMode = compliance?.reportingMode || 'Alles registreren';
+      const key = `${scope}|${reportingMode}`;
+      const group = groups.get(key) ?? { scope, reportingMode, rows: 0, weightKg: 0, batches: new Set<string>() };
+      group.rows += 1;
+      group.weightKg += parseDecimal(registration.totalWeightGrams) / 1000;
+      if (registration.batchOrderNumber) group.batches.add(registration.batchOrderNumber);
+      groups.set(key, group);
+    });
+    return Array.from(groups.values()).sort((a, b) => b.weightKg - a.weightKg);
+  }, [batchComplianceMap, filteredRegistrations]);
 
   function csvEscape(value: string) {
     return `"${value.replace(/"/g, '""')}"`;
@@ -3249,6 +3300,41 @@ function PackagingOverviewPage({ registrations }: { registrations: ProductPackag
               {materialOptions.map((material) => <option key={material} value={material}>{material}</option>)}
             </select>
           </label>
+          <label>Rapportage
+            <select value={reportingFilter} onChange={(event) => setReportingFilter(event.target.value)}>
+              <option value="all">Alles</option>
+              {batchPackagingReportingModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-title"><span className="panel-title-label"><DatabaseZap size={16} /> Compliance per batchtype</span></div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Scope</th>
+                <th>Rapportage</th>
+                <th>Batches</th>
+                <th>Registratieregels</th>
+                <th>Gewicht kg</th>
+              </tr>
+            </thead>
+            <tbody>
+              {complianceRows.length === 0 ? (
+                <tr><td colSpan={5}>Nog geen compliance-data gevonden.</td></tr>
+              ) : complianceRows.map((row) => (
+                <tr key={`${row.scope}-${row.reportingMode}`}>
+                  <td>{row.scope}</td>
+                  <td>{row.reportingMode}</td>
+                  <td>{row.batches.size}</td>
+                  <td>{row.rows}</td>
+                  <td>{formatDecimal(row.weightKg, 8)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
       <section className="panel">
@@ -3318,6 +3404,8 @@ function PackagingOverviewPage({ registrations }: { registrations: ProductPackag
                 <th>Component</th>
                 <th>Materiaal</th>
                 <th>Sticker</th>
+                <th>Scope</th>
+                <th>Rapportage</th>
                 <th>Verpakkingen</th>
                 <th>Gewicht kg</th>
                 <th>Datum</th>
@@ -3325,19 +3413,23 @@ function PackagingOverviewPage({ registrations }: { registrations: ProductPackag
             </thead>
             <tbody>
               {filteredRegistrations.length === 0 ? (
-                <tr><td colSpan={8}>Nog geen detailregels.</td></tr>
-              ) : filteredRegistrations.map((registration) => (
+                <tr><td colSpan={10}>Nog geen detailregels.</td></tr>
+              ) : filteredRegistrations.map((registration) => {
+                const compliance = batchComplianceMap.get(registration.batchId);
+                return (
                 <tr key={registration.id}>
                   <td>{registration.batchOrderNumber || '-'}</td>
                   <td><strong>{registration.productCode}</strong><br /><small>{registration.productDescription}</small></td>
                   <td>{registration.layerName}</td>
                   <td>{registration.material}<br /><small>{registration.recycleCode || '-'}</small></td>
                   <td>{registration.productStickerMaterial || '-'}</td>
+                  <td>{compliance?.scope || 'Eigen import'}</td>
+                  <td>{compliance?.reportingMode || 'Alles registreren'}</td>
                   <td>{registration.packagesCount || '-'}</td>
                   <td>{formatDecimal(parseDecimal(registration.totalWeightGrams) / 1000, 8)}</td>
                   <td>{registration.registeredAt ? formatDate(registration.registeredAt) : '-'}</td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
@@ -4410,6 +4502,7 @@ function ContainerCostModal({
   onSave: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
 }) {
   const initialCostItemState = parseBatchCostItems(initialBatch);
+  const initialPackagingCompliance = parseBatchPackagingCompliance(initialBatch);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
   const [batchStatus, setBatchStatus] = useState<'Concept' | 'Definitief'>(initialBatch?.status || 'Concept');
   const [containerNumber, setContainerNumber] = useState(initialBatch?.containerNumber ?? containers[0]?.number ?? '');
@@ -4423,6 +4516,11 @@ function ContainerCostModal({
   const [costItems, setCostItems] = useState<ContainerCostDraftItem[]>(() => initialCostItemState.costItems);
   const [paymentNetOverrideEur, setPaymentNetOverrideEur] = useState(initialBatch?.paymentNetOverrideEur ? String(initialBatch.paymentNetOverrideEur).replace('.', ',') : '');
   const [exactReference, setExactReference] = useState(initialBatch?.exactReference ?? '');
+  const [packagingComplianceScope, setPackagingComplianceScope] = useState<BatchPackagingScope>(initialPackagingCompliance.scope || 'Eigen import');
+  const [packagingComplianceReportingMode, setPackagingComplianceReportingMode] = useState<BatchPackagingReportingMode>(initialPackagingCompliance.reportingMode || 'Alles registreren');
+  const [packagingComplianceExactSource, setPackagingComplianceExactSource] = useState<BatchPackagingExactSource>(initialPackagingCompliance.exactSource || 'Ordernummer');
+  const [packagingComplianceProfileName, setPackagingComplianceProfileName] = useState(initialPackagingCompliance.profileName ?? '');
+  const [packagingComplianceNotes, setPackagingComplianceNotes] = useState(initialPackagingCompliance.notes ?? '');
   const [notes, setNotes] = useState(initialBatch?.notes ?? '');
   const [content, setContent] = useState('');
   const [importFileName, setImportFileName] = useState('');
@@ -4809,6 +4907,13 @@ function ContainerCostModal({
     setSaving(true);
     try {
       const batchId = initialBatch?.id ?? stableId('container-cost-batch', `${containerNumber}-${orderNumber}-${Date.now()}`);
+      const packagingComplianceConfig: BatchPackagingComplianceConfig = {
+        scope: packagingComplianceScope,
+        reportingMode: packagingComplianceReportingMode,
+        exactSource: packagingComplianceExactSource,
+        profileName: packagingComplianceProfileName.trim() || undefined,
+        notes: packagingComplianceNotes.trim() || undefined,
+      };
       const batch: ContainerCostBatch = {
         id: batchId,
         status: batchStatus,
@@ -4840,6 +4945,7 @@ function ContainerCostModal({
         paymentNetEur: formatDecimal(finalPaymentNetEur, 2),
         paymentNetOverrideEur: paymentNetOverrideEur.trim() ? formatDecimal(parseDecimal(paymentNetOverrideEur), 2) : undefined,
         exactReference: exactReference.trim() || undefined,
+        packagingComplianceJson: JSON.stringify(packagingComplianceConfig),
         notes: notes.trim() || undefined,
         createdAt: initialBatch?.createdAt || new Date().toISOString(),
       };
@@ -5040,6 +5146,37 @@ function ContainerCostModal({
               <label className="span-2">Notities
                 <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optioneel: opmerking over containerinhoud, samengestelde sets of correcties." />
               </label>
+            </div>
+            <div className="product-form-subsection container-cost-subsection container-compliance-section">
+              <div className="section-header-with-actions compact-header">
+                <div>
+                  <h4>Verpakkingscompliance</h4>
+                  <p className="section-subtitle">Leg per importbatch vast of deze order voor Verpact meetelt en hoe Exact deze batch later moet teruggeven.</p>
+                </div>
+              </div>
+              <div className="form-grid">
+                <label>Scope
+                  <select value={packagingComplianceScope} onChange={(event) => setPackagingComplianceScope(event.target.value as BatchPackagingScope)}>
+                    {batchPackagingScopeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+                <label>Rapportage
+                  <select value={packagingComplianceReportingMode} onChange={(event) => setPackagingComplianceReportingMode(event.target.value as BatchPackagingReportingMode)}>
+                    {batchPackagingReportingModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+                <label>Exact batchbron
+                  <select value={packagingComplianceExactSource} onChange={(event) => setPackagingComplianceExactSource(event.target.value as BatchPackagingExactSource)}>
+                    {batchPackagingExactSourceOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+                <label>Profiel / scenario
+                  <input value={packagingComplianceProfileName} onChange={(event) => setPackagingComplianceProfileName(event.target.value)} placeholder="Bijv. SUP zakje, karton doosje, mixbatch" />
+                </label>
+                <label className="span-2">Compliance notitie
+                  <textarea value={packagingComplianceNotes} onChange={(event) => setPackagingComplianceNotes(event.target.value)} placeholder="Bijv. vanaf deze batch doosje in plaats van zakje, of alleen eigen import meetellen." />
+                </label>
+              </div>
             </div>
             <div className="container-volume-planner">
               <div className="section-header-with-actions compact-header">

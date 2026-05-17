@@ -121,9 +121,13 @@ create table if not exists container_cost_batches (
   "paymentNetEur" text,
   "paymentNetOverrideEur" text,
   "exactReference" text,
+  "packagingComplianceJson" text,
   notes text,
   "createdAt" timestamptz default now()
 );
+
+alter table if exists container_cost_batches
+add column if not exists "packagingComplianceJson" text;
 
 create table if not exists container_cost_lines (
   id text primary key,

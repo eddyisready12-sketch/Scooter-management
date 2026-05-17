@@ -50,6 +50,17 @@ export type Container = {
 
 export type ContainerCostAllocationMode = 'volume' | 'value';
 export type ContainerCostItemCategory = 'transport' | 'import' | 'other';
+export type BatchPackagingScope = 'Eigen import' | 'EU-import' | 'Binnenlandse inkoop';
+export type BatchPackagingReportingMode = 'Alles registreren' | 'Alleen SUP' | 'Vrijgesteld';
+export type BatchPackagingExactSource = 'Ordernummer' | 'Batchnummer' | 'Handmatig';
+
+export type BatchPackagingComplianceConfig = {
+  scope?: BatchPackagingScope;
+  reportingMode?: BatchPackagingReportingMode;
+  exactSource?: BatchPackagingExactSource;
+  profileName?: string;
+  notes?: string;
+};
 
 export type ContainerCostBatch = {
   id: string;
@@ -82,6 +93,7 @@ export type ContainerCostBatch = {
   paymentNetEur?: string;
   paymentNetOverrideEur?: string;
   exactReference?: string;
+  packagingComplianceJson?: string;
   notes?: string;
   createdAt?: string;
 };
