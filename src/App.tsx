@@ -6055,6 +6055,20 @@ function ProductDetailModal({
           </div>
         </div>
         <section className="panel form-panel product-form-shell">
+          {productImageUrl ? (
+            <div className="product-top-image-preview">
+              {productImageFailed ? (
+                <span>Afbeelding kan niet geladen worden.</span>
+              ) : (
+                <img
+                  src={productImageUrl}
+                  alt={draft.description || draft.code}
+                  referrerPolicy="no-referrer"
+                  onError={() => setProductImageFailed(true)}
+                />
+              )}
+            </div>
+          ) : null}
           <div className="product-tab-bar top-attached">
             <button type="button" className={`product-tab-button${activeTab === 'basic' ? ' active' : ''}`} onClick={() => setActiveTab('basic')}>
               <span className="panel-title-label"><BriefcaseBusiness size={16} /> Product informatie</span>
@@ -6146,25 +6160,9 @@ function ProductDetailModal({
                   <label>Einddatum
                     <input type="date" value={rdwDateToInputDate(draft.endDate)} onChange={(event) => setDraft((current) => ({ ...current, endDate: event.target.value || undefined }))} />
                   </label>
-                  <div className="span-2 product-image-field">
-                    <label>Afbeelding URL
-                      <input value={draft.imageUrl ?? ''} onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.target.value }))} />
-                    </label>
-                    {productImageUrl ? (
-                      <div className="product-image-preview">
-                        {productImageFailed ? (
-                          <span>Afbeelding kan niet geladen worden.</span>
-                        ) : (
-                          <img
-                            src={productImageUrl}
-                            alt={draft.description || draft.code}
-                            referrerPolicy="no-referrer"
-                            onError={() => setProductImageFailed(true)}
-                          />
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
+                  <label className="span-2">Afbeelding URL
+                    <input value={draft.imageUrl ?? ''} onChange={(event) => setDraft((current) => ({ ...current, imageUrl: event.target.value }))} />
+                  </label>
                 </div>
               </div>
             </div>
