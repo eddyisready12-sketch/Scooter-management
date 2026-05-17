@@ -361,6 +361,20 @@ export type DocumentRecord = {
   uploadedAt?: string;
 };
 
+export type ExactConnectionStatus = {
+  id: string;
+  provider: 'exact';
+  isConnected: boolean;
+  administrationName?: string;
+  divisionCode?: string;
+  exactUserName?: string;
+  redirectUri?: string;
+  connectedAt?: string;
+  tokenExpiresAt?: string;
+  lastSyncAt?: string;
+  lastError?: string;
+};
+
 export type AppData = {
   scooters: Scooter[];
   containers: Container[];

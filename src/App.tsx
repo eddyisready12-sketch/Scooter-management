@@ -38,8 +38,8 @@ import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { createScooterDocumentUrl, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
+import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactConnectionStatus, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
@@ -3141,6 +3141,86 @@ function Dashboard({ data, onNavigate }: {
   );
 }
 
+function ExactConnectionPanel() {
+  const [status, setStatus] = useState<ExactConnectionStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  async function loadStatus() {
+    setLoading(true);
+    setError('');
+    try {
+      const nextStatus = await fetchExactConnectionStatus();
+      setStatus(nextStatus);
+    } catch (loadError) {
+      setError(importErrorMessage(loadError));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const exactState = url.searchParams.get('exact');
+    const exactError = url.searchParams.get('exact_error');
+    if (exactState === 'connected') {
+      setNotice('Exact is gekoppeld. Ververs de status om de administratiegegevens op te halen.');
+    } else if (exactError) {
+      setError(exactError);
+    }
+    if (exactState || exactError) {
+      url.searchParams.delete('exact');
+      url.searchParams.delete('exact_error');
+      window.history.replaceState({}, document.title, url.toString());
+    }
+    void loadStatus();
+  }, []);
+
+  function startExactConnect() {
+    const authUrl = buildExactAuthStartUrl();
+    if (!authUrl) {
+      setError('Supabase is niet geconfigureerd voor Exact koppelen.');
+      return;
+    }
+    const url = new URL(authUrl);
+    url.searchParams.set('returnTo', window.location.href.split('?')[0] || window.location.href);
+    window.location.href = url.toString();
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel-title">
+        <span className="panel-title-label"><Lock size={16} /> Exact koppeling</span>
+        <button type="button" className="secondary-button panel-title-action" onClick={() => void loadStatus()}>
+          <RefreshCw size={16} /> Status verversen
+        </button>
+      </div>
+      {notice ? <div className="inline-notice success-notice">{notice}</div> : null}
+      {error ? <div className="inline-notice">{error}</div> : null}
+      <div className="exact-connection-panel-body">
+        <div className="exact-connection-copy">
+          <strong>{status?.isConnected ? 'Exact Handel is gekoppeld' : 'Exact is nog niet gekoppeld'}</strong>
+          <span>Deze koppeling gebruikt later de verkoopregels en batchreferentie uit Exact. De verpakkingslogica blijft in Vite op batchniveau staan.</span>
+        </div>
+        <div className="exact-connection-meta">
+          <div><span>Status</span><strong>{loading ? 'Laden...' : status?.isConnected ? 'Gekoppeld' : 'Niet gekoppeld'}</strong></div>
+          <div><span>Administratie</span><strong>{status?.administrationName || '-'}</strong></div>
+          <div><span>Division</span><strong>{status?.divisionCode || '-'}</strong></div>
+          <div><span>Token geldig tot</span><strong>{status?.tokenExpiresAt ? formatDate(status.tokenExpiresAt) : '-'}</strong></div>
+          <div><span>Laatste sync</span><strong>{status?.lastSyncAt ? formatDate(status.lastSyncAt) : '-'}</strong></div>
+          <div><span>Laatste fout</span><strong>{status?.lastError || '-'}</strong></div>
+        </div>
+        <div className="exact-connection-actions">
+          <button type="button" className="primary-button" onClick={startExactConnect}>
+            <Lock size={16} /> {status?.isConnected ? 'Opnieuw koppelen' : 'Koppel Exact'}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function PackagingOverviewPage({ registrations, batches }: { registrations: ProductPackagingRegistration[]; batches: ContainerCostBatch[] }) {
   const [batchFilter, setBatchFilter] = useState('all');
   const [materialFilter, setMaterialFilter] = useState('all');
@@ -3276,6 +3356,7 @@ function PackagingOverviewPage({ registrations, batches }: { registrations: Prod
           <span>Overzicht per materiaal, productsticker en batch</span>
         </div>
       </div>
+      <ExactConnectionPanel />
       <section className="stat-grid packaging-overview-stats">
         <div className="stat-card"><PackagePlus size={22} /><div><span>Registratieregels</span><strong>{filteredRegistrations.length}</strong></div></div>
         <div className="stat-card"><Boxes size={22} /><div><span>Totaal gewicht</span><strong>{formatDecimal(totalWeightKg, 8)} kg</strong></div></div>

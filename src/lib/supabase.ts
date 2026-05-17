@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
+import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactConnectionStatus, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -8,6 +8,10 @@ export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 const scooterDocumentsBucket = 'scooter-documents';
+
+export function buildExactAuthStartUrl() {
+  return supabaseUrl ? `${supabaseUrl}/functions/v1/exact-auth-start` : '';
+}
 
 function normalizeDocumentFileName(value: string) {
   return value
@@ -48,6 +52,13 @@ export async function signOut() {
   if (!supabase) return;
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+}
+
+export async function fetchExactConnectionStatus(): Promise<ExactConnectionStatus | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.functions.invoke('exact-connection-status');
+  if (error) throw error;
+  return (data as ExactConnectionStatus | null) ?? null;
 }
 
 const tableMap: Record<keyof AppData, string> = {

@@ -253,6 +253,61 @@ h2 {
   padding: 14px;
 }
 
+.exact-connection-panel-body {
+  display: grid;
+  gap: 16px;
+  padding: 14px;
+}
+
+.exact-connection-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.exact-connection-copy strong {
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.exact-connection-copy span {
+  color: #5f6f7f;
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.exact-connection-meta {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.exact-connection-meta div {
+  background: #f8fafc;
+  border: 1px solid #dbe4ec;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.exact-connection-meta span {
+  color: #5f6f7f;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.exact-connection-meta strong {
+  color: #17202a;
+  font-size: 0.95rem;
+}
+
+.exact-connection-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .packaging-overview-toolbar label {
   display: grid;
   gap: 6px;

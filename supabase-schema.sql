@@ -173,6 +173,23 @@ create table if not exists scooter_packaging_specs (
 create unique index if not exists scooter_packaging_specs_model_component_idx
 on scooter_packaging_specs(lower(model), component);
 
+create table if not exists exact_connections (
+  id text primary key,
+  provider text not null default 'exact',
+  "administrationName" text,
+  "divisionCode" text,
+  "exactUserName" text,
+  "redirectUri" text,
+  "connectedAt" timestamptz,
+  "tokenExpiresAt" timestamptz,
+  "accessToken" text,
+  "refreshToken" text,
+  scope text,
+  "lastSyncAt" timestamptz,
+  "lastError" text,
+  "updatedAt" timestamptz default now()
+);
+
 create table if not exists product_packaging_registrations (
   id text primary key,
   "batchId" text not null references container_cost_batches(id) on delete cascade,
@@ -333,6 +350,7 @@ alter publication supabase_realtime add table containers;
 alter publication supabase_realtime add table container_cost_batches;
 alter publication supabase_realtime add table container_cost_lines;
 alter publication supabase_realtime add table product_packaging_registrations;
+alter publication supabase_realtime add table exact_connections;
 alter publication supabase_realtime add table dealers;
 alter publication supabase_realtime add table suppliers;
 alter publication supabase_realtime add table supplier_contacts;
@@ -350,6 +368,7 @@ alter table container_cost_batches enable row level security;
 alter table container_cost_lines enable row level security;
 alter table product_packaging_registrations enable row level security;
 alter table scooter_packaging_specs enable row level security;
+alter table exact_connections enable row level security;
 alter table batteries enable row level security;
 alter table battery_models enable row level security;
 alter table warranty_parts enable row level security;
