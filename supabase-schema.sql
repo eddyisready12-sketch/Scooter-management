@@ -25,6 +25,9 @@ add column if not exists "purchasePrice" text;
 alter table if exists products
 add column if not exists "importCompany" text;
 
+alter table if exists products
+add column if not exists "packagingLayers" jsonb;
+
 create table if not exists importers (
   id text primary key,
   name text not null,
@@ -184,6 +187,9 @@ create table if not exists product_packaging_registrations (
   material text not null,
   "recycleCode" text,
   "wasteStream" text,
+  "recycledContentPercent" text,
+  "recyclabilityClass" text,
+  "packagingRole" text,
   "weightGramsPerUnit" text not null,
   "totalWeightGrams" text not null,
   source text default 'product_snapshot',
@@ -198,6 +204,15 @@ add column if not exists "packagesCount" text;
 
 alter table if exists product_packaging_registrations
 add column if not exists "unitsPerPackage" text;
+
+alter table if exists product_packaging_registrations
+add column if not exists "recycledContentPercent" text;
+
+alter table if exists product_packaging_registrations
+add column if not exists "recyclabilityClass" text;
+
+alter table if exists product_packaging_registrations
+add column if not exists "packagingRole" text;
 
 create index if not exists product_packaging_registrations_batch_idx
 on product_packaging_registrations("batchId");

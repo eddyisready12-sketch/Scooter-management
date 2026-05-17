@@ -107,16 +107,18 @@ const containerVolumePresets = [
 
 const loginStorageKey = 'rso-admin-session';
 const packagingMaterialOptions = [
-  { value: 'Karton', label: 'Karton', recycleCode: 'PAP 20', recycleFamily: 'PAP', recycleNumber: '20', wasteStream: 'Papier en karton' },
-  { value: 'Glad karton', label: 'Glad karton', recycleCode: 'PAP 21', recycleFamily: 'PAP', recycleNumber: '21', wasteStream: 'Papier en karton' },
-  { value: 'Papier', label: 'Papier', recycleCode: 'PAP 22', recycleFamily: 'PAP', recycleNumber: '22', wasteStream: 'Papier en karton' },
-  { value: 'LDPE', label: 'LDPE folie', recycleCode: 'LDPE 4', recycleFamily: 'LDPE', recycleNumber: '4', wasteStream: 'Plastic / PMD' },
+  { value: 'PAP 20', label: 'PAP 20 - Golfkarton', recycleCode: 'PAP 20', recycleFamily: 'PAP', recycleNumber: '20', wasteStream: 'Papier en karton' },
+  { value: 'PAP 21', label: 'PAP 21 - Massief karton', recycleCode: 'PAP 21', recycleFamily: 'PAP', recycleNumber: '21', wasteStream: 'Papier en karton' },
+  { value: 'PAP 22', label: 'PAP 22 - Papier', recycleCode: 'PAP 22', recycleFamily: 'PAP', recycleNumber: '22', wasteStream: 'Papier en karton' },
+  { value: 'PE-LD 04', label: 'PE-LD 04 - LDPE plastic', recycleCode: 'PE-LD 04', recycleFamily: 'LDPE', recycleNumber: '4', wasteStream: 'Plastic / PMD' },
   { value: 'HDPE', label: 'HDPE', recycleCode: 'HDPE 2', recycleFamily: 'HDPE', recycleNumber: '2', wasteStream: 'Plastic / PMD' },
   { value: 'PP', label: 'PP', recycleCode: 'PP 5', recycleFamily: 'PP', recycleNumber: '5', wasteStream: 'Plastic / PMD' },
   { value: 'PET', label: 'PET', recycleCode: 'PET 1', recycleFamily: 'PET', recycleNumber: '1', wasteStream: 'Plastic / PMD' },
 ] as const;
 
-const packagingLayerNames = ['Primair', 'Secundair', 'Tertiair', 'Quaternair', '5e laag'] as const;
+const packagingLayerNames = ['01. Omverpakking', '02. Binnenzak', '03. Transportverpakking', '04. Extra component', '05. Extra component'] as const;
+const packagingRoleOptions = ['Primair', 'Secundair', 'Tertiair'] as const;
+const recyclabilityClassOptions = ['Klasse A', 'Klasse B', 'Klasse C', 'Klasse D', 'Klasse E'] as const;
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -197,7 +199,7 @@ function dealerName(dealers: Dealer[], dealerId?: string) {
 }
 
 function findPackagingMaterialOption(value?: string) {
-  return packagingMaterialOptions.find((option) => option.value === value);
+  return packagingMaterialOptions.find((option) => option.value === value || option.recycleCode === value);
 }
 
 function asOptionalTrimmedString(value: unknown): string | undefined {
@@ -263,6 +265,9 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
         material: readPackagingLayerField(record, ['material', 'packagingMaterial', 'packaging_material']),
         recycleCode: readPackagingLayerField(record, ['recycleCode', 'recycle_code', 'code']),
         weightGrams: readPackagingLayerField(record, ['weightGrams', 'weight', 'grams']),
+        recycledContentPercent: readPackagingLayerField(record, ['recycledContentPercent', 'pcrPercent', 'pcr_percentage']),
+        recyclabilityClass: readPackagingLayerField(record, ['recyclabilityClass', 'recyclability_class']) as ProductPackagingLayer['recyclabilityClass'],
+        packagingRole: readPackagingLayerField(record, ['packagingRole', 'role', 'packaging_role']) as ProductPackagingLayer['packagingRole'],
       };
     })
     .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
@@ -298,6 +303,9 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
     material: asOptionalTrimmedString(layer.material),
     recycleCode: asOptionalTrimmedString(layer.recycleCode),
     weightGrams: asOptionalTrimmedString(layer.weightGrams),
+    recycledContentPercent: asOptionalTrimmedString(layer.recycledContentPercent),
+    recyclabilityClass: layer.recyclabilityClass,
+    packagingRole: layer.packagingRole,
   }));
 }
 
@@ -456,6 +464,9 @@ function buildPackagingRegistrationsForBatch(
         material,
         recycleCode: layer.recycleCode,
         wasteStream,
+        recycledContentPercent: layer.recycledContentPercent,
+        recyclabilityClass: layer.recyclabilityClass,
+        packagingRole: layer.packagingRole,
         weightGramsPerUnit,
         totalWeightGrams: formatDecimal(totalWeightGrams, 8),
         source: 'product_snapshot',
@@ -6075,8 +6086,11 @@ function ProductDetailModal({
             material: asOptionalTrimmedString(layer.material),
             recycleCode: asOptionalTrimmedString(layer.recycleCode),
             weightGrams: asOptionalTrimmedString(layer.weightGrams),
+            recycledContentPercent: asOptionalTrimmedString(layer.recycledContentPercent),
+            recyclabilityClass: layer.recyclabilityClass,
+            packagingRole: layer.packagingRole,
           }))
-          .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
+          .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams || layer.recycledContentPercent || layer.recyclabilityClass || layer.packagingRole);
 
       const primaryLayer = normalizedLayers[0];
       const secondaryLayer = normalizedLayers[1];
@@ -6469,13 +6483,15 @@ function ProductDetailModal({
                 </div>
                 <div className="product-form-subsection">
                   <h3>Verpakkingslagen</h3>
-                  <p className="product-section-hint">Vul het gewicht per verpakking in. Bij 5 stuks per verpakking telt de registratie het aantal verpakkingen, niet het aantal losse producten.</p>
+                  <p className="product-section-hint">Leg per SKU alle verpakkingscomponenten vast. Dit vormt straks de basis voor Verpact/PPWR-export per materiaalcode.</p>
                   <div className="packaging-layer-table-header">
-                    <span>Laag</span>
-                    <span>Verpakkingsmateriaal</span>
+                    <span>Component</span>
+                    <span>Materiaalcode</span>
+                    <span>Rol</span>
                     <span>Afvalstroom</span>
-                    <span>Recyclecode</span>
                     <span>Gewicht (g)</span>
+                    <span>% PCR</span>
+                    <span>Recyclebaar</span>
                     <span>Labelicoon</span>
                     <span className="sr-only">Acties</span>
                   </div>
@@ -6491,20 +6507,23 @@ function ProductDetailModal({
                               <strong>{layer.name ?? packagingLayerNames[index]}</strong>
                             </div>
                             <div className="packaging-layer-field">
-                              <span className="packaging-layer-mobile-label">Verpakkingsmateriaal</span>
+                              <span className="packaging-layer-mobile-label">Materiaalcode</span>
                               <select value={layer.material ?? ''} onChange={(event) => applyPackagingMaterial(index, event.target.value)}>
                                 <option value="">Selecteer...</option>
                                 {layer.material && !selectedOption ? <option value={layer.material}>{layer.material}</option> : null}
-                                {packagingMaterialOptions.map((option) => <option key={`${index}-${option.recycleCode}`} value={option.value}>{option.label} ({option.recycleCode})</option>)}
+                                {packagingMaterialOptions.map((option) => <option key={`${index}-${option.recycleCode}`} value={option.value}>{option.label}</option>)}
+                              </select>
+                            </div>
+                            <div className="packaging-layer-field">
+                              <span className="packaging-layer-mobile-label">Rol</span>
+                              <select value={layer.packagingRole ?? ''} onChange={(event) => updatePackagingLayer(index, { packagingRole: (event.target.value || undefined) as ProductPackagingLayer['packagingRole'] })}>
+                                <option value="">Selecteer...</option>
+                                {packagingRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
                               </select>
                             </div>
                             <div className="packaging-layer-field">
                               <span className="packaging-layer-mobile-label">Afvalstroom</span>
                               <input value={layerWasteStream} readOnly />
-                            </div>
-                            <div className="packaging-layer-field">
-                              <span className="packaging-layer-mobile-label">Recyclecode</span>
-                              <input value={layer.recycleCode ?? ''} onChange={(event) => updatePackagingLayer(index, { recycleCode: event.target.value || undefined })} />
                             </div>
                             <div className="packaging-layer-field">
                               <span className="packaging-layer-mobile-label">Gewicht (g)</span>
@@ -6515,6 +6534,22 @@ function ProductDetailModal({
                                 onChange={(event) => updatePackagingLayer(index, { weightGrams: event.target.value || undefined })}
                               />
                             </div>
+                            <div className="packaging-layer-field">
+                              <span className="packaging-layer-mobile-label">% PCR</span>
+                              <input
+                                value={layer.recycledContentPercent ?? ''}
+                                inputMode="decimal"
+                                placeholder="0"
+                                onChange={(event) => updatePackagingLayer(index, { recycledContentPercent: event.target.value || undefined })}
+                              />
+                            </div>
+                            <div className="packaging-layer-field">
+                              <span className="packaging-layer-mobile-label">Recyclebaar</span>
+                              <select value={layer.recyclabilityClass ?? ''} onChange={(event) => updatePackagingLayer(index, { recyclabilityClass: (event.target.value || undefined) as ProductPackagingLayer['recyclabilityClass'] })}>
+                                <option value="">Selecteer...</option>
+                                {recyclabilityClassOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                              </select>
+                            </div>
                             <div className="packaging-layer-preview">
                               <span className="packaging-layer-mobile-label">Labelicoon</span>
                               <PackagingMaterialIcon option={selectedOption} compact />
@@ -6524,7 +6559,7 @@ function ProductDetailModal({
                                 type="button"
                                 className="danger-icon-button"
                                 onClick={() => removePackagingLayer(index)}
-                                disabled={packagingLayers.length <= 2 && !layer.material && !layer.recycleCode && !layer.weightGrams}
+                                disabled={packagingLayers.length <= 2 && !layer.material && !layer.recycleCode && !layer.weightGrams && !layer.recycledContentPercent && !layer.recyclabilityClass && !layer.packagingRole}
                                 aria-label={`${layer.name ?? packagingLayerNames[index]} verwijderen`}
                               >
                                 <XCircle size={18} />
