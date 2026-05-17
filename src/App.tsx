@@ -88,6 +88,7 @@ type ScooterVolumeDraftRow = {
   widthCm: string;
   heightCm: string;
   unitPriceUsd: string;
+  purchaseOrderAdded?: boolean;
 };
 
 type AirMailCostDraftRow = {
@@ -1302,6 +1303,7 @@ type ContainerCostImportDraftLine = {
   unitPriceUsd: string;
   amountUsd?: string;
   componentsNote?: string;
+  purchaseOrderAdded?: boolean;
 };
 
 function mergeContainerCostDraftLines(lines: ContainerCostImportDraftLine[]) {
@@ -1612,6 +1614,7 @@ function parseInitialScooterVolumeRows(lines?: ContainerCostLine[]): ScooterVolu
       widthCm: dimensionMatch?.[3]?.replace('.', ',') || '',
       heightCm: dimensionMatch?.[4]?.replace('.', ',') || '',
       unitPriceUsd: line.unitPriceUsd || '',
+      purchaseOrderAdded: line.purchaseOrderAdded,
     };
   });
 }
@@ -4189,6 +4192,7 @@ function ContainerCostModal({
       unitPriceUsd: line.unitPriceUsd,
       amountUsd: formatDecimal(parseDecimal(line.unitPriceUsd) * parseDecimal(line.quantity), 4),
       componentsNote: line.componentsNote,
+      purchaseOrderAdded: line.purchaseOrderAdded,
     })),
   );
   const [scooterVolumeRows, setScooterVolumeRows] = useState<ScooterVolumeDraftRow[]>(() => parseInitialScooterVolumeRows(initialLines));
@@ -4328,6 +4332,7 @@ function ContainerCostModal({
         volumeCbm: formatDecimal(unitVolumeCbm, 4),
         unitPriceUsd: row.unitPriceUsd.trim() || '0',
         componentsNote: `${row.component} - ${formatCompactDecimal(lengthCm, 1)} x ${formatCompactDecimal(widthCm, 1)} x ${formatCompactDecimal(heightCm, 1)} cm`,
+        purchaseOrderAdded: row.purchaseOrderAdded,
       };
     })
     .filter((line): line is ContainerCostImportDraftLine => Boolean(line));
@@ -4682,7 +4687,7 @@ function ContainerCostModal({
           allocatedOtherEur: formatDecimal(line.allocatedOtherEur, 4),
           calculatedUnitCostEur: formatDecimal(line.calculatedUnitCostEur, 4),
           componentsNote: line.componentsNote,
-          purchaseOrderAdded: previousLine?.purchaseOrderAdded ?? false,
+          purchaseOrderAdded: line.purchaseOrderAdded ?? previousLine?.purchaseOrderAdded ?? false,
         };
       });
 
