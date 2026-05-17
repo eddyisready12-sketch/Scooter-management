@@ -1762,6 +1762,7 @@ tbody tr:hover {
     minmax(120px, 0.65fr)
     minmax(100px, 0.55fr)
     minmax(130px, 0.7fr)
+    minmax(120px, 0.65fr)
     minmax(160px, 0.85fr)
     auto;
   gap: 12px;
@@ -1791,6 +1792,7 @@ tbody tr:hover {
     minmax(120px, 0.65fr)
     minmax(100px, 0.55fr)
     minmax(130px, 0.7fr)
+    minmax(120px, 0.65fr)
     minmax(160px, 0.85fr)
     auto;
   gap: 12px;
@@ -1807,6 +1809,19 @@ tbody tr:hover {
   display: grid;
   gap: 6px;
   align-content: center;
+}
+
+.packaging-label-skip {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #c9d3df;
+  border-radius: 8px;
+  color: #6b7b8c;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 .packaging-layer-mobile-label {

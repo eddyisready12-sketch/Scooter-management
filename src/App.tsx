@@ -116,9 +116,10 @@ const packagingMaterialOptions = [
   { value: 'PET', label: 'PET', recycleCode: 'PET 1', recycleFamily: 'PET', recycleNumber: '1', wasteStream: 'Plastic / PMD' },
 ] as const;
 
-const packagingLayerNames = ['01. Omverpakking', '02. Binnenzak', '03. Transportverpakking', '04. Extra component', '05. Extra component'] as const;
+const packagingLayerNames = ['01. Omverpakking', '02. Binnenzak', '03. Label / sticker', '04. Transportverpakking', '05. Extra component'] as const;
 const packagingRoleOptions = ['Primair', 'Secundair', 'Tertiair'] as const;
 const recyclabilityClassOptions = ['Klasse A', 'Klasse B', 'Klasse C', 'Klasse D', 'Klasse E'] as const;
+const adhesiveTypeOptions = ['Geen', 'Permanent', 'Wasbaar'] as const;
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -202,6 +203,11 @@ function findPackagingMaterialOption(value?: string) {
   return packagingMaterialOptions.find((option) => option.value === value || option.recycleCode === value);
 }
 
+function isStickerPackagingLayer(layer: ProductPackagingLayer) {
+  const name = (layer.name ?? '').toLowerCase();
+  return name.includes('sticker') || name.includes('label') || Boolean(layer.adhesiveType && layer.adhesiveType !== 'Geen');
+}
+
 function asOptionalTrimmedString(value: unknown): string | undefined {
   if (typeof value === 'string') {
     const trimmed = value.trim();
@@ -268,9 +274,18 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
         recycledContentPercent: readPackagingLayerField(record, ['recycledContentPercent', 'pcrPercent', 'pcr_percentage']),
         recyclabilityClass: readPackagingLayerField(record, ['recyclabilityClass', 'recyclability_class']) as ProductPackagingLayer['recyclabilityClass'],
         packagingRole: readPackagingLayerField(record, ['packagingRole', 'role', 'packaging_role']) as ProductPackagingLayer['packagingRole'],
+        adhesiveType: readPackagingLayerField(record, ['adhesiveType', 'adhesive_type', 'glueType']) as ProductPackagingLayer['adhesiveType'],
       };
     })
-    .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
+    .filter((layer) => (
+      layer.material
+      || layer.recycleCode
+      || layer.weightGrams
+      || layer.recycledContentPercent
+      || layer.recyclabilityClass
+      || layer.packagingRole
+      || layer.adhesiveType
+    ));
 
   const fallbackLayers: ProductPackagingLayer[] = [];
 
@@ -306,6 +321,7 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
     recycledContentPercent: asOptionalTrimmedString(layer.recycledContentPercent),
     recyclabilityClass: layer.recyclabilityClass,
     packagingRole: layer.packagingRole,
+    adhesiveType: layer.adhesiveType,
   }));
 }
 
@@ -467,6 +483,7 @@ function buildPackagingRegistrationsForBatch(
         recycledContentPercent: layer.recycledContentPercent,
         recyclabilityClass: layer.recyclabilityClass,
         packagingRole: layer.packagingRole,
+        adhesiveType: layer.adhesiveType,
         weightGramsPerUnit,
         totalWeightGrams: formatDecimal(totalWeightGrams, 8),
         source: 'product_snapshot',
@@ -760,6 +777,7 @@ function svgToPngBase64(svg: string, width: number, height: number) {
 
 async function buildMaterialIconsBase64(product: Product) {
   const iconParts = normalizePackagingLayers(product)
+    .filter((item) => !isStickerPackagingLayer(item))
     .filter((item) => item.recycleCode?.trim() || item.material?.trim())
     .slice(0, 2)
     .map((layer) => recycleCodeParts(layer))
@@ -6089,8 +6107,9 @@ function ProductDetailModal({
             recycledContentPercent: asOptionalTrimmedString(layer.recycledContentPercent),
             recyclabilityClass: layer.recyclabilityClass,
             packagingRole: layer.packagingRole,
+            adhesiveType: layer.adhesiveType,
           }))
-          .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams || layer.recycledContentPercent || layer.recyclabilityClass || layer.packagingRole);
+          .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams || layer.recycledContentPercent || layer.recyclabilityClass || layer.packagingRole || layer.adhesiveType);
 
       const primaryLayer = normalizedLayers[0];
       const secondaryLayer = normalizedLayers[1];
@@ -6492,6 +6511,7 @@ function ProductDetailModal({
                     <span>Gewicht (g)</span>
                     <span>% PCR</span>
                     <span>Recyclebaar</span>
+                    <span>Lijm</span>
                     <span>Labelicoon</span>
                     <span className="sr-only">Acties</span>
                   </div>
@@ -6550,16 +6570,23 @@ function ProductDetailModal({
                                 {recyclabilityClassOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                               </select>
                             </div>
+                            <div className="packaging-layer-field">
+                              <span className="packaging-layer-mobile-label">Lijm</span>
+                              <select value={layer.adhesiveType ?? ''} onChange={(event) => updatePackagingLayer(index, { adhesiveType: (event.target.value || undefined) as ProductPackagingLayer['adhesiveType'] })}>
+                                <option value="">N.v.t.</option>
+                                {adhesiveTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                              </select>
+                            </div>
                             <div className="packaging-layer-preview">
                               <span className="packaging-layer-mobile-label">Labelicoon</span>
-                              <PackagingMaterialIcon option={selectedOption} compact />
+                              {isStickerPackagingLayer(layer) ? <span className="packaging-label-skip">Niet op label</span> : <PackagingMaterialIcon option={selectedOption} compact />}
                             </div>
                             <div className="packaging-layer-actions">
                               <button
                                 type="button"
                                 className="danger-icon-button"
                                 onClick={() => removePackagingLayer(index)}
-                                disabled={packagingLayers.length <= 2 && !layer.material && !layer.recycleCode && !layer.weightGrams && !layer.recycledContentPercent && !layer.recyclabilityClass && !layer.packagingRole}
+                                disabled={packagingLayers.length <= 2 && !layer.material && !layer.recycleCode && !layer.weightGrams && !layer.recycledContentPercent && !layer.recyclabilityClass && !layer.packagingRole && !layer.adhesiveType}
                                 aria-label={`${layer.name ?? packagingLayerNames[index]} verwijderen`}
                               >
                                 <XCircle size={18} />

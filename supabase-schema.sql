@@ -190,6 +190,7 @@ create table if not exists product_packaging_registrations (
   "recycledContentPercent" text,
   "recyclabilityClass" text,
   "packagingRole" text,
+  "adhesiveType" text,
   "weightGramsPerUnit" text not null,
   "totalWeightGrams" text not null,
   source text default 'product_snapshot',
@@ -213,6 +214,9 @@ add column if not exists "recyclabilityClass" text;
 
 alter table if exists product_packaging_registrations
 add column if not exists "packagingRole" text;
+
+alter table if exists product_packaging_registrations
+add column if not exists "adhesiveType" text;
 
 create index if not exists product_packaging_registrations_batch_idx
 on product_packaging_registrations("batchId");

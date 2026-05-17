@@ -266,6 +266,7 @@ export type ProductPackagingLayer = {
   recycledContentPercent?: string;
   recyclabilityClass?: 'Klasse A' | 'Klasse B' | 'Klasse C' | 'Klasse D' | 'Klasse E';
   packagingRole?: 'Primair' | 'Secundair' | 'Tertiair';
+  adhesiveType?: 'Permanent' | 'Wasbaar' | 'Geen';
 };
 
 export type ProductPackagingRegistration = {
@@ -289,6 +290,7 @@ export type ProductPackagingRegistration = {
   recycledContentPercent?: string;
   recyclabilityClass?: string;
   packagingRole?: string;
+  adhesiveType?: string;
   weightGramsPerUnit: string;
   totalWeightGrams: string;
   source?: 'product_snapshot' | 'batch_override' | 'manual';
