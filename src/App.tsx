@@ -38,8 +38,8 @@ import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactConnectionStatus, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
+import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactConnectionStatus, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
@@ -3146,6 +3146,10 @@ function ExactConnectionPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [salesYear, setSalesYear] = useState(String(new Date().getFullYear()));
+  const [salesPreview, setSalesPreview] = useState<ExactSalesPreviewLine[]>([]);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [salesError, setSalesError] = useState('');
 
   async function loadStatus() {
     setLoading(true);
@@ -3188,6 +3192,27 @@ function ExactConnectionPanel() {
     window.location.href = url.toString();
   }
 
+  async function loadSalesPreview() {
+    setSalesLoading(true);
+    setSalesError('');
+    try {
+      const parsedYear = Number.parseInt(salesYear, 10);
+      if (!Number.isFinite(parsedYear) || parsedYear < 2020 || parsedYear > 2100) {
+        throw new Error('Vul een geldig jaar in voor de Exact test-sync.');
+      }
+      const lines = await fetchExactSalesPreview(parsedYear);
+      setSalesPreview(lines);
+      if (lines.length === 0) {
+        setSalesError('Geen leverregels gevonden voor dit jaar of deze batchbron.');
+      }
+    } catch (loadPreviewError) {
+      setSalesPreview([]);
+      setSalesError(importErrorMessage(loadPreviewError));
+    } finally {
+      setSalesLoading(false);
+    }
+  }
+
   return (
     <section className="panel">
       <div className="panel-title">
@@ -3217,6 +3242,60 @@ function ExactConnectionPanel() {
           </button>
         </div>
       </div>
+      {status?.isConnected ? (
+        <div className="exact-sales-preview">
+          <div className="panel-title">
+            <span className="panel-title-label"><ClipboardList size={16} /> Exact test-sync verkoopregels</span>
+          </div>
+          <div className="packaging-overview-toolbar">
+            <label>Jaar
+              <input
+                type="number"
+                min="2020"
+                max="2100"
+                value={salesYear}
+                onChange={(event) => setSalesYear(event.target.value)}
+              />
+            </label>
+            <div className="exact-connection-actions">
+              <button type="button" className="secondary-button" onClick={() => void loadSalesPreview()} disabled={salesLoading}>
+                <RefreshCw size={16} /> {salesLoading ? 'Ophalen...' : 'Test verkoopregels'}
+              </button>
+            </div>
+          </div>
+          {salesError ? <div className="inline-notice">{salesError}</div> : null}
+          {salesPreview.length > 0 ? (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Leverdatum</th>
+                    <th>Order</th>
+                    <th>Batchnummer</th>
+                    <th>Product</th>
+                    <th>Omschrijving</th>
+                    <th>Geleverd</th>
+                    <th>Besteld</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesPreview.map((line) => (
+                    <tr key={line.id}>
+                      <td>{line.deliveryDate ? formatDate(line.deliveryDate) : '-'}</td>
+                      <td>{line.salesOrderNumber || '-'}</td>
+                      <td>{line.batchNumber || '-'}</td>
+                      <td>{line.itemCode || '-'}</td>
+                      <td>{line.itemDescription || line.description || '-'}</td>
+                      <td>{line.quantityDelivered || '-'}</td>
+                      <td>{line.quantityOrdered || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

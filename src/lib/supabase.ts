@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactConnectionStatus, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
+import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactConnectionStatus, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -59,6 +59,15 @@ export async function fetchExactConnectionStatus(): Promise<ExactConnectionStatu
   const { data, error } = await supabase.functions.invoke('exact-connection-status');
   if (error) throw error;
   return (data as ExactConnectionStatus | null) ?? null;
+}
+
+export async function fetchExactSalesPreview(year: number): Promise<ExactSalesPreviewLine[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.functions.invoke('exact-test-sales', {
+    body: { year },
+  });
+  if (error) throw error;
+  return ((data as { lines?: ExactSalesPreviewLine[] } | null)?.lines ?? []);
 }
 
 const tableMap: Record<keyof AppData, string> = {

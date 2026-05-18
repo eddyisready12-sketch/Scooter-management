@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.exact-connection-status]
 verify_jwt = false
+
+[functions.exact-test-sales]
+verify_jwt = false

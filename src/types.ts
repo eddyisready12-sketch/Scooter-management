@@ -375,6 +375,18 @@ export type ExactConnectionStatus = {
   lastError?: string;
 };
 
+export type ExactSalesPreviewLine = {
+  id: string;
+  deliveryDate?: string;
+  salesOrderNumber?: string;
+  itemCode?: string;
+  itemDescription?: string;
+  quantityDelivered?: string;
+  quantityOrdered?: string;
+  batchNumber?: string;
+  description?: string;
+};
+
 export type AppData = {
   scooters: Scooter[];
   containers: Container[];
