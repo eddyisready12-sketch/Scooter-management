@@ -1,0 +1,10 @@
+project_id = "gxfndvhhjemrjzmchaxs"
+
+[functions.exact-auth-start]
+verify_jwt = false
+
+[functions.exact-auth-callback]
+verify_jwt = false
+
+[functions.exact-connection-status]
+verify_jwt = false

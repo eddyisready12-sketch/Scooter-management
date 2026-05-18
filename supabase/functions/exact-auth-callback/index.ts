@@ -17,6 +17,13 @@ function clearCookie(name: string) {
   return `${name}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 }
 
+function redirectWithCookies(location: string, cookies: string[]) {
+  const headers = new Headers();
+  headers.set('Location', location);
+  cookies.forEach((cookie) => headers.append('Set-Cookie', cookie));
+  return new Response(null, { status: 302, headers });
+}
+
 Deno.serve(async (request) => {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
@@ -111,10 +118,10 @@ Deno.serve(async (request) => {
 
     const redirectUrl = new URL(returnTo);
     redirectUrl.searchParams.set('exact', 'connected');
-    const response = Response.redirect(redirectUrl.toString(), 302);
-    response.headers.append('Set-Cookie', clearCookie('exact_oauth_state'));
-    response.headers.append('Set-Cookie', clearCookie('exact_return_to'));
-    return response;
+    return redirectWithCookies(redirectUrl.toString(), [
+      clearCookie('exact_oauth_state'),
+      clearCookie('exact_return_to'),
+    ]);
   } catch (callbackError) {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -132,9 +139,9 @@ Deno.serve(async (request) => {
 
     const redirectUrl = new URL(returnTo);
     redirectUrl.searchParams.set('exact_error', callbackError instanceof Error ? callbackError.message : 'Exact callback failed');
-    const response = Response.redirect(redirectUrl.toString(), 302);
-    response.headers.append('Set-Cookie', clearCookie('exact_oauth_state'));
-    response.headers.append('Set-Cookie', clearCookie('exact_return_to'));
-    return response;
+    return redirectWithCookies(redirectUrl.toString(), [
+      clearCookie('exact_oauth_state'),
+      clearCookie('exact_return_to'),
+    ]);
   }
 });
