@@ -245,6 +245,15 @@ function toInputDateValue(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function toInputDateTimeValue(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  const hours = String(value.getHours()).padStart(2, '0');
+  const minutes = String(value.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 function parseProbeEndpoint(endpoint: string) {
   const [path, requestUrl] = endpoint.split('\n');
   return {
@@ -3005,6 +3014,58 @@ export function App() {
     }
   }
 
+  async function markContainerAvailable(container: Container, arrivedAtInput: string) {
+    if (!arrivedAtInput.trim()) {
+      throw new Error('Vul eerst de juiste aankomstdatum en tijd in.');
+    }
+
+    const arrivedAtDate = new Date(arrivedAtInput);
+    if (Number.isNaN(arrivedAtDate.getTime())) {
+      throw new Error('De opgegeven aankomstdatum is ongeldig.');
+    }
+
+    const arrivedAt = arrivedAtDate.toISOString();
+    const updatedContainer: Container = {
+      ...container,
+      status: 'Aangekomen',
+      arrivedAt,
+      eta: container.eta || arrivedAt.slice(0, 10),
+    };
+
+    const updatedScooters = data.scooters
+      .filter((scooter) => scooter.containerId === container.id && scooter.status === 'Nog onderweg')
+      .map((scooter) => ({
+        ...scooter,
+        status: 'Beschikbaar' as const,
+        arrivedAt,
+      }));
+
+    try {
+      await upsertContainers([updatedContainer]);
+      if (updatedScooters.length > 0) {
+        await upsertScooters(updatedScooters);
+      }
+
+      setData((current) => {
+        const scootersById = new Map(updatedScooters.map((scooter) => [scooter.id, scooter]));
+        return {
+          ...current,
+          containers: current.containers.map((item) => (item.id === updatedContainer.id ? updatedContainer : item)),
+          scooters: current.scooters.map((scooter) => scootersById.get(scooter.id) ?? scooter),
+        };
+      });
+
+      showCsvMessage(
+        updatedScooters.length > 0
+          ? `${updatedContainer.number} is binnen gemeld. ${updatedScooters.length} scooters zijn op Beschikbaar gezet.`
+          : `${updatedContainer.number} is binnen gemeld.`,
+      );
+    } catch (error) {
+      showCsvMessage(`Container binnenmelden mislukt: ${importErrorMessage(error)}`);
+      throw error;
+    }
+  }
+
   async function updateDealer(updated: Dealer) {
     setData((current) => ({
       ...current,
@@ -3465,7 +3526,7 @@ export function App() {
 
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
-          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
+          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onMarkContainerAvailable={markContainerAvailable} />}
           {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
           {view === 'packaging' && (
             <PackagingOverviewPage
@@ -3477,7 +3538,7 @@ export function App() {
               onSelectProduct={openProduct}
             />
           )}
-          {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
+          {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} onMarkContainerAvailable={markContainerAvailable} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
           {view === 'products' && (
@@ -5713,12 +5774,14 @@ function Containers({
   messageDetails,
   onImport,
   onSelect,
+  onMarkContainerAvailable,
 }: {
   data: AppData;
   message: string;
   messageDetails: string[];
   onImport: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onSelect: (scooter: Scooter) => void;
+  onMarkContainerAvailable: (container: Container, arrivedAtInput: string) => Promise<void>;
 }) {
   const [showImport, setShowImport] = useState(false);
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
@@ -5764,6 +5827,7 @@ function Containers({
             scooters={data.scooters}
             dealers={data.dealers}
             onSelect={onSelect}
+            onMarkContainerAvailable={onMarkContainerAvailable}
             green
             emptyMessage="Geen containers onderweg."
           />
@@ -7243,11 +7307,13 @@ function ContainerAvailabilityBoard({
   scooters,
   dealers,
   onSelect,
+  onMarkContainerAvailable,
 }: {
   container: Container;
   scooters: Scooter[];
   dealers: Dealer[];
   onSelect: (scooter: Scooter) => void;
+  onMarkContainerAvailable?: (container: Container, arrivedAtInput: string) => Promise<void>;
 }) {
   const groups: Array<{ status: ScooterStatus; label: string }> = [
     { status: 'Nog onderweg', label: 'Nog onderweg' },
@@ -7257,6 +7323,13 @@ function ContainerAvailabilityBoard({
     { status: 'Verkocht klant', label: 'Verkocht klant' },
   ];
   const [openStatus, setOpenStatus] = useState<ScooterStatus | null>(groups[0].status);
+  const [arrivedAtValue, setArrivedAtValue] = useState(() => {
+    const baseDate = normalizeDateValue(container.arrivedAt || container.eta) || new Date();
+    return toInputDateTimeValue(baseDate);
+  });
+  const [markingAvailable, setMarkingAvailable] = useState(false);
+  const [markMessage, setMarkMessage] = useState('');
+  const [markMessageType, setMarkMessageType] = useState<'success' | 'warning'>('success');
 
   return (
     <div className="container-availability-board">
@@ -7282,6 +7355,40 @@ function ContainerAvailabilityBoard({
           <strong>{scooters.length}</strong>
         </div>
       </div>
+      {container.status !== 'Aangekomen' && onMarkContainerAvailable ? (
+        <div className="container-card-actions">
+          <label className="container-card-arrival-field">
+            <span>Aankomstdatum</span>
+            <input
+              type="datetime-local"
+              value={arrivedAtValue}
+              onChange={(event) => setArrivedAtValue(event.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={markingAvailable}
+            onClick={async () => {
+              setMarkingAvailable(true);
+              setMarkMessage('');
+              setMarkMessageType('success');
+              try {
+                await onMarkContainerAvailable(container, arrivedAtValue);
+                setMarkMessage('Container is binnen gemeld en scooters zijn bijgewerkt.');
+              } catch (error) {
+                setMarkMessageType('warning');
+                setMarkMessage(`Binnenmelden mislukt: ${importErrorMessage(error)}`);
+              } finally {
+                setMarkingAvailable(false);
+              }
+            }}
+          >
+            {markingAvailable ? 'Bezig...' : 'Zet container op beschikbaar'}
+          </button>
+        </div>
+      ) : null}
+      {markMessage ? <div className={`inline-notice ${markMessageType === 'warning' ? 'warning-notice' : 'success-notice'}`}>{markMessage}</div> : null}
       <div className="container-card-status-grid container-card-status-grid-wide">
         {groups.map(({ status, label }) => {
           const statusScooters = scooters.filter((scooter) => scooter.status === status);
@@ -7323,7 +7430,7 @@ function ContainerAvailabilityBoard({
   );
 }
 
-function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message, messageDetails, statusFilter, setStatusFilter, onBulkRdwCheck }: {
+function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message, messageDetails, statusFilter, setStatusFilter, onBulkRdwCheck, onMarkContainerAvailable }: {
   data: AppData;
   query: string;
   setQuery: (value: string) => void;
@@ -7335,6 +7442,7 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
   statusFilter: ScooterStatus | 'all';
   setStatusFilter: (status: ScooterStatus | 'all') => void;
   onBulkRdwCheck: (scooters: Scooter[]) => Promise<string>;
+  onMarkContainerAvailable: (container: Container, arrivedAtInput: string) => Promise<void>;
 }) {
   const groups = ['Beschikbaar', 'In optie', 'Af te leveren', 'Nog onderweg', 'In consignatie', 'Verkocht klant', 'Verkocht dealer', 'Overig'] as ScooterStatus[];
   const [searchField, setSearchField] = useState<SearchField>('frameNumber');
@@ -10191,6 +10299,7 @@ function ContainerListPanel({
   scooters,
   dealers,
   onSelect,
+  onMarkContainerAvailable,
   green = false,
   emptyMessage = 'N.V.T.',
 }: {
@@ -10199,6 +10308,7 @@ function ContainerListPanel({
   scooters: Scooter[];
   dealers: Dealer[];
   onSelect: (scooter: Scooter) => void;
+  onMarkContainerAvailable?: (container: Container, arrivedAtInput: string) => Promise<void>;
   green?: boolean;
   emptyMessage?: string;
 }) {
@@ -10220,7 +10330,13 @@ function ContainerListPanel({
             </button>
             {isOpen && (
               <div className="container-expanded-content">
-                <ContainerAvailabilityBoard container={container} scooters={containerScooters} dealers={dealers} onSelect={onSelect} />
+                <ContainerAvailabilityBoard
+                  container={container}
+                  scooters={containerScooters}
+                  dealers={dealers}
+                  onSelect={onSelect}
+                  onMarkContainerAvailable={onMarkContainerAvailable}
+                />
               </div>
             )}
           </div>
