@@ -7250,6 +7250,7 @@ function ContainerAvailabilityBoard({
   onSelect: (scooter: Scooter) => void;
 }) {
   const groups: Array<{ status: ScooterStatus; label: string }> = [
+    { status: 'Nog onderweg', label: 'Nog onderweg' },
     { status: 'Beschikbaar', label: 'Beschikbaar' },
     { status: 'In consignatie', label: 'In consignatie' },
     { status: 'Verkocht dealer', label: 'Verkocht dealer' },
