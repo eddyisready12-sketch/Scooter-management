@@ -59,6 +59,7 @@ export const demoData: AppData = {
   containerCostLines: [],
   scooterPackagingSpecs: [],
   productPackagingRegistrations: [],
+  exactSalesPackagingOverrides: [],
   dealers,
   products: [],
   suppliers: [],

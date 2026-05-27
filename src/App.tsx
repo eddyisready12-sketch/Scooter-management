@@ -21,6 +21,7 @@ import {
   LogOut,
   Menu,
   PackagePlus,
+  PackageX,
   Plus,
   Printer,
   RefreshCw,
@@ -37,9 +38,9 @@ import * as bwipjs from 'bwip-js';
 import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
-import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactConnectionStatus, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
+import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseExactBatchTransactionsImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
+import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
@@ -123,20 +124,50 @@ const productStickerMaterialOptions = ['Geen', 'Papier', 'Plastic PP'] as const;
 const batchPackagingScopeOptions: BatchPackagingScope[] = ['Eigen import', 'EU-import', 'Binnenlandse inkoop'];
 const batchPackagingReportingModeOptions: BatchPackagingReportingMode[] = ['Alles registreren', 'Alleen SUP', 'Vrijgesteld'];
 const batchPackagingExactSourceOptions: BatchPackagingExactSource[] = ['Ordernummer', 'Batchnummer', 'Handmatig'];
+const euMemberStates = [
+  { code: 'AT', name: 'Oostenrijk' },
+  { code: 'BE', name: 'Belgie' },
+  { code: 'BG', name: 'Bulgarije' },
+  { code: 'HR', name: 'Kroatie' },
+  { code: 'CY', name: 'Cyprus' },
+  { code: 'CZ', name: 'Tsjechie' },
+  { code: 'DK', name: 'Denemarken' },
+  { code: 'EE', name: 'Estland' },
+  { code: 'FI', name: 'Finland' },
+  { code: 'FR', name: 'Frankrijk' },
+  { code: 'DE', name: 'Duitsland' },
+  { code: 'GR', name: 'Griekenland' },
+  { code: 'HU', name: 'Hongarije' },
+  { code: 'IE', name: 'Ierland' },
+  { code: 'IT', name: 'Italie' },
+  { code: 'LV', name: 'Letland' },
+  { code: 'LT', name: 'Litouwen' },
+  { code: 'LU', name: 'Luxemburg' },
+  { code: 'MT', name: 'Malta' },
+  { code: 'NL', name: 'Nederland' },
+  { code: 'PL', name: 'Polen' },
+  { code: 'PT', name: 'Portugal' },
+  { code: 'RO', name: 'Roemenie' },
+  { code: 'SK', name: 'Slowakije' },
+  { code: 'SI', name: 'Slovenie' },
+  { code: 'ES', name: 'Spanje' },
+  { code: 'SE', name: 'Zweden' },
+] as const;
+const euMemberStateMap = new Map<string, string>(euMemberStates.map((country) => [country.code, country.name]));
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'batteries', label: 'Accu', icon: BatteryCharging },
   { id: 'containers', label: 'Containers', icon: Boxes },
-  { id: 'costBatches', label: 'Import China', icon: FileText },
-  { id: 'packaging', label: 'Verpakking', icon: PackagePlus },
   { id: 'dealers', label: 'Dealers', icon: UsersRound },
   { id: 'warranty', label: 'Garantie claims', icon: ShieldCheck },
+  { id: 'costBatches', label: 'Import China', icon: FileText },
   { id: 'suppliers', label: 'Leveranciers', icon: Factory },
   { id: 'maintenance', label: 'Onderhoud', icon: ClipboardList },
   { id: 'products', label: 'Producten', icon: BriefcaseBusiness },
   { id: 'scooters', label: 'Scooters', icon: Bike },
   { id: 'sales', label: 'Verkoop', icon: CircleDollarSign },
+  { id: 'packaging', label: 'Verpakking', icon: PackagePlus },
   { id: 'search', label: 'Zoeken', icon: Search },
 ];
 
@@ -172,24 +203,271 @@ function scooterStatusLabel(status: ScooterStatus) {
   return status === 'Af te leveren' ? 'Verkocht zonder kenteken' : status;
 }
 
+function normalizeDateValue(value?: string) {
+  if (!value) return null;
+  const exactMatch = value.match(/^\/Date\((\d+)\)\/$/);
+  if (exactMatch) {
+    const timestamp = Number.parseInt(exactMatch[1], 10);
+    return Number.isFinite(timestamp) ? new Date(timestamp) : null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function formatDate(value?: string) {
   if (!value) return '-';
+  const date = normalizeDateValue(value);
+  if (!date) return value;
   return new Intl.DateTimeFormat('nl-NL', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     hour: value.includes('T') ? '2-digit' : undefined,
     minute: value.includes('T') ? '2-digit' : undefined,
-  }).format(new Date(value));
+  }).format(date);
 }
 
 function formatDateOnly(value?: string) {
   if (!value) return '-';
+  const date = normalizeDateValue(value);
+  if (!date) return value;
   return new Intl.DateTimeFormat('nl-NL', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
-  }).format(new Date(value));
+  }).format(date);
+}
+
+function toInputDateValue(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseProbeEndpoint(endpoint: string) {
+  const [path, requestUrl] = endpoint.split('\n');
+  return {
+    path: path || endpoint,
+    requestUrl: requestUrl || '',
+  };
+}
+
+function compactProbeLabel(endpoint: string) {
+  const { path } = parseProbeEndpoint(endpoint);
+  const parts = path.split('/');
+  if (parts.length <= 2) return path;
+  return `${parts.slice(0, 2).join('/')}/${parts[parts.length - 1]}`;
+}
+
+function summarizeProbeRequest(endpoint: string) {
+  const { path, requestUrl } = parseProbeEndpoint(endpoint);
+
+  if (!requestUrl) {
+    return {
+      title: compactProbeLabel(endpoint),
+      details: [] as string[],
+    };
+  }
+
+  try {
+    const url = new URL(requestUrl);
+    const filter = url.searchParams.get('$filter');
+    const select = url.searchParams.get('$select');
+    const expand = url.searchParams.get('$expand');
+    const top = url.searchParams.get('$top');
+    const details: string[] = [];
+
+    if (filter) details.push(`Filter: ${decodeURIComponent(filter)}`);
+    if (select) details.push(`Velden: ${decodeURIComponent(select)}`);
+    if (expand) details.push(`Uitklappen: ${decodeURIComponent(expand)}`);
+    if (top) details.push(`Top: ${top}`);
+
+    return {
+      title: compactProbeLabel(path),
+      details,
+    };
+  } catch {
+    return {
+      title: compactProbeLabel(endpoint),
+      details: requestUrl ? [requestUrl] : [],
+    };
+  }
+}
+
+function preferredProbeFields(row: Record<string, string>) {
+  const fieldOrder = [
+    'BatchNumber',
+    'OrderNumber',
+    'AvailableQuantity',
+    'Quantity',
+    'QuantityIn',
+    'QuantityOut',
+    'SalesOrderNumber',
+    'LineNumber',
+    'StockTransactionType',
+    'MutationNumber',
+    'MutationDate',
+    'Created',
+    'EntryID',
+    'EntryNumber',
+    'ItemCode',
+    'Description',
+    'ID',
+    'Item',
+  ];
+
+  const picked = fieldOrder
+    .filter((key) => row[key])
+    .map((key) => [key, row[key]] as const);
+
+  return picked.length > 0 ? picked : Object.entries(row).slice(0, 6);
+}
+
+function humanizeProbeFieldLabel(key: string) {
+  const labels: Record<string, string> = {
+    BatchNumber: 'Batch',
+    OrderNumber: 'Order',
+    AvailableQuantity: 'Beschikbaar',
+    Quantity: 'Aantal',
+    QuantityIn: 'Aantal in',
+    QuantityOut: 'Aantal uit',
+    SalesOrderNumber: 'Order',
+    LineNumber: 'Regel',
+    StockTransactionType: 'Stock type',
+    MutationNumber: 'Mutatienummer',
+    MutationDate: 'Mutatiedatum',
+    Created: 'Aangemaakt',
+    EntryID: 'Entry ID',
+    EntryNumber: 'Entry',
+    ItemCode: 'Artikel',
+    Description: 'Omschrijving',
+    ID: 'ID',
+    Item: 'Item GUID',
+  };
+
+  return labels[key] || key;
+}
+
+function renderProbeCell(probe: ExactEndpointProbeResult | ExactBatchProbeResult) {
+  if (!probe.ok) {
+    return <span className="probe-error-message">{probe.message || 'Onbekende fout'}</span>;
+  }
+
+  if (!probe.sample?.length) {
+    return <span className="probe-empty-message">Geen resultaten</span>;
+  }
+
+  return (
+    <div className="probe-sample-list">
+      {probe.sample.map((row, index) => (
+        <div key={`${probe.endpoint}-${index}`} className="probe-sample-card">
+          {preferredProbeFields(row).map(([key, value]) => (
+            <div key={key} className="probe-sample-row">
+              <strong>{humanizeProbeFieldLabel(key)}</strong>
+              <span>{value}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function renderProbeList(probes: Array<ExactEndpointProbeResult | ExactBatchProbeResult>) {
+  return (
+    <div className="probe-list">
+      {probes.map((probe) => {
+        const summary = summarizeProbeRequest(probe.endpoint);
+
+        return (
+          <article key={probe.endpoint} className="probe-card">
+            <div className="probe-card-header">
+              <div className="probe-card-title-group">
+                <strong className="probe-card-title">{summary.title}</strong>
+                {summary.details.length > 0 ? (
+                  <div className="probe-card-details">
+                    {summary.details.map((detail) => (
+                      <span key={detail}>{detail}</span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <div className="probe-card-meta">
+                <span className={`probe-status ${probe.ok ? 'ok' : 'error'}`}>{probe.ok ? 'OK' : 'Fout'}</span>
+                <span className="probe-count">{probe.count ?? '-'}</span>
+              </div>
+            </div>
+            <div className="probe-card-body">{renderProbeCell(probe)}</div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function findProbeByPath(probes: ExactBatchProbeResult[], path: string) {
+  return probes.find((probe) => parseProbeEndpoint(probe.endpoint).path === path);
+}
+
+function parseDecimalString(value?: string) {
+  if (!value) return 0;
+  const normalized = value.replace(',', '.');
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeExactCountryCode(value?: string) {
+  const normalized = value?.trim().toUpperCase();
+  if (!normalized) return '';
+  if (normalized === 'EL') return 'GR';
+  return normalized.length === 2 ? normalized : '';
+}
+
+function formatExactCountry(value?: string, fallback?: string) {
+  const countryCode = normalizeExactCountryCode(value);
+  if (!countryCode) return fallback?.trim() || 'Land ontbreekt';
+  return `${euMemberStateMap.get(countryCode) || fallback?.trim() || countryCode} (${countryCode})`;
+}
+
+function buildBatchProbeSummary(
+  probes: ExactBatchProbeResult[],
+  line: ExactSalesPreviewLine | null,
+  knownBatchNumber: string,
+) {
+  const goodsDeliveryLineProbe = findProbeByPath(probes, 'salesorder/GoodsDeliveryLines');
+  const goodsDeliveriesProbe = findProbeByPath(probes, 'salesorder/GoodsDeliveries');
+  const batchNumbersProbe = findProbeByPath(probes, 'inventory/BatchNumbers');
+  const stockBatchNumbersProbe = findProbeByPath(probes, 'inventory/StockBatchNumbers');
+
+  const goodsDeliveryLineRow = goodsDeliveryLineProbe?.sample?.[0];
+  const goodsDeliveriesRow = goodsDeliveriesProbe?.sample?.[0];
+  const batchNumberRows = (batchNumbersProbe?.sample ?? []).filter((row) =>
+    !knownBatchNumber || row.BatchNumber === knownBatchNumber,
+  );
+  const stockBatchNumberRows = (stockBatchNumbersProbe?.sample ?? []).filter((row) =>
+    !knownBatchNumber || row.BatchNumber === knownBatchNumber,
+  );
+
+  const availableQuantity = batchNumberRows.reduce((sum, row) => sum + parseDecimalString(row.AvailableQuantity), 0);
+  const stockQuantity = stockBatchNumberRows.reduce((sum, row) => sum + parseDecimalString(row.Quantity), 0);
+
+  const deliveryLineMatches = Boolean(
+    goodsDeliveryLineRow
+    && line
+    && goodsDeliveryLineRow.SalesOrderNumber === (line.salesOrderNumber || '')
+    && goodsDeliveryLineRow.LineNumber === (line.lineNumber || ''),
+  );
+
+  return {
+    deliveryLineMatches,
+    goodsDeliveryLineRow,
+    goodsDeliveriesRow,
+    batchNumberRows,
+    stockBatchNumberRows,
+    availableQuantity,
+    stockQuantity,
+  };
 }
 
 function rdwDateToInputDate(value?: string) {
@@ -470,6 +748,7 @@ function buildPackagingRegistrationsForBatch(
         id: stableId('product-packaging-registration', `${batch.id}-${line.id}-${index + 1}`),
         batchId: batch.id,
         batchOrderNumber: batch.orderNumber,
+        batchNumber: product.batchNumber,
         containerNumber: batch.containerNumber,
         containerCostLineId: line.id,
         productId: product.id,
@@ -494,6 +773,107 @@ function buildPackagingRegistrationsForBatch(
         registeredAt: new Date().toISOString(),
       };
     });
+  });
+}
+
+function buildPackagingRegistrationsForExistingProduct(
+  product: Product,
+  existingRegistrations: ProductPackagingRegistration[],
+): ProductPackagingRegistration[] {
+  const unitsPerPackage = unitsPerPackageFromProduct(product);
+  const layersWithValues = normalizePackagingLayers(product)
+    .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
+  const layers = layersWithValues.length > 0
+    ? layersWithValues
+    : [{ name: 'Onbekend', material: 'Onbekend', weightGrams: '0' }];
+
+  const grouped = new Map<string, ProductPackagingRegistration>();
+  existingRegistrations.forEach((registration) => {
+    const key = [
+      registration.batchId,
+      registration.containerCostLineId || '',
+      registration.productCode,
+      registration.batchNumber || '',
+      registration.quantity,
+    ].join('|');
+    if (!grouped.has(key)) {
+      grouped.set(key, registration);
+    }
+  });
+
+  return Array.from(grouped.values()).flatMap((registration, groupIndex) => {
+    const quantity = parseDecimal(registration.quantity);
+    const packagesCount = unitsPerPackage > 0 ? Math.ceil(quantity / unitsPerPackage) : quantity;
+
+    return layers.map((layer, index) => {
+      const material = layer.material || 'Onbekend';
+      const weightGramsPerUnit = layer.weightGrams || '0';
+      const totalWeightGrams = parseDecimal(weightGramsPerUnit) * packagesCount;
+      const wasteStream = findPackagingMaterialOption(material)?.wasteStream;
+
+      return {
+        ...registration,
+        id: stableId(
+          'product-packaging-registration',
+          `${registration.batchId}-${registration.containerCostLineId || registration.productCode}-${registration.batchNumber || 'batch'}-${groupIndex + 1}-${index + 1}`,
+        ),
+        productId: product.id || registration.productId,
+        productCode: product.code || registration.productCode,
+        productDescription: product.description || registration.productDescription,
+        productBarcode: product.barcode || registration.productBarcode,
+        packagingUnit: product.packagingUnit || '1',
+        packagesCount: formatDecimal(packagesCount, 8),
+        unitsPerPackage: formatDecimal(unitsPerPackage, 8),
+        layerName: layer.name || packagingLayerNames[index] || `Laag ${index + 1}`,
+        material,
+        recycleCode: layer.recycleCode,
+        wasteStream,
+        recycledContentPercent: layer.recycledContentPercent,
+        recyclabilityClass: layer.recyclabilityClass,
+        packagingRole: layer.packagingRole,
+        productStickerMaterial: layer.productStickerMaterial,
+        weightGramsPerUnit,
+        totalWeightGrams: formatDecimal(totalWeightGrams, 8),
+        source: 'product_snapshot',
+        registeredAt: new Date().toISOString(),
+      } satisfies ProductPackagingRegistration;
+    });
+  });
+}
+
+function buildExactSalesPackagingOverridesForBatch(
+  product: Product,
+  batchNumber: string,
+): ExactSalesPackagingOverride[] {
+  const normalizedBatch = batchNumber.trim();
+  if (!normalizedBatch) return [];
+
+  const layersWithValues = normalizePackagingLayers(product)
+    .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
+  const layers = layersWithValues.length > 0
+    ? layersWithValues
+    : [{ name: 'Onbekend', material: 'Onbekend', weightGrams: '0' }];
+
+  return layers.map((layer, index) => {
+    const material = layer.material || 'Onbekend';
+    return {
+      id: stableId('exact-sales-packaging-override', `${product.code}-${normalizedBatch}-${index + 1}`),
+      productCode: product.code,
+      batchNumber: normalizedBatch,
+      productDescription: product.description,
+      packagingUnit: product.packagingUnit || '1',
+      layerName: layer.name || packagingLayerNames[index] || `Laag ${index + 1}`,
+      material,
+      recycleCode: layer.recycleCode,
+      wasteStream: findPackagingMaterialOption(material)?.wasteStream,
+      recycledContentPercent: layer.recycledContentPercent,
+      recyclabilityClass: layer.recyclabilityClass,
+      packagingRole: layer.packagingRole,
+      productStickerMaterial: layer.productStickerMaterial,
+      weightGramsPerUnit: layer.weightGrams || '0',
+      notes: product.packagingNotes,
+      updatedAt: new Date().toISOString(),
+    } satisfies ExactSalesPackagingOverride;
   });
 }
 
@@ -1229,6 +1609,30 @@ function importErrorMessage(error: unknown) {
   return JSON.stringify(error);
 }
 
+async function importEdgeFunctionErrorMessage(error: unknown) {
+  if (error && typeof error === 'object' && 'context' in error) {
+    const context = (error as { context?: { json?: () => Promise<unknown>; text?: () => Promise<string> } }).context;
+    if (context?.json) {
+      try {
+        const payload = await context.json() as { error?: string; message?: string };
+        if (payload?.error) return payload.error;
+        if (payload?.message) return payload.message;
+      } catch {
+        // Fall back to text parsing below.
+      }
+    }
+    if (context?.text) {
+      try {
+        const bodyText = await context.text();
+        if (bodyText) return bodyText;
+      } catch {
+        // Fall back to generic error parsing below.
+      }
+    }
+  }
+  return importErrorMessage(error);
+}
+
 function stableId(prefix: string, value: string) {
   return `${prefix}-${value.replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
 }
@@ -1247,11 +1651,7 @@ function supplierNameMatches(supplier: Supplier, value?: string) {
 
   const supplierName = normalizedSupplierKey(supplier.name);
   const importedName = supplierImportedKey(supplier);
-  if (candidate === supplierName || candidate === importedName) return true;
-
-  return candidate.length >= 5 && supplierName.length >= 5 && (
-    supplierName.includes(candidate) || candidate.includes(supplierName)
-  );
+  return candidate === supplierName || candidate === importedName;
 }
 
 function displaySupplierName(suppliers: Supplier[], value?: string) {
@@ -1283,6 +1683,14 @@ function formatDecimal(value: number, digits = 4) {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
+}
+
+function formatQuantity(value?: string | number | null) {
+  const numericValue = parseDecimal(value);
+  if (Math.abs(numericValue - Math.round(numericValue)) < 0.00000001) {
+    return formatDecimal(Math.round(numericValue), 0);
+  }
+  return formatCompactDecimal(numericValue, 2);
 }
 
 function formatCompactDecimal(value: number, digits = 3) {
@@ -1990,6 +2398,7 @@ export function App() {
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedProductTab, setSelectedProductTab] = useState<ProductModalTab>('basic');
+  const [selectedProductApplyBatchNumber, setSelectedProductApplyBatchNumber] = useState('');
   const [pendingBatchLabelPrint, setPendingBatchLabelPrint] = useState<PendingBatchLabelPrint | null>(null);
   const [csvMessage, setCsvMessage] = useState('');
   const [csvMessageDetails, setCsvMessageDetails] = useState<string[]>([]);
@@ -2234,9 +2643,97 @@ export function App() {
     }
   }
 
-  function openProduct(product: Product, tab: ProductModalTab = 'basic') {
+  async function updateProductAndApplyPackagingToExistingBatches(updatedProduct: Product, batchNumber?: string) {
+    const articleCode = updatedProduct.code.trim();
+    const normalizedBatchNumber = batchNumber?.trim() || '';
+    try {
+      const existingRegistrations = data.productPackagingRegistrations.filter(
+        (registration) =>
+          registration.productCode?.trim() === articleCode
+          && (!normalizedBatchNumber || (registration.batchNumber || '').trim() === normalizedBatchNumber),
+      );
+
+      const rebuiltRegistrations = buildPackagingRegistrationsForExistingProduct(
+        updatedProduct,
+        existingRegistrations,
+      );
+
+      setData((current) => ({
+        ...current,
+        products: current.products.some((product) => product.id === updatedProduct.id)
+          ? current.products.map((product) => product.id === updatedProduct.id ? updatedProduct : product)
+          : [...current.products, updatedProduct],
+        productPackagingRegistrations: [
+          ...current.productPackagingRegistrations.filter((registration) => {
+            const sameArticle = registration.productCode?.trim() === articleCode;
+            if (!sameArticle) return true;
+            if (normalizedBatchNumber) {
+              return (registration.batchNumber || '').trim() !== normalizedBatchNumber;
+            }
+            return false;
+          }),
+          ...rebuiltRegistrations,
+        ],
+      }));
+
+      await upsertProducts([updatedProduct]);
+
+      if (rebuiltRegistrations.length === 0) {
+        const overrides = normalizedBatchNumber
+          ? buildExactSalesPackagingOverridesForBatch(updatedProduct, normalizedBatchNumber)
+          : [];
+
+        if (overrides.length > 0) {
+          setData((current) => ({
+            ...current,
+            exactSalesPackagingOverrides: [
+              ...current.exactSalesPackagingOverrides.filter(
+                (item) => !(item.productCode === articleCode && item.batchNumber === normalizedBatchNumber),
+              ),
+              ...overrides,
+            ],
+          }));
+
+          await upsertExactSalesPackagingOverrides(overrides);
+        }
+
+        setProductMessage(
+          overrides.length > 0
+            ? `Product ${articleCode} bijgewerkt en opgeslagen als verkochte-batch override voor batch ${normalizedBatchNumber}.`
+            : `Product ${articleCode} bijgewerkt, maar er zijn nog geen bestaande batchregistraties${normalizedBatchNumber ? ` voor batch ${normalizedBatchNumber}` : ''} om op toe te passen.`,
+        );
+        return;
+      }
+
+      if (supabase) {
+        let deleteQuery = supabase
+          .from('product_packaging_registrations')
+          .delete()
+          .eq('productCode', articleCode);
+
+        if (normalizedBatchNumber) {
+          deleteQuery = deleteQuery.eq('batchNumber', normalizedBatchNumber);
+        }
+
+        const { error: deleteError } = await deleteQuery;
+
+        if (deleteError) throw deleteError;
+      }
+
+      await upsertProductPackagingRegistrations(rebuiltRegistrations);
+
+      setProductMessage(
+        `Product ${articleCode} bijgewerkt en toegepast op ${existingRegistrations.length} bestaande batchregel${existingRegistrations.length === 1 ? '' : 's'}${batchNumber ? ` voor batch ${batchNumber}` : ''}.`,
+      );
+    } catch (error) {
+      setProductMessage(`Product/verpakking toepassen mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
+  function openProduct(product: Product, tab: ProductModalTab = 'basic', applyBatchNumber = '') {
     setPendingBatchLabelPrint(null);
     setSelectedProductTab(tab);
+    setSelectedProductApplyBatchNumber(applyBatchNumber);
     setSelectedProduct(product);
   }
 
@@ -2970,7 +3467,16 @@ export function App() {
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} />}
           {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
-          {view === 'packaging' && <PackagingOverviewPage registrations={data.productPackagingRegistrations} batches={data.containerCostBatches} />}
+          {view === 'packaging' && (
+            <PackagingOverviewPage
+              registrations={data.productPackagingRegistrations}
+              exactSalesPackagingOverrides={data.exactSalesPackagingOverrides}
+              batches={data.containerCostBatches}
+              products={data.products}
+              supplierRecords={data.suppliers}
+              onSelectProduct={openProduct}
+            />
+          )}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
@@ -3012,15 +3518,22 @@ export function App() {
           supplierRecords={data.suppliers}
           importers={data.importers}
           initialTab={selectedProductTab}
+          message={productMessage}
           onClose={() => {
             setSelectedProduct(null);
             setPendingBatchLabelPrint(null);
             setSelectedProductTab('basic');
+            setSelectedProductApplyBatchNumber('');
           }}
           onSave={async (nextProduct) => {
             await updateProduct(nextProduct);
             setSelectedProduct(nextProduct);
           }}
+          onSaveAndApplyPackaging={async (nextProduct, batchNumber) => {
+            await updateProductAndApplyPackagingToExistingBatches(nextProduct, batchNumber);
+            setSelectedProduct(nextProduct);
+          }}
+          applyBatchNumber={selectedProductApplyBatchNumber}
           onPrintLabel={pendingBatchLabelPrint ? async (product, quantity) => {
             return printBatchProductLabel(
               pendingBatchLabelPrint.batch,
@@ -3141,15 +3654,85 @@ function Dashboard({ data, onNavigate }: {
   );
 }
 
-function ExactConnectionPanel() {
+function ExactConnectionPanel({
+  registrations = [],
+  exactSalesPackagingOverrides = [],
+  batches = [],
+  products = [],
+  supplierRecords = [],
+  onSelectProduct,
+}: {
+  registrations?: ProductPackagingRegistration[];
+  exactSalesPackagingOverrides?: ExactSalesPackagingOverride[];
+  batches?: ContainerCostBatch[];
+  products?: Product[];
+  supplierRecords?: Supplier[];
+  onSelectProduct: (product: Product, tab?: ProductModalTab, applyBatchNumber?: string) => void;
+}) {
   const [status, setStatus] = useState<ExactConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [salesYear, setSalesYear] = useState(String(new Date().getFullYear()));
+  const [salesDateFrom, setSalesDateFrom] = useState(() => toInputDateValue(new Date(new Date().getFullYear(), 0, 1)));
+  const [salesDateTo, setSalesDateTo] = useState(() => toInputDateValue(new Date(new Date().getFullYear(), 11, 31)));
+  const [salesOrderFilter, setSalesOrderFilter] = useState('');
   const [salesPreview, setSalesPreview] = useState<ExactSalesPreviewLine[]>([]);
   const [salesLoading, setSalesLoading] = useState(false);
   const [salesError, setSalesError] = useState('');
+  const [salesDebugProbes, setSalesDebugProbes] = useState<ExactEndpointProbeResult[]>([]);
+  const [salesDebugDivision, setSalesDebugDivision] = useState('');
+  const [salesDebugRaw, setSalesDebugRaw] = useState<Array<Record<string, unknown>>>([]);
+  const [salesSourceLabel, setSalesSourceLabel] = useState('Exact API');
+  const [salesImportedFromFile, setSalesImportedFromFile] = useState(false);
+  const [probeLoadingId, setProbeLoadingId] = useState('');
+  const [batchProbeResults, setBatchProbeResults] = useState<ExactBatchProbeResult[]>([]);
+  const [batchProbeLine, setBatchProbeLine] = useState<ExactSalesPreviewLine | null>(null);
+  const [batchProbeError, setBatchProbeError] = useState('');
+  const [knownBatchNumber, setKnownBatchNumber] = useState('');
+  const [showBatchProbeDetails, setShowBatchProbeDetails] = useState(false);
+  const [showSalesLines, setShowSalesLines] = useState(false);
+  const [salesSummaryArticleFilter, setSalesSummaryArticleFilter] = useState('');
+  const [salesSummaryStatusFilter, setSalesSummaryStatusFilter] = useState<'all' | 'linked' | 'unlinked'>('all');
+  const eigenImportBatchIds = useMemo(
+    () => new Set(
+      batches
+        .filter((batch) => parseBatchPackagingCompliance(batch).scope === 'Eigen import')
+        .map((batch) => batch.id),
+    ),
+    [batches],
+  );
+  const eigenImportProductCodes = useMemo(
+    () => new Set(
+      registrations
+        .filter((registration) => eigenImportBatchIds.has(registration.batchId))
+        .map((registration) => registration.productCode?.trim())
+        .filter(Boolean) as string[],
+    ),
+    [eigenImportBatchIds, registrations],
+  );
+  const importCompanyProductCodes = useMemo(
+    () => new Set(
+      products
+        .filter((product) =>
+          supplierRecords.some((supplier) => supplier.isImportCompany && supplierNameMatches(supplier, product.supplier)),
+        )
+        .map((product) => product.code?.trim())
+        .filter(Boolean) as string[],
+    ),
+    [products, supplierRecords],
+  );
+  const productsByCode = useMemo(
+    () => new Map(products.map((product) => [product.code?.trim(), product] as const).filter(([code]) => Boolean(code))),
+    [products],
+  );
+  const productsByNormalizedCode = useMemo(
+    () => new Map(
+      products
+        .map((product) => [normalizeLookup(product.code?.trim() || ''), product] as const)
+        .filter(([code]) => Boolean(code)),
+    ),
+    [products],
+  );
 
   async function loadStatus() {
     setLoading(true);
@@ -3195,21 +3778,491 @@ function ExactConnectionPanel() {
   async function loadSalesPreview() {
     setSalesLoading(true);
     setSalesError('');
+    setSalesDebugProbes([]);
+    setSalesDebugDivision('');
+    setSalesDebugRaw([]);
     try {
-      const parsedYear = Number.parseInt(salesYear, 10);
-      if (!Number.isFinite(parsedYear) || parsedYear < 2020 || parsedYear > 2100) {
-        throw new Error('Vul een geldig jaar in voor de Exact test-sync.');
+      if (!salesDateFrom || !salesDateTo) {
+        throw new Error('Vul een geldige van- en tot-datum in voor de Exact test-sync.');
       }
-      const lines = await fetchExactSalesPreview(parsedYear);
+      if (Date.parse(`${salesDateFrom}T00:00:00`) > Date.parse(`${salesDateTo}T23:59:59`)) {
+        throw new Error('De van-datum moet voor of gelijk aan de tot-datum liggen.');
+      }
+      const preview = await fetchExactSalesPreview({ dateFrom: salesDateFrom, dateTo: salesDateTo });
+      const lines = preview.lines ?? [];
       setSalesPreview(lines);
-      if (lines.length === 0) {
-        setSalesError('Geen leverregels gevonden voor dit jaar of deze batchbron.');
+      setSalesDebugProbes(preview.probes ?? []);
+      setSalesDebugDivision(preview.divisionCode || '');
+      setSalesDebugRaw(preview.raw ?? []);
+      setSalesSourceLabel('Exact API');
+      setSalesImportedFromFile(false);
+      if (preview.debug) {
+        setSalesError('');
+      } else if (lines.length === 0) {
+        setSalesError('Geen leverregels gevonden voor deze periode of deze batchbron.');
       }
     } catch (loadPreviewError) {
       setSalesPreview([]);
-      setSalesError(importErrorMessage(loadPreviewError));
+      setSalesDebugProbes([]);
+      setSalesDebugDivision('');
+      setSalesDebugRaw([]);
+      setSalesError(await importEdgeFunctionErrorMessage(loadPreviewError));
     } finally {
       setSalesLoading(false);
+    }
+  }
+
+  async function importSalesPreviewFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setSalesLoading(true);
+    setSalesError('');
+    setSalesDebugProbes([]);
+    setSalesDebugDivision('Bestandsimport');
+    setSalesDebugRaw([]);
+    try {
+      const lines = await parseExactBatchTransactionsImport(file);
+      setSalesPreview(lines);
+      setSalesSourceLabel(`Bestandsimport: ${file.name}`);
+      setSalesImportedFromFile(true);
+      if (lines.length === 0) {
+        setSalesError('Geen goederenlevering-mutaties gevonden in deze export.');
+      }
+    } catch (importError) {
+      setSalesPreview([]);
+      setSalesSourceLabel('Bestandsimport');
+      setSalesError(importErrorMessage(importError));
+    } finally {
+      setSalesLoading(false);
+    }
+  }
+
+  const visibleSalesPreview = useMemo(() => {
+    const startDate = salesDateFrom ? Date.parse(`${salesDateFrom}T00:00:00`) : Number.NEGATIVE_INFINITY;
+    const endDate = salesDateTo ? Date.parse(`${salesDateTo}T23:59:59`) : Number.POSITIVE_INFINITY;
+    const needle = salesOrderFilter.trim();
+    const filtered = salesPreview.filter((line) => {
+      const lineDate = line.deliveryDate ? Date.parse(line.deliveryDate) : Number.NaN;
+      const inRange = Number.isNaN(lineDate) ? true : lineDate >= startDate && lineDate <= endDate;
+      if (!inRange) return false;
+      const articleCode = line.itemCode?.trim() || '';
+      const inEigenImport = salesImportedFromFile
+        ? importCompanyProductCodes.has(articleCode)
+        : eigenImportProductCodes.size === 0 || eigenImportProductCodes.has(articleCode);
+      if (!inEigenImport) return false;
+      if (!needle) return true;
+      return (line.salesOrderNumber || '').includes(needle)
+        || articleCode.toLowerCase().includes(needle.toLowerCase())
+        || (line.itemDescription || line.description || '').toLowerCase().includes(needle.toLowerCase());
+    });
+
+    return [...filtered].sort((a, b) => {
+      const dateCompare = (a.deliveryDate || '').localeCompare(b.deliveryDate || '');
+      if (dateCompare !== 0) return dateCompare;
+
+      const orderA = Number(a.salesOrderNumber || 0);
+      const orderB = Number(b.salesOrderNumber || 0);
+      if (orderA !== orderB) return orderA - orderB;
+
+      const lineA = Number(a.lineNumber || 0);
+      const lineB = Number(b.lineNumber || 0);
+      if (lineA !== lineB) return lineA - lineB;
+
+      return (a.itemCode || '').localeCompare(b.itemCode || '', 'nl', { sensitivity: 'base' });
+    });
+  }, [eigenImportProductCodes, importCompanyProductCodes, salesDateFrom, salesDateTo, salesImportedFromFile, salesOrderFilter, salesPreview]);
+
+  const batchProbeSummary = useMemo(
+    () => buildBatchProbeSummary(batchProbeResults, batchProbeLine, knownBatchNumber.trim()),
+    [batchProbeResults, batchProbeLine, knownBatchNumber],
+  );
+  const salesSoldTotals = useMemo(() => {
+    const batchTotals = new Map<string, number>();
+    const articleTotals = new Map<string, number>();
+
+    visibleSalesPreview.forEach((line) => {
+      const article = line.itemCode?.trim();
+      if (!article) return;
+
+      const batches = (line.batchNumber || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (batches.length === 0) return;
+
+      const soldRaw = parseDecimal(line.quantityDelivered || line.quantityOrdered || '0');
+      if (soldRaw <= 0) return;
+
+      const soldPerBatch = soldRaw / batches.length;
+      const countryCode = normalizeExactCountryCode(line.deliveryCountryCode) || 'missing';
+
+      batches.forEach((batch) => {
+        const batchKey = `${article}|${batch}|${countryCode}`;
+        batchTotals.set(batchKey, (batchTotals.get(batchKey) ?? 0) + soldPerBatch);
+      });
+
+      articleTotals.set(article, (articleTotals.get(article) ?? 0) + soldRaw);
+    });
+
+    return { batchTotals, articleTotals };
+  }, [visibleSalesPreview]);
+  const salesPackagingRows = useMemo(() => {
+    type SalesPackagingOption = {
+      packaging: string;
+      material: string;
+      recycleCode?: string;
+      wasteStream?: string;
+      weightPerPackageKg: number;
+      missingReason?: 'no-product-packaging' | 'no-batch-application';
+    };
+
+    const registrationGroups = new Map<string, {
+      packaging: string;
+      material: string;
+      recycleCode?: string;
+      wasteStream?: string;
+      weightPerPackageKg: number;
+    }[]>();
+
+    registrations.forEach((registration) => {
+      const productCode = registration.productCode?.trim();
+      const batchNumber = registration.batchNumber?.trim();
+      if (!productCode || !batchNumber) return;
+
+      const key = `${productCode}|${batchNumber}`;
+      const existing = registrationGroups.get(key) ?? [];
+      existing.push({
+        packaging: registration.recycleCode || registration.material || registration.layerName || 'Onbekend',
+        material: registration.material || 'Onbekend',
+        recycleCode: registration.recycleCode,
+        wasteStream: registration.wasteStream,
+        weightPerPackageKg: parseDecimal(registration.weightGramsPerUnit) / 1000,
+      });
+      registrationGroups.set(key, existing);
+    });
+
+    const overrideGroups = new Map<string, SalesPackagingOption[]>();
+
+    exactSalesPackagingOverrides.forEach((override) => {
+      const productCode = override.productCode?.trim();
+      const batchNumber = override.batchNumber?.trim();
+      if (!productCode || !batchNumber) return;
+
+      const key = `${productCode}|${batchNumber}`;
+      const existing = overrideGroups.get(key) ?? [];
+      existing.push({
+        packaging: override.recycleCode || override.material || override.layerName || 'Onbekend',
+        material: override.material || 'Onbekend',
+        recycleCode: override.recycleCode,
+        wasteStream: override.wasteStream,
+        weightPerPackageKg: parseDecimal(override.weightGramsPerUnit) / 1000,
+      });
+      overrideGroups.set(key, existing);
+    });
+
+    const productHasPackagingMap = new Map<string, boolean>();
+    products.forEach((product) => {
+      const productCode = product.code?.trim();
+      if (!productCode) return;
+      const hasPackaging = normalizePackagingLayers(product)
+        .some((layer) => layer.material || layer.recycleCode || parseDecimal(layer.weightGrams) > 0);
+      productHasPackagingMap.set(productCode, hasPackaging);
+    });
+
+    const totals = new Map<string, {
+      article: string;
+      batch: string;
+      packaging: string;
+      material: string;
+      recycleCode?: string;
+      wasteStream?: string;
+      countryCode: string;
+      countryName?: string;
+      sold: number;
+      weightPerPackageKg: number;
+      totalKg: number;
+      missingReason?: 'no-product-packaging' | 'no-batch-application';
+    }>();
+
+    visibleSalesPreview.forEach((line) => {
+      const article = line.itemCode?.trim();
+      if (!article) return;
+
+      const batches = (line.batchNumber || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (batches.length === 0) return;
+
+      const soldRaw = parseDecimal(line.quantityDelivered || line.quantityOrdered || '0');
+      if (soldRaw <= 0) return;
+
+      const soldPerBatch = soldRaw / batches.length;
+      const countryCode = normalizeExactCountryCode(line.deliveryCountryCode);
+
+      batches.forEach((batch) => {
+        const registrationOptions: SalesPackagingOption[] = registrationGroups.get(`${article}|${batch}`)
+          ?? overrideGroups.get(`${article}|${batch}`)
+          ?? [{
+            packaging: productHasPackagingMap.get(article) ? 'Nog niet toegepast op batch' : 'Geen verpakking op product',
+            material: 'Onbekend',
+            recycleCode: undefined,
+            wasteStream: undefined,
+            weightPerPackageKg: 0,
+            missingReason: productHasPackagingMap.get(article) ? 'no-batch-application' as const : 'no-product-packaging' as const,
+          }];
+
+        registrationOptions.forEach((registrationOption) => {
+          const key = `${article}|${batch}|${registrationOption.packaging}|${registrationOption.weightPerPackageKg}|${countryCode || 'missing'}`;
+          const current = totals.get(key) ?? {
+            article,
+            batch,
+            packaging: registrationOption.packaging,
+            material: registrationOption.material,
+            recycleCode: registrationOption.recycleCode,
+            wasteStream: registrationOption.wasteStream,
+            countryCode,
+            countryName: line.deliveryCountryName,
+            sold: 0,
+            weightPerPackageKg: registrationOption.weightPerPackageKg,
+            totalKg: 0,
+            missingReason: 'missingReason' in registrationOption ? registrationOption.missingReason : undefined,
+          };
+
+          current.sold += soldPerBatch;
+          current.totalKg += soldPerBatch * registrationOption.weightPerPackageKg;
+          totals.set(key, current);
+        });
+      });
+    });
+
+    return Array.from(totals.values()).sort((a, b) => {
+      const byArticle = a.article.localeCompare(b.article, 'nl', { sensitivity: 'base' });
+      if (byArticle !== 0) return byArticle;
+      const byBatch = a.batch.localeCompare(b.batch, 'nl', { sensitivity: 'base' });
+      if (byBatch !== 0) return byBatch;
+      return a.packaging.localeCompare(b.packaging, 'nl', { sensitivity: 'base' });
+    });
+  }, [exactSalesPackagingOverrides, registrations, visibleSalesPreview]);
+  const salesArticleRows = useMemo(() => {
+    const totals = new Map<string, {
+      article: string;
+      description: string;
+      sold: number;
+      packagingTypes: Set<string>;
+      batches: Set<string>;
+      totalKg: number;
+    }>();
+
+    salesPackagingRows.forEach((row) => {
+      const current = totals.get(row.article) ?? {
+        article: row.article,
+        description: visibleSalesPreview.find((line) => line.itemCode?.trim() === row.article)?.itemDescription
+          || visibleSalesPreview.find((line) => line.itemCode?.trim() === row.article)?.description
+          || '',
+        sold: salesSoldTotals.articleTotals.get(row.article) ?? 0,
+        packagingTypes: new Set<string>(),
+        batches: new Set<string>(),
+        totalKg: 0,
+      };
+
+      current.totalKg += row.totalKg;
+      if (row.packaging) current.packagingTypes.add(row.packaging);
+      if (row.batch) current.batches.add(row.batch);
+      totals.set(row.article, current);
+    });
+
+    return Array.from(totals.values()).sort((a, b) =>
+      a.article.localeCompare(b.article, 'nl', { sensitivity: 'base' }),
+    );
+  }, [salesPackagingRows, salesSoldTotals.articleTotals, visibleSalesPreview]);
+  const salesArticleTotalsByArticle = useMemo(
+    () => new Map(salesArticleRows.map((row) => [row.article, row])),
+    [salesArticleRows],
+  );
+  const salesSummaryRows = useMemo(() => (
+    salesPackagingRows.map((row) => ({
+      ...row,
+      description: salesArticleTotalsByArticle.get(row.article)?.description || '',
+      product: productsByCode.get(row.article) || productsByNormalizedCode.get(normalizeLookup(row.article)),
+      sold: salesSoldTotals.batchTotals.get(`${row.article}|${row.batch}|${row.countryCode || 'missing'}`) ?? row.sold,
+      isLinked: row.missingReason == null,
+      status: row.missingReason === 'no-product-packaging'
+        ? 'Geen verpakking op product'
+        : row.missingReason === 'no-batch-application'
+          ? 'Nog toepassen op batch'
+          : 'Gekoppeld aan verpakking',
+    }))
+  ), [productsByCode, productsByNormalizedCode, salesArticleTotalsByArticle, salesPackagingRows, salesSoldTotals.batchTotals]);
+  const filteredSalesSummaryRows = (() => {
+    const needle = salesSummaryArticleFilter.trim();
+    const normalizedNeedle = needle ? normalizeLookup(needle) : '';
+
+    return salesSummaryRows.filter((row) => {
+      const matchesStatus = salesSummaryStatusFilter === 'all'
+        ? true
+        : salesSummaryStatusFilter === 'linked'
+          ? row.status === 'Gekoppeld aan verpakking' && row.isLinked
+          : row.status !== 'Gekoppeld aan verpakking' || !row.isLinked;
+      if (!matchesStatus) return false;
+      if (!needle) return true;
+
+      const description = row.description || '';
+      return row.article.toLowerCase().includes(needle.toLowerCase())
+        || description.toLowerCase().includes(needle.toLowerCase())
+        || normalizeLookup(row.article).includes(normalizedNeedle)
+        || normalizeLookup(description).includes(normalizedNeedle);
+    });
+  })();
+  const missingPackagingMatches = useMemo(() => {
+    const groups = new Map<string, {
+      article: string;
+      batch: string;
+      description: string;
+      sold: number;
+      salesOrders: Set<string>;
+    }>();
+
+    salesPackagingRows.forEach((row) => {
+      if (!row.missingReason) return;
+
+      const key = `${row.article}|${row.batch}`;
+      const current = groups.get(key) ?? {
+        article: row.article,
+        batch: row.batch,
+        description:
+          visibleSalesPreview.find(
+            (line) => line.itemCode?.trim() === row.article && (line.batchNumber || '').split(',').map((value) => value.trim()).includes(row.batch),
+          )?.itemDescription
+          || visibleSalesPreview.find((line) => line.itemCode?.trim() === row.article)?.itemDescription
+          || visibleSalesPreview.find((line) => line.itemCode?.trim() === row.article)?.description
+          || '',
+        sold: 0,
+        salesOrders: new Set<string>(),
+      };
+
+      current.sold += row.sold;
+
+      visibleSalesPreview.forEach((line) => {
+        const lineArticle = line.itemCode?.trim();
+        const lineBatches = (line.batchNumber || '').split(',').map((value) => value.trim()).filter(Boolean);
+        if (lineArticle === row.article && lineBatches.includes(row.batch) && line.salesOrderNumber) {
+          current.salesOrders.add(line.salesOrderNumber);
+        }
+      });
+
+      groups.set(key, current);
+    });
+
+    return Array.from(groups.values()).sort((a, b) => {
+      const byArticle = a.article.localeCompare(b.article, 'nl', { sensitivity: 'base' });
+      if (byArticle !== 0) return byArticle;
+      return a.batch.localeCompare(b.batch, 'nl', { sensitivity: 'base' });
+    });
+  }, [salesPackagingRows, visibleSalesPreview]);
+  const ppwrReportRows = useMemo(() => {
+    const groups = new Map<string, {
+      countryCode: string;
+      countryName: string;
+      material: string;
+      recycleCode?: string;
+      wasteStream?: string;
+      sold: number;
+      weightKg: number;
+      articles: Set<string>;
+      batches: Set<string>;
+    }>();
+
+    salesPackagingRows.forEach((row) => {
+      if (!euMemberStateMap.has(row.countryCode) || row.missingReason) return;
+
+      const key = `${row.countryCode}|${row.material}|${row.recycleCode || ''}|${row.wasteStream || ''}`;
+      const current = groups.get(key) ?? {
+        countryCode: row.countryCode,
+        countryName: euMemberStateMap.get(row.countryCode) || row.countryName || row.countryCode,
+        material: row.material,
+        recycleCode: row.recycleCode,
+        wasteStream: row.wasteStream,
+        sold: 0,
+        weightKg: 0,
+        articles: new Set<string>(),
+        batches: new Set<string>(),
+      };
+
+      current.sold += row.sold;
+      current.weightKg += row.totalKg;
+      current.articles.add(row.article);
+      current.batches.add(row.batch);
+      groups.set(key, current);
+    });
+
+    return Array.from(groups.values()).sort((a, b) => {
+      const byCountry = a.countryName.localeCompare(b.countryName, 'nl', { sensitivity: 'base' });
+      if (byCountry !== 0) return byCountry;
+      return b.weightKg - a.weightKg;
+    });
+  }, [salesPackagingRows]);
+  const ppwrCountryRows = useMemo(() => {
+    const groups = new Map<string, { countryCode: string; countryName: string; materials: Set<string>; weightKg: number }>();
+
+    ppwrReportRows.forEach((row) => {
+      const current = groups.get(row.countryCode) ?? {
+        countryCode: row.countryCode,
+        countryName: row.countryName,
+        materials: new Set<string>(),
+        weightKg: 0,
+      };
+      current.materials.add(row.material);
+      current.weightKg += row.weightKg;
+      groups.set(row.countryCode, current);
+    });
+
+    return Array.from(groups.values()).sort((a, b) => b.weightKg - a.weightKg);
+  }, [ppwrReportRows]);
+  const ppwrChecks = useMemo(() => {
+    const exactLines = visibleSalesPreview.filter((line) => line.itemCode?.trim());
+    const linesWithoutBatch = exactLines.filter((line) => !(line.batchNumber || '').trim()).length;
+    const linkedRows = salesPackagingRows.filter((row) => !row.missingReason);
+    const rowsWithoutPackaging = salesPackagingRows.filter((row) => row.missingReason === 'no-product-packaging').length;
+    const rowsPendingBatchApply = salesPackagingRows.filter((row) => row.missingReason === 'no-batch-application').length;
+    const rowsWithoutCountry = linkedRows.filter((row) => !row.countryCode).length;
+    const rowsOutsideEu = linkedRows.filter((row) => row.countryCode && !euMemberStateMap.has(row.countryCode)).length;
+
+    return {
+      exactLines: exactLines.length,
+      linesWithoutBatch,
+      linkedRows: linkedRows.length,
+      rowsWithoutPackaging,
+      rowsPendingBatchApply,
+      rowsWithoutCountry,
+      rowsOutsideEu,
+    };
+  }, [salesPackagingRows, visibleSalesPreview]);
+
+  async function inspectBatchForLine(line: ExactSalesPreviewLine) {
+    setProbeLoadingId(line.id);
+    setBatchProbeError('');
+    setBatchProbeLine(line);
+    setShowBatchProbeDetails(false);
+    setKnownBatchNumber((currentValue) => currentValue || line.batchNumber || '');
+    try {
+      const probes = await probeExactBatchLookup({
+        goodsDeliveryLineId: line.exactGoodsDeliveryLineId || line.id,
+        salesOrderNumber: line.salesOrderNumber,
+        lineNumber: line.lineNumber,
+        salesOrderLineId: line.salesOrderLineId,
+        itemCode: line.itemCode,
+        itemId: line.itemId,
+        batchNumber: (knownBatchNumber || line.batchNumber || '').trim() || undefined,
+      });
+      setBatchProbeResults(probes);
+    } catch (probeError) {
+      setBatchProbeResults([]);
+      setBatchProbeError(importErrorMessage(probeError));
+    } finally {
+      setProbeLoadingId('');
     }
   }
 
@@ -3245,33 +4298,332 @@ function ExactConnectionPanel() {
       {status?.isConnected ? (
         <div className="exact-sales-preview">
           <div className="panel-title">
-            <span className="panel-title-label"><ClipboardList size={16} /> Exact test-sync verkoopregels</span>
+            <span className="panel-title-label"><ClipboardList size={16} /> Exact goederen-transacties</span>
           </div>
           <div className="packaging-overview-toolbar">
-            <label>Jaar
+            <label>Van
               <input
-                type="number"
-                min="2020"
-                max="2100"
-                value={salesYear}
-                onChange={(event) => setSalesYear(event.target.value)}
+                type="date"
+                value={salesDateFrom}
+                onChange={(event) => setSalesDateFrom(event.target.value)}
+              />
+            </label>
+            <label>Tot
+              <input
+                type="date"
+                value={salesDateTo}
+                onChange={(event) => setSalesDateTo(event.target.value)}
+              />
+            </label>
+            <label>Zoek order / artikel
+              <input
+                type="text"
+                placeholder="Bijv. 6549 of 2507001452"
+                value={salesOrderFilter}
+                onChange={(event) => setSalesOrderFilter(event.target.value)}
               />
             </label>
             <div className="exact-connection-actions">
-              <button type="button" className="secondary-button" onClick={() => void loadSalesPreview()} disabled={salesLoading}>
-                <RefreshCw size={16} /> {salesLoading ? 'Ophalen...' : 'Test verkoopregels'}
-              </button>
+              <label className="upload-button">
+                <Upload size={16} /> Upload goederen-transacties
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={(event) => void importSalesPreviewFile(event)} />
+              </label>
             </div>
           </div>
+          <div className="exact-connection-copy" style={{ paddingTop: 0 }}>
+            <span>Upload hier de Excel/CSV-export uit Exact van <strong>Transacties | Batchnummers</strong>.</span>
+          </div>
           {salesError ? <div className="inline-notice">{salesError}</div> : null}
-          {salesPreview.length > 0 ? (
+          {salesDebugProbes.length > 0 || salesDebugRaw.length > 0 ? (
+            <div className="panel" style={{ marginTop: 12 }}>
+              <div className="panel-title">
+                <span className="panel-title-label"><DatabaseZap size={16} /> Exact debugprobe</span>
+              </div>
+              <div className="exact-connection-copy">
+                <span>Bron: <strong>{salesSourceLabel}</strong></span>
+                <span>Division uit response: <code>{salesDebugDivision || '-'}</code></span>
+                <span>Ruwe regels in debugresponse: <strong>{salesDebugRaw.length}</strong></span>
+              </div>
+              {salesDebugRaw.length > 0 ? (
+                <div className="table-wrap" style={{ marginBottom: 12 }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Pagina</th>
+                        <th>Request</th>
+                        <th>Regels</th>
+                        <th>Volgende</th>
+                        <th>Fout</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salesDebugRaw.map((row, index) => (
+                        <tr key={`${String(row.requestUrl || 'debug')}-${index}`}>
+                          <td>{String(row.page ?? index + 1)}</td>
+                          <td><small>{String(row.requestUrl ?? '-')}</small></td>
+                          <td>{String(row.rowCount ?? '-')}</td>
+                          <td><small>{String(row.next ?? '-')}</small></td>
+                          <td><small>{String(row.error ?? '-')}</small></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+              <div className="probe-list-wrap">{renderProbeList(salesDebugProbes)}</div>
+            </div>
+          ) : null}
+          <div className="ppwr-exact-grid">
+            <section className="ppwr-report-panel">
+              <div className="ppwr-section-heading">
+                <strong>PPWR-output</strong>
+                <span>Kg verpakking per materiaalsoort en EU-lidstaat uit de gekozen Exact-rapportageperiode.</span>
+              </div>
+              <div className="ppwr-check-grid">
+                <div><span>Exact regels</span><strong>{ppwrChecks.exactLines}</strong></div>
+                <div><span>Gekoppeld</span><strong>{ppwrChecks.linkedRows}</strong></div>
+                <div className={ppwrChecks.rowsWithoutCountry > 0 ? 'warning' : ''}><span>Land ontbreekt</span><strong>{ppwrChecks.rowsWithoutCountry}</strong></div>
+                <div className={ppwrChecks.rowsWithoutPackaging > 0 ? 'warning' : ''}><span>Geen verpakking op product</span><strong>{ppwrChecks.rowsWithoutPackaging}</strong></div>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>EU-land</th>
+                      <th>Materiaal</th>
+                      <th>Recyclecode</th>
+                      <th>Afvalstroom</th>
+                      <th>Verkocht</th>
+                      <th>Artikelen</th>
+                      <th>Batches</th>
+                      <th>Kg</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ppwrReportRows.length === 0 ? (
+                      <tr><td colSpan={8}>Nog geen PPWR-regels. Haal Exact-verkoopregels op met batchnummer, afleverland en verpakkingskoppeling.</td></tr>
+                    ) : ppwrReportRows.map((row) => (
+                      <tr key={`${row.countryCode}-${row.material}-${row.recycleCode}-${row.wasteStream}`}>
+                        <td><strong>{row.countryName}</strong><br /><small>{row.countryCode}</small></td>
+                        <td>{row.material}</td>
+                        <td>{row.recycleCode || '-'}</td>
+                        <td>{row.wasteStream || '-'}</td>
+                        <td>{formatQuantity(row.sold)}</td>
+                        <td>{row.articles.size}</td>
+                        <td>{row.batches.size}</td>
+                        <td><strong>{formatDecimal(row.weightKg, 8)}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            <aside className="ppwr-country-panel">
+              <div className="ppwr-section-heading">
+                <strong>Rapportagecontrole</strong>
+                <span>Regels buiten de export blijven zichtbaar als controlepunt.</span>
+              </div>
+              <div className="ppwr-control-grid">
+                {[
+                  { label: 'Geen batch uit Exact', value: ppwrChecks.linesWithoutBatch },
+                  { label: 'Geen verpakking op product', value: ppwrChecks.rowsWithoutPackaging },
+                  { label: 'Nog toepassen op batch', value: ppwrChecks.rowsPendingBatchApply },
+                  { label: 'Geen afleverland', value: ppwrChecks.rowsWithoutCountry },
+                  { label: 'Buiten EU', value: ppwrChecks.rowsOutsideEu },
+                ].map((item) => (
+                  <article
+                    key={item.label}
+                    className={`ppwr-control-card ${item.value > 0 ? 'warning' : 'ok'}`}
+                  >
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </article>
+                ))}
+              </div>
+              <div className="ppwr-country-summary">
+                {ppwrCountryRows.length === 0 ? (
+                  <span>De landtotalen verschijnen zodra Exact het afleverland meegeeft.</span>
+                ) : ppwrCountryRows.map((row) => (
+                  <div key={row.countryCode}>
+                    <span>{row.countryName}</span>
+                    <strong>{formatDecimal(row.weightKg, 8)} kg</strong>
+                    <small>{row.materials.size} materiaalsoorten</small>
+                  </div>
+                ))}
+              </div>
+            </aside>
+          </div>
+          {salesSummaryRows.length > 0 ? (
+            <div className="panel" style={{ marginTop: 12 }}>
+              <div className="sales-summary-panel-head">
+                <div className="panel-title sales-summary-panel-title">
+                  <span className="panel-title-label"><BriefcaseBusiness size={16} /> Verkooptotalen per artikel, batch en land</span>
+                </div>
+                <label className="sales-summary-search" aria-label="Zoek artikel of omschrijving">
+                  <Search size={14} />
+                  <input
+                    type="text"
+                    placeholder="Zoek artikel of omschrijving"
+                    value={salesSummaryArticleFilter}
+                    onChange={(event) => setSalesSummaryArticleFilter(event.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="sales-summary-helper">
+                <span>Een detailregel per artikel, batch en land, met direct daarnaast het artikeltotaal uit dezelfde rapportageperiode.</span>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <colgroup>
+                    <col className="sales-summary-col-article" />
+                    <col className="sales-summary-col-batch" />
+                    <col className="sales-summary-col-country" />
+                    <col className="sales-summary-col-number" />
+                    <col className="sales-summary-col-number" />
+                    <col className="sales-summary-col-packaging" />
+                    <col className="sales-summary-col-weight" />
+                    <col className="sales-summary-col-weight" />
+                    <col className="sales-summary-col-weight" />
+                    <col className="sales-summary-col-status" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>Artikel</th>
+                      <th>Batchnr.</th>
+                      <th>Land</th>
+                      <th>Verkocht batch</th>
+                      <th>Verkocht artikel</th>
+                      <th>Verpakking</th>
+                      <th>Gewicht verpakking</th>
+                      <th>Totaal batch</th>
+                      <th>Totaal artikel</th>
+                      <th className="sales-summary-status-header">
+                        <label className="sales-summary-filter sales-summary-filter-inline">
+                          <span>Status</span>
+                          <select
+                            value={salesSummaryStatusFilter}
+                            onChange={(event) => setSalesSummaryStatusFilter(event.target.value as 'all' | 'linked' | 'unlinked')}
+                          >
+                            <option value="all">Alles</option>
+                            <option value="linked">Gekoppeld</option>
+                            <option value="unlinked">Niet gekoppeld</option>
+                          </select>
+                        </label>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSalesSummaryRows.map((row) => (
+                      <tr key={`summary-${row.article}-${row.batch}-${row.countryCode || 'missing'}-${row.packaging}-${row.status}`}>
+                        <td
+                          className={`sales-summary-article-cell ${row.product ? 'sales-summary-article-cell-clickable' : ''}`}
+                          onClick={row.product ? () => onSelectProduct(row.product!, 'packaging', row.batch) : undefined}
+                        >
+                          {row.product ? (
+                            <button
+                              type="button"
+                              className="link-button sales-summary-article-link"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onSelectProduct(row.product!, 'packaging', row.batch);
+                              }}
+                            >
+                              <strong>{row.article}</strong>
+                              {row.description ? (
+                                <small>{row.description}</small>
+                              ) : null}
+                            </button>
+                          ) : (
+                            <>
+                              <strong>{row.article}</strong>
+                              {row.description ? (
+                                <>
+                                  <br />
+                                  <small>{row.description}</small>
+                                </>
+                              ) : null}
+                            </>
+                          )}
+                        </td>
+                        <td className="sales-summary-batch-cell"><strong>{row.batch}</strong></td>
+                        <td className="sales-summary-country-cell">{row.countryCode || '-'}</td>
+                        <td className="sales-summary-number-cell">{formatQuantity(row.sold)}</td>
+                        <td className="sales-summary-number-cell">{formatQuantity(salesArticleTotalsByArticle.get(row.article)?.sold ?? 0)}</td>
+                        <td>{row.packaging}</td>
+                        <td className="sales-summary-number-cell">{formatDecimal(row.weightPerPackageKg, 8)} kg</td>
+                        <td className="sales-summary-number-cell">{formatDecimal(row.totalKg, 8)} kg</td>
+                        <td className="sales-summary-number-cell">{formatDecimal(salesArticleTotalsByArticle.get(row.article)?.totalKg ?? 0, 8)} kg</td>
+                        <td className="sales-summary-status-cell">
+                          <span className={`sales-scope-pill ${row.status === 'Gekoppeld aan verpakking' ? 'ok' : 'warning'}`}>
+                            {row.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredSalesSummaryRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={10}>Geen artikelen gevonden voor deze zoekopdracht.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+          {missingPackagingMatches.length > 0 ? (
+            <div className="panel" style={{ marginTop: 12 }}>
+              <div className="panel-title">
+                <span className="panel-title-label"><PackageX size={16} /> Ontbrekende verpakkingskoppelingen</span>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Artikel</th>
+                      <th>Batch</th>
+                      <th>Omschrijving</th>
+                      <th>Verkocht</th>
+                      <th>Orders</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {missingPackagingMatches.map((row) => (
+                      <tr key={`${row.article}-${row.batch}`}>
+                        <td><strong>{row.article}</strong></td>
+                        <td>{row.batch}</td>
+                        <td>{row.description || '-'}</td>
+                        <td>{formatQuantity(row.sold)}</td>
+                        <td>{Array.from(row.salesOrders).join(', ') || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+          {visibleSalesPreview.length > 0 ? (
+            <div className="exact-connection-actions" style={{ marginTop: 12, marginBottom: 12 }}>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setShowSalesLines((current) => !current)}
+              >
+                {showSalesLines ? 'Verberg ruwe orderregels' : 'Toon ruwe orderregels'}
+              </button>
+            </div>
+          ) : null}
+          {visibleSalesPreview.length > 0 && showSalesLines ? (
             <div className="table-wrap">
-              <table>
+              <table className="exact-preview-table">
                 <thead>
                   <tr>
                     <th>Leverdatum</th>
                     <th>Order</th>
+                    <th>Inspectie</th>
+                    <th>Regel</th>
                     <th>Batchnummer</th>
+                    <th>Batchregels</th>
+                    <th>Land</th>
                     <th>Product</th>
                     <th>Omschrijving</th>
                     <th>Geleverd</th>
@@ -3279,11 +4631,28 @@ function ExactConnectionPanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {salesPreview.map((line) => (
+                  {visibleSalesPreview.map((line) => (
                     <tr key={line.id}>
                       <td>{line.deliveryDate ? formatDate(line.deliveryDate) : '-'}</td>
                       <td>{line.salesOrderNumber || '-'}</td>
+                      <td>
+                        {line.itemId || line.exactGoodsDeliveryLineId || line.lineNumber ? (
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => void inspectBatchForLine(line)}
+                            disabled={probeLoadingId === line.id}
+                          >
+                            {probeLoadingId === line.id ? 'Zoeken...' : 'Inspecteer batch'}
+                          </button>
+                        ) : (
+                          <span className="muted-text">Niet beschikbaar</span>
+                        )}
+                      </td>
+                      <td>{line.lineNumber || '-'}</td>
                       <td>{line.batchNumber || '-'}</td>
+                      <td>{line.batchCount || '0'}</td>
+                      <td>{formatExactCountry(line.deliveryCountryCode, line.deliveryCountryName)}</td>
                       <td>{line.itemCode || '-'}</td>
                       <td>{line.itemDescription || line.description || '-'}</td>
                       <td>{line.quantityDelivered || '-'}</td>
@@ -3294,13 +4663,141 @@ function ExactConnectionPanel() {
               </table>
             </div>
           ) : null}
+          {batchProbeLine ? (
+            <div className="panel" style={{ marginTop: 12 }}>
+              <div className="panel-title">
+                <span className="panel-title-label"><DatabaseZap size={16} /> Batch-inspectie voor order {batchProbeLine.salesOrderNumber || '-'}, regel {batchProbeLine.lineNumber || '-'}</span>
+              </div>
+              <div className="exact-connection-copy">
+                <span>Product: <strong>{batchProbeLine.itemCode || '-'}</strong> - {batchProbeLine.itemDescription || batchProbeLine.description || '-'}</span>
+                <span>Item GUID: <code>{batchProbeLine.itemId || '-'}</code></span>
+                <span>SalesOrderLineID: <code>{batchProbeLine.salesOrderLineId || '-'}</code></span>
+                <span>EntryID: <code>{batchProbeLine.entryId || '-'}</code></span>
+              </div>
+              <div className="packaging-overview-toolbar">
+                <label>Bekend batchnummer uit Exact
+                  <input
+                    type="text"
+                    placeholder="Bijv. 25841"
+                    value={knownBatchNumber}
+                    onChange={(event) => setKnownBatchNumber(event.target.value)}
+                  />
+                </label>
+                <div className="exact-connection-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => void inspectBatchForLine(batchProbeLine)}
+                    disabled={probeLoadingId === batchProbeLine.id}
+                  >
+                    <RefreshCw size={16} /> {probeLoadingId === batchProbeLine.id ? 'Zoeken...' : 'Opnieuw inspecteren'}
+                  </button>
+                </div>
+              </div>
+              {batchProbeError ? <div className="inline-notice">{batchProbeError}</div> : null}
+              {batchProbeResults.length > 0 ? (
+                <div className="exact-connection-meta" style={{ marginBottom: 12 }}>
+                  <div>
+                    <span>Juiste regel</span>
+                    <strong>{batchProbeSummary.deliveryLineMatches ? 'Gevonden' : 'Nog niet bevestigd'}</strong>
+                  </div>
+                  <div>
+                    <span>Bekende batch</span>
+                    <strong>{knownBatchNumber.trim() || '-'}</strong>
+                  </div>
+                  <div>
+                    <span>Batch hits</span>
+                    <strong>{batchProbeSummary.batchNumberRows.length}</strong>
+                  </div>
+                  <div>
+                    <span>Beschikbaar totaal</span>
+                    <strong>{batchProbeSummary.availableQuantity || 0}</strong>
+                  </div>
+                  <div>
+                    <span>Stock hits</span>
+                    <strong>{batchProbeSummary.stockBatchNumberRows.length}</strong>
+                  </div>
+                  <div>
+                    <span>Stock totaal</span>
+                    <strong>{batchProbeSummary.stockQuantity || 0}</strong>
+                  </div>
+                </div>
+              ) : null}
+              {batchProbeSummary.goodsDeliveryLineRow ? (
+                <div className={`inline-notice ${batchProbeSummary.deliveryLineMatches ? 'success-notice' : ''}`}>
+                  {batchProbeSummary.deliveryLineMatches
+                    ? `Exact match: order ${batchProbeSummary.goodsDeliveryLineRow.SalesOrderNumber}, regel ${batchProbeSummary.goodsDeliveryLineRow.LineNumber}, artikel ${batchProbeSummary.goodsDeliveryLineRow.ItemCode}.`
+                    : 'Er is wel een GoodsDeliveryLine gevonden, maar die matcht nog niet met de aangeklikte orderregel.'}
+                  {batchProbeSummary.batchNumberRows.length > 0
+                    ? ` Batch ${knownBatchNumber.trim() || '-'} is gevonden in BatchNumbers met totaal beschikbaar ${batchProbeSummary.availableQuantity || 0}.`
+                    : ''}
+                </div>
+              ) : null}
+              {batchProbeResults.length > 0 ? (
+                <div className="exact-connection-meta" style={{ marginBottom: 12 }}>
+                  <div>
+                    <span>Orderregel in Exact</span>
+                    <strong>
+                      {batchProbeSummary.goodsDeliveryLineRow
+                        ? `${batchProbeSummary.goodsDeliveryLineRow.SalesOrderNumber || '-'} / regel ${batchProbeSummary.goodsDeliveryLineRow.LineNumber || '-'}`
+                        : 'Niet gevonden'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Artikel</span>
+                    <strong>{batchProbeSummary.goodsDeliveryLineRow?.ItemCode || batchProbeLine.itemCode || '-'}</strong>
+                  </div>
+                  <div>
+                    <span>Batch in Exact</span>
+                    <strong>{batchProbeSummary.batchNumberRows.length > 0 ? 'Ja' : 'Niet gevonden'}</strong>
+                  </div>
+                  <div>
+                    <span>Totaal beschikbaar</span>
+                    <strong>{batchProbeSummary.availableQuantity || 0}</strong>
+                  </div>
+                  <div>
+                    <span>GoodsDelivery entry</span>
+                    <strong>{batchProbeSummary.goodsDeliveriesRow?.EntryNumber || '-'}</strong>
+                  </div>
+                  <div>
+                    <span>Stock transacties</span>
+                    <strong>{batchProbeSummary.stockBatchNumberRows.length}</strong>
+                  </div>
+                </div>
+              ) : null}
+              <div className="exact-connection-actions" style={{ marginBottom: 12 }}>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => setShowBatchProbeDetails((current) => !current)}
+                >
+                  {showBatchProbeDetails ? 'Verberg technische details' : 'Toon technische details'}
+                </button>
+              </div>
+              {showBatchProbeDetails ? <div className="probe-list-wrap">{renderProbeList(batchProbeResults)}</div> : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>
   );
 }
 
-function PackagingOverviewPage({ registrations, batches }: { registrations: ProductPackagingRegistration[]; batches: ContainerCostBatch[] }) {
+function PackagingOverviewPage({
+  registrations,
+  exactSalesPackagingOverrides,
+  batches,
+  products,
+  supplierRecords,
+  onSelectProduct,
+}: {
+  registrations: ProductPackagingRegistration[];
+  exactSalesPackagingOverrides: ExactSalesPackagingOverride[];
+  batches: ContainerCostBatch[];
+  products: Product[];
+  supplierRecords: Supplier[];
+  onSelectProduct: (product: Product, tab?: ProductModalTab, applyBatchNumber?: string) => void;
+}) {
   const [batchFilter, setBatchFilter] = useState('all');
   const [materialFilter, setMaterialFilter] = useState('all');
   const [reportingFilter, setReportingFilter] = useState('all');
@@ -3357,6 +4854,90 @@ function PackagingOverviewPage({ registrations, batches }: { registrations: Prod
     });
     return Array.from(groups.values()).sort((a, b) => a.material.localeCompare(b.material, 'nl', { sensitivity: 'base' }));
   }, [filteredRegistrations]);
+  const articleBatchRows = useMemo(() => {
+    const groups = new Map<string, {
+      productCode: string;
+      productDescription: string;
+      batch: string;
+      packaging: string;
+      delivered: number;
+      registered: number;
+      weightPerPackageKg: number;
+      totalWeightKg: number;
+    }>();
+
+    filteredRegistrations.forEach((registration) => {
+      const packaging = registration.recycleCode || registration.material || 'Onbekend';
+      const batch = registration.batchNumber || registration.batchOrderNumber || registration.containerNumber || '-';
+      const delivered = parseDecimal(registration.quantity);
+      const registered = parseDecimal(registration.labelPrintCount || registration.packagesCount || registration.quantity);
+      const weightPerPackageKg = parseDecimal(registration.weightGramsPerUnit) / 1000;
+      const key = [
+        registration.productCode,
+        batch,
+        packaging,
+        registration.weightGramsPerUnit || '0',
+      ].join('|');
+
+      const group = groups.get(key) ?? {
+        productCode: registration.productCode,
+        productDescription: registration.productDescription,
+        batch,
+        packaging,
+        delivered: 0,
+        registered: 0,
+        weightPerPackageKg,
+        totalWeightKg: 0,
+      };
+
+      group.delivered += delivered;
+      group.registered += registered;
+      group.totalWeightKg += parseDecimal(registration.totalWeightGrams) / 1000;
+      groups.set(key, group);
+    });
+
+    return Array.from(groups.values()).sort((a, b) => {
+      const byArticle = a.productCode.localeCompare(b.productCode, 'nl', { sensitivity: 'base' });
+      if (byArticle !== 0) return byArticle;
+      const byBatch = a.batch.localeCompare(b.batch, 'nl', { sensitivity: 'base' });
+      if (byBatch !== 0) return byBatch;
+      return a.packaging.localeCompare(b.packaging, 'nl', { sensitivity: 'base' });
+    });
+  }, [filteredRegistrations]);
+  const articleTotalRows = useMemo(() => {
+    const groups = new Map<string, {
+      productCode: string;
+      productDescription: string;
+      delivered: number;
+      registered: number;
+      totalWeightKg: number;
+      packagingTypes: Set<string>;
+      batches: Set<string>;
+    }>();
+
+    articleBatchRows.forEach((row) => {
+      const group = groups.get(row.productCode) ?? {
+        productCode: row.productCode,
+        productDescription: row.productDescription,
+        delivered: 0,
+        registered: 0,
+        totalWeightKg: 0,
+        packagingTypes: new Set<string>(),
+        batches: new Set<string>(),
+      };
+
+      group.delivered += row.delivered;
+      group.registered += row.registered;
+      group.totalWeightKg += row.totalWeightKg;
+      if (row.packaging) group.packagingTypes.add(row.packaging);
+      if (row.batch && row.batch !== '-') group.batches.add(row.batch);
+      groups.set(row.productCode, group);
+    });
+
+    return Array.from(groups.values()).sort((a, b) =>
+      a.productCode.localeCompare(b.productCode, 'nl', { sensitivity: 'base' }),
+    );
+  }, [articleBatchRows]);
   const complianceRows = useMemo(() => {
     const groups = new Map<string, { scope: string; reportingMode: string; rows: number; weightKg: number; batches: Set<string> }>();
     filteredRegistrations.forEach((registration) => {
@@ -3379,7 +4960,8 @@ function PackagingOverviewPage({ registrations, batches }: { registrations: Prod
 
   function exportPackagingCsv() {
     const headers = [
-      'Batch',
+      'Importbatch',
+      'Productbatch',
       'Container',
       'Productnummer',
       'Omschrijving',
@@ -3400,6 +4982,7 @@ function PackagingOverviewPage({ registrations, batches }: { registrations: Prod
     ];
     const rows = filteredRegistrations.map((registration) => [
       registration.batchOrderNumber ?? '',
+      registration.batchNumber ?? '',
       registration.containerNumber ?? '',
       registration.productCode,
       registration.productDescription,
@@ -3431,14 +5014,38 @@ function PackagingOverviewPage({ registrations, batches }: { registrations: Prod
     <>
       <div className="page-title-row">
         <div>
-          <h1>Verpakkingsregistratie</h1>
-          <span>Overzicht per materiaal, productsticker en batch</span>
+          <h1>PPWR verpakking</h1>
+          <span>Van batchverpakking en Exact-verkoop naar kg per materiaal en EU-lidstaat</span>
         </div>
       </div>
-      <ExactConnectionPanel />
+      <section className="panel ppwr-flow-panel">
+        <div className="panel-title"><span className="panel-title-label"><ShieldCheck size={16} /> PPWR werkstroom</span></div>
+        <div className="ppwr-flow">
+          <div>
+            <strong>1. Inkoopbatch</strong>
+            <span>Leg per artikel en batch de verpakkingslagen, materiaalsoort en gewicht vast.</span>
+          </div>
+          <div>
+            <strong>2. Exact verkoop</strong>
+            <span>Lees verkochte stuks, batchnummer en afleverland uit de REST-koppeling.</span>
+          </div>
+          <div>
+            <strong>3. Rapportage</strong>
+            <span>Vermenigvuldig stuks met kg per verpakkingslaag en groepeer per EU-land.</span>
+          </div>
+        </div>
+      </section>
+      <ExactConnectionPanel
+        registrations={registrations}
+        exactSalesPackagingOverrides={exactSalesPackagingOverrides}
+        batches={batches}
+        products={products}
+        supplierRecords={supplierRecords}
+        onSelectProduct={onSelectProduct}
+      />
       <section className="stat-grid packaging-overview-stats">
         <div className="stat-card"><PackagePlus size={22} /><div><span>Registratieregels</span><strong>{filteredRegistrations.length}</strong></div></div>
-        <div className="stat-card"><Boxes size={22} /><div><span>Totaal gewicht</span><strong>{formatDecimal(totalWeightKg, 8)} kg</strong></div></div>
+        <div className="stat-card"><Boxes size={22} /><div><span>Brongewicht batch</span><strong>{formatDecimal(totalWeightKg, 8)} kg</strong></div></div>
         <div className="stat-card"><BriefcaseBusiness size={22} /><div><span>Producten</span><strong>{uniqueProducts}</strong></div></div>
         <div className="stat-card"><FileText size={22} /><div><span>Batches</span><strong>{batchOptions.length}</strong></div></div>
       </section>
@@ -3466,6 +5073,70 @@ function PackagingOverviewPage({ registrations, batches }: { registrations: Prod
               {batchPackagingReportingModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
           </label>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-title"><span className="panel-title-label"><BriefcaseBusiness size={16} /> Totaal per artikel</span></div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Artikel</th>
+                <th>Geleverd</th>
+                <th>Geregistreerd</th>
+                <th>Verpakkingstypes</th>
+                <th>Batches</th>
+                <th>Totaal kg</th>
+              </tr>
+            </thead>
+            <tbody>
+              {articleTotalRows.length === 0 ? (
+                <tr><td colSpan={6}>Nog geen artikeltotalen beschikbaar.</td></tr>
+              ) : articleTotalRows.map((row) => (
+                <tr key={row.productCode}>
+                  <td><strong>{row.productCode}</strong><br /><small>{row.productDescription}</small></td>
+                  <td>{formatQuantity(row.delivered)}</td>
+                  <td>{formatQuantity(row.registered)}</td>
+                  <td>{Array.from(row.packagingTypes).join(', ') || '-'}</td>
+                  <td>{row.batches.size}</td>
+                  <td>{formatDecimal(row.totalWeightKg, 8)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-title"><span className="panel-title-label"><BriefcaseBusiness size={16} /> Totaal per artikel en batch</span></div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Artikel</th>
+                <th>Batch</th>
+                <th>Geleverd</th>
+                <th>Geregistreerd</th>
+                <th>Verpakking</th>
+                <th>Gewicht verpakking kg</th>
+                <th>Totaal kg</th>
+              </tr>
+            </thead>
+            <tbody>
+              {articleBatchRows.length === 0 ? (
+                <tr><td colSpan={7}>Nog geen totalen beschikbaar.</td></tr>
+              ) : articleBatchRows.map((row) => (
+                <tr key={`${row.productCode}-${row.batch}-${row.packaging}`}>
+                  <td><strong>{row.productCode}</strong><br /><small>{row.productDescription}</small></td>
+                  <td>{row.batch}</td>
+                  <td>{formatQuantity(row.delivered)}</td>
+                  <td>{formatQuantity(row.registered)}</td>
+                  <td>{row.packaging}</td>
+                  <td>{formatDecimal(row.weightPerPackageKg, 8)}</td>
+                  <td>{formatDecimal(row.totalWeightKg, 8)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
       <section className="panel">
@@ -3578,7 +5249,7 @@ function PackagingOverviewPage({ registrations, batches }: { registrations: Prod
                 const compliance = batchComplianceMap.get(registration.batchId);
                 return (
                 <tr key={registration.id}>
-                  <td>{registration.batchOrderNumber || '-'}</td>
+                  <td>{registration.batchNumber || registration.batchOrderNumber || '-'}</td>
                   <td><strong>{registration.productCode}</strong><br /><small>{registration.productDescription}</small></td>
                   <td>{registration.layerName}</td>
                   <td>{registration.material}<br /><small>{registration.recycleCode || '-'}</small></td>
@@ -3772,8 +5443,6 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
   title?: string;
   onBulkRdwCheck?: (scooters: Scooter[]) => Promise<string>;
 }) {
-  const [pageSize, setPageSize] = useState<number | 'all'>(20);
-  const [page, setPage] = useState(1);
   const [rdwChecking, setRdwChecking] = useState(false);
   const [rdwCheckMessage, setRdwCheckMessage] = useState('');
   const [sortOrder, setSortOrder] = useState('model-asc');
@@ -3838,13 +5507,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     }
   });
   const speedOptions = speedOptionsFromScooters(scooters);
-  const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(sortedRows.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const visibleScooters = pageSize === 'all'
-    ? sortedRows
-    : sortedRows.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const firstEntry = sortedRows.length === 0 ? 0 : pageSize === 'all' ? 1 : (safePage - 1) * pageSize + 1;
-  const lastEntry = pageSize === 'all' ? sortedRows.length : Math.min(safePage * pageSize, sortedRows.length);
+  const visibleScooters = sortedRows;
 
   const exportRows = sortedRows.map((scooter) => ({
     Model: scooter.model,
@@ -3861,7 +5524,6 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
 
   function setColumnFilter(key: keyof typeof columnFilters, value: string) {
     setColumnFilters((current) => ({ ...current, [key]: value }));
-    setPage(1);
   }
 
   function csvEscape(value: string) {
@@ -3974,16 +5636,8 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
           <button type="button" disabled={exportRows.length === 0} onClick={() => openPrintView('print')}>Print</button>
         </div>
         <div className="table-controls">
-          <label>Rows:
-            <select value={pageSize} onChange={(event) => { setPageSize(event.target.value === 'all' ? 'all' : Number(event.target.value)); setPage(1); }}>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value="all">Alles</option>
-            </select>
-          </label>
           <label>Sorteer:
-            <select value={sortOrder} onChange={(event) => { setSortOrder(event.target.value); setPage(1); }}>
+            <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
               <option value="model-asc">Model A-Z</option>
               <option value="model-desc">Model Z-A</option>
               <option value="color-asc">Kleur A-Z</option>
@@ -3993,7 +5647,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
               <option value="newest-added">Nieuwste eerst</option>
             </select>
           </label>
-          <label>Search: <input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></label>
+          <label>Search: <input value={query} onChange={(event) => setQuery(event.target.value)} /></label>
         </div>
       </div>
       <div className="table-wrap">
@@ -4047,14 +5701,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
         </table>
       </div>
       <div className="table-footer">
-        <span>Showing {firstEntry} to {lastEntry} of {sortedRows.length} entries</span>
-        {pageSize !== 'all' && (
-          <div className="pagination">
-            <button disabled={safePage <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button>
-            <span>{safePage} / {totalPages}</span>
-            <button disabled={safePage >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Next</button>
-          </div>
-        )}
+        <span>{sortedRows.length} scooters in deze lijst</span>
       </div>
     </section>
   );
@@ -6541,8 +8188,11 @@ function ProductDetailModal({
   supplierRecords,
   importers,
   initialTab = 'basic',
+  message,
   onClose,
   onSave,
+  onSaveAndApplyPackaging,
+  applyBatchNumber,
   onPrintLabel,
 }: {
   product: Product;
@@ -6550,12 +8200,16 @@ function ProductDetailModal({
   supplierRecords: Supplier[];
   importers: Importer[];
   initialTab?: ProductModalTab;
+  message?: string;
   onClose: () => void;
   onSave: (product: Product) => Promise<void>;
+  onSaveAndApplyPackaging: (product: Product, batchNumber?: string) => Promise<void>;
+  applyBatchNumber?: string;
   onPrintLabel?: (product: Product, quantity: number) => Promise<string>;
 }) {
   const [draft, setDraft] = useState<Product>(() => createProductDraft(product));
   const [saving, setSaving] = useState(false);
+  const [saveMode, setSaveMode] = useState<'product' | 'apply'>('product');
   const [activeTab, setActiveTab] = useState<ProductModalTab>(initialTab);
   const [dymoPrinting, setDymoPrinting] = useState(false);
   const [dymoMessage, setDymoMessage] = useState('');
@@ -6631,14 +8285,20 @@ function ProductDetailModal({
     event.preventDefault();
     setSaving(true);
       try {
+        const normalizeNumericInput = (value?: string) => {
+          const trimmed = asOptionalTrimmedString(value);
+          if (!trimmed) return undefined;
+          return parseDecimal(trimmed).toFixed(8);
+        };
+
         const normalizedLayers = packagingLayers
           .slice(0, packagingLayerNames.length)
           .map((layer, index) => ({
             name: asOptionalTrimmedString(layer.name) || packagingLayerNames[index],
             material: asOptionalTrimmedString(layer.material),
             recycleCode: asOptionalTrimmedString(layer.recycleCode),
-            weightGrams: asOptionalTrimmedString(layer.weightGrams),
-            recycledContentPercent: asOptionalTrimmedString(layer.recycledContentPercent),
+            weightGrams: normalizeNumericInput(layer.weightGrams),
+            recycledContentPercent: normalizeNumericInput(layer.recycledContentPercent),
             recyclabilityClass: layer.recyclabilityClass,
             packagingRole: layer.packagingRole,
             productStickerMaterial: layer.productStickerMaterial,
@@ -6648,7 +8308,7 @@ function ProductDetailModal({
       const primaryLayer = normalizedLayers[0];
       const secondaryLayer = normalizedLayers[1];
 
-      await onSave({
+      const nextProduct = {
         ...draft,
         code: draft.code.trim(),
         supplierItemNo: draft.supplierItemNo?.trim() || undefined,
@@ -6698,12 +8358,19 @@ function ProductDetailModal({
           packagingRecycleCodeSecondary: secondaryLayer?.recycleCode,
           packagingWasteStream: asOptionalTrimmedString(derivedPackagingWasteStream),
           packagingNotes: asOptionalTrimmedString(draft.packagingNotes),
-          packagingWeightPrimaryGrams: primaryLayer?.weightGrams,
-          packagingWeightSecondaryGrams: secondaryLayer?.weightGrams,
-          packagingWeightTotalGrams: derivedPackagingWeightTotal ?? asOptionalTrimmedString(draft.packagingWeightTotalGrams),
-        });
+          packagingWeightPrimaryGrams: normalizeNumericInput(primaryLayer?.weightGrams),
+          packagingWeightSecondaryGrams: normalizeNumericInput(secondaryLayer?.weightGrams),
+          packagingWeightTotalGrams: normalizeNumericInput(derivedPackagingWeightTotal ?? draft.packagingWeightTotalGrams),
+        };
+
+      if (saveMode === 'apply') {
+        await onSaveAndApplyPackaging(nextProduct, applyBatchNumber);
+      } else {
+        await onSave(nextProduct);
+      }
     } finally {
       setSaving(false);
+      setSaveMode('product');
     }
   }
 
@@ -7010,6 +8677,11 @@ function ProductDetailModal({
           )}
             {activeTab === 'packaging' && (
               <div className="product-section-body">
+                {applyBatchNumber ? (
+                  <div className="inline-notice" style={{ marginBottom: 12 }}>
+                    Deze actie werkt batchgericht voor <strong>{applyBatchNumber}</strong>. Als er voor die batch nog geen bestaande batchregistratie is, wordt nu alleen het product bijgewerkt.
+                  </div>
+                ) : null}
                 <div className="product-form-subsection">
                   <div className="product-subsection-header">
                     <h3>Verpakking algemeen</h3>
@@ -7143,9 +8815,31 @@ function ProductDetailModal({
             </div>
           )}
           <div className="drawer-actions">
+            {message ? <p className="drawer-note">{message}</p> : null}
             {dymoMessage && <p className="drawer-note product-dymo-message">{dymoMessage}</p>}
             <button type="button" className="secondary-button" onClick={onClose}>Sluiten</button>
-            <button className="primary-button" type="submit" disabled={saving}>Opslaan</button>
+            <div className="modal-submit-actions">
+              <button
+                className="secondary-button"
+                type="submit"
+                disabled={saving}
+                onClick={() => setSaveMode('product')}
+              >
+                {saving && saveMode === 'product' ? 'Opslaan...' : 'Opslaan'}
+              </button>
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={saving}
+                onClick={() => setSaveMode('apply')}
+              >
+                {saving && saveMode === 'apply'
+                  ? 'Toepassen...'
+                  : applyBatchNumber
+                    ? `Opslaan + toepassen op batch ${applyBatchNumber}`
+                    : 'Opslaan + toepassen op batchregels'}
+              </button>
+            </div>
           </div>
         </section>
       </form>
@@ -8566,6 +10260,9 @@ function ScooterDrawer({
   const [documentMessage, setDocumentMessage] = useState('');
   const [documentUploading, setDocumentUploading] = useState(false);
   const registrationComplete = isRegistrationComplete(scooter);
+  const selectableDealers = dealers
+    .filter((dealer) => dealer.active !== false || dealer.id === draft.dealerId)
+    .sort((a, b) => (a.company || a.name).localeCompare(b.company || b.name, 'nl', { sensitivity: 'base' }));
 
   async function handleRdwFetch() {
     setRdwLoading(true);
@@ -8683,7 +10380,7 @@ function ScooterDrawer({
               <label>Snelheid<input value={draft.speed} onChange={(e) => setDraft({ ...draft, speed: e.target.value })} /></label>
               <label>Kenteken<input value={draft.licensePlate ?? ''} onChange={(e) => setDraft({ ...draft, licensePlate: e.target.value })} /></label>
               <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{(Object.keys(statusColor) as ScooterStatus[]).map((status) => <option key={status} value={status}>{scooterStatusLabel(status)}</option>)}</select></label>
-              <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value })}><option value="">Geen dealer</option>{dealers.map((d) => <option value={d.id} key={d.id}>{d.company}</option>)}</select></label>
+              <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value })}><option value="">Geen dealer</option>{selectableDealers.map((dealer) => <option value={dealer.id} key={dealer.id}>{dealer.company || dealer.name}</option>)}</select></label>
               <label>Factuur<input value={draft.invoiceNumber ?? ''} onChange={(e) => setDraft({ ...draft, invoiceNumber: e.target.value })} /></label>
               <label className="checkbox-field">
                 <input type="checkbox" checked={Boolean(draft.isUnpacked)} onChange={(e) => setDraft({ ...draft, isUnpacked: e.target.checked })} />

@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.exact-test-sales]
 verify_jwt = false
+
+[functions.exact-probe-batch]
+verify_jwt = false

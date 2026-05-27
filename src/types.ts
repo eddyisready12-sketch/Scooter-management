@@ -285,6 +285,7 @@ export type ProductPackagingRegistration = {
   id: string;
   batchId: string;
   batchOrderNumber?: string;
+  batchNumber?: string;
   containerNumber?: string;
   containerCostLineId?: string;
   productId?: string;
@@ -310,6 +311,25 @@ export type ProductPackagingRegistration = {
   labelPrintedAt?: string;
   labelPrintCount?: string;
   notes?: string;
+};
+
+export type ExactSalesPackagingOverride = {
+  id: string;
+  productCode: string;
+  batchNumber: string;
+  productDescription?: string;
+  packagingUnit?: string;
+  layerName: string;
+  material: string;
+  recycleCode?: string;
+  wasteStream?: string;
+  recycledContentPercent?: string;
+  recyclabilityClass?: string;
+  packagingRole?: string;
+  productStickerMaterial?: string;
+  weightGramsPerUnit: string;
+  notes?: string;
+  updatedAt?: string;
 };
 
 export type WarrantyPart = {
@@ -377,14 +397,47 @@ export type ExactConnectionStatus = {
 
 export type ExactSalesPreviewLine = {
   id: string;
+  exactGoodsDeliveryLineId?: string;
+  itemId?: string;
   deliveryDate?: string;
   salesOrderNumber?: string;
+  entryId?: string;
+  lineNumber?: string;
+  salesOrderLineId?: string;
   itemCode?: string;
   itemDescription?: string;
   quantityDelivered?: string;
   quantityOrdered?: string;
   batchNumber?: string;
+  batchCount?: string;
+  deliveryCountryCode?: string;
+  deliveryCountryName?: string;
   description?: string;
+};
+
+export type ExactEndpointProbeResult = {
+  endpoint: string;
+  ok: boolean;
+  count?: number;
+  sample?: Array<Record<string, string>>;
+  message?: string;
+};
+
+export type ExactSalesPreviewResponse = {
+  lines?: ExactSalesPreviewLine[];
+  debug?: boolean;
+  count?: number;
+  raw?: Array<Record<string, unknown>>;
+  divisionCode?: string;
+  probes?: ExactEndpointProbeResult[];
+};
+
+export type ExactBatchProbeResult = {
+  endpoint: string;
+  ok: boolean;
+  message?: string;
+  count?: number;
+  sample?: Array<Record<string, string>>;
 };
 
 export type AppData = {
@@ -394,6 +447,7 @@ export type AppData = {
   containerCostLines: ContainerCostLine[];
   scooterPackagingSpecs: ScooterPackagingSpec[];
   productPackagingRegistrations: ProductPackagingRegistration[];
+  exactSalesPackagingOverrides: ExactSalesPackagingOverride[];
   dealers: Dealer[];
   products: Product[];
   suppliers: Supplier[];

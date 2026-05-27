@@ -28,6 +28,36 @@ add column if not exists "importCompany" text;
 alter table if exists products
 add column if not exists "packagingLayers" jsonb;
 
+alter table if exists products
+add column if not exists "packagingMaterialPrimary" text;
+
+alter table if exists products
+add column if not exists "packagingMaterialSecondary" text;
+
+alter table if exists products
+add column if not exists "packagingRecycleCodePrimary" text;
+
+alter table if exists products
+add column if not exists "packagingRecycleCodeSecondary" text;
+
+alter table if exists products
+add column if not exists "packagingWasteStream" text;
+
+alter table if exists products
+add column if not exists "packagingNotes" text;
+
+alter table if exists products
+add column if not exists "packagingWeightPrimaryGrams" text;
+
+alter table if exists products
+add column if not exists "packagingWeightSecondaryGrams" text;
+
+alter table if exists products
+add column if not exists "packagingWeightTotalGrams" text;
+
+alter table if exists products
+add column if not exists "packagingUnit" text;
+
 create table if not exists importers (
   id text primary key,
   name text not null,
@@ -194,6 +224,7 @@ create table if not exists product_packaging_registrations (
   id text primary key,
   "batchId" text not null references container_cost_batches(id) on delete cascade,
   "batchOrderNumber" text,
+  "batchNumber" text,
   "containerNumber" text,
   "containerCostLineId" text references container_cost_lines(id) on delete set null,
   "productId" text,
@@ -221,8 +252,33 @@ create table if not exists product_packaging_registrations (
   notes text
 );
 
+create table if not exists exact_sales_packaging_overrides (
+  id text primary key,
+  "productCode" text not null,
+  "batchNumber" text not null,
+  "productDescription" text,
+  "packagingUnit" text,
+  "layerName" text not null,
+  material text not null,
+  "recycleCode" text,
+  "wasteStream" text,
+  "recycledContentPercent" text,
+  "recyclabilityClass" text,
+  "packagingRole" text,
+  "productStickerMaterial" text,
+  "weightGramsPerUnit" text not null,
+  notes text,
+  "updatedAt" timestamptz default now()
+);
+
+create index if not exists exact_sales_packaging_overrides_product_batch_idx
+on exact_sales_packaging_overrides("productCode", "batchNumber");
+
 alter table if exists product_packaging_registrations
 add column if not exists "packagesCount" text;
+
+alter table if exists product_packaging_registrations
+add column if not exists "batchNumber" text;
 
 alter table if exists product_packaging_registrations
 add column if not exists "unitsPerPackage" text;
@@ -367,6 +423,7 @@ alter table scooters enable row level security;
 alter table container_cost_batches enable row level security;
 alter table container_cost_lines enable row level security;
 alter table product_packaging_registrations enable row level security;
+alter table exact_sales_packaging_overrides enable row level security;
 alter table scooter_packaging_specs enable row level security;
 alter table exact_connections enable row level security;
 alter table batteries enable row level security;
@@ -479,6 +536,10 @@ drop policy if exists "Allow authenticated read product packaging registrations"
 drop policy if exists "Allow authenticated insert product packaging registrations" on product_packaging_registrations;
 drop policy if exists "Allow authenticated update product packaging registrations" on product_packaging_registrations;
 drop policy if exists "Allow authenticated delete product packaging registrations" on product_packaging_registrations;
+drop policy if exists "Allow authenticated read exact sales packaging overrides" on exact_sales_packaging_overrides;
+drop policy if exists "Allow authenticated insert exact sales packaging overrides" on exact_sales_packaging_overrides;
+drop policy if exists "Allow authenticated update exact sales packaging overrides" on exact_sales_packaging_overrides;
+drop policy if exists "Allow authenticated delete exact sales packaging overrides" on exact_sales_packaging_overrides;
 
 create policy "Allow authenticated read container cost batches"
 on container_cost_batches
@@ -545,6 +606,31 @@ with check (true);
 
 create policy "Allow authenticated delete product packaging registrations"
 on product_packaging_registrations
+for delete
+to authenticated
+using (true);
+
+create policy "Allow authenticated read exact sales packaging overrides"
+on exact_sales_packaging_overrides
+for select
+to authenticated
+using (true);
+
+create policy "Allow authenticated insert exact sales packaging overrides"
+on exact_sales_packaging_overrides
+for insert
+to authenticated
+with check (true);
+
+create policy "Allow authenticated update exact sales packaging overrides"
+on exact_sales_packaging_overrides
+for update
+to authenticated
+using (true)
+with check (true);
+
+create policy "Allow authenticated delete exact sales packaging overrides"
+on exact_sales_packaging_overrides
 for delete
 to authenticated
 using (true);

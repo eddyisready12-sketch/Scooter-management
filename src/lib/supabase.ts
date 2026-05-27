@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactConnectionStatus, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
+import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactSalesPackagingOverride, ExactSalesPreviewResponse, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -61,13 +61,30 @@ export async function fetchExactConnectionStatus(): Promise<ExactConnectionStatu
   return (data as ExactConnectionStatus | null) ?? null;
 }
 
-export async function fetchExactSalesPreview(year: number): Promise<ExactSalesPreviewLine[]> {
-  if (!supabase) return [];
+export async function fetchExactSalesPreview(period: { dateFrom: string; dateTo: string }): Promise<ExactSalesPreviewResponse> {
+  if (!supabase) return { lines: [] };
   const { data, error } = await supabase.functions.invoke('exact-test-sales', {
-    body: { year },
+    body: period,
   });
   if (error) throw error;
-  return ((data as { lines?: ExactSalesPreviewLine[] } | null)?.lines ?? []);
+  return (data as ExactSalesPreviewResponse | null) ?? { lines: [] };
+}
+
+export async function probeExactBatchLookup(payload: {
+  goodsDeliveryLineId?: string;
+  salesOrderNumber?: string;
+  lineNumber?: string;
+  salesOrderLineId?: string;
+  itemCode?: string;
+  itemId?: string;
+  batchNumber?: string;
+}) {
+  if (!supabase) return [] as ExactBatchProbeResult[];
+  const { data, error } = await supabase.functions.invoke('exact-probe-batch', {
+    body: payload,
+  });
+  if (error) throw error;
+  return ((data as { probes?: ExactBatchProbeResult[] } | null)?.probes ?? []);
 }
 
 const tableMap: Record<keyof AppData, string> = {
@@ -77,6 +94,7 @@ const tableMap: Record<keyof AppData, string> = {
   containerCostLines: 'container_cost_lines',
   scooterPackagingSpecs: 'scooter_packaging_specs',
   productPackagingRegistrations: 'product_packaging_registrations',
+  exactSalesPackagingOverrides: 'exact_sales_packaging_overrides',
   dealers: 'dealers',
   products: 'products',
   suppliers: 'suppliers',
@@ -423,6 +441,16 @@ export async function replaceProductPackagingRegistrations(batchId: string, regi
   if (deleteError) throw deleteError;
 
   await upsertProductPackagingRegistrations(registrations);
+}
+
+export async function upsertExactSalesPackagingOverrides(overrides: ExactSalesPackagingOverride[]) {
+  if (!supabase || overrides.length === 0) return;
+
+  const { error } = await supabase
+    .from('exact_sales_packaging_overrides')
+    .upsert(overrides);
+
+  if (error) throw error;
 }
 
 export async function replaceContainerCostLines(batchId: string, lines: ContainerCostLine[], existingLineIds: string[] = []) {

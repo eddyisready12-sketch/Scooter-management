@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import type { CsvScooterRow, Dealer, Product, Scooter, ScooterStatus } from '../types';
+import type { CsvScooterRow, Dealer, ExactSalesPreviewLine, Product, Scooter, ScooterStatus } from '../types';
 
 const statusFallback: ScooterStatus = 'Beschikbaar';
 
@@ -41,6 +41,26 @@ function parseImportDate(value: string) {
   }
   const parsed = new Date(clean);
   return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString();
+}
+
+function parseImportNumber(value: string) {
+  const source = value.trim();
+  if (!source) return 0;
+
+  let clean = source;
+  if (source.includes(',') && source.includes('.')) {
+    clean = source.replace(/\./g, '').replace(',', '.');
+  } else if (source.includes(',')) {
+    clean = source.replace(',', '.');
+  }
+
+  const parsed = Number.parseFloat(clean);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isGoodsDeliveryTransaction(value: string) {
+  const normalized = normalizeValue(value);
+  return normalized.includes('goederenlevering') || normalized.includes('goodsdelivery');
 }
 
 function nameVariants(value: string) {
@@ -212,6 +232,75 @@ export function parseProductImport(file: File): Promise<Product[]> {
     return readExcelRows(file, ['artikelnummer', 'code', 'itemno', 'parts', 'omschrijving', 'description', 'barcode']).then(normalizeProductRows);
   }
   return readCsvRows(file).then(normalizeProductRows);
+}
+
+function normalizeExactBatchTransactionRows(rows: Record<string, unknown>[]): ExactSalesPreviewLine[] {
+  return rows
+    .flatMap((row, index) => {
+      const salesOrderNumber = pick(row, ['ordernummer', 'order number', 'order']);
+      const batchNumber = pick(row, ['batchnummer', 'batchnr', 'batch number', 'batch']);
+      const itemCode = pick(row, ['artikel', 'artikelcode', 'productcode', 'item code', 'itemcode']);
+      const itemDescription = pick(row, ['artikelomschrijving', 'omschrijving', 'description', 'item description']);
+      const deliveryDate = parseImportDate(pick(row, ['mutatiedatum', 'mutation date', 'datum']));
+      const transactionType = pick(row, ['soort transactie', 'soorttransactie', 'transaction type', 'transactie', 'transaction']);
+      const mutationNumber = pick(row, ['mutatienummer', 'mutation number']);
+      const quantityOut = parseImportNumber(pick(row, ['aantal: uit', 'aantal uit', 'aantaluit', 'quantity out', 'uit']));
+      const countryCode = pick(row, ['land', 'country', 'afleverland']).toUpperCase();
+
+      if (
+        !itemCode
+        || !batchNumber
+        || quantityOut <= 0
+        || !isGoodsDeliveryTransaction(transactionType)
+      ) {
+        return [];
+      }
+
+      return [{
+        id: `exact-export-${salesOrderNumber || 'order'}-${mutationNumber || index}-${batchNumber || 'batch'}`,
+        deliveryDate,
+        salesOrderNumber,
+        lineNumber: '',
+        itemCode,
+        itemDescription,
+        quantityDelivered: quantityOut > 0 ? String(quantityOut) : '',
+        quantityOrdered: quantityOut > 0 ? String(quantityOut) : '',
+        batchNumber,
+        batchCount: batchNumber ? '1' : '0',
+        deliveryCountryCode: countryCode,
+        deliveryCountryName: countryCode,
+        description: itemDescription,
+        salesOrderLineId: mutationNumber || undefined,
+      } satisfies ExactSalesPreviewLine];
+    });
+}
+
+export function parseExactBatchTransactionsImport(file: File): Promise<ExactSalesPreviewLine[]> {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  const headerCandidates = [
+    'ordernummer',
+    'batchnummer',
+    'batchnr',
+    'artikel',
+    'artikelcode',
+    'artikelomschrijving',
+    'mutatiedatum',
+    'soorttransactie',
+    'soort transactie',
+    'mutatienummer',
+    'aantaluit',
+    'aantal uit',
+    'aantal: uit',
+    'land',
+  ];
+
+  const normalize = (rows: Record<string, unknown>[]) => normalizeExactBatchTransactionRows(rows);
+
+  if (extension === 'xlsx' || extension === 'xls') {
+    return readExcelRows(file, headerCandidates).then(normalize);
+  }
+
+  return readCsvRows(file).then(normalize);
 }
 
 function findDealerId(dealers: Dealer[], dealerName?: string) {
