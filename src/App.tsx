@@ -10318,6 +10318,7 @@ function ContainerListPanel({
       <div className="panel-title"><Boxes size={16} /> {title}</div>
       {containers.length === 0 ? <p className="empty">{emptyMessage}</p> : containers.map((container) => {
         const containerScooters = scooters.filter((scooter) => scooter.containerId === container.id);
+        const readyScooters = containerScooters.filter((scooter) => scooter.status === 'Beschikbaar' || scooter.status === 'In consignatie').length;
         const isOpen = openContainerId === container.id;
         return (
           <div className="container-list-item" key={container.id}>
@@ -10326,7 +10327,7 @@ function ContainerListPanel({
                 <strong>{container.number}</strong>
                 <small>{container.invoiceNumber} - {formatDate(container.arrivedAt || container.eta)}</small>
               </span>
-              <span className="container-row-meta">{containerScooters.length} scooters {isOpen ? '-' : '+'}</span>
+              <span className="container-row-meta">{readyScooters}/{containerScooters.length} scooters {isOpen ? '-' : '+'}</span>
             </button>
             {isOpen && (
               <div className="container-expanded-content">
