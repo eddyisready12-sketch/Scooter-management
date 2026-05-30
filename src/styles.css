@@ -1524,19 +1524,29 @@ tbody tr:hover {
   text-align: center;
 }
 
+.sales-metric-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
 .sales-metric-value {
   display: block;
   font-size: 20px;
   font-weight: 700;
   line-height: 1.1;
+  text-align: center;
 }
 
 .sales-metric-share {
   display: block;
-  margin-top: 4px;
   color: #65717d;
   font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .sales-total-cell {

@@ -5450,12 +5450,16 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
                 <td>{row.year}</td>
                 <td><button className="link-button" type="button">{row.model}</button></td>
                 <td className="sales-metric-cell">
-                  <span className="sales-metric-value">{row.snorCount}</span>
-                  <small className="sales-metric-share">{formatPercentage(row.snorCount, row.totalCount)}</small>
+                  <div className="sales-metric-layout">
+                    <span className="sales-metric-value">{row.snorCount}</span>
+                    <small className="sales-metric-share">{formatPercentage(row.snorCount, row.totalCount)}</small>
+                  </div>
                 </td>
                 <td className="sales-metric-cell">
-                  <span className="sales-metric-value">{row.bromCount}</span>
-                  <small className="sales-metric-share">{formatPercentage(row.bromCount, row.totalCount)}</small>
+                  <div className="sales-metric-layout">
+                    <span className="sales-metric-value">{row.bromCount}</span>
+                    <small className="sales-metric-share">{formatPercentage(row.bromCount, row.totalCount)}</small>
+                  </div>
                 </td>
                 <td className="sales-total-cell"><strong>{row.totalCount}</strong></td>
               </tr>
@@ -7471,7 +7475,6 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
     color: '',
     status: '',
   });
-  const [showLatestRegistered, setShowLatestRegistered] = useState(false);
   const cards: Array<{ status: ScooterStatus; label: string; icon: typeof Bike }> = [
     { status: 'Beschikbaar', label: 'Beschikbaar', icon: Bike },
     { status: 'In consignatie', label: 'In consignatie', icon: BriefcaseBusiness },
@@ -7482,14 +7485,6 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
     { status: 'In optie', label: 'In optie', icon: CalendarDays },
     { status: 'Overig', label: 'Overig', icon: CircleHelp },
   ];
-  const latestRegisteredScooters = [...data.scooters]
-    .filter((scooter) => isRegistrationComplete(scooter))
-    .sort((a, b) => {
-      const aDate = new Date(a.firstRegistrationDate || 0).getTime();
-      const bDate = new Date(b.firstRegistrationDate || 0).getTime();
-      return bDate - aDate || a.frameNumber.localeCompare(b.frameNumber);
-    })
-    .slice(0, 10);
   const visibleScooters = filterScootersForPanel(scooters, query, searchField, panelFilters);
   return (
     <>
@@ -7507,36 +7502,6 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
           </button>
         ))}
       </div>
-      <section className="panel dashboard-registered-panel">
-        <button
-          type="button"
-          className="dashboard-registered-toggle"
-          onClick={() => setShowLatestRegistered((current) => !current)}
-        >
-          <span className="panel-title-label"><CheckCircle2 size={16} /> Laatste 10 tenaamgestelde scooters</span>
-          <span>{latestRegisteredScooters.length} scooters {showLatestRegistered ? '-' : '+'}</span>
-        </button>
-        {showLatestRegistered && latestRegisteredScooters.length ? (
-          <div className="dashboard-registered-list">
-            {latestRegisteredScooters.map((scooter) => (
-              <button
-                key={scooter.id}
-                type="button"
-                className="dashboard-registered-row"
-                onClick={() => onSelect(scooter)}
-              >
-                <strong>{scooter.frameNumber}</strong>
-                <span>{normalizeSalesModel(scooter.model)}</span>
-                <span>{scooter.licensePlate || '-'}</span>
-                <span>{dealerName(data.dealers, scooter.dealerId) || 'Geen dealer'}</span>
-                <small>{formatDate(scooter.firstRegistrationDate)}</small>
-              </button>
-            ))}
-          </div>
-        ) : showLatestRegistered ? (
-          <p className="empty">Nog geen tenaamgestelde scooters gevonden.</p>
-        ) : null}
-      </section>
       {statusFilter !== 'all' && (
         <div className="filter-notice">
           Gefilterd op <strong>{scooterStatusLabel(statusFilter)}</strong>
