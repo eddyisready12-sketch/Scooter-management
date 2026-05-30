@@ -1603,6 +1603,11 @@ function normalizeSalesModel(model?: string) {
   return value;
 }
 
+function normalizeSalesColor(color?: string) {
+  const value = (color || 'Onbekend').trim().replace(/\s+/g, ' ');
+  return value ? value.toUpperCase() : 'Onbekend';
+}
+
 function warrantyStatusIcon(status: WarrantyPart['status']) {
   if (status === 'Afgehandeld' || status === 'Goedgekeurd') return <CheckCircle2 className="warranty-status-icon success" size={20} aria-label={status} />;
   if (status === 'In behandeling') return <Timer className="warranty-status-icon pending" size={20} aria-label={status} />;
@@ -5345,13 +5350,17 @@ function SalesPage({ scooters, dealers, onSelect }: { scooters: Scooter[]; deale
 }
 
 function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; dealers: Dealer[]; onSelect: (scooter: Scooter) => void }) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'colors'>('overview');
   const [dealerFilter, setDealerFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
+  const [colorModelFilter, setColorModelFilter] = useState('all');
   const [selectedBucket, setSelectedBucket] = useState<{ year: string; model: string } | null>(null);
+
   function formatPercentage(count: number, total: number) {
     if (total === 0) return '0,0%';
     return ((count / total) * 100).toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
   }
+
   const soldScootersForYear = scooters.filter((scooter) =>
     scooter.status === 'Verkocht klant' &&
     (yearFilter === 'all' || salesYearForScooter(scooter) === yearFilter),
@@ -5400,6 +5409,37 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
       .filter((scooter) => salesYearForScooter(scooter) === selectedBucket.year && normalizeSalesModel(scooter.model) === selectedBucket.model)
       .sort((a, b) => (a.firstRegistrationDate || '').localeCompare(b.firstRegistrationDate || '') || a.frameNumber.localeCompare(b.frameNumber))
     : [];
+  const colorModelOptions = Array.from(new Set(soldScooters.map((scooter) => normalizeSalesModel(scooter.model)))).sort((a, b) =>
+    a.localeCompare(b, 'nl', { sensitivity: 'base' }),
+  );
+  const colorTabScooters = soldScooters.filter((scooter) =>
+    colorModelFilter === 'all' || normalizeSalesModel(scooter.model) === colorModelFilter,
+  );
+  const colorRows = Array.from(colorTabScooters.reduce((map, scooter) => {
+    const color = normalizeSalesColor(scooter.color);
+    const current = map.get(color) ?? {
+      color,
+      snorCount: 0,
+      bromCount: 0,
+      totalCount: 0,
+      models: new Set<string>(),
+    };
+    const speed = normalizeSpeedValue(scooter.speed);
+    current.models.add(normalizeSalesModel(scooter.model));
+    current.snorCount += speed === '25' ? 1 : 0;
+    current.bromCount += speed === '45' ? 1 : 0;
+    current.totalCount += 1;
+    map.set(color, current);
+    return map;
+  }, new Map<string, { color: string; snorCount: number; bromCount: number; totalCount: number; models: Set<string> }>()).values())
+    .map((row) => ({
+      color: row.color,
+      snorCount: row.snorCount,
+      bromCount: row.bromCount,
+      totalCount: row.totalCount,
+      modelCount: row.models.size,
+    }))
+    .sort((a, b) => b.totalCount - a.totalCount || a.color.localeCompare(b.color, 'nl', { sensitivity: 'base' }));
   const totalSnorCount = soldScooters.reduce((sum, scooter) => sum + (normalizeSpeedValue(scooter.speed) === '25' ? 1 : 0), 0);
   const totalBromCount = soldScooters.reduce((sum, scooter) => sum + (normalizeSpeedValue(scooter.speed) === '45' ? 1 : 0), 0);
 
@@ -5408,6 +5448,12 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
       setDealerFilter('all');
     }
   }, [availableDealers, dealerFilter]);
+
+  useEffect(() => {
+    if (colorModelFilter !== 'all' && !colorModelOptions.includes(colorModelFilter)) {
+      setColorModelFilter('all');
+    }
+  }, [colorModelFilter, colorModelOptions]);
 
   return (
     <section className="panel sales-dashboard">
@@ -5428,80 +5474,138 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
           </select>
         </label>
       </div>
+      <div className="sales-tab-bar">
+        <button type="button" className={`product-tab-button sales-tab-button${activeTab === 'overview' ? ' active' : ''}`} onClick={() => setActiveTab('overview')}>
+          Overzicht
+          <span className="product-section-meta">Jaar, model, snor en brom</span>
+        </button>
+        <button type="button" className={`product-tab-button sales-tab-button${activeTab === 'colors' ? ' active' : ''}`} onClick={() => setActiveTab('colors')}>
+          Kleuren
+          <span className="product-section-meta">Verkoopverdeling per kleur</span>
+        </button>
+      </div>
+      {activeTab === 'colors' ? (
+        <div className="sales-subfilters">
+          <label className="sales-subfilter">
+            Model
+            <select value={colorModelFilter} onChange={(event) => setColorModelFilter(event.target.value)}>
+              <option value="all">Alle modellen</option>
+              {colorModelOptions.map((model) => <option key={model} value={model}>{model}</option>)}
+            </select>
+          </label>
+        </div>
+      ) : null}
       <div className="sales-summary">
         <div><span>Verkocht totaal</span><strong>{soldScooters.length}</strong></div>
         <div><span>Modellen</span><strong>{new Set(soldScooters.map((scooter) => normalizeSalesModel(scooter.model))).size}</strong></div>
+        <div><span>Kleuren</span><strong>{colorRows.length}</strong><small>{activeTab === 'colors' ? `${colorTabScooters.length} scooters in selectie` : 'Beschikbare kleurverdeling'}</small></div>
         <div><span>Snorscooter (25)</span><strong>{totalSnorCount}</strong><small>{formatPercentage(totalSnorCount, soldScooters.length)} van {soldScooters.length}</small></div>
         <div><span>Bromscooter (45)</span><strong>{totalBromCount}</strong><small>{formatPercentage(totalBromCount, soldScooters.length)} van {soldScooters.length}</small></div>
         <div><span>Filters</span><strong>{yearFilter === 'all' ? 'Alle jaren' : yearFilter} / {dealerFilter === 'all' ? 'Alle dealers' : dealerName(dealers, dealerFilter)}</strong></div>
       </div>
-      <div className="table-wrap sales-table-wrap">
-        <table className="sales-table">
-          <thead>
-            <tr><th>Jaar</th><th>Model</th><th>Snorscooter (25)</th><th>Bromscooter (45)</th><th>Totaal</th></tr>
-          </thead>
-          <tbody>
-            {rows.length ? rows.map((row) => (
-              <tr
-                className={`clickable-sales-row ${selectedBucket?.year === row.year && selectedBucket?.model === row.model ? 'selected' : ''}`}
-                key={`${row.year}-${row.model}`}
-                onClick={() => setSelectedBucket({ year: row.year, model: row.model })}
-              >
-                <td>{row.year}</td>
-                <td><button className="link-button" type="button">{row.model}</button></td>
-                <td className="sales-metric-cell">
-                  <div className="sales-metric-layout">
-                    <span className="sales-metric-value">{row.snorCount}</span>
-                    <small className="sales-metric-share">{formatPercentage(row.snorCount, row.totalCount)}</small>
-                  </div>
-                </td>
-                <td className="sales-metric-cell">
-                  <div className="sales-metric-layout">
-                    <span className="sales-metric-value">{row.bromCount}</span>
-                    <small className="sales-metric-share">{formatPercentage(row.bromCount, row.totalCount)}</small>
-                  </div>
-                </td>
-                <td className="sales-total-cell"><strong>{row.totalCount}</strong></td>
-              </tr>
-            )) : (
-              <tr><td colSpan={5}>Geen verkoopdata gevonden.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      {selectedBucket && (
-        <div className="sales-detail">
-          <div className="sales-detail-header">
-            <div>
-              <strong>{selectedBucket.model}</strong>
-              <span>{selectedBucket.year} - {bucketScooters.length} scooters</span>
-            </div>
-            <button className="secondary-button" type="button" onClick={() => setSelectedBucket(null)}>Sluiten</button>
-          </div>
-          <div className="table-wrap sales-detail-table-wrap">
-            <table className="sales-detail-table">
+      {activeTab === 'overview' ? (
+        <>
+          <div className="table-wrap sales-table-wrap">
+            <table className="sales-table">
               <thead>
-                <tr>
-                  <th>Frame #</th>
-                  <th>Kenteken</th>
-                  <th>Dealer</th>
-                  <th>Eerste tenaamstelling</th>
-                  <th>Factuur</th>
-                </tr>
+                <tr><th>Jaar</th><th>Model</th><th>Snorscooter (25)</th><th>Bromscooter (45)</th><th>Totaal</th></tr>
               </thead>
               <tbody>
-                {bucketScooters.map((scooter) => (
-                  <tr className="clickable-sales-row" key={scooter.id} onClick={() => onSelect(scooter)}>
-                    <td><button className="link-button" type="button">{scooter.frameNumber}</button></td>
-                    <td>{scooter.licensePlate || '-'}</td>
-                    <td>{dealerName(dealers, scooter.dealerId) || '-'}</td>
-                    <td>{formatDate(scooter.firstRegistrationDate)}</td>
-                    <td>{scooter.invoiceNumber || '-'}</td>
+                {rows.length ? rows.map((row) => (
+                  <tr
+                    className={`clickable-sales-row ${selectedBucket?.year === row.year && selectedBucket?.model === row.model ? 'selected' : ''}`}
+                    key={`${row.year}-${row.model}`}
+                    onClick={() => setSelectedBucket({ year: row.year, model: row.model })}
+                  >
+                    <td>{row.year}</td>
+                    <td><button className="link-button" type="button">{row.model}</button></td>
+                    <td className="sales-metric-cell">
+                      <div className="sales-metric-layout">
+                        <span className="sales-metric-value">{row.snorCount}</span>
+                        <small className="sales-metric-share">{formatPercentage(row.snorCount, row.totalCount)}</small>
+                      </div>
+                    </td>
+                    <td className="sales-metric-cell">
+                      <div className="sales-metric-layout">
+                        <span className="sales-metric-value">{row.bromCount}</span>
+                        <small className="sales-metric-share">{formatPercentage(row.bromCount, row.totalCount)}</small>
+                      </div>
+                    </td>
+                    <td className="sales-total-cell"><strong>{row.totalCount}</strong></td>
                   </tr>
-                ))}
+                )) : (
+                  <tr><td colSpan={5}>Geen verkoopdata gevonden.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
+          {selectedBucket && (
+            <div className="sales-detail">
+              <div className="sales-detail-header">
+                <div>
+                  <strong>{selectedBucket.model}</strong>
+                  <span>{selectedBucket.year} - {bucketScooters.length} scooters</span>
+                </div>
+                <button className="secondary-button" type="button" onClick={() => setSelectedBucket(null)}>Sluiten</button>
+              </div>
+              <div className="table-wrap sales-detail-table-wrap">
+                <table className="sales-detail-table">
+                  <thead>
+                    <tr>
+                      <th>Frame #</th>
+                      <th>Kenteken</th>
+                      <th>Dealer</th>
+                      <th>Eerste tenaamstelling</th>
+                      <th>Factuur</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bucketScooters.map((scooter) => (
+                      <tr className="clickable-sales-row" key={scooter.id} onClick={() => onSelect(scooter)}>
+                        <td><button className="link-button" type="button">{scooter.frameNumber}</button></td>
+                        <td>{scooter.licensePlate || '-'}</td>
+                        <td>{dealerName(dealers, scooter.dealerId) || '-'}</td>
+                        <td>{formatDate(scooter.firstRegistrationDate)}</td>
+                        <td>{scooter.invoiceNumber || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="table-wrap sales-table-wrap">
+          <table className="sales-table sales-color-table">
+            <thead>
+              <tr><th>Kleur</th><th>Snorscooter (25)</th><th>Bromscooter (45)</th><th>Totaal</th><th>Aandeel</th><th>Modellen</th></tr>
+            </thead>
+            <tbody>
+              {colorRows.length ? colorRows.map((row) => (
+                <tr key={row.color}>
+                  <td className="sales-color-cell"><strong>{row.color}</strong></td>
+                  <td className="sales-metric-cell">
+                    <div className="sales-metric-layout">
+                      <span className="sales-metric-value">{row.snorCount}</span>
+                      <small className="sales-metric-share">{formatPercentage(row.snorCount, row.totalCount)}</small>
+                    </div>
+                  </td>
+                  <td className="sales-metric-cell">
+                    <div className="sales-metric-layout">
+                      <span className="sales-metric-value">{row.bromCount}</span>
+                      <small className="sales-metric-share">{formatPercentage(row.bromCount, row.totalCount)}</small>
+                    </div>
+                  </td>
+                  <td className="sales-total-cell"><strong>{row.totalCount}</strong></td>
+                  <td className="sales-share-cell">{formatPercentage(row.totalCount, colorTabScooters.length)}</td>
+                  <td>{row.modelCount}</td>
+                </tr>
+              )) : (
+                <tr><td colSpan={6}>Geen kleurdata gevonden.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
     </section>

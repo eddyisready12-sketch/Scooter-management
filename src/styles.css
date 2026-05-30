@@ -1423,6 +1423,38 @@ tbody tr:hover {
   margin-bottom: 14px;
 }
 
+.sales-tab-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid #dce1e6;
+}
+
+.sales-tab-button {
+  min-height: 74px;
+}
+
+.sales-subfilters {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 14px 14px;
+  border-bottom: 1px solid #dce1e6;
+}
+
+.sales-subfilter {
+  display: grid;
+  gap: 6px;
+  min-width: 240px;
+  color: #65717d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sales-subfilter select {
+  min-height: 38px;
+}
+
 .panel-title-filter {
   display: inline-flex;
   align-items: center;
@@ -1440,7 +1472,7 @@ tbody tr:hover {
 
 .sales-summary {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0;
   border-bottom: 1px solid #dce1e6;
 }
@@ -1555,10 +1587,55 @@ tbody tr:hover {
   padding-right: 18px !important;
 }
 
+.sales-color-table th:nth-child(1),
+.sales-color-table td:nth-child(1) {
+  width: 24%;
+}
+
+.sales-color-table th:nth-child(2),
+.sales-color-table td:nth-child(2),
+.sales-color-table th:nth-child(3),
+.sales-color-table td:nth-child(3) {
+  width: 20%;
+  text-align: center;
+}
+
+.sales-color-table th:nth-child(4),
+.sales-color-table td:nth-child(4) {
+  width: 10%;
+  text-align: right;
+}
+
+.sales-color-table th:nth-child(5),
+.sales-color-table td:nth-child(5),
+.sales-color-table th:nth-child(6),
+.sales-color-table td:nth-child(6) {
+  width: 13%;
+  text-align: right;
+}
+
+.sales-color-cell strong,
+.sales-share-cell {
+  font-weight: 700;
+}
+
 @media (max-width: 980px) {
   .sales-summary-panel-head {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .sales-tab-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .sales-subfilters {
+    justify-content: stretch;
+  }
+
+  .sales-subfilter {
+    min-width: 0;
+    width: 100%;
   }
 
   .sales-summary-toolbar-bottom {
@@ -3182,8 +3259,9 @@ tbody tr:hover {
 }
 
 .import-batch-lines-wrap {
-  max-height: min(68vh, 720px);
-  overflow: auto;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: visible;
   border: 1px solid #dce1e6;
   border-radius: 8px;
 }
