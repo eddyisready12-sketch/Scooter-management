@@ -5348,10 +5348,9 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
   const [dealerFilter, setDealerFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
   const [selectedBucket, setSelectedBucket] = useState<{ year: string; model: string } | null>(null);
-  function formatShare(count: number, total: number) {
-    if (total === 0) return `${count} (0%)`;
-    const percentage = ((count / total) * 100).toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-    return `${count} (${percentage}%)`;
+  function formatPercentage(count: number, total: number) {
+    if (total === 0) return '0,0%';
+    return ((count / total) * 100).toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
   }
   const soldScootersForYear = scooters.filter((scooter) =>
     scooter.status === 'Verkocht klant' &&
@@ -5401,6 +5400,8 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
       .filter((scooter) => salesYearForScooter(scooter) === selectedBucket.year && normalizeSalesModel(scooter.model) === selectedBucket.model)
       .sort((a, b) => (a.firstRegistrationDate || '').localeCompare(b.firstRegistrationDate || '') || a.frameNumber.localeCompare(b.frameNumber))
     : [];
+  const totalSnorCount = soldScooters.reduce((sum, scooter) => sum + (normalizeSpeedValue(scooter.speed) === '25' ? 1 : 0), 0);
+  const totalBromCount = soldScooters.reduce((sum, scooter) => sum + (normalizeSpeedValue(scooter.speed) === '45' ? 1 : 0), 0);
 
   useEffect(() => {
     if (dealerFilter !== 'all' && !availableDealers.some((dealer) => dealer.id === dealerFilter)) {
@@ -5430,6 +5431,8 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
       <div className="sales-summary">
         <div><span>Verkocht totaal</span><strong>{soldScooters.length}</strong></div>
         <div><span>Modellen</span><strong>{new Set(soldScooters.map((scooter) => normalizeSalesModel(scooter.model))).size}</strong></div>
+        <div><span>Snorscooter (25)</span><strong>{totalSnorCount}</strong><small>{formatPercentage(totalSnorCount, soldScooters.length)} van {soldScooters.length}</small></div>
+        <div><span>Bromscooter (45)</span><strong>{totalBromCount}</strong><small>{formatPercentage(totalBromCount, soldScooters.length)} van {soldScooters.length}</small></div>
         <div><span>Filters</span><strong>{yearFilter === 'all' ? 'Alle jaren' : yearFilter} / {dealerFilter === 'all' ? 'Alle dealers' : dealerName(dealers, dealerFilter)}</strong></div>
       </div>
       <div className="table-wrap sales-table-wrap">
@@ -5446,8 +5449,14 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
               >
                 <td>{row.year}</td>
                 <td><button className="link-button" type="button">{row.model}</button></td>
-                <td className="sales-metric-cell"><span>{formatShare(row.snorCount, row.totalCount)}</span></td>
-                <td className="sales-metric-cell"><span>{formatShare(row.bromCount, row.totalCount)}</span></td>
+                <td className="sales-metric-cell">
+                  <span className="sales-metric-value">{row.snorCount}</span>
+                  <small className="sales-metric-share">{formatPercentage(row.snorCount, row.totalCount)}</small>
+                </td>
+                <td className="sales-metric-cell">
+                  <span className="sales-metric-value">{row.bromCount}</span>
+                  <small className="sales-metric-share">{formatPercentage(row.bromCount, row.totalCount)}</small>
+                </td>
                 <td className="sales-total-cell"><strong>{row.totalCount}</strong></td>
               </tr>
             )) : (
