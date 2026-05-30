@@ -5416,30 +5416,24 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
     colorModelFilter === 'all' || normalizeSalesModel(scooter.model) === colorModelFilter,
   );
   const colorRows = Array.from(colorTabScooters.reduce((map, scooter) => {
+    const model = normalizeSalesModel(scooter.model);
     const color = normalizeSalesColor(scooter.color);
-    const current = map.get(color) ?? {
+    const key = `${model}|${color}`;
+    const current = map.get(key) ?? {
+      model,
       color,
       snorCount: 0,
       bromCount: 0,
       totalCount: 0,
-      models: new Set<string>(),
     };
     const speed = normalizeSpeedValue(scooter.speed);
-    current.models.add(normalizeSalesModel(scooter.model));
     current.snorCount += speed === '25' ? 1 : 0;
     current.bromCount += speed === '45' ? 1 : 0;
     current.totalCount += 1;
-    map.set(color, current);
+    map.set(key, current);
     return map;
-  }, new Map<string, { color: string; snorCount: number; bromCount: number; totalCount: number; models: Set<string> }>()).values())
-    .map((row) => ({
-      color: row.color,
-      snorCount: row.snorCount,
-      bromCount: row.bromCount,
-      totalCount: row.totalCount,
-      modelCount: row.models.size,
-    }))
-    .sort((a, b) => b.totalCount - a.totalCount || a.color.localeCompare(b.color, 'nl', { sensitivity: 'base' }));
+  }, new Map<string, { model: string; color: string; snorCount: number; bromCount: number; totalCount: number }>()).values())
+    .sort((a, b) => b.totalCount - a.totalCount || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' }) || a.color.localeCompare(b.color, 'nl', { sensitivity: 'base' }));
   const totalSnorCount = soldScooters.reduce((sum, scooter) => sum + (normalizeSpeedValue(scooter.speed) === '25' ? 1 : 0), 0);
   const totalBromCount = soldScooters.reduce((sum, scooter) => sum + (normalizeSpeedValue(scooter.speed) === '45' ? 1 : 0), 0);
 
@@ -5579,11 +5573,12 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
         <div className="table-wrap sales-table-wrap">
           <table className="sales-table sales-color-table">
             <thead>
-              <tr><th>Kleur</th><th>Snorscooter (25)</th><th>Bromscooter (45)</th><th>Totaal</th><th>Aandeel</th><th>Modellen</th></tr>
+              <tr><th>Model</th><th>Kleur</th><th>Snorscooter (25)</th><th>Bromscooter (45)</th><th>Totaal</th><th>Aandeel</th></tr>
             </thead>
             <tbody>
               {colorRows.length ? colorRows.map((row) => (
-                <tr key={row.color}>
+                <tr key={`${row.model}-${row.color}`}>
+                  <td className="sales-color-model-cell"><strong>{row.model}</strong></td>
                   <td className="sales-color-cell"><strong>{row.color}</strong></td>
                   <td className="sales-metric-cell">
                     <div className="sales-metric-layout">
@@ -5599,7 +5594,6 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
                   </td>
                   <td className="sales-total-cell"><strong>{row.totalCount}</strong></td>
                   <td className="sales-share-cell">{formatPercentage(row.totalCount, colorTabScooters.length)}</td>
-                  <td>{row.modelCount}</td>
                 </tr>
               )) : (
                 <tr><td colSpan={6}>Geen kleurdata gevonden.</td></tr>

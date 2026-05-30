@@ -1589,31 +1589,35 @@ tbody tr:hover {
 
 .sales-color-table th:nth-child(1),
 .sales-color-table td:nth-child(1) {
-  width: 24%;
+  width: 22%;
 }
 
 .sales-color-table th:nth-child(2),
-.sales-color-table td:nth-child(2),
-.sales-color-table th:nth-child(3),
-.sales-color-table td:nth-child(3) {
+.sales-color-table td:nth-child(2) {
   width: 20%;
+}
+
+.sales-color-table th:nth-child(3),
+.sales-color-table td:nth-child(3),
+.sales-color-table th:nth-child(4),
+.sales-color-table td:nth-child(4) {
+  width: 19%;
   text-align: center;
 }
 
-.sales-color-table th:nth-child(4),
-.sales-color-table td:nth-child(4) {
+.sales-color-table th:nth-child(5),
+.sales-color-table td:nth-child(5) {
   width: 10%;
   text-align: right;
 }
 
-.sales-color-table th:nth-child(5),
-.sales-color-table td:nth-child(5),
 .sales-color-table th:nth-child(6),
 .sales-color-table td:nth-child(6) {
-  width: 13%;
+  width: 10%;
   text-align: right;
 }
 
+.sales-color-model-cell strong,
 .sales-color-cell strong,
 .sales-share-cell {
   font-weight: 700;
