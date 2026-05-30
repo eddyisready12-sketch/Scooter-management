@@ -1558,6 +1558,9 @@ tbody tr:hover {
 
 .sales-table-wrap {
   margin: 0;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .exact-preview-table {
