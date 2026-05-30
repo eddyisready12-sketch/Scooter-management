@@ -1604,8 +1604,42 @@ function normalizeSalesModel(model?: string) {
 }
 
 function normalizeSalesColor(color?: string) {
-  const value = (color || 'Onbekend').trim().replace(/\s+/g, ' ');
-  return value ? value.toUpperCase() : 'Onbekend';
+  const value = (color || 'Onbekend').trim().replace(/\s+/g, ' ').toUpperCase();
+  if (!value) return 'Onbekend';
+
+  if ([
+    'NARDO GREY',
+    'NARDO GREY RY-087',
+    'GREY',
+    'GREY NARDO',
+  ].includes(value)) return 'NARDO GREY';
+
+  if ([
+    'MAT ZWART',
+    'MATTE BLACK RY054',
+    'DARK MATTE BLACK RY053',
+    'MATTE BLACK',
+    'MAT BLACK',
+    'DARK MATTE BLACK',
+  ].includes(value)) return 'MATT BLACK';
+
+  if ([
+    'DARK MATTE BLUE BOMA',
+    'DARKMATTER BLUE BOMA',
+    'MATTE DARK BLUE',
+  ].includes(value)) return 'DARK MATTE BLUE BOMA';
+
+  if ([
+    'ZWART',
+    'BLACK',
+  ].includes(value)) return 'BLACK';
+
+  if ([
+    'OLIVE GREEN',
+    'OLIVER GREEN',
+  ].includes(value)) return 'OLIVE GREEN';
+
+  return value;
 }
 
 function warrantyStatusIcon(status: WarrantyPart['status']) {
