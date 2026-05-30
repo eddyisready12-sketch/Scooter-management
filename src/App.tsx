@@ -1624,6 +1624,7 @@ function normalizeSalesColor(color?: string) {
   ].includes(value)) return 'MATT BLACK';
 
   if ([
+    'DARK MATTE BLUE',
     'DARK MATTE BLUE BOMA',
     'DARKMATTER BLUE BOMA',
     'MATTE DARK BLUE',
@@ -1638,6 +1639,16 @@ function normalizeSalesColor(color?: string) {
     'OLIVE GREEN',
     'OLIVER GREEN',
   ].includes(value)) return 'OLIVE GREEN';
+
+  if (value === 'CHAMPAGNE') return 'CHAMPAGNE RY-042';
+  if (value === 'RED') return 'RED RY083';
+
+  if ([
+    'METAL PINK',
+    'MAT PINK',
+  ].includes(value)) return 'METAL PINK';
+
+  if (value === 'MAT CAMELION') return 'MATT CAMELION';
 
   return value;
 }
@@ -5386,9 +5397,11 @@ function SalesPage({ scooters, dealers, onSelect }: { scooters: Scooter[]; deale
 function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; dealers: Dealer[]; onSelect: (scooter: Scooter) => void }) {
   const [activeTab, setActiveTab] = useState<'overview' | 'colors'>('overview');
   const [dealerFilter, setDealerFilter] = useState('all');
-  const [yearFilter, setYearFilter] = useState('all');
+  const [selectedYears, setSelectedYears] = useState<string[]>([]);
+  const [showYearFilter, setShowYearFilter] = useState(false);
   const [colorModelFilter, setColorModelFilter] = useState('all');
   const [selectedBucket, setSelectedBucket] = useState<{ year: string; model: string } | null>(null);
+  const yearFilterRef = useRef<HTMLDivElement | null>(null);
 
   function formatPercentage(count: number, total: number) {
     if (total === 0) return '0,0%';
@@ -5397,7 +5410,7 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
 
   const soldScootersForYear = scooters.filter((scooter) =>
     scooter.status === 'Verkocht klant' &&
-    (yearFilter === 'all' || salesYearForScooter(scooter) === yearFilter),
+    (selectedYears.length === 0 || selectedYears.includes(salesYearForScooter(scooter))),
   );
   const availableDealers = dealers
     .filter((dealer) => soldScootersForYear.some((scooter) => scooter.dealerId === dealer.id))
@@ -5405,7 +5418,7 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
   const soldScooters = scooters.filter((scooter) =>
     scooter.status === 'Verkocht klant' &&
     (dealerFilter === 'all' || scooter.dealerId === dealerFilter) &&
-    (yearFilter === 'all' || salesYearForScooter(scooter) === yearFilter),
+    (selectedYears.length === 0 || selectedYears.includes(salesYearForScooter(scooter))),
   );
   const yearOptions = Array.from(new Set(scooters
     .filter((scooter) => scooter.status === 'Verkocht klant')
@@ -5415,6 +5428,11 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
       if (b === 'Onbekend') return -1;
       return b.localeCompare(a);
     });
+  const yearFilterLabel = selectedYears.length === 0
+    ? 'Alle jaren'
+    : selectedYears.length === 1
+      ? selectedYears[0]
+      : `${selectedYears.length} jaren`;
   const rows = Array.from(soldScooters.reduce((map, scooter) => {
     const model = normalizeSalesModel(scooter.model);
     const key = `${salesYearForScooter(scooter)}|${model}`;
@@ -5478,22 +5496,63 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
   }, [availableDealers, dealerFilter]);
 
   useEffect(() => {
+    setSelectedYears((current) => current.filter((year) => yearOptions.includes(year)));
+  }, [yearOptions]);
+
+  useEffect(() => {
     if (colorModelFilter !== 'all' && !colorModelOptions.includes(colorModelFilter)) {
       setColorModelFilter('all');
     }
   }, [colorModelFilter, colorModelOptions]);
 
+  useEffect(() => {
+    if (!showYearFilter) return;
+    function handlePointerDown(event: MouseEvent) {
+      if (yearFilterRef.current && !yearFilterRef.current.contains(event.target as Node)) {
+        setShowYearFilter(false);
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [showYearFilter]);
+
+  function toggleYearFilter(year: string) {
+    setSelectedYears((current) =>
+      current.includes(year)
+        ? current.filter((value) => value !== year)
+        : [...current, year].sort((a, b) => {
+          if (a === 'Onbekend') return 1;
+          if (b === 'Onbekend') return -1;
+          return b.localeCompare(a);
+        }),
+    );
+  }
+
   return (
     <section className="panel sales-dashboard">
       <div className="panel-title">
         <span className="panel-title-label"><CircleDollarSign size={16} /> Verkoop dashboard</span>
-        <label className="panel-title-filter">
-          Jaar
-          <select value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
-            <option value="all">Alle jaren</option>
-            {yearOptions.map((year) => <option key={year} value={year}>{year}</option>)}
-          </select>
-        </label>
+        <div className="panel-title-filter year-filter-dropdown" ref={yearFilterRef}>
+          <span>Jaar</span>
+          <button type="button" className="panel-title-filter-button" onClick={() => setShowYearFilter((current) => !current)}>
+            <span>{yearFilterLabel}</span>
+            <ChevronDown size={16} />
+          </button>
+          {showYearFilter ? (
+            <div className="year-filter-menu">
+              <label className="year-filter-option">
+                <input type="checkbox" checked={selectedYears.length === 0} onChange={() => setSelectedYears([])} />
+                <span>Alle jaren</span>
+              </label>
+              {yearOptions.map((year) => (
+                <label key={year} className="year-filter-option">
+                  <input type="checkbox" checked={selectedYears.includes(year)} onChange={() => toggleYearFilter(year)} />
+                  <span>{year}</span>
+                </label>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <label className="panel-title-filter">
           Dealer
           <select value={dealerFilter} onChange={(event) => setDealerFilter(event.target.value)}>
@@ -5529,7 +5588,7 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
         <div><span>Kleuren</span><strong>{colorRows.length}</strong><small>{activeTab === 'colors' ? `${colorTabScooters.length} scooters in selectie` : 'Beschikbare kleurverdeling'}</small></div>
         <div><span>Snorscooter (25)</span><strong>{totalSnorCount}</strong><small>{formatPercentage(totalSnorCount, soldScooters.length)} van {soldScooters.length}</small></div>
         <div><span>Bromscooter (45)</span><strong>{totalBromCount}</strong><small>{formatPercentage(totalBromCount, soldScooters.length)} van {soldScooters.length}</small></div>
-        <div><span>Filters</span><strong>{yearFilter === 'all' ? 'Alle jaren' : yearFilter} / {dealerFilter === 'all' ? 'Alle dealers' : dealerName(dealers, dealerFilter)}</strong></div>
+        <div><span>Filters</span><strong>{yearFilterLabel} / {dealerFilter === 'all' ? 'Alle dealers' : dealerName(dealers, dealerFilter)}</strong></div>
       </div>
       {activeTab === 'overview' ? (
         <>
