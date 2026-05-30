@@ -5495,7 +5495,7 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
   );
 }
 
-function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'Beschikbare scooters', onBulkRdwCheck }: {
+function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'Beschikbare scooters', onBulkRdwCheck, defaultSortOrder = 'model-asc' }: {
   scooters: Scooter[];
   dealers: Dealer[];
   query: string;
@@ -5503,10 +5503,11 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
   onSelect: (scooter: Scooter) => void;
   title?: string;
   onBulkRdwCheck?: (scooters: Scooter[]) => Promise<string>;
+  defaultSortOrder?: string;
 }) {
   const [rdwChecking, setRdwChecking] = useState(false);
   const [rdwCheckMessage, setRdwCheckMessage] = useState('');
-  const [sortOrder, setSortOrder] = useState('model-asc');
+  const [sortOrder, setSortOrder] = useState(defaultSortOrder);
   const [columnFilters, setColumnFilters] = useState({
     model: '',
     frame: '',
@@ -5533,6 +5534,9 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
       .map((scooter) => dealerName(dealers, scooter.dealerId))
       .filter(Boolean),
   )).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  useEffect(() => {
+    setSortOrder(defaultSortOrder);
+  }, [defaultSortOrder]);
   const filteredRows = scooters.filter((scooter) => {
     const dealer = dealerName(dealers, scooter.dealerId);
     const registrationComplete = isRegistrationComplete(scooter);
@@ -5562,6 +5566,10 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
         return Number(normalizeSpeedValue(a.speed) || 0) - Number(normalizeSpeedValue(b.speed) || 0) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
       case 'newest-added':
         return new Date(b.arrivedAt || 0).getTime() - new Date(a.arrivedAt || 0).getTime() || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'registration-newest':
+        return new Date(b.firstRegistrationDate || 0).getTime() - new Date(a.firstRegistrationDate || 0).getTime() || a.frameNumber.localeCompare(b.frameNumber, 'nl', { sensitivity: 'base' });
+      case 'registration-oldest':
+        return new Date(a.firstRegistrationDate || 0).getTime() - new Date(b.firstRegistrationDate || 0).getTime() || a.frameNumber.localeCompare(b.frameNumber, 'nl', { sensitivity: 'base' });
       case 'model-asc':
       default:
         return a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' }) || a.frameNumber.localeCompare(b.frameNumber, 'nl', { sensitivity: 'base' });
@@ -5701,6 +5709,8 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
             <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}>
               <option value="model-asc">Model A-Z</option>
               <option value="model-desc">Model Z-A</option>
+              <option value="registration-newest">1e tenaamstelling nieuw-oud</option>
+              <option value="registration-oldest">1e tenaamstelling oud-nieuw</option>
               <option value="color-asc">Kleur A-Z</option>
               <option value="color-desc">Kleur Z-A</option>
               <option value="speed-high">Snelheid hoog-laag</option>
@@ -7533,6 +7543,7 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
           onSelect={onSelect}
           title={`Scooters: ${scooterStatusLabel(statusFilter)} (${scooters.length})`}
           onBulkRdwCheck={statusFilter === 'Verkocht dealer' || statusFilter === 'Verkocht klant' ? onBulkRdwCheck : undefined}
+          defaultSortOrder={statusFilter === 'Verkocht klant' ? 'registration-newest' : 'model-asc'}
         />
       )}
       <SearchPanel
