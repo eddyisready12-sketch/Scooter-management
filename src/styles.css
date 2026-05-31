@@ -2246,11 +2246,11 @@ tbody tr:hover {
   margin-bottom: 0;
 }
 
-.content > .table-panel:last-child .table-wrap,
-.content > .table-panel:last-child .sales-table-wrap,
-.content > .table-panel:last-child .sales-detail-table-wrap,
-.content > .table-panel:last-child .scooter-packaging-table-wrap,
-.content > .table-panel:last-child .container-scooter-table-wrap {
+.content > .table-panel:last-child > .table-wrap,
+.content > .table-panel:last-child > .sales-table-wrap,
+.content > .table-panel:last-child > .sales-detail-table-wrap,
+.content > .table-panel:last-child > .scooter-packaging-table-wrap,
+.content > .table-panel:last-child > .container-scooter-table-wrap {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
