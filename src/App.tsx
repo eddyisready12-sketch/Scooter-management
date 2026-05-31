@@ -6415,6 +6415,7 @@ function CostBatchesPage({
                                   <table className="container-scooter-table import-batch-lines-table">
                                     <thead>
                                       <tr>
+                                        <th>#</th>
                                         <th>Type</th>
                                         <th>Omschrijving</th>
                                         <th>EAN</th>
@@ -6432,7 +6433,7 @@ function CostBatchesPage({
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {lines.map((line) => {
+                                      {lines.map((line, index) => {
                                         const product = findProductForCostLine(data.products, line);
                                         const dutchDescription = product?.shortDescription?.trim()
                                           || product?.labelTitle?.trim()
@@ -6458,6 +6459,7 @@ function CostBatchesPage({
                                         );
                                         return (
                                           <tr key={line.id}>
+                                            <td className="import-line-number">{index + 1}</td>
                                             <td>{line.type}</td>
                                             <td className="import-batch-description-cell">
                                               {product ? (
