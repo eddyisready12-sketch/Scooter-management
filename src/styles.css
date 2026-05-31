@@ -3223,6 +3223,12 @@ tbody tr:hover {
   cursor: pointer;
 }
 
+.import-product-title-secondary {
+  color: #5f6f7f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .import-product-number {
   border: 0;
   background: transparent;

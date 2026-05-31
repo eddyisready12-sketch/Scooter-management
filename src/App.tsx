@@ -6422,6 +6422,12 @@ function CostBatchesPage({
                                     <tbody>
                                       {lines.map((line) => {
                                         const product = findProductForCostLine(data.products, line);
+                                        const dutchDescription = product?.shortDescription?.trim() || product?.labelTitle?.trim() || '';
+                                        const englishDescription = line.description.trim();
+                                        const hasDistinctDutchDescription = Boolean(
+                                          dutchDescription
+                                          && dutchDescription.toLowerCase() !== englishDescription.toLowerCase(),
+                                        );
                                         const componentParts = line.componentsNote
                                           ?.split(' - ')
                                           .map((part) => part.trim())
@@ -6440,18 +6446,32 @@ function CostBatchesPage({
                                             <td>{line.type}</td>
                                             <td className="import-batch-description-cell">
                                               {product ? (
-                                                <button
-                                                  type="button"
-                                                  className="import-product-title"
-                                                  onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    onSelectProduct(product);
-                                                  }}
-                                                >
-                                                  {line.description}
-                                                </button>
+                                                <>
+                                                  {hasDistinctDutchDescription ? (
+                                                    <button
+                                                      type="button"
+                                                      className="import-product-title"
+                                                      onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        onSelectProduct(product);
+                                                      }}
+                                                    >
+                                                      {dutchDescription}
+                                                    </button>
+                                                  ) : null}
+                                                  <button
+                                                    type="button"
+                                                    className={`import-product-title${hasDistinctDutchDescription ? ' import-product-title-secondary' : ''}`}
+                                                    onClick={(event) => {
+                                                      event.stopPropagation();
+                                                      onSelectProduct(product);
+                                                    }}
+                                                  >
+                                                    {englishDescription}
+                                                  </button>
+                                                </>
                                               ) : (
-                                                <strong>{line.description}</strong>
+                                                <strong>{englishDescription}</strong>
                                               )}
                                               <small className="import-batch-description-meta">
                                                 <span className="import-batch-meta-line">
