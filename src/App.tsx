@@ -6322,7 +6322,19 @@ function CostBatchesPage({
               <tbody>
                 {sortedBatches.slice(0, 25).map((batch) => {
                   const container = data.containers.find((item) => item.id === batch.containerId);
-                  const lines = visibleContainerCostLines.filter((line) => line.batchId === batch.id);
+                  const lines = visibleContainerCostLines
+                    .filter((line) => line.batchId === batch.id)
+                    .sort((left, right) => {
+                      const leftCode = (left.referenceCode || '').trim();
+                      const rightCode = (right.referenceCode || '').trim();
+                      if (leftCode && rightCode) {
+                        return leftCode.localeCompare(rightCode, 'nl', { numeric: true, sensitivity: 'base' });
+                      }
+                      if (leftCode || rightCode) {
+                        return leftCode ? -1 : 1;
+                      }
+                      return left.description.localeCompare(right.description, 'nl', { numeric: true, sensitivity: 'base' });
+                    });
                   const purchaseOrderAddedCount = lines.filter((line) => line.purchaseOrderAdded).length;
                   const isExpanded = expandedBatchId === batch.id;
                   return (

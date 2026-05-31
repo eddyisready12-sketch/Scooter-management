@@ -3363,9 +3363,9 @@ tbody tr:hover {
 }
 
 .import-batch-lines-wrap {
-  max-height: none;
+  max-height: min(62vh, 760px);
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: auto;
   border: 1px solid #dce1e6;
   border-radius: 8px;
 }
