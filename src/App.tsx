@@ -6422,7 +6422,10 @@ function CostBatchesPage({
                                     <tbody>
                                       {lines.map((line) => {
                                         const product = findProductForCostLine(data.products, line);
-                                        const dutchDescription = product?.shortDescription?.trim() || product?.labelTitle?.trim() || '';
+                                        const dutchDescription = product?.shortDescription?.trim()
+                                          || product?.labelTitle?.trim()
+                                          || product?.description?.trim()
+                                          || '';
                                         const englishDescription = line.description.trim();
                                         const hasDistinctDutchDescription = Boolean(
                                           dutchDescription
