@@ -6305,7 +6305,7 @@ function CostBatchesPage({
             <span>Maak een batch aan om transport, inklaring en actuele kostprijzen vast te leggen.</span>
           </div>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap import-batches-table-wrap">
             <table>
               <thead>
                 <tr>

@@ -3345,6 +3345,12 @@ tbody tr:hover {
   border-radius: 8px;
 }
 
+.import-batches-table-wrap {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
 .import-batch-lines-table th,
 .import-batch-lines-table td {
   padding-top: 14px;
