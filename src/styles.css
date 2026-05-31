@@ -16,6 +16,10 @@ body {
   min-height: 100vh;
 }
 
+#root {
+  min-height: 100vh;
+}
+
 button,
 input,
 select,
@@ -31,6 +35,7 @@ button {
   display: grid;
   grid-template-columns: 248px 1fr;
   min-height: 100vh;
+  align-items: stretch;
 }
 
 .sidebar {
@@ -38,6 +43,12 @@ button {
   color: #eef5f7;
   padding: 18px 14px;
   box-shadow: 10px 0 24px rgba(20, 28, 36, 0.18);
+  min-height: 100%;
+  align-self: stretch;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: auto;
 }
 
 .brand {
@@ -87,6 +98,9 @@ button {
 
 .workspace {
   min-width: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .topbar {
@@ -108,9 +122,12 @@ button {
 }
 
 .content {
+  flex: 1;
   width: min(1560px, calc(100vw - 288px));
   margin: 0 auto;
   padding: 22px;
+  display: flex;
+  flex-direction: column;
 }
 
 h1 {
@@ -2213,6 +2230,17 @@ tbody tr:hover {
 
 .table-panel {
   overflow: hidden;
+}
+
+.content > .table-panel:last-child {
+  flex: 1 1 auto;
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.content > .table-panel:last-child .table-wrap {
+  flex: 1 1 auto;
 }
 
 .product-table-intro {
