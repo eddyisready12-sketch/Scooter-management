@@ -18,6 +18,7 @@ body {
 
 #root {
   min-height: 100vh;
+  height: 100vh;
 }
 
 button,
@@ -35,6 +36,7 @@ button {
   display: grid;
   grid-template-columns: 248px 1fr;
   min-height: 100vh;
+  height: 100vh;
   align-items: stretch;
 }
 
@@ -99,8 +101,10 @@ button {
 .workspace {
   min-width: 0;
   min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .topbar {
@@ -128,6 +132,8 @@ button {
   padding: 22px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 h1 {
@@ -2234,13 +2240,21 @@ tbody tr:hover {
 
 .content > .table-panel:last-child {
   flex: 1 1 auto;
-  min-height: 60vh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  margin-bottom: 0;
 }
 
-.content > .table-panel:last-child .table-wrap {
+.content > .table-panel:last-child .table-wrap,
+.content > .table-panel:last-child .sales-table-wrap,
+.content > .table-panel:last-child .sales-detail-table-wrap,
+.content > .table-panel:last-child .scooter-packaging-table-wrap,
+.content > .table-panel:last-child .container-scooter-table-wrap {
   flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
 }
 
 .product-table-intro {
