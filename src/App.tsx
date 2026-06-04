@@ -980,8 +980,14 @@ function isRegistrationComplete(scooter: Scooter) {
   );
 }
 
+function hasInvoiceNumber(scooter: Scooter) {
+  return Boolean(scooter.invoiceNumber?.trim());
+}
+
 function normalizeRegistrationStatus(scooter: Scooter): Scooter {
-  return isRegistrationComplete(scooter) ? { ...scooter, status: 'Verkocht klant' } : scooter;
+  return isRegistrationComplete(scooter) && hasInvoiceNumber(scooter)
+    ? { ...scooter, status: 'Verkocht klant' }
+    : scooter;
 }
 
 function formatVehicleAge(firstAdmissionDate?: string) {
@@ -3056,9 +3062,13 @@ export function App() {
     setSelectedScooter(normalized);
     try {
       await upsertScooters([normalized]);
-      showCsvMessage(isRegistrationComplete(normalized)
-        ? `${normalized.frameNumber} is tenaamgesteld en automatisch naar Verkocht klant gezet.`
-        : `${normalized.frameNumber} is bijgewerkt.`);
+      showCsvMessage(
+        isRegistrationComplete(normalized) && hasInvoiceNumber(normalized)
+          ? `${normalized.frameNumber} is tenaamgesteld en automatisch naar Verkocht klant gezet.`
+          : isRegistrationComplete(normalized) && !hasInvoiceNumber(normalized)
+            ? `${normalized.frameNumber} is tenaamgesteld, maar blijft op de huidige status omdat het factuurnummer ontbreekt.`
+            : `${normalized.frameNumber} is bijgewerkt.`,
+      );
     } catch (error) {
       showCsvMessage(`Scooter opslaan mislukt: ${importErrorMessage(error)}`);
     }
