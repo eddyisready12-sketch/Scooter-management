@@ -10058,8 +10058,9 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
             <div className="claim-row" key={claim.id}>
               {warrantyStatusIcon(claim.status)}
               <button type="button" className="claim-row-main" onClick={() => setSelectedClaim(claim)}>
-                <strong>{claim.claimNumber || claim.id} - {claim.partName}</strong>
-                <span>{claim.scooterFrame} - {claim.licensePlate || 'geen kenteken'} - {claim.partNumber || '-'}</span>
+                <strong>{claim.claimNumber || claim.id} - {claim.licensePlate || 'geen kenteken'}</strong>
+                <span>{claim.partName || 'Geen onderdeel'}{claim.partNumber ? ` - ${claim.partNumber}` : ''}</span>
+                <small>{claim.scooterFrame}</small>
                 <small>{warrantyItemsForClaim(claim).length} onderdeel{warrantyItemsForClaim(claim).length === 1 ? '' : 'en'} - totaal {formatCurrency(warrantyTotalPrice(claim))}</small>
                 <small>{claim.mileage || '0'} km - ouderdom {claim.age || '-'}</small>
               </button>
