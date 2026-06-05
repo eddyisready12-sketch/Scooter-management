@@ -4927,14 +4927,40 @@ dd {
     top: 0;
     z-index: 10;
     padding: 8px;
+    height: auto;
+    min-height: 0;
+    box-shadow: 0 6px 16px rgba(20, 28, 36, 0.14);
   }
 
   .sidebar nav {
-    grid-template-columns: repeat(7, 1fr);
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .sidebar nav::-webkit-scrollbar {
+    display: none;
   }
 
   .brand {
     display: none;
+  }
+
+  .sidebar button,
+  .sidebar button.active,
+  .sidebar button:hover {
+    flex: 0 0 auto;
+    min-width: 76px;
+    min-height: 64px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    justify-content: center;
+    flex-direction: column;
+    gap: 6px;
+    text-align: center;
   }
 
   .workspace,
