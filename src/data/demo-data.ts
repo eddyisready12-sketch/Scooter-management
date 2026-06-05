@@ -39,6 +39,7 @@ const scooters = Array.from({ length: 42 }, (_, index) => {
     brand: 'RSO' as const,
     model,
     color: colors[index % colors.length],
+    colorNumber: '',
     speed: index % 3 === 0 ? '25km/h' : '45km/h',
     status,
     dealerId: ['Verkocht dealer', 'Verkocht klant', 'In consignatie', 'In optie'].includes(status) ? dealer.id : undefined,

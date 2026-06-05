@@ -15,6 +15,7 @@ export type Scooter = {
   brand: 'RSO';
   model: string;
   color: string;
+  colorNumber?: string;
   speed: string;
   status: ScooterStatus;
   dealerId?: string;

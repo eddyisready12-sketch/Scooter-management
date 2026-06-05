@@ -2533,7 +2533,7 @@ export function App() {
     const needle = query.toLowerCase().trim();
     return data.scooters.filter((scooter) =>
       (statusFilter === 'all' || scooter.status === statusFilter) &&
-      (!needle || [scooter.frameNumber, scooter.engineNumber, scooter.model, scooter.color, scooter.status, scooter.licensePlate, scooter.invoiceNumber, dealerName(data.dealers, scooter.dealerId)]
+      (!needle || [scooter.frameNumber, scooter.engineNumber, scooter.model, scooter.color, scooter.colorNumber, scooter.status, scooter.licensePlate, scooter.invoiceNumber, dealerName(data.dealers, scooter.dealerId)]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(needle))),
     );
@@ -5726,6 +5726,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     model: '',
     frame: '',
     color: '',
+    colorNumber: '',
     licensePlate: '',
     speed: '',
     status: '',
@@ -5758,6 +5759,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
       (!columnFilters.model || scooter.model === columnFilters.model) &&
       scooter.frameNumber.toLowerCase().includes(columnFilters.frame.toLowerCase()) &&
       (!columnFilters.color || scooter.color === columnFilters.color) &&
+      (scooter.colorNumber || '').toLowerCase().includes(columnFilters.colorNumber.toLowerCase()) &&
       (scooter.licensePlate || '').toLowerCase().includes(columnFilters.licensePlate.toLowerCase()) &&
       (!columnFilters.speed || normalizeSpeedValue(scooter.speed) === columnFilters.speed) &&
       (!columnFilters.status || scooter.status === columnFilters.status) &&
@@ -5796,6 +5798,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     Model: scooter.model,
     'Frame #': scooter.frameNumber,
     Kleur: scooter.color,
+    'Kleur No': scooter.colorNumber || '-',
     Kenteken: scooter.licensePlate || '-',
     Snelheid: normalizeSpeedValue(scooter.speed) || '-',
     Status: scooter.status,
@@ -5938,7 +5941,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Model</th><th>Frame #</th><th>Kleur</th><th>Kenteken</th><th>Snelheid</th><th>Status</th><th>Dealer</th><th>Factuur</th><th>Uitgepakt</th><th>Tenaam</th></tr>
+            <tr><th>Model</th><th>Frame #</th><th>Kleur</th><th>Kleur No</th><th>Kenteken</th><th>Snelheid</th><th>Status</th><th>Dealer</th><th>Factuur</th><th>Uitgepakt</th><th>Tenaam</th></tr>
             <tr className="filter-row">
               <th>
                 <select value={columnFilters.model} onChange={(event) => setColumnFilter('model', event.target.value)} aria-label="Filter model">
@@ -5953,6 +5956,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
                   {colorOptions.map((color) => <option key={color} value={color}>{color}</option>)}
                 </select>
               </th>
+              <th><input value={columnFilters.colorNumber} onChange={(event) => setColumnFilter('colorNumber', event.target.value)} aria-label="Filter kleur nummer" /></th>
               <th><input value={columnFilters.licensePlate} onChange={(event) => setColumnFilter('licensePlate', event.target.value)} aria-label="Filter kenteken" /></th>
               <th><select value={columnFilters.speed} onChange={(event) => setColumnFilter('speed', event.target.value)} aria-label="Filter snelheid"><option value="">Alle</option>{speedOptions.map((speed) => <option value={speed} key={speed}>{speed}</option>)}</select></th>
               <th><select value={columnFilters.status} onChange={(event) => setColumnFilter('status', event.target.value)} aria-label="Filter status"><option value="">Alle</option>{(Object.keys(statusColor) as ScooterStatus[]).map((status) => <option value={status} key={status}>{scooterStatusLabel(status)}</option>)}</select></th>
@@ -5973,6 +5977,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
                 <td>{scooter.model}</td>
                 <td><button className="link-button">{scooter.frameNumber}</button></td>
                 <td>{scooter.color}</td>
+                <td>{scooter.colorNumber || '-'}</td>
                 <td>{scooter.licensePlate || '-'}</td>
                 <td>{normalizeSpeedValue(scooter.speed) || '-'}</td>
                 <td>{scooter.status}</td>
@@ -10707,6 +10712,7 @@ function ScooterDrawer({
               <dt>Merk</dt><dd>{scooter.brand}</dd>
               <dt>Model</dt><dd>{scooter.model}</dd>
               <dt>Kleur</dt><dd>{scooter.color}</dd>
+              <dt>Kleur No</dt><dd>{scooter.colorNumber || '-'}</dd>
               <dt>Snelheid</dt><dd>{normalizeSpeedValue(scooter.speed)}</dd>
               <dt>Kenteken</dt><dd>{scooter.licensePlate || '-'}</dd>
               <dt>Factuur</dt><dd>{scooter.invoiceNumber || '-'}</dd>
@@ -10719,6 +10725,7 @@ function ScooterDrawer({
             <div className="panel-title"><Wrench size={16} /> Gegevens wijzigen</div>
             <div className="drawer-form">
               <label>Kleur<input value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })} /></label>
+              <label>Kleur No<input value={draft.colorNumber ?? ''} onChange={(e) => setDraft({ ...draft, colorNumber: e.target.value })} /></label>
               <label>Snelheid<input value={draft.speed} onChange={(e) => setDraft({ ...draft, speed: e.target.value })} /></label>
               <label>Kenteken<input value={draft.licensePlate ?? ''} onChange={(e) => setDraft({ ...draft, licensePlate: e.target.value })} /></label>
               <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{(Object.keys(statusColor) as ScooterStatus[]).map((status) => <option key={status} value={status}>{scooterStatusLabel(status)}</option>)}</select></label>

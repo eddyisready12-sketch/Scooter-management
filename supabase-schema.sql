@@ -308,6 +308,7 @@ create table if not exists scooters (
   brand text not null default 'RSO',
   model text not null,
   color text,
+  "colorNumber" text,
   speed text,
   status text not null,
   "dealerId" text references dealers(id),
@@ -331,6 +332,9 @@ create table if not exists scooters (
 
 alter table scooters
 add column if not exists "isUnpacked" boolean default false;
+
+alter table scooters
+add column if not exists "colorNumber" text;
 
 create table if not exists batteries (
   id text primary key,
