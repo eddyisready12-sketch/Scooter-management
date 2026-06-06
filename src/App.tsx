@@ -45,7 +45,7 @@ import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource
 type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
-type ProductModalTab = 'basic' | 'gpsr' | 'packaging';
+type ProductModalTab = 'basic' | 'gpsr' | 'packaging' | 'batches';
 type PendingBatchLabelPrint = {
   batch: ContainerCostBatch;
   line: ContainerCostLine;
@@ -3638,6 +3638,9 @@ export function App() {
           suppliers={productModalSuppliers}
           supplierRecords={data.suppliers}
           importers={data.importers}
+          batches={data.containerCostBatches}
+          costLines={data.containerCostLines}
+          registrations={data.productPackagingRegistrations}
           initialTab={selectedProductTab}
           message={productMessage}
           onClose={() => {
@@ -8524,6 +8527,9 @@ function ProductDetailModal({
   suppliers,
   supplierRecords,
   importers,
+  batches,
+  costLines,
+  registrations,
   initialTab = 'basic',
   message,
   onClose,
@@ -8536,6 +8542,9 @@ function ProductDetailModal({
   suppliers: string[];
   supplierRecords: Supplier[];
   importers: Importer[];
+  batches: ContainerCostBatch[];
+  costLines: ContainerCostLine[];
+  registrations: ProductPackagingRegistration[];
   initialTab?: ProductModalTab;
   message?: string;
   onClose: () => void;
@@ -8590,6 +8599,105 @@ function ProductDetailModal({
   ].filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const productImageUrl = draft.imageUrl?.trim() || '';
+  const batchOverviewRows = useMemo(() => {
+    const normalizedProductCode = draft.code.trim().toLowerCase();
+    const productId = draft.id?.trim();
+    if (!normalizedProductCode && !productId) return [];
+
+    const relevantRegistrations = registrations.filter((registration) => {
+      const registrationCode = registration.productCode?.trim().toLowerCase();
+      return (productId && registration.productId === productId) ||
+        (normalizedProductCode && registrationCode === normalizedProductCode);
+    });
+
+    const registrationGroups = new Map<string, ProductPackagingRegistration[]>();
+    relevantRegistrations.forEach((registration) => {
+      const key = registration.containerCostLineId || `${registration.batchId}:${registration.productCode}`;
+      const items = registrationGroups.get(key) ?? [];
+      items.push(registration);
+      registrationGroups.set(key, items);
+    });
+
+    const grouped = new Map<string, {
+      batchId: string;
+      batchNumber: string;
+      quantity: number;
+      purchaseTotalEur: number;
+      costTotalEur: number;
+      packagingUnit: number;
+      packagesCount: number;
+    }>();
+
+    costLines.forEach((line) => {
+      const lineCode = line.referenceCode?.trim().toLowerCase();
+      const matchesProduct = (productId && line.referenceId === productId) ||
+        (normalizedProductCode && lineCode === normalizedProductCode);
+      if (!matchesProduct) return;
+
+      const batch = batches.find((item) => item.id === line.batchId);
+      const quantity = parseDecimal(line.quantity);
+      const goodsValueEur = parseDecimal(line.goodsValueEur);
+      const costTotalEur = parseDecimal(line.calculatedUnitCostEur) * quantity;
+      const lineRegistrations = registrationGroups.get(line.id)
+        ?? relevantRegistrations.filter((registration) => registration.batchId === line.batchId);
+      const unitsPerPackage = lineRegistrations.reduce((highest, registration) => {
+        const candidate = parseDecimal(registration.unitsPerPackage || registration.packagingUnit);
+        return candidate > 0 ? Math.max(highest, candidate) : highest;
+      }, 0);
+      const packagesCount = lineRegistrations.reduce((highest, registration) => {
+        const candidate = parseDecimal(registration.packagesCount);
+        return candidate > 0 ? Math.max(highest, candidate) : highest;
+      }, 0);
+
+      const key = batch?.id || line.batchId;
+      const current = grouped.get(key) ?? {
+        batchId: line.batchId,
+        batchNumber: batch?.orderNumber || line.batchId,
+        quantity: 0,
+        purchaseTotalEur: 0,
+        costTotalEur: 0,
+        packagingUnit: 0,
+        packagesCount: 0,
+      };
+
+      current.quantity += quantity;
+      current.purchaseTotalEur += goodsValueEur;
+      current.costTotalEur += costTotalEur;
+      current.packagingUnit = Math.max(current.packagingUnit, unitsPerPackage, parseDecimal(draft.packagingUnit));
+      current.packagesCount = Math.max(current.packagesCount, packagesCount);
+      grouped.set(key, current);
+    });
+
+    return Array.from(grouped.values())
+      .map((entry) => {
+        const purchasePerUnitEur = entry.quantity > 0 ? entry.purchaseTotalEur / entry.quantity : 0;
+        const costPerUnitEur = entry.quantity > 0 ? entry.costTotalEur / entry.quantity : 0;
+        const packaging = entry.packagingUnit > 0
+          ? `${formatQuantity(entry.packagingUnit)} st./verpakking${entry.packagesCount > 0 ? ` • ${formatQuantity(entry.packagesCount)} verp.` : ''}`
+          : '-';
+
+        return {
+          ...entry,
+          packaging,
+          purchasePerUnitEur,
+          costPerUnitEur,
+        };
+      })
+      .sort((a, b) => b.batchNumber.localeCompare(a.batchNumber, 'nl', { numeric: true, sensitivity: 'base' }));
+  }, [batches, costLines, draft.code, draft.id, draft.packagingUnit, registrations]);
+  const batchOverviewTotals = useMemo(() => {
+    return batchOverviewRows.reduce((summary, row) => ({
+      batches: summary.batches + 1,
+      quantity: summary.quantity + row.quantity,
+      purchaseTotalEur: summary.purchaseTotalEur + (row.purchasePerUnitEur * row.quantity),
+      costTotalEur: summary.costTotalEur + (row.costPerUnitEur * row.quantity),
+    }), {
+      batches: 0,
+      quantity: 0,
+      purchaseTotalEur: 0,
+      costTotalEur: 0,
+    });
+  }, [batchOverviewRows]);
 
   function applySupplierManufacturer(supplierName: string) {
     const supplier = supplierRecords.find((item) => item.name === supplierName);
@@ -8815,6 +8923,10 @@ function ProductDetailModal({
             <button type="button" className={`product-tab-button${activeTab === 'packaging' ? ' active' : ''}`} onClick={() => setActiveTab('packaging')}>
               <span className="panel-title-label"><PackagePlus size={16} /> Verpakkingen informatie</span>
               <small className="product-section-meta">Materiaal, recyclecodes en gewichten.</small>
+            </button>
+            <button type="button" className={`product-tab-button${activeTab === 'batches' ? ' active' : ''}`} onClick={() => setActiveTab('batches')}>
+              <span className="panel-title-label"><ClipboardList size={16} /> Batchoverzicht</span>
+              <small className="product-section-meta">Batch nr, qty, verpakking, inkoop en kostprijs.</small>
             </button>
           </div>
           {activeTab === 'basic' && (
@@ -9148,6 +9260,66 @@ function ProductDetailModal({
                     <textarea value={draft.packagingNotes ?? ''} onChange={(event) => setDraft((current) => ({ ...current, packagingNotes: event.target.value }))} />
                   </label>
                 </div>
+              </div>
+            </div>
+          )}
+          {activeTab === 'batches' && (
+            <div className="product-section-body">
+              <div className="product-form-subsection">
+                <div className="product-table-intro compact">
+                  <strong>Batchhistorie per product</strong>
+                  <span>Per batch zie je hier de hoeveelheid, verpakking en de batchspecifieke prijzen van dit product.</span>
+                </div>
+                <div className="product-batch-summary-grid">
+                  <div className="panel detail-card">
+                    <span className="detail-card-title">Batches</span>
+                    <strong>{batchOverviewTotals.batches}</strong>
+                  </div>
+                  <div className="panel detail-card">
+                    <span className="detail-card-title">Totaal qty</span>
+                    <strong>{formatQuantity(batchOverviewTotals.quantity)}</strong>
+                  </div>
+                  <div className="panel detail-card">
+                    <span className="detail-card-title">Gem. inkoop</span>
+                    <strong>{batchOverviewTotals.quantity > 0 ? formatCurrency((batchOverviewTotals.purchaseTotalEur / batchOverviewTotals.quantity).toFixed(4)) : '-'}</strong>
+                  </div>
+                  <div className="panel detail-card">
+                    <span className="detail-card-title">Gem. kostprijs</span>
+                    <strong>{batchOverviewTotals.quantity > 0 ? formatCurrency((batchOverviewTotals.costTotalEur / batchOverviewTotals.quantity).toFixed(4)) : '-'}</strong>
+                  </div>
+                </div>
+              </div>
+              <div className="product-form-subsection">
+                {batchOverviewRows.length === 0 ? (
+                  <div className="product-table-intro compact">
+                    <span>Nog geen batchregels gevonden voor dit product.</span>
+                  </div>
+                ) : (
+                  <div className="table-wrap product-batch-overview-wrap">
+                    <table className="inventory-table product-batch-overview-table">
+                      <thead>
+                        <tr>
+                          <th>Batch nr</th>
+                          <th>QTY</th>
+                          <th>Verpakking</th>
+                          <th>Inkoop</th>
+                          <th>Kostprijs</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {batchOverviewRows.map((row) => (
+                          <tr key={row.batchId}>
+                            <td>{row.batchNumber}</td>
+                            <td>{formatQuantity(row.quantity)}</td>
+                            <td>{row.packaging}</td>
+                            <td>{formatCurrency(row.purchasePerUnitEur.toFixed(4))}</td>
+                            <td>{formatCurrency(row.costPerUnitEur.toFixed(4))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -2447,7 +2447,7 @@ tbody tr:hover {
 
 .product-tab-bar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   padding: 14px 16px 0;
 }
@@ -2518,6 +2518,34 @@ tbody tr:hover {
 
 .product-form-subsection .span-2 {
   grid-column: 1 / -1;
+}
+
+.product-batch-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.product-batch-summary-grid .detail-card {
+  display: grid;
+  gap: 6px;
+  padding: 0 0 16px;
+}
+
+.product-batch-summary-grid .detail-card strong {
+  padding: 0 16px;
+  font-size: 1.4rem;
+}
+
+.product-batch-overview-wrap {
+  margin: 0;
+  max-height: none;
+}
+
+.product-batch-overview-table th,
+.product-batch-overview-table td {
+  white-space: nowrap;
 }
 
 .product-identification-layout {
@@ -4834,6 +4862,7 @@ dd {
   .drawer-grid,
   .search-grid,
   .product-summary-grid,
+  .product-batch-summary-grid,
   .dashboard-links-grid {
     grid-template-columns: 1fr;
   }
@@ -4844,6 +4873,10 @@ dd {
   }
 
   .packaging-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-tab-bar {
     grid-template-columns: 1fr;
   }
 
