@@ -46,6 +46,33 @@ type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'scooters
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
 type ProductModalTab = 'basic' | 'gpsr' | 'packaging' | 'batches';
+type ProductComplianceLevel = 'green' | 'yellow' | 'red';
+type ProductComplianceDomain = 'gpsr' | 'packaging' | 'ppwr';
+type ProductComplianceSection = 'identification' | 'planning' | 'traceability' | 'manufacturer' | 'importer' | 'safety' | 'packagingGeneral' | 'packagingLayers' | 'batches';
+type ProductComplianceIssue = {
+  id: string;
+  domain: ProductComplianceDomain;
+  level: 'error' | 'warning';
+  label: string;
+  tab: ProductModalTab;
+  section: ProductComplianceSection;
+};
+type ProductComplianceSummary = {
+  gpsr: { level: ProductComplianceLevel; issues: ProductComplianceIssue[] };
+  packaging: { level: ProductComplianceLevel; issues: ProductComplianceIssue[] };
+  ppwr: { level: ProductComplianceLevel; issues: ProductComplianceIssue[] };
+  checklist: ProductComplianceIssue[];
+  overallLevel: ProductComplianceLevel;
+  overallLabel: 'Compleet' | 'Controleren' | 'Onvolledig';
+};
+type ProductBatchOverviewRow = {
+  batchId: string;
+  batchNumber: string;
+  quantity: number;
+  packaging: string;
+  purchasePerUnitEur: number;
+  costPerUnitEur: number;
+};
 type PendingBatchLabelPrint = {
   batch: ContainerCostBatch;
   line: ContainerCostLine;
@@ -660,6 +687,262 @@ function createProductDraft(product: Product): Product {
     packagingWasteStream: derivedWasteStream ?? product.packagingWasteStream,
     packagingUnit: asOptionalTrimmedString(product.packagingUnit) || '1',
     packagingWeightTotalGrams: derivedTotalWeight ?? asOptionalTrimmedString(product.packagingWeightTotalGrams),
+  };
+}
+
+function getResolvedProductComplianceSource(
+  product: Product,
+  supplierRecords: Supplier[] = [],
+  importers: Importer[] = [],
+) {
+  const selectedSupplier = product.supplier
+    ? supplierRecords.find((supplier) => supplierNameMatches(supplier, product.supplier))
+    : undefined;
+  const linkedImporter = importers.find((importer) => importer.id === selectedSupplier?.importerId);
+
+  return {
+    ...product,
+    importerName: product.importerName || linkedImporter?.name,
+    importerEmail: product.importerEmail || linkedImporter?.email,
+    importerAddress: product.importerAddress || linkedImporter?.address,
+    importerWebsite: product.importerWebsite || linkedImporter?.website,
+    importerPostalCode: product.importerPostalCode || linkedImporter?.postalCode,
+    importerCity: product.importerCity || linkedImporter?.city,
+    importerCountry: product.importerCountry || linkedImporter?.country,
+  };
+}
+
+function getProductBatchOverviewRows(
+  product: Product,
+  batches: ContainerCostBatch[],
+  costLines: ContainerCostLine[],
+  registrations: ProductPackagingRegistration[],
+): ProductBatchOverviewRow[] {
+  const normalizedProductCode = product.code.trim().toLowerCase();
+  const productId = product.id?.trim();
+  if (!normalizedProductCode && !productId) return [];
+
+  const relevantRegistrations = registrations.filter((registration) => {
+    const registrationCode = registration.productCode?.trim().toLowerCase();
+    return (productId && registration.productId === productId) ||
+      (normalizedProductCode && registrationCode === normalizedProductCode);
+  });
+
+  const registrationGroups = new Map<string, ProductPackagingRegistration[]>();
+  relevantRegistrations.forEach((registration) => {
+    const key = registration.containerCostLineId || `${registration.batchId}:${registration.productCode}`;
+    const items = registrationGroups.get(key) ?? [];
+    items.push(registration);
+    registrationGroups.set(key, items);
+  });
+
+  const grouped = new Map<string, {
+    batchId: string;
+    batchNumber: string;
+    quantity: number;
+    purchaseTotalEur: number;
+    costTotalEur: number;
+    packagingUnit: number;
+    packagesCount: number;
+  }>();
+
+  costLines.forEach((line) => {
+    const lineCode = line.referenceCode?.trim().toLowerCase();
+    const matchesProduct = (productId && line.referenceId === productId) ||
+      (normalizedProductCode && lineCode === normalizedProductCode);
+    if (!matchesProduct) return;
+
+    const batch = batches.find((item) => item.id === line.batchId);
+    const quantity = parseDecimal(line.quantity);
+    const goodsValueEur = parseDecimal(line.goodsValueEur);
+    const costTotalEur = parseDecimal(line.calculatedUnitCostEur) * quantity;
+    const lineRegistrations = registrationGroups.get(line.id)
+      ?? relevantRegistrations.filter((registration) => registration.batchId === line.batchId);
+    const unitsPerPackage = lineRegistrations.reduce((highest, registration) => {
+      const candidate = parseDecimal(registration.unitsPerPackage || registration.packagingUnit);
+      return candidate > 0 ? Math.max(highest, candidate) : highest;
+    }, 0);
+    const packagesCount = lineRegistrations.reduce((highest, registration) => {
+      const candidate = parseDecimal(registration.packagesCount);
+      return candidate > 0 ? Math.max(highest, candidate) : highest;
+    }, 0);
+
+    const key = batch?.id || line.batchId;
+    const current = grouped.get(key) ?? {
+      batchId: line.batchId,
+      batchNumber: batch?.orderNumber || line.batchId,
+      quantity: 0,
+      purchaseTotalEur: 0,
+      costTotalEur: 0,
+      packagingUnit: 0,
+      packagesCount: 0,
+    };
+
+    current.quantity += quantity;
+    current.purchaseTotalEur += goodsValueEur;
+    current.costTotalEur += costTotalEur;
+    current.packagingUnit = Math.max(current.packagingUnit, unitsPerPackage, parseDecimal(product.packagingUnit));
+    current.packagesCount = Math.max(current.packagesCount, packagesCount);
+    grouped.set(key, current);
+  });
+
+  return Array.from(grouped.values())
+    .map((entry) => {
+      const purchasePerUnitEur = entry.quantity > 0 ? entry.purchaseTotalEur / entry.quantity : 0;
+      const costPerUnitEur = entry.quantity > 0 ? entry.costTotalEur / entry.quantity : 0;
+      const packaging = entry.packagingUnit > 0
+        ? `${formatQuantity(entry.packagingUnit)} st./verpakking${entry.packagesCount > 0 ? ` | ${formatQuantity(entry.packagesCount)} verp.` : ''}`
+        : '-';
+
+      return {
+        batchId: entry.batchId,
+        batchNumber: entry.batchNumber,
+        quantity: entry.quantity,
+        packaging,
+        purchasePerUnitEur,
+        costPerUnitEur,
+      };
+    })
+    .sort((a, b) => b.batchNumber.localeCompare(a.batchNumber, 'nl', { numeric: true, sensitivity: 'base' }));
+}
+
+function getProductComplianceSummary(
+  product: Product,
+  batches: ContainerCostBatch[],
+  costLines: ContainerCostLine[],
+  registrations: ProductPackagingRegistration[],
+  supplierRecords: Supplier[] = [],
+  importers: Importer[] = [],
+): ProductComplianceSummary {
+  const resolvedProduct = getResolvedProductComplianceSource(product, supplierRecords, importers);
+  const packagingLayers = normalizePackagingLayers(resolvedProduct);
+  const batchOverviewRows = getProductBatchOverviewRows(resolvedProduct, batches, costLines, registrations);
+  const hasText = (value?: string) => Boolean(value?.trim());
+  const importerHasContact = hasText(resolvedProduct.importerEmail) || hasText(resolvedProduct.importerWebsite);
+  const importerHasAddress = hasText(resolvedProduct.importerAddress)
+    && hasText(resolvedProduct.importerPostalCode)
+    && hasText(resolvedProduct.importerCity)
+    && hasText(resolvedProduct.importerCountry);
+  const hasTraceability = hasText(resolvedProduct.batchNumber) || hasText(resolvedProduct.traceabilityCode);
+  const hasResponsibleEntity = hasText(resolvedProduct.manufacturerName) || hasText(resolvedProduct.importerName);
+
+  const gpsrIssues: ProductComplianceIssue[] = [];
+  if (!hasText(resolvedProduct.code)) {
+    gpsrIssues.push({ id: 'gpsr-code', domain: 'gpsr', level: 'error', label: 'Artikelnummer ontbreekt', tab: 'basic', section: 'identification' });
+  }
+  if (!hasTraceability) {
+    gpsrIssues.push({ id: 'gpsr-traceability', domain: 'gpsr', level: 'error', label: 'Batchnummer of traceercode ontbreekt', tab: 'gpsr', section: 'traceability' });
+  }
+  if (!hasResponsibleEntity) {
+    gpsrIssues.push({ id: 'gpsr-entity', domain: 'gpsr', level: 'error', label: 'Fabrikantnaam of EU-verantwoordelijke ontbreekt', tab: 'gpsr', section: 'manufacturer' });
+  }
+  if (!hasText(resolvedProduct.importerName)) {
+    gpsrIssues.push({ id: 'gpsr-importer-name', domain: 'gpsr', level: 'error', label: 'Importeur naam ontbreekt', tab: 'gpsr', section: 'importer' });
+  }
+  if (!importerHasContact) {
+    gpsrIssues.push({ id: 'gpsr-importer-contact', domain: 'gpsr', level: 'error', label: 'Importeur e-mail of website ontbreekt', tab: 'gpsr', section: 'importer' });
+  }
+  if (!importerHasAddress) {
+    gpsrIssues.push({ id: 'gpsr-importer-address', domain: 'gpsr', level: 'error', label: 'Importeur adresgegevens zijn niet compleet', tab: 'gpsr', section: 'importer' });
+  }
+  if (!hasText(resolvedProduct.countryOfOrigin)) {
+    gpsrIssues.push({ id: 'gpsr-origin', domain: 'gpsr', level: 'error', label: 'Land van herkomst ontbreekt', tab: 'basic', section: 'planning' });
+  }
+  if (!hasText(resolvedProduct.warning)) {
+    gpsrIssues.push({ id: 'gpsr-warning', domain: 'gpsr', level: 'warning', label: 'Waarschuwing ontbreekt', tab: 'gpsr', section: 'safety' });
+  }
+  if (!hasText(resolvedProduct.safetyInfo)) {
+    gpsrIssues.push({ id: 'gpsr-safety', domain: 'gpsr', level: 'warning', label: 'Veiligheidsinformatie ontbreekt', tab: 'gpsr', section: 'safety' });
+  }
+
+  const activePackagingLayers = packagingLayers.filter((layer) => (
+    hasText(layer.material)
+    || hasText(layer.recycleCode)
+    || parseDecimal(layer.weightGrams) > 0
+    || hasText(layer.recycledContentPercent)
+    || hasText(layer.recyclabilityClass)
+    || hasText(layer.packagingRole)
+    || hasText(layer.productStickerMaterial)
+  ));
+  const packagingIssues: ProductComplianceIssue[] = [];
+  if (activePackagingLayers.length === 0) {
+    packagingIssues.push({ id: 'packaging-layer', domain: 'packaging', level: 'error', label: 'Er is nog geen verpakkingslaag vastgelegd', tab: 'packaging', section: 'packagingLayers' });
+  }
+  activePackagingLayers.forEach((layer, index) => {
+    const layerNumber = index + 1;
+    const option = findPackagingMaterialOption(layer.material);
+    const hasWasteStream = Boolean(option?.wasteStream);
+    if (!hasText(layer.material)) {
+      packagingIssues.push({ id: `packaging-material-${index}`, domain: 'packaging', level: 'error', label: `Materiaalcode ontbreekt bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
+    }
+    if (parseDecimal(layer.weightGrams) <= 0) {
+      packagingIssues.push({ id: `packaging-weight-${index}`, domain: 'packaging', level: 'error', label: `Gewicht ontbreekt bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
+    }
+    if (!hasWasteStream) {
+      packagingIssues.push({ id: `packaging-waste-${index}`, domain: 'packaging', level: 'error', label: `Afvalstroom ontbreekt bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
+    }
+    if (!hasText(layer.recyclabilityClass)) {
+      packagingIssues.push({ id: `packaging-recyclability-${index}`, domain: 'packaging', level: 'warning', label: `Recyclebaarheid ontbreekt bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
+    }
+    if (!hasText(layer.recycledContentPercent)) {
+      packagingIssues.push({ id: `packaging-pcr-${index}`, domain: 'packaging', level: 'warning', label: `PCR% ontbreekt bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
+    }
+    if (!hasText(layer.productStickerMaterial)) {
+      packagingIssues.push({ id: `packaging-label-${index}`, domain: 'packaging', level: 'warning', label: `Labelinformatie ontbreekt bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
+    }
+  });
+
+  const batchLinkAvailable = batchOverviewRows.length > 0 || hasText(resolvedProduct.batch) || hasText(resolvedProduct.batchNumber);
+  const ppwrIssues: ProductComplianceIssue[] = [];
+  const packagingErrorCount = packagingIssues.filter((issue) => issue.level === 'error').length;
+  const packagingWarningCount = packagingIssues.filter((issue) => issue.level === 'warning').length;
+  if (!batchLinkAvailable) {
+    ppwrIssues.push({ id: 'ppwr-batch', domain: 'ppwr', level: 'error', label: 'Batchkoppeling ontbreekt voor PPWR-export', tab: 'batches', section: 'batches' });
+  }
+  if (activePackagingLayers.length === 0) {
+    ppwrIssues.push({ id: 'ppwr-packaging', domain: 'ppwr', level: 'error', label: 'Geen verpakking beschikbaar voor PPWR', tab: 'packaging', section: 'packagingLayers' });
+  }
+  if (activePackagingLayers.some((layer) => parseDecimal(layer.weightGrams) <= 0)) {
+    ppwrIssues.push({ id: 'ppwr-weight', domain: 'ppwr', level: 'error', label: 'Gewicht ontbreekt nog voor PPWR-export', tab: 'packaging', section: 'packagingLayers' });
+  }
+  if (activePackagingLayers.some((layer) => {
+    const option = findPackagingMaterialOption(layer.material);
+    return !hasText(layer.material) || !option?.wasteStream;
+  })) {
+    ppwrIssues.push({ id: 'ppwr-material', domain: 'ppwr', level: 'warning', label: 'PPWR-export heeft nog onvolledige materiaal- of afvalstroomdata', tab: 'packaging', section: 'packagingLayers' });
+  }
+  if (batchOverviewRows.length === 0 && batchLinkAvailable) {
+    ppwrIssues.push({ id: 'ppwr-history', domain: 'ppwr', level: 'warning', label: 'Nog geen batchhistorie gevonden voor deze PPWR-koppeling', tab: 'batches', section: 'batches' });
+  }
+
+  const resolveLevel = (issues: ProductComplianceIssue[]): ProductComplianceLevel => {
+    if (issues.some((issue) => issue.level === 'error')) return 'red';
+    if (issues.some((issue) => issue.level === 'warning')) return 'yellow';
+    return 'green';
+  };
+
+  const gpsrLevel = resolveLevel(gpsrIssues);
+  const packagingLevel = resolveLevel(packagingIssues);
+  let ppwrLevel: ProductComplianceLevel = 'green';
+  if (!batchLinkAvailable || packagingErrorCount > 0) {
+    ppwrLevel = 'red';
+  } else if (ppwrIssues.some((issue) => issue.level === 'warning') || packagingWarningCount > 0 || packagingLevel === 'yellow') {
+    ppwrLevel = 'yellow';
+  }
+
+  const overallLevel: ProductComplianceLevel = [gpsrLevel, packagingLevel, ppwrLevel].includes('red')
+    ? 'red'
+    : [gpsrLevel, packagingLevel, ppwrLevel].includes('yellow')
+      ? 'yellow'
+      : 'green';
+
+  return {
+    gpsr: { level: gpsrLevel, issues: gpsrIssues },
+    packaging: { level: packagingLevel, issues: packagingIssues },
+    ppwr: { level: ppwrLevel, issues: ppwrIssues },
+    checklist: [...gpsrIssues, ...packagingIssues, ...ppwrIssues],
+    overallLevel,
+    overallLabel: overallLevel === 'green' ? 'Compleet' : overallLevel === 'yellow' ? 'Controleren' : 'Onvolledig',
   };
 }
 
@@ -3605,6 +3888,10 @@ export function App() {
             <ProductsPage
               products={data.products}
               supplierRecords={data.suppliers}
+              importers={data.importers}
+              batches={data.containerCostBatches}
+              costLines={data.containerCostLines}
+              registrations={data.productPackagingRegistrations}
               onImport={handleProductImport}
               onSelectProduct={openProduct}
               message={productMessage}
@@ -8081,14 +8368,22 @@ function BatteryDetailModal({ battery, batteryModels, dealers, scooters, onClose
 function ProductsPage({
   products,
   supplierRecords,
+  importers,
+  batches,
+  costLines,
+  registrations,
   onImport,
   onSelectProduct,
   message,
 }: {
   products: Product[];
   supplierRecords: Supplier[];
+  importers: Importer[];
+  batches: ContainerCostBatch[];
+  costLines: ContainerCostLine[];
+  registrations: ProductPackagingRegistration[];
   onImport: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
-  onSelectProduct: (product: Product) => void;
+  onSelectProduct: (product: Product, tab?: ProductModalTab, applyBatchNumber?: string) => void;
   message: string;
 }) {
   const [query, setQuery] = useState('');
@@ -8100,6 +8395,7 @@ function ProductsPage({
   const [importCompanyFilter, setImportCompanyFilter] = useState<'__all__' | string>('');
   const [lifecycleFilter, setLifecycleFilter] = useState('');
   const [availableFromFilter, setAvailableFromFilter] = useState('');
+  const [complianceFilter, setComplianceFilter] = useState('');
   const [codeFilter, setCodeFilter] = useState('');
   const [descriptionFilter, setDescriptionFilter] = useState('');
   const [barcodeFilter, setBarcodeFilter] = useState('');
@@ -8142,6 +8438,12 @@ function ProductsPage({
   const stockValues = Array.from(new Set(products.map((product) => product.stock).filter(Boolean) as string[]))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const missingSupplierValue = '__missing_supplier__';
+  const complianceByProductId = useMemo(() => new Map(
+    scopedProducts.map((product) => [
+      product.id,
+      getProductComplianceSummary(product, batches, costLines, registrations, supplierRecords, importers),
+    ]),
+  ), [scopedProducts, batches, costLines, registrations, supplierRecords, importers]);
 
   const visibleProducts = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -8179,6 +8481,11 @@ function ProductsPage({
       ].some((value) => value?.toLowerCase().includes(needle));
       const lifecycleMatch = !lifecycleFilter
         || (lifecycleFilter === 'endOfLife' ? hasEndDate : !hasEndDate);
+      const compliance = complianceByProductId.get(product.id);
+      const complianceMatch = !complianceFilter
+        || (complianceFilter === 'complete' && compliance?.overallLevel === 'green')
+        || (complianceFilter === 'attention' && compliance?.overallLevel === 'yellow')
+        || (complianceFilter === 'blocking' && compliance?.overallLevel === 'red');
 
       return inQuery
         && (!codeNeedle || product.code?.toLowerCase().includes(codeNeedle))
@@ -8192,6 +8499,7 @@ function ProductsPage({
         && importCompanyMatch
         && availableFromMatch
         && lifecycleMatch
+        && complianceMatch
     }).sort((a, b) => {
       const codeA = (a.code || '').trim();
       const codeB = (b.code || '').trim();
@@ -8228,7 +8536,20 @@ function ProductsPage({
           return codeA.localeCompare(codeB, 'nl', { sensitivity: 'base', numeric: true }) * direction;
       }
     });
-  }, [scopedProducts, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, importCompanyFilter, lifecycleFilter, availableFromFilter, sortField, sortDirection]);
+  }, [scopedProducts, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, importCompanyFilter, lifecycleFilter, availableFromFilter, complianceFilter, sortField, sortDirection, complianceByProductId]);
+  const complianceSummaryCounts = useMemo(() => {
+    return scopedProducts.reduce((summary, product) => {
+      const compliance = complianceByProductId.get(product.id);
+      if (compliance?.overallLevel === 'green') summary.complete += 1;
+      else if (compliance?.overallLevel === 'yellow') summary.attention += 1;
+      else if (compliance?.overallLevel === 'red') summary.blocking += 1;
+      return summary;
+    }, {
+      complete: 0,
+      attention: 0,
+      blocking: 0,
+    });
+  }, [scopedProducts, complianceByProductId]);
 
   const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(visibleProducts.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -8355,6 +8676,12 @@ function ProductsPage({
             <option value="active">Actief</option>
             <option value="endOfLife">End of life</option>
           </select>
+          <select value={complianceFilter} onChange={(event) => setComplianceFilter(event.target.value)}>
+            <option value="">Alle</option>
+            <option value="complete">Compleet</option>
+            <option value="attention">Controleren</option>
+            <option value="blocking">Onvolledig</option>
+          </select>
           <label className="product-date-filter">
             <span>Toegevoegd / beschikbaar vanaf</span>
             <input type="date" value={availableFromFilter} onChange={(event) => setAvailableFromFilter(event.target.value)} />
@@ -8409,6 +8736,21 @@ function ProductsPage({
           <strong>{products.filter((product) => product.isNewProduct).length}</strong>
           <small>Automatisch aangemaakte producten</small>
         </article>
+        <article className="stat-card">
+          <span>Compliance compleet</span>
+          <strong>{complianceSummaryCounts.complete}</strong>
+          <small>GPSR, verpakking en PPWR groen</small>
+        </article>
+        <article className="stat-card">
+          <span>Controleren</span>
+          <strong>{complianceSummaryCounts.attention}</strong>
+          <small>Wel exporteerbaar, maar met waarschuwingen</small>
+        </article>
+        <article className="stat-card">
+          <span>Onvolledig</span>
+          <strong>{complianceSummaryCounts.blocking}</strong>
+          <small>Minimaal 1 kritieke compliancefout</small>
+        </article>
       </section>
       <section className="panel table-panel">
         <div className="panel-title"><FileText size={16} /> Artikelen</div>
@@ -8446,6 +8788,7 @@ function ProductsPage({
                       Omschrijving {renderSortIcon('description')}
                     </button>
                   </th>
+                  <th>Compliance</th>
                   <th>
                     <button type="button" className="column-sort-button" onClick={() => handleSort('salePrice')}>
                       Verkoopprijs {renderSortIcon('salePrice')}
@@ -8473,10 +8816,35 @@ function ProductsPage({
                 </tr>
               </thead>
               <tbody>
-                {pagedProducts.map((product) => (
+                {pagedProducts.map((product) => {
+                  const compliance = complianceByProductId.get(product.id);
+                  const levelLabel = (level?: ProductComplianceLevel) => (
+                    level === 'green' ? 'groen' : level === 'yellow' ? 'geel' : 'rood'
+                  );
+                  const tooltipLines = compliance ? [
+                    `GPSR ${levelLabel(compliance.gpsr.level)}`,
+                    `Verpakking ${levelLabel(compliance.packaging.level)}`,
+                    `PPWR ${levelLabel(compliance.ppwr.level)}`,
+                    ...compliance.checklist.slice(0, 3).map((item) => `- ${item.label}`),
+                  ] : [];
+                  return (
                   <tr key={product.id} className="product-row" onClick={() => onSelectProduct(product)}>
                     <td>{product.code || '-'}</td>
                     <td>{product.description || '-'}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className={`product-compliance-table-pill ${compliance?.overallLevel || 'yellow'}`}
+                        title={tooltipLines.join('\n')}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onSelectProduct(product, 'basic');
+                        }}
+                      >
+                        <span className="product-compliance-table-dot" />
+                        <span>{compliance?.overallLabel || 'Aandacht nodig'}</span>
+                      </button>
+                    </td>
                     <td>{formatPriceValue(product.salePrice)}</td>
                     <td>{formatPriceValue(product.purchasePrice)}</td>
                     <td>{formatPriceValue(product.costPrice)}</td>
@@ -8486,7 +8854,7 @@ function ProductsPage({
                     <td>{product.stock || '-'}</td>
                     <td>{formatDateOnly(product.endDate)}</td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
             </div>
@@ -8599,92 +8967,10 @@ function ProductDetailModal({
   ].filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const productImageUrl = draft.imageUrl?.trim() || '';
-  const batchOverviewRows = useMemo(() => {
-    const normalizedProductCode = draft.code.trim().toLowerCase();
-    const productId = draft.id?.trim();
-    if (!normalizedProductCode && !productId) return [];
-
-    const relevantRegistrations = registrations.filter((registration) => {
-      const registrationCode = registration.productCode?.trim().toLowerCase();
-      return (productId && registration.productId === productId) ||
-        (normalizedProductCode && registrationCode === normalizedProductCode);
-    });
-
-    const registrationGroups = new Map<string, ProductPackagingRegistration[]>();
-    relevantRegistrations.forEach((registration) => {
-      const key = registration.containerCostLineId || `${registration.batchId}:${registration.productCode}`;
-      const items = registrationGroups.get(key) ?? [];
-      items.push(registration);
-      registrationGroups.set(key, items);
-    });
-
-    const grouped = new Map<string, {
-      batchId: string;
-      batchNumber: string;
-      quantity: number;
-      purchaseTotalEur: number;
-      costTotalEur: number;
-      packagingUnit: number;
-      packagesCount: number;
-    }>();
-
-    costLines.forEach((line) => {
-      const lineCode = line.referenceCode?.trim().toLowerCase();
-      const matchesProduct = (productId && line.referenceId === productId) ||
-        (normalizedProductCode && lineCode === normalizedProductCode);
-      if (!matchesProduct) return;
-
-      const batch = batches.find((item) => item.id === line.batchId);
-      const quantity = parseDecimal(line.quantity);
-      const goodsValueEur = parseDecimal(line.goodsValueEur);
-      const costTotalEur = parseDecimal(line.calculatedUnitCostEur) * quantity;
-      const lineRegistrations = registrationGroups.get(line.id)
-        ?? relevantRegistrations.filter((registration) => registration.batchId === line.batchId);
-      const unitsPerPackage = lineRegistrations.reduce((highest, registration) => {
-        const candidate = parseDecimal(registration.unitsPerPackage || registration.packagingUnit);
-        return candidate > 0 ? Math.max(highest, candidate) : highest;
-      }, 0);
-      const packagesCount = lineRegistrations.reduce((highest, registration) => {
-        const candidate = parseDecimal(registration.packagesCount);
-        return candidate > 0 ? Math.max(highest, candidate) : highest;
-      }, 0);
-
-      const key = batch?.id || line.batchId;
-      const current = grouped.get(key) ?? {
-        batchId: line.batchId,
-        batchNumber: batch?.orderNumber || line.batchId,
-        quantity: 0,
-        purchaseTotalEur: 0,
-        costTotalEur: 0,
-        packagingUnit: 0,
-        packagesCount: 0,
-      };
-
-      current.quantity += quantity;
-      current.purchaseTotalEur += goodsValueEur;
-      current.costTotalEur += costTotalEur;
-      current.packagingUnit = Math.max(current.packagingUnit, unitsPerPackage, parseDecimal(draft.packagingUnit));
-      current.packagesCount = Math.max(current.packagesCount, packagesCount);
-      grouped.set(key, current);
-    });
-
-    return Array.from(grouped.values())
-      .map((entry) => {
-        const purchasePerUnitEur = entry.quantity > 0 ? entry.purchaseTotalEur / entry.quantity : 0;
-        const costPerUnitEur = entry.quantity > 0 ? entry.costTotalEur / entry.quantity : 0;
-        const packaging = entry.packagingUnit > 0
-          ? `${formatQuantity(entry.packagingUnit)} st./verpakking${entry.packagesCount > 0 ? ` • ${formatQuantity(entry.packagesCount)} verp.` : ''}`
-          : '-';
-
-        return {
-          ...entry,
-          packaging,
-          purchasePerUnitEur,
-          costPerUnitEur,
-        };
-      })
-      .sort((a, b) => b.batchNumber.localeCompare(a.batchNumber, 'nl', { numeric: true, sensitivity: 'base' }));
-  }, [batches, costLines, draft.code, draft.id, draft.packagingUnit, registrations]);
+  const batchOverviewRows = useMemo(
+    () => getProductBatchOverviewRows(draft, batches, costLines, registrations),
+    [draft, batches, costLines, registrations],
+  );
   const batchOverviewTotals = useMemo(() => {
     return batchOverviewRows.reduce((summary, row) => ({
       batches: summary.batches + 1,
@@ -8698,6 +8984,20 @@ function ProductDetailModal({
       costTotalEur: 0,
     });
   }, [batchOverviewRows]);
+  const identificationSectionRef = useRef<HTMLDivElement | null>(null);
+  const planningSectionRef = useRef<HTMLDivElement | null>(null);
+  const traceabilitySectionRef = useRef<HTMLDivElement | null>(null);
+  const manufacturerSectionRef = useRef<HTMLDivElement | null>(null);
+  const importerSectionRef = useRef<HTMLDivElement | null>(null);
+  const safetySectionRef = useRef<HTMLDivElement | null>(null);
+  const packagingGeneralSectionRef = useRef<HTMLDivElement | null>(null);
+  const packagingLayersSectionRef = useRef<HTMLDivElement | null>(null);
+  const batchOverviewSectionRef = useRef<HTMLDivElement | null>(null);
+  const lastComplianceCheckAt = useMemo(() => new Date().toISOString(), [product.id]);
+  const complianceStatus = useMemo(
+    () => getProductComplianceSummary(draft, batches, costLines, registrations, supplierRecords, importers),
+    [draft, batches, costLines, registrations, supplierRecords, importers],
+  );
 
   function applySupplierManufacturer(supplierName: string) {
     const supplier = supplierRecords.find((item) => item.name === supplierName);
@@ -8872,6 +9172,31 @@ function ProductDetailModal({
     });
   }
 
+  function openComplianceTarget(
+    tab: ProductModalTab,
+    section: 'identification' | 'planning' | 'traceability' | 'manufacturer' | 'importer' | 'safety' | 'packagingGeneral' | 'packagingLayers' | 'batches',
+  ) {
+    const sectionRefs = {
+      identification: identificationSectionRef,
+      planning: planningSectionRef,
+      traceability: traceabilitySectionRef,
+      manufacturer: manufacturerSectionRef,
+      importer: importerSectionRef,
+      safety: safetySectionRef,
+      packagingGeneral: packagingGeneralSectionRef,
+      packagingLayers: packagingLayersSectionRef,
+      batches: batchOverviewSectionRef,
+    } as const;
+
+    setActiveTab(tab);
+    window.setTimeout(() => {
+      sectionRefs[section].current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 80);
+  }
+
   async function handleDymoPrint() {
     const quantityAnswer = window.prompt('Hoeveel productlabels wil je printen?', '1');
     if (quantityAnswer === null) return;
@@ -8911,6 +9236,64 @@ function ProductDetailModal({
           </div>
         </div>
         <section className="panel form-panel product-form-shell">
+          <div className="product-compliance-shell">
+            <div className="product-compliance-bar">
+              <div className="panel detail-card product-compliance-card">
+                <span className="detail-card-title">GPSR status</span>
+                <span className={`product-compliance-pill ${complianceStatus.gpsr.level}`}>
+                  {complianceStatus.gpsr.level === 'green' ? <CheckCircle2 size={14} /> : complianceStatus.gpsr.level === 'yellow' ? <CircleHelp size={14} /> : <XCircle size={14} />}
+                  {complianceStatus.gpsr.level === 'green' ? 'Groen' : complianceStatus.gpsr.level === 'yellow' ? 'Geel' : 'Rood'}
+                </span>
+              </div>
+              <div className="panel detail-card product-compliance-card">
+                <span className="detail-card-title">Verpakking status</span>
+                <span className={`product-compliance-pill ${complianceStatus.packaging.level}`}>
+                  {complianceStatus.packaging.level === 'green' ? <CheckCircle2 size={14} /> : complianceStatus.packaging.level === 'yellow' ? <CircleHelp size={14} /> : <XCircle size={14} />}
+                  {complianceStatus.packaging.level === 'green' ? 'Groen' : complianceStatus.packaging.level === 'yellow' ? 'Geel' : 'Rood'}
+                </span>
+              </div>
+              <div className="panel detail-card product-compliance-card">
+                <span className="detail-card-title">PPWR status</span>
+                <span className={`product-compliance-pill ${complianceStatus.ppwr.level}`}>
+                  {complianceStatus.ppwr.level === 'green' ? <CheckCircle2 size={14} /> : complianceStatus.ppwr.level === 'yellow' ? <CircleHelp size={14} /> : <XCircle size={14} />}
+                  {complianceStatus.ppwr.level === 'green' ? 'Groen' : complianceStatus.ppwr.level === 'yellow' ? 'Geel' : 'Rood'}
+                </span>
+              </div>
+              <div className="panel detail-card product-compliance-card">
+                <span className="detail-card-title">Laatste controle</span>
+                <strong className="product-compliance-date">{formatDate(lastComplianceCheckAt)}</strong>
+              </div>
+            </div>
+            <div className="product-compliance-checklist">
+              <div className="product-table-intro compact">
+                <strong>Checklist</strong>
+                <span>
+                  {complianceStatus.checklist.length > 0
+                    ? 'Klik op een punt om direct naar de juiste tab en sectie te gaan.'
+                    : 'Alle bekende compliance-velden voor deze eerste stap zijn ingevuld.'}
+                </span>
+              </div>
+              {complianceStatus.checklist.length > 0 ? (
+                <div className="product-compliance-checklist-grid">
+                  {complianceStatus.checklist.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`product-compliance-item ${item.level}`}
+                      onClick={() => openComplianceTarget(item.tab, item.section)}
+                    >
+                      <span className="product-compliance-item-tag">{item.domain.toUpperCase()}</span>
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="inline-notice success-notice product-compliance-ok">
+                  Productkaart is klaar voor GPSR, verpakking en PPWR-controle op basis van de huidige velden.
+                </div>
+              )}
+            </div>
+          </div>
           <div className="product-tab-bar top-attached">
             <button type="button" className={`product-tab-button${activeTab === 'basic' ? ' active' : ''}`} onClick={() => setActiveTab('basic')}>
               <span className="panel-title-label"><BriefcaseBusiness size={16} /> Product informatie</span>
@@ -8931,7 +9314,7 @@ function ProductDetailModal({
           </div>
           {activeTab === 'basic' && (
             <div className="product-section-body">
-              <div className="product-form-subsection">
+              <div className="product-form-subsection" ref={identificationSectionRef}>
                 <h3>Identificatie</h3>
                 <div className="product-identification-layout">
                   <div className="form-grid">
@@ -9015,7 +9398,7 @@ function ProductDetailModal({
                   </label>
                 </div>
               </div>
-              <div className="product-form-subsection">
+              <div className="product-form-subsection" ref={planningSectionRef}>
                 <h3>Planning en media</h3>
                 <div className="form-grid">
                   <label>Begindatum
@@ -9033,7 +9416,7 @@ function ProductDetailModal({
           )}
           {activeTab === 'gpsr' && (
             <div className="product-section-body">
-              <div className="product-form-subsection">
+              <div className="product-form-subsection" ref={traceabilitySectionRef}>
                 <h3>Label en traceerbaarheid</h3>
                 <div className="form-grid">
                   <label>Label titel
@@ -9056,7 +9439,7 @@ function ProductDetailModal({
                   </label>
                 </div>
               </div>
-              <div className="product-form-subsection">
+              <div className="product-form-subsection" ref={manufacturerSectionRef}>
                 <h3>Fabrikant</h3>
                 <div className="form-grid">
                   <label>Fabrikant naam
@@ -9082,7 +9465,7 @@ function ProductDetailModal({
                   </label>
                 </div>
               </div>
-              <div className="product-form-subsection">
+              <div className="product-form-subsection" ref={importerSectionRef}>
                 <h3>Importeur / EU-verantwoordelijke</h3>
                 <div className="product-table-intro compact">
                   <span>Deze velden worden automatisch gevuld vanuit jullie eigen importeurprofiel, maar blijven handmatig aanpasbaar.</span>
@@ -9111,7 +9494,7 @@ function ProductDetailModal({
                   </label>
                 </div>
               </div>
-              <div className="product-form-subsection">
+              <div className="product-form-subsection" ref={safetySectionRef}>
                 <h3>Veiligheid</h3>
                 <div className="form-grid">
                   <label className="span-2">Waarschuwing
@@ -9131,7 +9514,7 @@ function ProductDetailModal({
                     Deze actie werkt batchgericht voor <strong>{applyBatchNumber}</strong>. Als er voor die batch nog geen bestaande batchregistratie is, wordt nu alleen het product bijgewerkt.
                   </div>
                 ) : null}
-                <div className="product-form-subsection">
+                <div className="product-form-subsection" ref={packagingGeneralSectionRef}>
                   <div className="product-subsection-header">
                     <h3>Verpakking algemeen</h3>
                     <button type="button" className="secondary-button" onClick={addPackagingLayer} disabled={packagingLayers.length >= packagingLayerNames.length}>
@@ -9155,7 +9538,7 @@ function ProductDetailModal({
                     </label>
                   </div>
                 </div>
-                <div className="product-form-subsection">
+                <div className="product-form-subsection" ref={packagingLayersSectionRef}>
                   <h3>Verpakkingslagen</h3>
                   <p className="product-section-hint">Leg per SKU alle verpakkingscomponenten vast. Dit vormt straks de basis voor Verpact/PPWR-export per materiaalcode.</p>
                   <div className="packaging-layer-table-header">
@@ -9265,7 +9648,7 @@ function ProductDetailModal({
           )}
           {activeTab === 'batches' && (
             <div className="product-section-body">
-              <div className="product-form-subsection">
+              <div className="product-form-subsection" ref={batchOverviewSectionRef}>
                 <div className="product-table-intro compact">
                   <strong>Batchhistorie per product</strong>
                   <span>Per batch zie je hier de hoeveelheid, verpakking en de batchspecifieke prijzen van dit product.</span>

@@ -2282,30 +2282,83 @@ tbody tr:hover {
 
 .product-table th:nth-child(2),
 .product-table td:nth-child(2) {
-  min-width: 340px;
+  min-width: 320px;
   white-space: normal;
 }
 
 .product-table th:nth-child(3),
-.product-table td:nth-child(3),
+.product-table td:nth-child(3) {
+  min-width: 170px;
+}
+
 .product-table th:nth-child(4),
-.product-table td:nth-child(4) {
+.product-table td:nth-child(4),
+.product-table th:nth-child(5),
+.product-table td:nth-child(5),
+.product-table th:nth-child(6),
+.product-table td:nth-child(6) {
   min-width: 130px;
 }
 
-.product-table th:nth-child(5),
-.product-table td:nth-child(5),
-.product-table th:nth-child(8),
-.product-table td:nth-child(8) {
+.product-table th:nth-child(7),
+.product-table td:nth-child(7),
+.product-table th:nth-child(9),
+.product-table td:nth-child(9),
+.product-table th:nth-child(10),
+.product-table td:nth-child(10),
+.product-table th:nth-child(11),
+.product-table td:nth-child(11) {
   min-width: 110px;
 }
 
-.product-table th:nth-child(6),
-.product-table td:nth-child(6),
-.product-table th:nth-child(7),
-.product-table td:nth-child(7) {
+.product-table th:nth-child(8),
+.product-table td:nth-child(8) {
   min-width: 220px;
   white-space: normal;
+}
+
+.product-compliance-table-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  border-radius: 999px;
+  border: 1px solid #d6dce2;
+  background: #f8fafc;
+  color: #213547;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.product-compliance-table-pill:hover {
+  border-color: #93c5fd;
+  background: #f3f8ff;
+}
+
+.product-compliance-table-pill.green {
+  border-color: #9bd7ad;
+  background: #ecf9ef;
+  color: #0d6c2f;
+}
+
+.product-compliance-table-pill.yellow {
+  border-color: #ffc266;
+  background: #fff5e6;
+  color: #8a4b00;
+}
+
+.product-compliance-table-pill.red {
+  border-color: #f5b4b4;
+  background: #fff1f1;
+  color: #b42318;
+}
+
+.product-compliance-table-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
 }
 
 .history-card {
@@ -2496,6 +2549,121 @@ tbody tr:hover {
 
 .product-form-shell {
   margin: 14px 16px 16px;
+}
+
+.product-compliance-shell {
+  display: grid;
+  gap: 12px;
+  padding: 16px 16px 0;
+}
+
+.product-compliance-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.product-compliance-card {
+  display: grid;
+  gap: 8px;
+  padding: 0 0 14px;
+}
+
+.product-compliance-card strong,
+.product-compliance-date {
+  padding: 0 16px;
+  font-size: 1rem;
+  color: #1f2937;
+}
+
+.product-compliance-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  margin: 0 16px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid #d6dce2;
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.product-compliance-pill.green {
+  border-color: #9bd7ad;
+  background: #ecf9ef;
+  color: #0d6c2f;
+}
+
+.product-compliance-pill.yellow {
+  border-color: #ffc266;
+  background: #fff5e6;
+  color: #8a4b00;
+}
+
+.product-compliance-pill.red {
+  border-color: #f5b4b4;
+  background: #fff1f1;
+  color: #b42318;
+}
+
+.product-compliance-checklist {
+  display: grid;
+  gap: 10px;
+}
+
+.product-compliance-checklist-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.product-compliance-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d6dce2;
+  border-radius: 999px;
+  background: #fff;
+  color: #213547;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.product-compliance-item:hover {
+  border-color: #93c5fd;
+  background: #f3f8ff;
+}
+
+.product-compliance-item.error {
+  border-color: #f5b4b4;
+  background: #fff7f7;
+}
+
+.product-compliance-item.warning {
+  border-color: #ffd699;
+  background: #fffaf0;
+}
+
+.product-compliance-item-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #edf2f6;
+  color: #5f6f7f;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.product-compliance-ok {
+  margin: 0;
 }
 
 .product-form-subsection + .product-form-subsection {
@@ -4863,6 +5031,7 @@ dd {
   .search-grid,
   .product-summary-grid,
   .product-batch-summary-grid,
+  .product-compliance-bar,
   .dashboard-links-grid {
     grid-template-columns: 1fr;
   }
