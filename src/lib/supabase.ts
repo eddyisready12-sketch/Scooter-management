@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactSalesPackagingOverride, ExactSalesPreviewResponse, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
+import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactProductImportResponse, ExactSalesPackagingOverride, ExactSalesPreviewResponse, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -68,6 +68,14 @@ export async function fetchExactSalesPreview(period: { dateFrom: string; dateTo:
   });
   if (error) throw error;
   return (data as ExactSalesPreviewResponse | null) ?? { lines: [] };
+}
+
+export async function fetchExactProductsImport(itemCode?: string): Promise<ExactProductImportResponse> {
+  if (!supabase) return { products: [], count: 0 };
+  const payload = itemCode?.trim() ? { itemCode: itemCode.trim() } : undefined;
+  const { data, error } = await supabase.functions.invoke('exact-sync-products', payload ? { body: payload } : undefined);
+  if (error) throw error;
+  return (data as ExactProductImportResponse | null) ?? { products: [], count: 0 };
 }
 
 export async function probeExactBatchLookup(payload: {

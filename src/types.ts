@@ -224,6 +224,14 @@ export type Product = {
   packagingWeightPrimaryGrams?: string;
   packagingWeightSecondaryGrams?: string;
   packagingWeightTotalGrams?: string;
+  complianceCategory?: 'STANDARD_PART' | 'SAFETY_RELEVANT_PART' | 'ELECTRICAL_PART' | 'BATTERY_PRODUCT' | 'TYPE_APPROVAL_RELATED' | 'E_MARK_RELEVANT';
+  eMarkRelevant?: 'ja' | 'nee' | 'onbekend';
+  eMarkPresent?: 'ja' | 'nee' | 'niet_van_toepassing' | 'onbekend';
+  eMarkNumber?: string;
+  ceRelevant?: 'ja' | 'nee' | 'onbekend';
+  cePresent?: 'ja' | 'nee' | 'niet_van_toepassing' | 'onbekend';
+  certificationNotes?: string;
+  certificateDocumentId?: string;
 };
 
 export type Supplier = {
@@ -439,6 +447,29 @@ export type ExactBatchProbeResult = {
   message?: string;
   count?: number;
   sample?: Array<Record<string, string>>;
+};
+
+export type ExactProductImportRow = {
+  code: string;
+  description: string;
+  barcode?: string;
+  articleGroup?: string;
+  salePrice?: string;
+  purchasePrice?: string;
+  costPrice?: string;
+  webshop?: boolean;
+  shortDescription?: string;
+  createdAt?: string;
+};
+
+export type ExactProductImportResponse = {
+  products: ExactProductImportRow[];
+  count: number;
+  divisionCode?: string;
+  requestedItemCode?: string;
+  rawRowsFetched?: number;
+  pagesProcessed?: number;
+  lastSkip?: number;
 };
 
 export type AppData = {
