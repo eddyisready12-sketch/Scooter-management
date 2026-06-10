@@ -39,31 +39,35 @@ import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseExactBatchTransactionsImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
+import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
-type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'search';
+type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
-type ProductModalTab = 'basic' | 'gpsr' | 'packaging' | 'batches';
+type ProductModalTab = 'basic' | 'gpsr' | 'packaging' | 'certification' | 'batches';
 type ProductComplianceLevel = 'green' | 'yellow' | 'red';
 type ProductComplianceDomain = 'gpsr' | 'packaging' | 'ppwr';
-type ProductComplianceSection = 'identification' | 'planning' | 'traceability' | 'manufacturer' | 'importer' | 'safety' | 'packagingGeneral' | 'packagingLayers' | 'batches';
+type ProductComplianceSection = 'identification' | 'planning' | 'traceability' | 'manufacturer' | 'importer' | 'safety' | 'certification' | 'packagingGeneral' | 'packagingLayers' | 'batches';
+type ProductComplianceIssueLevel = 'error' | 'warning' | 'info';
 type ProductComplianceIssue = {
   id: string;
   domain: ProductComplianceDomain;
-  level: 'error' | 'warning';
+  level: ProductComplianceIssueLevel;
   label: string;
   tab: ProductModalTab;
   section: ProductComplianceSection;
+  field?: string;
 };
 type ProductComplianceSummary = {
-  gpsr: { level: ProductComplianceLevel; issues: ProductComplianceIssue[] };
-  packaging: { level: ProductComplianceLevel; issues: ProductComplianceIssue[] };
-  ppwr: { level: ProductComplianceLevel; issues: ProductComplianceIssue[] };
+  gpsr: { level: ProductComplianceLevel; issues: ProductComplianceIssue[]; progress: number };
+  packaging: { level: ProductComplianceLevel; issues: ProductComplianceIssue[]; progress: number };
+  ppwr: { level: ProductComplianceLevel; issues: ProductComplianceIssue[]; progress: number };
   checklist: ProductComplianceIssue[];
   overallLevel: ProductComplianceLevel;
   overallLabel: 'Compleet' | 'Controleren' | 'Onvolledig';
+  overallProgress: number;
+  severityCounts: { critical: number; recommended: number; informational: number };
 };
 type ProductBatchOverviewRow = {
   batchId: string;
@@ -77,13 +81,6 @@ type PendingBatchLabelPrint = {
   batch: ContainerCostBatch;
   line: ContainerCostLine;
   product?: Product;
-};
-type SearchField = 'frameNumber' | 'engineNumber' | 'licensePlate';
-type ScooterPanelFilters = {
-  speed: string;
-  model: string;
-  color: string;
-  status: string;
 };
 type LoginSession = {
   email: string;
@@ -148,6 +145,33 @@ const packagingLayerNames = ['01. Omverpakking', '02. Binnenzak', '03. Label / s
 const packagingRoleOptions = ['Primair', 'Secundair', 'Tertiair'] as const;
 const recyclabilityClassOptions = ['Klasse A', 'Klasse B', 'Klasse C', 'Klasse D', 'Klasse E'] as const;
 const productStickerMaterialOptions = ['Geen', 'Papier', 'Plastic PP'] as const;
+const productComplianceCategoryOptions = [
+  'STANDARD_PART',
+  'SAFETY_RELEVANT_PART',
+  'ELECTRICAL_PART',
+  'BATTERY_PRODUCT',
+  'TYPE_APPROVAL_RELATED',
+  'E_MARK_RELEVANT',
+] as const;
+const productComplianceCategoryLabels: Record<(typeof productComplianceCategoryOptions)[number], string> = {
+  STANDARD_PART: 'Standaard onderdeel',
+  SAFETY_RELEVANT_PART: 'Veiligheidsrelevant onderdeel',
+  ELECTRICAL_PART: 'Elektrisch onderdeel',
+  BATTERY_PRODUCT: 'Accu / batterijproduct',
+  TYPE_APPROVAL_RELATED: 'Typegoedkeuringsgerelateerd',
+  E_MARK_RELEVANT: 'E-mark relevant',
+};
+const relevanceOptions = ['ja', 'nee', 'onbekend'] as const;
+const presenceOptions = ['ja', 'nee', 'niet_van_toepassing', 'onbekend'] as const;
+const certificationArticleGroupRules: Array<{
+  match: string[];
+  updates: Partial<Product>;
+}> = [
+  { match: ['verlichting'], updates: { eMarkRelevant: 'ja', complianceCategory: 'E_MARK_RELEVANT' } },
+  { match: ['spiegels'], updates: { eMarkRelevant: 'ja', complianceCategory: 'E_MARK_RELEVANT' } },
+  { match: ['banden'], updates: { eMarkRelevant: 'ja', complianceCategory: 'TYPE_APPROVAL_RELATED' } },
+  { match: ['standaard onderdelen'], updates: { eMarkRelevant: 'nee', complianceCategory: 'STANDARD_PART', eMarkPresent: 'niet_van_toepassing' } },
+] as const;
 const batchPackagingScopeOptions: BatchPackagingScope[] = ['Eigen import', 'EU-import', 'Binnenlandse inkoop'];
 const batchPackagingReportingModeOptions: BatchPackagingReportingMode[] = ['Alles registreren', 'Alleen SUP', 'Vrijgesteld'];
 const batchPackagingExactSourceOptions: BatchPackagingExactSource[] = ['Ordernummer', 'Batchnummer', 'Handmatig'];
@@ -195,7 +219,6 @@ const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'scooters', label: 'Scooters', icon: Bike },
   { id: 'sales', label: 'Verkoop', icon: CircleDollarSign },
   { id: 'packaging', label: 'Verpakking', icon: PackagePlus },
-  { id: 'search', label: 'Zoeken', icon: Search },
 ];
 
 const statusColor: Record<ScooterStatus, string> = {
@@ -333,7 +356,15 @@ function summarizeProbeRequest(endpoint: string) {
 
 function preferredProbeFields(row: Record<string, string>) {
   const fieldOrder = [
+    'Code',
+    'SearchCode',
     'BatchNumber',
+    'Herkomststroom',
+    'HerkomstStroom',
+    'ExtraDescription',
+    'SupplierCode',
+    'SupplierName',
+    'CountryOfOrigin',
     'OrderNumber',
     'AvailableQuantity',
     'Quantity',
@@ -351,6 +382,8 @@ function preferredProbeFields(row: Record<string, string>) {
     'Description',
     'ID',
     'Item',
+    'MatchingFields',
+    'DetectedFields',
   ];
 
   const picked = fieldOrder
@@ -362,7 +395,15 @@ function preferredProbeFields(row: Record<string, string>) {
 
 function humanizeProbeFieldLabel(key: string) {
   const labels: Record<string, string> = {
+    Code: 'Artikelcode',
+    SearchCode: 'Zoekcode',
     BatchNumber: 'Batch',
+    Herkomststroom: 'Herkomststroom',
+    HerkomstStroom: 'Herkomststroom',
+    ExtraDescription: 'Extra omschrijving',
+    SupplierCode: 'Leverancierscode',
+    SupplierName: 'Leverancier',
+    CountryOfOrigin: 'Land van herkomst',
     OrderNumber: 'Order',
     AvailableQuantity: 'Beschikbaar',
     Quantity: 'Aantal',
@@ -380,6 +421,8 @@ function humanizeProbeFieldLabel(key: string) {
     Description: 'Omschrijving',
     ID: 'ID',
     Item: 'Item GUID',
+    MatchingFields: 'Mogelijke matchvelden',
+    DetectedFields: 'Gedetecteerde velden',
   };
 
   return labels[key] || key;
@@ -451,6 +494,11 @@ function parseDecimalString(value?: string) {
   const normalized = value.replace(',', '.');
   const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatSignedQuantity(value: number) {
+  if (value <= 0) return '-';
+  return formatQuantity(value);
 }
 
 function normalizeExactCountryCode(value?: string) {
@@ -690,6 +738,42 @@ function createProductDraft(product: Product): Product {
   };
 }
 
+function certificationRuleForArticleGroup(articleGroup?: string) {
+  const normalized = (articleGroup || '').trim().toLowerCase();
+  if (!normalized) return null;
+  return certificationArticleGroupRules.find((rule) => rule.match.some((candidate) => normalized.includes(candidate)));
+}
+
+function formatCertificationPresence(value?: Product['eMarkPresent']) {
+  if (!value) return 'Onbekend';
+  if (value === 'niet_van_toepassing') return 'Niet van toepassing';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function isEMarkRelevant(product: Product) {
+  return product.eMarkRelevant === 'ja'
+    || product.complianceCategory === 'E_MARK_RELEVANT'
+    || product.complianceCategory === 'TYPE_APPROVAL_RELATED';
+}
+
+function isEMarkMissing(product: Product) {
+  return isEMarkRelevant(product) && product.eMarkPresent !== 'ja';
+}
+
+function isCeRelevant(product: Product) {
+  return product.ceRelevant === 'ja';
+}
+
+function isCeMissing(product: Product) {
+  return isCeRelevant(product) && product.cePresent !== 'ja';
+}
+
+function productComplianceIssueLevelLabel(level: ProductComplianceIssueLevel) {
+  if (level === 'error') return 'Kritiek';
+  if (level === 'warning') return 'Aanbevolen';
+  return 'Informatief';
+}
+
 function getResolvedProductComplianceSource(
   product: Product,
   supplierRecords: Supplier[] = [],
@@ -818,6 +902,7 @@ function getProductComplianceSummary(
   const packagingLayers = normalizePackagingLayers(resolvedProduct);
   const batchOverviewRows = getProductBatchOverviewRows(resolvedProduct, batches, costLines, registrations);
   const hasText = (value?: string) => Boolean(value?.trim());
+  const percentage = (completed: number, total: number) => Math.max(0, Math.min(100, Math.round((completed / Math.max(1, total)) * 100)));
   const importerHasContact = hasText(resolvedProduct.importerEmail) || hasText(resolvedProduct.importerWebsite);
   const importerHasAddress = hasText(resolvedProduct.importerAddress)
     && hasText(resolvedProduct.importerPostalCode)
@@ -831,7 +916,7 @@ function getProductComplianceSummary(
     gpsrIssues.push({ id: 'gpsr-code', domain: 'gpsr', level: 'error', label: 'Artikelnummer ontbreekt', tab: 'basic', section: 'identification' });
   }
   if (!hasTraceability) {
-    gpsrIssues.push({ id: 'gpsr-traceability', domain: 'gpsr', level: 'error', label: 'Batchnummer of traceercode ontbreekt', tab: 'gpsr', section: 'traceability' });
+    gpsrIssues.push({ id: 'gpsr-traceability', domain: 'gpsr', level: 'error', label: 'Batchnummer of traceercode ontbreekt', tab: 'gpsr', section: 'traceability', field: 'batchNumber' });
   }
   if (!hasResponsibleEntity) {
     gpsrIssues.push({ id: 'gpsr-entity', domain: 'gpsr', level: 'error', label: 'Fabrikantnaam of EU-verantwoordelijke ontbreekt', tab: 'gpsr', section: 'manufacturer' });
@@ -853,6 +938,21 @@ function getProductComplianceSummary(
   }
   if (!hasText(resolvedProduct.safetyInfo)) {
     gpsrIssues.push({ id: 'gpsr-safety', domain: 'gpsr', level: 'warning', label: 'Veiligheidsinformatie ontbreekt', tab: 'gpsr', section: 'safety' });
+  }
+  if (resolvedProduct.eMarkRelevant === 'onbekend' || !resolvedProduct.eMarkRelevant) {
+    gpsrIssues.push({ id: 'gpsr-emark-assessment', domain: 'gpsr', level: 'info', label: 'E-mark relevantie is nog niet beoordeeld', tab: 'certification', section: 'certification' });
+  }
+  if (resolvedProduct.ceRelevant === 'onbekend' || !resolvedProduct.ceRelevant) {
+    gpsrIssues.push({ id: 'gpsr-ce-assessment', domain: 'gpsr', level: 'info', label: 'CE relevantie is nog niet beoordeeld', tab: 'certification', section: 'certification' });
+  }
+  if (resolvedProduct.eMarkRelevant === 'ja' && resolvedProduct.eMarkPresent !== 'ja') {
+    gpsrIssues.push({ id: 'gpsr-emark', domain: 'gpsr', level: 'warning', label: 'E-markering relevant, maar niet als aanwezig vastgelegd', tab: 'certification', section: 'certification' });
+  }
+  if (resolvedProduct.ceRelevant === 'ja' && resolvedProduct.cePresent !== 'ja') {
+    gpsrIssues.push({ id: 'gpsr-ce', domain: 'gpsr', level: 'warning', label: 'CE-markering relevant, maar niet als aanwezig vastgelegd', tab: 'certification', section: 'certification' });
+  }
+  if ((resolvedProduct.complianceCategory === 'E_MARK_RELEVANT' || resolvedProduct.complianceCategory === 'TYPE_APPROVAL_RELATED') && !hasText(resolvedProduct.eMarkNumber)) {
+    gpsrIssues.push({ id: 'gpsr-emark-number', domain: 'gpsr', level: 'warning', label: 'E-mark nummer ontbreekt bij typegoedkeuringsrelevant product', tab: 'certification', section: 'certification' });
   }
 
   const activePackagingLayers = packagingLayers.filter((layer) => (
@@ -921,6 +1021,18 @@ function getProductComplianceSummary(
     return 'green';
   };
 
+  const gpsrTotalChecks = 11
+    + ((resolvedProduct.complianceCategory === 'E_MARK_RELEVANT' || resolvedProduct.complianceCategory === 'TYPE_APPROVAL_RELATED') ? 1 : 0)
+    + (resolvedProduct.eMarkRelevant === 'ja' ? 1 : 0)
+    + (resolvedProduct.ceRelevant === 'ja' ? 1 : 0);
+  const gpsrProgress = percentage(gpsrTotalChecks - gpsrIssues.length, gpsrTotalChecks);
+
+  const packagingTotalChecks = Math.max(1, activePackagingLayers.length) * 6;
+  const packagingProgress = percentage(packagingTotalChecks - packagingIssues.length, packagingTotalChecks);
+
+  const ppwrTotalChecks = 4;
+  const ppwrProgress = percentage(ppwrTotalChecks - ppwrIssues.length, ppwrTotalChecks);
+
   const gpsrLevel = resolveLevel(gpsrIssues);
   const packagingLevel = resolveLevel(packagingIssues);
   let ppwrLevel: ProductComplianceLevel = 'green';
@@ -935,14 +1047,31 @@ function getProductComplianceSummary(
     : [gpsrLevel, packagingLevel, ppwrLevel].includes('yellow')
       ? 'yellow'
       : 'green';
+  const checklist = [...gpsrIssues, ...packagingIssues, ...ppwrIssues].sort((left, right) => {
+    const levelWeight: Record<ProductComplianceIssueLevel, number> = { error: 0, warning: 1, info: 2 };
+    return levelWeight[left.level] - levelWeight[right.level];
+  });
+  const severityCounts = checklist.reduce((summary, issue) => {
+    if (issue.level === 'error') summary.critical += 1;
+    else if (issue.level === 'warning') summary.recommended += 1;
+    else summary.informational += 1;
+    return summary;
+  }, {
+    critical: 0,
+    recommended: 0,
+    informational: 0,
+  });
+  const overallProgress = Math.round((gpsrProgress + packagingProgress + ppwrProgress) / 3);
 
   return {
-    gpsr: { level: gpsrLevel, issues: gpsrIssues },
-    packaging: { level: packagingLevel, issues: packagingIssues },
-    ppwr: { level: ppwrLevel, issues: ppwrIssues },
-    checklist: [...gpsrIssues, ...packagingIssues, ...ppwrIssues],
+    gpsr: { level: gpsrLevel, issues: gpsrIssues, progress: gpsrProgress },
+    packaging: { level: packagingLevel, issues: packagingIssues, progress: packagingProgress },
+    ppwr: { level: ppwrLevel, issues: ppwrIssues, progress: ppwrProgress },
+    checklist,
     overallLevel,
     overallLabel: overallLevel === 'green' ? 'Compleet' : overallLevel === 'yellow' ? 'Controleren' : 'Onvolledig',
+    overallProgress,
+    severityCounts,
   };
 }
 
@@ -1213,6 +1342,61 @@ function normalizeImportedProducts(products: Product[], existingProducts: Produc
       ...(supplierItemNo ? { supplierItemNo } : {}),
     };
   });
+}
+
+function normalizeExactImportedPrice(value?: string) {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  const numeric = Number(trimmed.replace(',', '.'));
+  return Number.isFinite(numeric) ? numeric.toFixed(4).replace(/\.?0+$/, '') : trimmed;
+}
+
+function mergeExactProductsIntoCatalog(importedRows: ExactProductImportRow[], existingProducts: Product[]) {
+  const existingByCode = new Map(
+    existingProducts
+      .map((product) => [product.code.trim().toLowerCase(), product] as const)
+      .filter(([code]) => Boolean(code)),
+  );
+
+  const mergedProducts: Product[] = [];
+  let created = 0;
+  let updated = 0;
+
+  for (const row of importedRows) {
+    const code = row.code.trim();
+    const normalizedCode = code.toLowerCase();
+    if (!normalizedCode) continue;
+
+    const existing = existingByCode.get(normalizedCode);
+    const nextProduct: Product = {
+      ...(existing ?? {}),
+      id: existing?.id ?? productIdFromArticleNumber(code),
+      code,
+      description: row.description.trim() || existing?.description || code,
+      isNewProduct: false,
+      ...(row.barcode?.trim() ? { barcode: row.barcode.trim() } : {}),
+      ...(row.articleGroup?.trim() ? { articleGroup: row.articleGroup.trim() } : {}),
+      ...(row.shortDescription?.trim() ? { shortDescription: row.shortDescription.trim() } : {}),
+      ...(row.createdAt?.trim() ? { createdAt: row.createdAt.trim() } : {}),
+      ...(normalizeExactImportedPrice(row.salePrice) ? { salePrice: normalizeExactImportedPrice(row.salePrice) } : {}),
+      ...(normalizeExactImportedPrice(row.purchasePrice) ? { purchasePrice: normalizeExactImportedPrice(row.purchasePrice) } : {}),
+      ...(normalizeExactImportedPrice(row.costPrice) ? { costPrice: normalizeExactImportedPrice(row.costPrice) } : {}),
+      ...(typeof row.webshop === 'boolean' ? { webshop: row.webshop } : {}),
+    };
+
+    if (!existing) {
+      created += 1;
+      mergedProducts.push(nextProduct);
+      continue;
+    }
+
+    if (JSON.stringify(existing) !== JSON.stringify(nextProduct)) {
+      updated += 1;
+      mergedProducts.push(nextProduct);
+    }
+  }
+
+  return { products: mergedProducts, created, updated };
 }
 
 function PackagingMaterialIcon({
@@ -2586,25 +2770,6 @@ function speedOptionsFromScooters(scooters: Scooter[]) {
   )).sort((a, b) => Number(a) - Number(b) || a.localeCompare(b, 'nl', { sensitivity: 'base' }));
 }
 
-function filterScootersForPanel(scooters: Scooter[], query: string, searchField: SearchField, filters: ScooterPanelFilters) {
-  const needle = query.toLowerCase().trim();
-  return scooters.filter((scooter) => {
-    const selectedFieldValue = searchField === 'frameNumber'
-      ? scooter.frameNumber
-      : searchField === 'engineNumber'
-        ? scooter.engineNumber
-        : scooter.licensePlate || '';
-
-    return (
-      (!needle || selectedFieldValue.toLowerCase().includes(needle)) &&
-      (!filters.speed || normalizeSpeedValue(scooter.speed) === filters.speed) &&
-      (!filters.model || scooter.model === filters.model) &&
-      (!filters.color || scooter.color === filters.color) &&
-      (!filters.status || scooter.status === filters.status)
-    );
-  });
-}
-
 function containerSortTime(container: Container) {
   const date = container.arrivedAt || container.eta;
   const time = date ? new Date(date).getTime() : 0;
@@ -2752,6 +2917,7 @@ export function App() {
   const [csvMessageDetails, setCsvMessageDetails] = useState<string[]>([]);
   const [dealerImportMessage, setDealerImportMessage] = useState('');
   const [productMessage, setProductMessage] = useState('');
+  const [exactProductImporting, setExactProductImporting] = useState(false);
   const [supplierMessage, setSupplierMessage] = useState('');
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
   const [batteryMessage, setBatteryMessage] = useState('');
@@ -2976,6 +3142,50 @@ export function App() {
     }
   }
 
+  async function handleExactProductImport(itemCode?: string) {
+    setExactProductImporting(true);
+    try {
+      const exactCode = itemCode?.trim() || '';
+      const imported = await fetchExactProductsImport(exactCode || undefined);
+      if (imported.products.length === 0) {
+        setProductMessage(
+          exactCode
+            ? `Geen Exact artikel gevonden voor code ${exactCode}.`
+            : 'Geen artikelen ontvangen uit Exact.',
+        );
+        return;
+      }
+
+        const merged = mergeExactProductsIntoCatalog(imported.products, data.products);
+        if (merged.products.length === 0) {
+          setProductMessage(
+            `Exact import voltooid. ${imported.count} artikelen gecontroleerd, geen wijzigingen nodig. ` +
+            `(ruw: ${imported.rawRowsFetched ?? imported.count}, pagina's: ${imported.pagesProcessed ?? 1}, skip: ${imported.lastSkip ?? 0})`,
+          );
+          return;
+        }
+
+      setData((current) => {
+        const byId = new Map(current.products.map((product) => [product.id, product]));
+        merged.products.forEach((product) => byId.set(product.id, product));
+        return { ...current, products: Array.from(byId.values()) };
+      });
+
+      await upsertProducts(merged.products);
+
+        setProductMessage(
+          exactCode
+            ? `Exact artikel ${exactCode} verwerkt. ${merged.created} nieuw en ${merged.updated} bijgewerkt.`
+            : `Exact import voltooid. ${imported.count} artikelen opgehaald, ${merged.created} nieuw en ${merged.updated} bijgewerkt. ` +
+              `(ruw: ${imported.rawRowsFetched ?? imported.count}, pagina's: ${imported.pagesProcessed ?? 1}, skip: ${imported.lastSkip ?? 0})`,
+        );
+    } catch (error) {
+      setProductMessage(`Exact import mislukt: ${importErrorMessage(error)}`);
+    } finally {
+      setExactProductImporting(false);
+    }
+  }
+
   async function updateProduct(updatedProduct: Product) {
     try {
       setData((current) => ({
@@ -2988,6 +3198,21 @@ export function App() {
       setProductMessage(`Product ${updatedProduct.code} bijgewerkt.`);
     } catch (error) {
       setProductMessage(`Product opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
+  async function bulkUpdateProducts(updatedProducts: Product[], messagePrefix = 'Producten bijgewerkt') {
+    if (updatedProducts.length === 0) return;
+    try {
+      setData((current) => {
+        const byId = new Map(current.products.map((product) => [product.id, product]));
+        updatedProducts.forEach((product) => byId.set(product.id, product));
+        return { ...current, products: Array.from(byId.values()) };
+      });
+      await upsertProducts(updatedProducts);
+      setProductMessage(`${messagePrefix}: ${updatedProducts.length} product${updatedProducts.length === 1 ? '' : 'en'}.`);
+    } catch (error) {
+      setProductMessage(`Bulk update mislukt: ${importErrorMessage(error)}`);
     }
   }
 
@@ -3881,7 +4106,7 @@ export function App() {
               onSelectProduct={openProduct}
             />
           )}
-          {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} onImport={handleInventoryImport} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} onMarkContainerAvailable={markContainerAvailable} />}
+          {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
           {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
           {view === 'products' && (
@@ -3893,6 +4118,9 @@ export function App() {
               costLines={data.containerCostLines}
               registrations={data.productPackagingRegistrations}
               onImport={handleProductImport}
+              onExactImport={handleExactProductImport}
+              exactImporting={exactProductImporting}
+              onBulkUpdateProducts={bulkUpdateProducts}
               onSelectProduct={openProduct}
               message={productMessage}
             />
@@ -3901,7 +4129,6 @@ export function App() {
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} products={data.products} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
           {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
-          {view === 'search' && <GlobalSearch data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} />}
         </section>
       </main>
 
@@ -7986,28 +8213,18 @@ function ContainerAvailabilityBoard({
   );
 }
 
-function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message, messageDetails, statusFilter, setStatusFilter, onBulkRdwCheck, onMarkContainerAvailable }: {
+function Scooters({ data, query, setQuery, scooters, onSelect, message, messageDetails, statusFilter, setStatusFilter, onBulkRdwCheck }: {
   data: AppData;
   query: string;
   setQuery: (value: string) => void;
   scooters: Scooter[];
   onSelect: (scooter: Scooter) => void;
-  onImport: (target: ImportTarget, status: ImportScooterStatus, event: ChangeEvent<HTMLInputElement>) => void;
   message: string;
   messageDetails: string[];
   statusFilter: ScooterStatus | 'all';
   setStatusFilter: (status: ScooterStatus | 'all') => void;
   onBulkRdwCheck: (scooters: Scooter[]) => Promise<string>;
-  onMarkContainerAvailable: (container: Container, arrivedAtInput: string) => Promise<void>;
 }) {
-  const groups = ['Beschikbaar', 'In optie', 'Af te leveren', 'Nog onderweg', 'In consignatie', 'Verkocht klant', 'Verkocht dealer', 'Overig'] as ScooterStatus[];
-  const [searchField, setSearchField] = useState<SearchField>('frameNumber');
-  const [panelFilters, setPanelFilters] = useState<ScooterPanelFilters>({
-    speed: '',
-    model: '',
-    color: '',
-    status: '',
-  });
   const cards: Array<{ status: ScooterStatus; label: string; icon: typeof Bike }> = [
     { status: 'Beschikbaar', label: 'Beschikbaar', icon: Bike },
     { status: 'In consignatie', label: 'In consignatie', icon: BriefcaseBusiness },
@@ -8018,7 +8235,6 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
     { status: 'In optie', label: 'In optie', icon: CalendarDays },
     { status: 'Overig', label: 'Overig', icon: CircleHelp },
   ];
-  const visibleScooters = filterScootersForPanel(scooters, query, searchField, panelFilters);
   return (
     <>
       <h1>Scooters</h1>
@@ -8053,30 +8269,6 @@ function Scooters({ data, query, setQuery, scooters, onSelect, onImport, message
           defaultSortOrder={statusFilter === 'Verkocht klant' ? 'registration-newest' : 'model-asc'}
         />
       )}
-      <SearchPanel
-        scooters={scooters}
-        query={query}
-        setQuery={setQuery}
-        searchField={searchField}
-        setSearchField={setSearchField}
-        panelFilters={panelFilters}
-        setPanelFilters={setPanelFilters}
-      />
-      <div className="card-grid">
-        {groups.map((status) => (
-          <section className="panel compact-list" key={status}>
-            <div className="panel-title"><Bike size={16} /> Recent {scooterStatusLabel(status).toLowerCase()}</div>
-            {visibleScooters.filter((s) => s.status === status).slice(0, 5).map((scooter) => (
-              <button key={scooter.id} className="record-row" onClick={() => onSelect(scooter)}>
-                <span>{scooter.frameNumber}</span>
-                {scooter.model} {scooter.color} {normalizeSpeedValue(scooter.speed)}
-                <strong>{dealerName(data.dealers, scooter.dealerId)}</strong>
-              </button>
-            ))}
-            {visibleScooters.filter((s) => s.status === status).length === 0 ? <p className="empty">Geen scooters gevonden.</p> : null}
-          </section>
-        ))}
-      </div>
     </>
   );
 }
@@ -8373,6 +8565,9 @@ function ProductsPage({
   costLines,
   registrations,
   onImport,
+  onExactImport,
+  exactImporting,
+  onBulkUpdateProducts,
   onSelectProduct,
   message,
 }: {
@@ -8383,6 +8578,9 @@ function ProductsPage({
   costLines: ContainerCostLine[];
   registrations: ProductPackagingRegistration[];
   onImport: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  onExactImport: (itemCode?: string) => Promise<void>;
+  exactImporting: boolean;
+  onBulkUpdateProducts: (updatedProducts: Product[], messagePrefix?: string) => Promise<void>;
   onSelectProduct: (product: Product, tab?: ProductModalTab, applyBatchNumber?: string) => void;
   message: string;
 }) {
@@ -8399,12 +8597,14 @@ function ProductsPage({
   const [codeFilter, setCodeFilter] = useState('');
   const [descriptionFilter, setDescriptionFilter] = useState('');
   const [barcodeFilter, setBarcodeFilter] = useState('');
+  const [exactProductImportCode, setExactProductImportCode] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number | 'all'>(25);
-  const [sortField, setSortField] = useState<'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate'>('code');
+  const [sortField, setSortField] = useState<'code' | 'description' | 'salePrice' | 'costPrice' | 'supplier' | 'articleGroup' | 'stock' | 'startDate'>('code');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
 
-  function handleSort(field: 'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate') {
+  function handleSort(field: 'code' | 'description' | 'salePrice' | 'costPrice' | 'supplier' | 'articleGroup' | 'stock' | 'startDate') {
     if (sortField === field) {
       setSortDirection((current) => current === 'asc' ? 'desc' : 'asc');
       return;
@@ -8413,7 +8613,7 @@ function ProductsPage({
     setSortDirection('asc');
   }
 
-  function renderSortIcon(field: 'code' | 'description' | 'salePrice' | 'costPrice' | 'articleGroup' | 'stock' | 'startDate') {
+  function renderSortIcon(field: 'code' | 'description' | 'salePrice' | 'costPrice' | 'supplier' | 'articleGroup' | 'stock' | 'startDate') {
     if (sortField !== field) return <ArrowUpDown size={14} />;
     return sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
   }
@@ -8525,6 +8725,8 @@ function ProductsPage({
           const right = Number.isFinite(costB) ? costB : (sortDirection === 'asc' ? Infinity : -Infinity);
           return (left - right) * direction;
         }
+        case 'supplier':
+          return (a.supplier || '').localeCompare(b.supplier || '', 'nl', { sensitivity: 'base', numeric: true }) * direction;
         case 'articleGroup':
           return (a.articleGroup || '').localeCompare(b.articleGroup || '', 'nl', { sensitivity: 'base', numeric: true }) * direction;
         case 'stock':
@@ -8550,6 +8752,69 @@ function ProductsPage({
       blocking: 0,
     });
   }, [scopedProducts, complianceByProductId]);
+  const certificationSummaryCounts = useMemo(() => {
+    return scopedProducts.reduce((summary, product) => {
+      if (isEMarkRelevant(product)) summary.eMarkRelevant += 1;
+      if (isEMarkRelevant(product) && product.eMarkPresent === 'ja') summary.eMarkPresent += 1;
+      if (isEMarkMissing(product)) summary.eMarkMissing += 1;
+      if (isCeRelevant(product)) summary.ceRelevant += 1;
+      if (isCeMissing(product)) summary.ceMissing += 1;
+      return summary;
+    }, {
+      eMarkRelevant: 0,
+      eMarkPresent: 0,
+      eMarkMissing: 0,
+      ceRelevant: 0,
+      ceMissing: 0,
+    });
+  }, [scopedProducts]);
+  const visibleProductIds = useMemo(() => new Set(visibleProducts.map((product) => product.id)), [visibleProducts]);
+  const selectedVisibleCount = selectedProductIds.filter((productId) => visibleProductIds.has(productId)).length;
+  const allVisibleSelected = visibleProducts.length > 0 && selectedVisibleCount === visibleProducts.length;
+  const selectedProducts = useMemo(
+    () => products.filter((product) => selectedProductIds.includes(product.id)),
+    [products, selectedProductIds],
+  );
+
+  function toggleProductSelection(productId: string) {
+    setSelectedProductIds((current) => (
+      current.includes(productId)
+        ? current.filter((id) => id !== productId)
+        : [...current, productId]
+    ));
+  }
+
+  function toggleVisibleSelection() {
+    setSelectedProductIds((current) => {
+      if (allVisibleSelected) {
+        return current.filter((productId) => !visibleProductIds.has(productId));
+      }
+      const merged = new Set(current);
+      visibleProducts.forEach((product) => merged.add(product.id));
+      return Array.from(merged);
+    });
+  }
+
+  async function applyCertificationRulesToSelected() {
+    const updatedProducts = selectedProducts.flatMap((product) => {
+      const rule = certificationRuleForArticleGroup(product.articleGroup);
+      if (!rule) return [];
+      const updatedProduct = { ...product, ...rule.updates };
+      return JSON.stringify(updatedProduct) === JSON.stringify(product) ? [] : [updatedProduct];
+    });
+    if (updatedProducts.length === 0) return;
+    await onBulkUpdateProducts(updatedProducts, 'Certificeringsregels toegepast');
+  }
+
+  async function markSelectedProductsAsEMarkNotApplicable() {
+    const updatedProducts = selectedProducts.map((product) => ({
+      ...product,
+      eMarkRelevant: 'nee' as const,
+      eMarkPresent: 'niet_van_toepassing' as const,
+    }));
+    if (updatedProducts.length === 0) return;
+    await onBulkUpdateProducts(updatedProducts, 'E-mark niet van toepassing ingesteld');
+  }
 
   const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(visibleProducts.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -8566,7 +8831,25 @@ function ProductsPage({
           <h1>Producten</h1>
           <span>{products.length} producten geregistreerd</span>
         </div>
-        <label className="upload-button"><Upload size={16} /> Producten importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={(event) => void onImport(event)} /></label>
+        <div className="page-title-actions">
+          <label className="exact-import-code-field">
+            <span>Exact artikelcode</span>
+            <input
+              value={exactProductImportCode}
+              onChange={(event) => setExactProductImportCode(event.target.value)}
+              placeholder="Bijv. 3SCO81184BWD11"
+            />
+          </label>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void onExactImport(exactProductImportCode)}
+            disabled={exactImporting}
+          >
+            <DatabaseZap size={16} /> {exactImporting ? 'Exact importeren...' : 'Importeer uit Exact'}
+          </button>
+          <label className="upload-button"><Upload size={16} /> Producten importeren<input type="file" accept=".csv,.xlsx,.xls" onChange={(event) => void onImport(event)} /></label>
+        </div>
       </div>
       {message && <div className="notice">{message}</div>}
       <section className="panel maintenance-search">
@@ -8591,73 +8874,20 @@ function ProductsPage({
         </div>
         {productsTab === 'catalog' ? (
           <>
-        <div className="product-intro">
-          <div>
-            <strong>Artikelen centraal beheren</strong>
-            <span>Importeer jullie complete onderdelenlijst. Afbeeldingen kunnen we daarna per product toevoegen en later koppelen aan scooters, garantieclaims en onderhoud.</span>
-          </div>
-        </div>
-        <div className="product-import-groups">
-          <div className="product-import-groups-head">
-            <strong>Weergave</strong>
-            <span>Nieuwe producten zijn automatisch aangemaakte artikelen uit importstromen die je nog even wilt nalopen.</span>
-          </div>
-          <div className="product-import-tags">
-            <button
-              type="button"
-              className={`product-import-tag ${catalogView === 'all' ? 'active' : ''}`}
-              onClick={() => setCatalogView('all')}
-            >
-              Alle producten
-            </button>
-            <button
-              type="button"
-              className={`product-import-tag ${catalogView === 'new' ? 'active' : ''}`}
-              onClick={() => setCatalogView('new')}
-            >
-              Nieuwe producten ({products.filter((product) => product.isNewProduct).length})
-            </button>
-          </div>
-        </div>
-        <div className="product-import-groups">
-          <div className="product-import-groups-head">
-            <strong>Fabrikant filter</strong>
-            <span>Deze lijst komt uit leveranciers die je wilt gebruiken binnen Eigen import.</span>
-          </div>
-          <div className="product-import-tags">
-            <button
-              type="button"
-              className={`product-import-tag ${importCompanyFilter === '__all__' ? 'active' : ''}`}
-              onClick={() => setImportCompanyFilter((current) => current === '__all__' ? '' : '__all__')}
-            >
-              Alle fabrikanten
-            </button>
-            {importCompanies.map((company) => (
-              <button
-                key={company}
-                type="button"
-                className={`product-import-tag ${importCompanyFilter === company ? 'active' : ''}`}
-                onClick={() => setImportCompanyFilter((current) => current === company ? '' : company)}
-              >
-                {company}
-              </button>
-            ))}
-          </div>
-          <div className="product-table-intro compact">
-            <span>
-              {importCompanyFilter === '__all__'
-                ? `Filter actief: alle fabrikanten`
-                : importCompanyFilter
-                ? `Filter actief: ${importCompanyFilter}`
-                : `Geen fabrikant-filter actief. ${importCompanies.length} fabrikanten beschikbaar.`}
-            </span>
-          </div>
-        </div>
         <div className="product-toolbar">
           <div className="product-search-field">
             <Search size={16} />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek op artikelnummer, omschrijving, barcode of leverancier" />
           </div>
+          <select value={catalogView} onChange={(event) => setCatalogView(event.target.value as 'all' | 'new')}>
+            <option value="all">Alle producten</option>
+            <option value="new">Nieuwe producten ({products.filter((product) => product.isNewProduct).length})</option>
+          </select>
+          <select value={importCompanyFilter} onChange={(event) => setImportCompanyFilter(event.target.value as '__all__' | string)}>
+            <option value="">Alle fabrikanten</option>
+            <option value="__all__">Alle importfabrikanten</option>
+            {importCompanies.map((company) => <option key={company} value={company}>{company}</option>)}
+          </select>
           <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
             <option value="">Alle artikelgroepen</option>
             {articleGroups.map((group) => <option key={group} value={group}>{group}</option>)}
@@ -8705,63 +8935,43 @@ function ProductsPage({
       </section>
       {productsTab === 'catalog' ? (
       <>
-      <section className="stats-row product-stats">
-        <article className="stat-card">
-          <span>Totaal</span>
-          <strong>{products.length}</strong>
-          <small>Volledige productcatalogus</small>
-        </article>
-        <article className="stat-card">
-          <span>Zichtbaar</span>
-          <strong>{visibleProducts.length}</strong>
-          <small>Na huidige filters</small>
-        </article>
-        <article className="stat-card">
-          <span>Webshop</span>
-          <strong>{products.filter((product) => product.webshop).length}</strong>
-          <small>Gemarkeerd voor webwinkel</small>
-        </article>
-        <article className="stat-card">
-          <span>Leveranciers</span>
-          <strong>{suppliers.length}</strong>
-          <small>Unieke hoofdleveranciers</small>
-        </article>
-        <article className="stat-card">
-          <span>End of life</span>
-          <strong>{products.filter((product) => product.endDate?.trim()).length}</strong>
-          <small>Producten met einddatum</small>
-        </article>
-        <article className="stat-card">
-          <span>Nieuw</span>
-          <strong>{products.filter((product) => product.isNewProduct).length}</strong>
-          <small>Automatisch aangemaakte producten</small>
-        </article>
-        <article className="stat-card">
-          <span>Compliance compleet</span>
-          <strong>{complianceSummaryCounts.complete}</strong>
-          <small>GPSR, verpakking en PPWR groen</small>
-        </article>
-        <article className="stat-card">
-          <span>Controleren</span>
-          <strong>{complianceSummaryCounts.attention}</strong>
-          <small>Wel exporteerbaar, maar met waarschuwingen</small>
-        </article>
-        <article className="stat-card">
-          <span>Onvolledig</span>
-          <strong>{complianceSummaryCounts.blocking}</strong>
-          <small>Minimaal 1 kritieke compliancefout</small>
-        </article>
-      </section>
       <section className="panel table-panel">
         <div className="panel-title"><FileText size={16} /> Artikelen</div>
         <div className="product-table-intro">
-          <strong>Klik op een artikel om alle details te bekijken en te wijzigen.</strong>
-          <span>De lijst hieronder laat alleen de belangrijkste cataloguskolommen zien.</span>
+          <strong>{visibleProducts.length} producten zichtbaar</strong>
+          <span>
+            Compleet {complianceSummaryCounts.complete} · Controleren {complianceSummaryCounts.attention} · Onvolledig {complianceSummaryCounts.blocking}
+            {certificationSummaryCounts.eMarkMissing > 0 ? ` · E-mark ontbrekend ${certificationSummaryCounts.eMarkMissing}` : ''}
+            {certificationSummaryCounts.ceMissing > 0 ? ` · CE ontbrekend ${certificationSummaryCounts.ceMissing}` : ''}
+          </span>
         </div>
         {visibleProducts.length === 0 ? (
           <div className="empty-state inline"><BriefcaseBusiness size={22} /><strong>Geen producten gevonden</strong><span>Importeer een Excel/CSV of pas je filters aan.</span></div>
         ) : (
           <>
+            <div className="product-bulk-toolbar">
+              <label className="checkbox-field">
+                <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisibleSelection} />
+                {allVisibleSelected ? 'Zichtbare selectie opheffen' : 'Selecteer zichtbare producten'}
+              </label>
+              <span>{selectedProductIds.length} geselecteerd</span>
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={selectedProductIds.length === 0}
+                onClick={() => void applyCertificationRulesToSelected()}
+              >
+                Artikelgroep-regels toepassen
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={selectedProductIds.length === 0}
+                onClick={() => void markSelectedProductsAsEMarkNotApplicable()}
+              >
+                E-mark niet van toepassing
+              </button>
+            </div>
             <div className="table-toolbar">
               <div className="table-controls">
                 <label>Rows:
@@ -8774,10 +8984,13 @@ function ProductsPage({
                 </label>
               </div>
             </div>
-            <div className="table-scroll">
+            <div className="table-scroll product-table-scroll">
             <table className="inventory-table product-table">
               <thead>
                 <tr>
+                  <th className="product-checkbox-column">
+                    <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisibleSelection} aria-label="Selecteer zichtbare producten" />
+                  </th>
                   <th>
                     <button type="button" className="column-sort-button" onClick={() => handleSort('code')}>
                       Artikelnummer {renderSortIcon('code')}
@@ -8801,7 +9014,11 @@ function ProductsPage({
                     </button>
                   </th>
                   <th>Webwinkel</th>
-                  <th>Leverancier / fabrikant</th>
+                  <th>
+                    <button type="button" className="column-sort-button" onClick={() => handleSort('supplier')}>
+                      Leverancier / fabrikant {renderSortIcon('supplier')}
+                    </button>
+                  </th>
                   <th>
                     <button type="button" className="column-sort-button" onClick={() => handleSort('articleGroup')}>
                       Artikelgroep {renderSortIcon('articleGroup')}
@@ -8829,6 +9046,14 @@ function ProductsPage({
                   ] : [];
                   return (
                   <tr key={product.id} className="product-row" onClick={() => onSelectProduct(product)}>
+                    <td className="product-checkbox-column" onClick={(event) => event.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedProductIds.includes(product.id)}
+                        onChange={() => toggleProductSelection(product.id)}
+                        aria-label={`Selecteer ${product.code || product.description || 'product'}`}
+                      />
+                    </td>
                     <td>{product.code || '-'}</td>
                     <td>{product.description || '-'}</td>
                     <td>
@@ -8838,7 +9063,7 @@ function ProductsPage({
                         title={tooltipLines.join('\n')}
                         onClick={(event) => {
                           event.stopPropagation();
-                          onSelectProduct(product, 'basic');
+                          onSelectProduct(product, compliance?.checklist.some((item) => item.section === 'certification') ? 'certification' : 'basic');
                         }}
                       >
                         <span className="product-compliance-table-dot" />
@@ -8990,10 +9215,10 @@ function ProductDetailModal({
   const manufacturerSectionRef = useRef<HTMLDivElement | null>(null);
   const importerSectionRef = useRef<HTMLDivElement | null>(null);
   const safetySectionRef = useRef<HTMLDivElement | null>(null);
+  const certificationSectionRef = useRef<HTMLDivElement | null>(null);
   const packagingGeneralSectionRef = useRef<HTMLDivElement | null>(null);
   const packagingLayersSectionRef = useRef<HTMLDivElement | null>(null);
   const batchOverviewSectionRef = useRef<HTMLDivElement | null>(null);
-  const lastComplianceCheckAt = useMemo(() => new Date().toISOString(), [product.id]);
   const complianceStatus = useMemo(
     () => getProductComplianceSummary(draft, batches, costLines, registrations, supplierRecords, importers),
     [draft, batches, costLines, registrations, supplierRecords, importers],
@@ -9095,6 +9320,14 @@ function ProductDetailModal({
         importerCountry: draft.importerCountry?.trim() || undefined,
         importerEmail: draft.importerEmail?.trim() || undefined,
         importerWebsite: draft.importerWebsite?.trim() || undefined,
+        complianceCategory: draft.complianceCategory,
+        eMarkRelevant: draft.eMarkRelevant,
+        eMarkPresent: draft.eMarkPresent,
+        eMarkNumber: draft.eMarkNumber?.trim() || undefined,
+        ceRelevant: draft.ceRelevant,
+        cePresent: draft.cePresent,
+        certificationNotes: draft.certificationNotes?.trim() || undefined,
+        certificateDocumentId: draft.certificateDocumentId?.trim() || undefined,
         packagingUnit: String(Math.max(1, parseDecimal(draft.packagingUnit) || 1)),
         packagingLayers: normalizedLayers,
         packagingMaterialPrimary: primaryLayer?.material,
@@ -9174,7 +9407,8 @@ function ProductDetailModal({
 
   function openComplianceTarget(
     tab: ProductModalTab,
-    section: 'identification' | 'planning' | 'traceability' | 'manufacturer' | 'importer' | 'safety' | 'packagingGeneral' | 'packagingLayers' | 'batches',
+    section: 'identification' | 'planning' | 'traceability' | 'manufacturer' | 'importer' | 'safety' | 'certification' | 'packagingGeneral' | 'packagingLayers' | 'batches',
+    field?: string,
   ) {
     const sectionRefs = {
       identification: identificationSectionRef,
@@ -9183,6 +9417,7 @@ function ProductDetailModal({
       manufacturer: manufacturerSectionRef,
       importer: importerSectionRef,
       safety: safetySectionRef,
+      certification: certificationSectionRef,
       packagingGeneral: packagingGeneralSectionRef,
       packagingLayers: packagingLayersSectionRef,
       batches: batchOverviewSectionRef,
@@ -9194,6 +9429,10 @@ function ProductDetailModal({
         behavior: 'smooth',
         block: 'start',
       });
+      if (field) {
+        const target = document.getElementById(`product-field-${field}`) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+        target?.focus();
+      }
     }, 80);
   }
 
@@ -9244,6 +9483,7 @@ function ProductDetailModal({
                   {complianceStatus.gpsr.level === 'green' ? <CheckCircle2 size={14} /> : complianceStatus.gpsr.level === 'yellow' ? <CircleHelp size={14} /> : <XCircle size={14} />}
                   {complianceStatus.gpsr.level === 'green' ? 'Groen' : complianceStatus.gpsr.level === 'yellow' ? 'Geel' : 'Rood'}
                 </span>
+                <strong className="product-compliance-progress">{complianceStatus.gpsr.progress}% gereed</strong>
               </div>
               <div className="panel detail-card product-compliance-card">
                 <span className="detail-card-title">Verpakking status</span>
@@ -9251,6 +9491,7 @@ function ProductDetailModal({
                   {complianceStatus.packaging.level === 'green' ? <CheckCircle2 size={14} /> : complianceStatus.packaging.level === 'yellow' ? <CircleHelp size={14} /> : <XCircle size={14} />}
                   {complianceStatus.packaging.level === 'green' ? 'Groen' : complianceStatus.packaging.level === 'yellow' ? 'Geel' : 'Rood'}
                 </span>
+                <strong className="product-compliance-progress">{complianceStatus.packaging.progress}% gereed</strong>
               </div>
               <div className="panel detail-card product-compliance-card">
                 <span className="detail-card-title">PPWR status</span>
@@ -9258,10 +9499,14 @@ function ProductDetailModal({
                   {complianceStatus.ppwr.level === 'green' ? <CheckCircle2 size={14} /> : complianceStatus.ppwr.level === 'yellow' ? <CircleHelp size={14} /> : <XCircle size={14} />}
                   {complianceStatus.ppwr.level === 'green' ? 'Groen' : complianceStatus.ppwr.level === 'yellow' ? 'Geel' : 'Rood'}
                 </span>
+                <strong className="product-compliance-progress">{complianceStatus.ppwr.progress}% gereed</strong>
               </div>
               <div className="panel detail-card product-compliance-card">
-                <span className="detail-card-title">Laatste controle</span>
-                <strong className="product-compliance-date">{formatDate(lastComplianceCheckAt)}</strong>
+                <span className="detail-card-title">Totale score</span>
+                <strong className="product-compliance-date">{complianceStatus.overallProgress}% gereed</strong>
+                <small className="product-compliance-summary">
+                  {complianceStatus.severityCounts.critical} kritiek · {complianceStatus.severityCounts.recommended} aanbevolen · {complianceStatus.severityCounts.informational} informatief
+                </small>
               </div>
             </div>
             <div className="product-compliance-checklist">
@@ -9280,9 +9525,10 @@ function ProductDetailModal({
                       key={item.id}
                       type="button"
                       className={`product-compliance-item ${item.level}`}
-                      onClick={() => openComplianceTarget(item.tab, item.section)}
+                      onClick={() => openComplianceTarget(item.tab, item.section, item.field)}
                     >
-                      <span className="product-compliance-item-tag">{item.domain.toUpperCase()}</span>
+                      <span className="product-compliance-item-tag">{productComplianceIssueLevelLabel(item.level)}</span>
+                      <span className="product-compliance-item-domain">{item.domain.toUpperCase()}</span>
                       <span>{item.label}</span>
                     </button>
                   ))}
@@ -9306,6 +9552,10 @@ function ProductDetailModal({
             <button type="button" className={`product-tab-button${activeTab === 'packaging' ? ' active' : ''}`} onClick={() => setActiveTab('packaging')}>
               <span className="panel-title-label"><PackagePlus size={16} /> Verpakkingen informatie</span>
               <small className="product-section-meta">Materiaal, recyclecodes en gewichten.</small>
+            </button>
+            <button type="button" className={`product-tab-button${activeTab === 'certification' ? ' active' : ''}`} onClick={() => setActiveTab('certification')}>
+              <span className="panel-title-label"><ShieldCheck size={16} /> Certificering</span>
+              <small className="product-section-meta">E-mark, CE en typegoedkeuringsrelevantie.</small>
             </button>
             <button type="button" className={`product-tab-button${activeTab === 'batches' ? ' active' : ''}`} onClick={() => setActiveTab('batches')}>
               <span className="panel-title-label"><ClipboardList size={16} /> Batchoverzicht</span>
@@ -9338,8 +9588,8 @@ function ProductDetailModal({
                       />
                       Nieuw product
                     </label>
-                    <label>Batch
-                      <input value={draft.batch ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batch: event.target.value }))} />
+                    <label>Interne batch / importbatch
+                      <input id="product-field-batch" value={draft.batch ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batch: event.target.value }))} />
                     </label>
                     <label>Merk
                       <input value={draft.brand ?? ''} onChange={(event) => setDraft((current) => ({ ...current, brand: event.target.value }))} />
@@ -9429,10 +9679,10 @@ function ProductDetailModal({
                     <input value={draft.shortDescription ?? ''} onChange={(event) => setDraft((current) => ({ ...current, shortDescription: event.target.value }))} />
                   </label>
                   <label>Traceercode
-                    <input value={draft.traceabilityCode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, traceabilityCode: event.target.value }))} />
+                    <input id="product-field-traceabilityCode" value={draft.traceabilityCode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, traceabilityCode: event.target.value }))} />
                   </label>
-                  <label>Batchnummer
-                    <input value={draft.batchNumber ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batchNumber: event.target.value }))} />
+                  <label>Batchnummer voor traceerbaarheid
+                    <input id="product-field-batchNumber" value={draft.batchNumber ?? ''} onChange={(event) => setDraft((current) => ({ ...current, batchNumber: event.target.value }))} />
                   </label>
                   <label>Serienummer
                     <input value={draft.serialNumber ?? ''} onChange={(event) => setDraft((current) => ({ ...current, serialNumber: event.target.value }))} />
@@ -9502,6 +9752,98 @@ function ProductDetailModal({
                   </label>
                   <label className="span-2">Veiligheidsinformatie
                     <textarea value={draft.safetyInfo ?? ''} onChange={(event) => setDraft((current) => ({ ...current, safetyInfo: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+          {activeTab === 'certification' && (
+            <div className="product-section-body">
+              <div className="product-form-subsection" ref={certificationSectionRef}>
+                <div className="product-subsection-header">
+                  <h3>Regelgeving & certificering</h3>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => {
+                      const rule = certificationRuleForArticleGroup(draft.articleGroup);
+                      if (!rule) return;
+                      setDraft((current) => ({ ...current, ...rule.updates }));
+                    }}
+                    disabled={!certificationRuleForArticleGroup(draft.articleGroup)}
+                  >
+                    Artikelgroep-regel toepassen
+                  </button>
+                </div>
+                <div className="product-table-intro compact">
+                  <span>Leg hier vast of E-mark, CE of andere certificering relevant is voor dit product. Deze gegevens tellen mee in de compliance-checklist.</span>
+                </div>
+                <div className="form-grid">
+                  <label>Compliance categorie
+                    <select value={draft.complianceCategory ?? ''} onChange={(event) => setDraft((current) => ({ ...current, complianceCategory: (event.target.value || undefined) as Product['complianceCategory'] }))}>
+                      <option value="">Selecteer...</option>
+                      {productComplianceCategoryOptions.map((option) => <option key={option} value={option}>{productComplianceCategoryLabels[option]}</option>)}
+                    </select>
+                  </label>
+                  <label>E-mark relevant
+                    <select value={draft.eMarkRelevant ?? 'onbekend'} onChange={(event) => setDraft((current) => ({ ...current, eMarkRelevant: event.target.value as Product['eMarkRelevant'] }))}>
+                      {relevanceOptions.map((option) => <option key={option} value={option}>{formatCertificationPresence(option as Product['eMarkPresent'])}</option>)}
+                    </select>
+                  </label>
+                  <label>CE relevant
+                    <select value={draft.ceRelevant ?? 'onbekend'} onChange={(event) => setDraft((current) => ({ ...current, ceRelevant: event.target.value as Product['ceRelevant'] }))}>
+                      {relevanceOptions.map((option) => <option key={option} value={option}>{formatCertificationPresence(option as Product['eMarkPresent'])}</option>)}
+                    </select>
+                  </label>
+                </div>
+              </div>
+              {(draft.complianceCategory === 'E_MARK_RELEVANT' || draft.complianceCategory === 'TYPE_APPROVAL_RELATED' || draft.eMarkRelevant === 'ja') ? (
+                <div className="product-form-subsection">
+                  <div className="inline-notice warning-notice product-certification-notice">
+                    E-mark velden zijn extra belangrijk voor dit producttype. Leg aanwezigheid en nummer vast voor snelle controle.
+                  </div>
+                  <div className="form-grid">
+                    <label>E-mark aanwezig
+                      <select value={draft.eMarkPresent ?? 'onbekend'} onChange={(event) => setDraft((current) => ({ ...current, eMarkPresent: event.target.value as Product['eMarkPresent'] }))}>
+                        {presenceOptions.map((option) => <option key={option} value={option}>{formatCertificationPresence(option)}</option>)}
+                      </select>
+                    </label>
+                    <label>E-mark nummer
+                      <input value={draft.eMarkNumber ?? ''} onChange={(event) => setDraft((current) => ({ ...current, eMarkNumber: event.target.value }))} />
+                    </label>
+                  </div>
+                </div>
+              ) : (
+                <div className="product-form-subsection">
+                  <div className="form-grid">
+                    <label>E-mark aanwezig
+                      <select value={draft.eMarkPresent ?? 'onbekend'} onChange={(event) => setDraft((current) => ({ ...current, eMarkPresent: event.target.value as Product['eMarkPresent'] }))}>
+                        {presenceOptions.map((option) => <option key={option} value={option}>{formatCertificationPresence(option)}</option>)}
+                      </select>
+                    </label>
+                    <label>E-mark nummer
+                      <input value={draft.eMarkNumber ?? ''} onChange={(event) => setDraft((current) => ({ ...current, eMarkNumber: event.target.value }))} />
+                    </label>
+                  </div>
+                </div>
+              )}
+              <div className="product-form-subsection">
+                {draft.ceRelevant === 'ja' && draft.cePresent !== 'ja' ? (
+                  <div className="inline-notice warning-notice product-certification-notice">
+                    CE is als relevant gemarkeerd, maar nog niet als aanwezig bevestigd.
+                  </div>
+                ) : null}
+                <div className="form-grid">
+                  <label>CE aanwezig
+                    <select value={draft.cePresent ?? 'onbekend'} onChange={(event) => setDraft((current) => ({ ...current, cePresent: event.target.value as Product['cePresent'] }))}>
+                      {presenceOptions.map((option) => <option key={option} value={option}>{formatCertificationPresence(option)}</option>)}
+                    </select>
+                  </label>
+                  <label>Certificaat document id
+                    <input value={draft.certificateDocumentId ?? ''} onChange={(event) => setDraft((current) => ({ ...current, certificateDocumentId: event.target.value }))} placeholder="Optioneel document-id" />
+                  </label>
+                  <label className="span-2">Certificering notities
+                    <textarea value={draft.certificationNotes ?? ''} onChange={(event) => setDraft((current) => ({ ...current, certificationNotes: event.target.value }))} />
                   </label>
                 </div>
               </div>
@@ -10971,100 +11313,6 @@ function MaintenanceDetailModal({ record, scooter, onClose }: { record: Maintena
         </section>
       </section>
     </div>
-  );
-}
-
-function GlobalSearch({ data, query, setQuery, scooters, onSelect }: { data: AppData; query: string; setQuery: (value: string) => void; scooters: Scooter[]; onSelect: (scooter: Scooter) => void }) {
-  const [searchField, setSearchField] = useState<SearchField>('frameNumber');
-  const [panelFilters, setPanelFilters] = useState<ScooterPanelFilters>({
-    speed: '',
-    model: '',
-    color: '',
-    status: '',
-  });
-  const visibleScooters = filterScootersForPanel(scooters, query, searchField, panelFilters);
-  return (
-    <>
-      <h1>Zoeken</h1>
-      <SearchPanel
-        scooters={scooters}
-        query={query}
-        setQuery={setQuery}
-        searchField={searchField}
-        setSearchField={setSearchField}
-        panelFilters={panelFilters}
-        setPanelFilters={setPanelFilters}
-      />
-      <ScooterTable scooters={visibleScooters} dealers={data.dealers} query={query} setQuery={setQuery} onSelect={onSelect} />
-    </>
-  );
-}
-
-function SearchPanel({
-  scooters,
-  query,
-  setQuery,
-  searchField,
-  setSearchField,
-  panelFilters,
-  setPanelFilters,
-}: {
-  scooters: Scooter[];
-  query: string;
-  setQuery: (value: string) => void;
-  searchField: SearchField;
-  setSearchField: (value: SearchField) => void;
-  panelFilters: ScooterPanelFilters;
-  setPanelFilters: (value: ScooterPanelFilters) => void;
-}) {
-  const speedOptions = speedOptionsFromScooters(scooters);
-  const modelOptions = Array.from(new Set(scooters.map((scooter) => scooter.model).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
-  const colorOptions = Array.from(new Set(scooters.map((scooter) => scooter.color).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
-  const statusOptions = Array.from(new Set(scooters.map((scooter) => scooter.status).filter(Boolean)));
-  const placeholder = searchField === 'frameNumber'
-    ? 'Zoek op framenummer'
-    : searchField === 'engineNumber'
-      ? 'Zoek op motornummer'
-      : 'Zoek op kenteken';
-
-  return (
-    <section className="panel search-panel">
-      <div className="panel-title"><Search size={16} /> Zoeken</div>
-      <div className="search-grid">
-        <div>
-          <strong>Zoek in</strong>
-          <label><input type="checkbox" checked={searchField === 'frameNumber'} onChange={() => setSearchField('frameNumber')} /> Frame nummer</label>
-          <label><input type="checkbox" checked={searchField === 'engineNumber'} onChange={() => setSearchField('engineNumber')} /> Engine nummer</label>
-          <label><input type="checkbox" checked={searchField === 'licensePlate'} onChange={() => setSearchField('licensePlate')} /> Kenteken</label>
-        </div>
-        <div>
-          <strong>voor</strong>
-          <div className="inline-search">
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={placeholder} />
-            <button className="primary-button" type="button" onClick={() => setQuery('')}><Search size={15} /></button>
-          </div>
-        </div>
-        <div>
-          <strong>met</strong>
-          <select value={panelFilters.speed} onChange={(event) => setPanelFilters({ ...panelFilters, speed: event.target.value })}>
-            <option value="">Alle snelheden</option>
-            {speedOptions.map((speed) => <option key={speed} value={speed}>{speed}</option>)}
-          </select>
-          <select value={panelFilters.model} onChange={(event) => setPanelFilters({ ...panelFilters, model: event.target.value })}>
-            <option value="">Alle modellen</option>
-            {modelOptions.map((model) => <option key={model} value={model}>{model}</option>)}
-          </select>
-          <select value={panelFilters.color} onChange={(event) => setPanelFilters({ ...panelFilters, color: event.target.value })}>
-            <option value="">Alle kleuren</option>
-            {colorOptions.map((color) => <option key={color} value={color}>{color}</option>)}
-          </select>
-          <select value={panelFilters.status} onChange={(event) => setPanelFilters({ ...panelFilters, status: event.target.value })}>
-            <option value="">Alle statussen</option>
-            {statusOptions.map((status) => <option key={status} value={status}>{scooterStatusLabel(status)}</option>)}
-          </select>
-        </div>
-      </div>
-    </section>
   );
 }
 
