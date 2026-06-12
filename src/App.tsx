@@ -2770,6 +2770,30 @@ function speedOptionsFromScooters(scooters: Scooter[]) {
   )).sort((a, b) => Number(a) - Number(b) || a.localeCompare(b, 'nl', { sensitivity: 'base' }));
 }
 
+function normalizeScooterModelFilterKey(model?: string) {
+  return model?.trim().toLowerCase() || '';
+}
+
+function buildScooterModelFilterOptions(scooters: Scooter[]) {
+  const groupedModels = new Map<string, string[]>();
+
+  scooters.forEach((scooter) => {
+    const model = scooter.model?.trim();
+    const key = normalizeScooterModelFilterKey(model);
+    if (!model || !key) return;
+    const current = groupedModels.get(key) ?? [];
+    if (!current.includes(model)) current.push(model);
+    groupedModels.set(key, current);
+  });
+
+  return Array.from(groupedModels.entries())
+    .map(([value, models]) => ({
+      value,
+      label: models.find((model) => model === model.toUpperCase()) ?? models[0],
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'nl', { sensitivity: 'base' }));
+}
+
 function containerSortTime(container: Container) {
   const date = container.arrivedAt || container.eta;
   const time = date ? new Date(date).getTime() : 0;
@@ -6251,11 +6275,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     invoice: '',
     registration: '',
   });
-  const modelOptions = Array.from(new Set(
-    scooters
-      .map((scooter) => scooter.model?.trim())
-      .filter(Boolean),
-  )).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const modelOptions = buildScooterModelFilterOptions(scooters);
   const colorOptions = Array.from(new Set(
     scooters
       .map((scooter) => scooter.color?.trim())
@@ -6273,7 +6293,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     const dealer = dealerName(dealers, scooter.dealerId);
     const registrationComplete = isRegistrationComplete(scooter);
     return (
-      (!columnFilters.model || scooter.model === columnFilters.model) &&
+      (!columnFilters.model || normalizeScooterModelFilterKey(scooter.model) === columnFilters.model) &&
       scooter.frameNumber.toLowerCase().includes(columnFilters.frame.toLowerCase()) &&
       (!columnFilters.color || scooter.color === columnFilters.color) &&
       (scooter.colorNumber || '').toLowerCase().includes(columnFilters.colorNumber.toLowerCase()) &&
@@ -6463,7 +6483,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
               <th>
                 <select value={columnFilters.model} onChange={(event) => setColumnFilter('model', event.target.value)} aria-label="Filter model">
                   <option value="">Alle</option>
-                  {modelOptions.map((model) => <option key={model} value={model}>{model}</option>)}
+                  {modelOptions.map((model) => <option key={model.value} value={model.value}>{model.label}</option>)}
                 </select>
               </th>
               <th><input value={columnFilters.frame} onChange={(event) => setColumnFilter('frame', event.target.value)} aria-label="Filter frame" /></th>
