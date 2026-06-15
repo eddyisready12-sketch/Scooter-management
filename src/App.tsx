@@ -6280,6 +6280,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
     status: '',
     dealer: '',
     invoice: '',
+    unpacked: '',
     registration: '',
   });
   const modelOptions = buildScooterModelFilterOptions(scooters);
@@ -6320,6 +6321,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
       (!columnFilters.status || scooter.status === columnFilters.status) &&
       (!columnFilters.dealer || dealer === columnFilters.dealer) &&
       (scooter.invoiceNumber || '').toLowerCase().includes(columnFilters.invoice.toLowerCase()) &&
+      (!columnFilters.unpacked || (columnFilters.unpacked === 'yes' ? Boolean(scooter.isUnpacked) : !scooter.isUnpacked)) &&
       (!columnFilters.registration || (columnFilters.registration === 'complete' ? registrationComplete : !registrationComplete))
     );
   });
@@ -6564,7 +6566,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
                 </select>
               </th>
               <th><input value={columnFilters.invoice} onChange={(event) => setColumnFilter('invoice', event.target.value)} aria-label="Filter factuur" /></th>
-              <th></th>
+              <th><select value={columnFilters.unpacked} onChange={(event) => setColumnFilter('unpacked', event.target.value)} aria-label="Filter uitgepakt"><option value="">Alle</option><option value="yes">Ja</option><option value="no">Nee</option></select></th>
               <th><select value={columnFilters.registration} onChange={(event) => setColumnFilter('registration', event.target.value)} aria-label="Filter tenaamstelling"><option value="">Alle</option><option value="complete">Compleet</option><option value="missing">Mist data</option></select></th>
             </tr>
           </thead>
