@@ -2933,6 +2933,7 @@ export function App() {
   const [data, setData] = useState<AppData>(demoData);
   const [query, setQuery] = useState('');
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
+  const [focusedContainerId, setFocusedContainerId] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedProductTab, setSelectedProductTab] = useState<ProductModalTab>('basic');
   const [selectedProductApplyBatchNumber, setSelectedProductApplyBatchNumber] = useState('');
@@ -4118,7 +4119,7 @@ export function App() {
 
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
-          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onMarkContainerAvailable={markContainerAvailable} />}
+          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onMarkContainerAvailable={markContainerAvailable} focusedContainerId={focusedContainerId} />}
           {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
           {view === 'packaging' && (
             <PackagingOverviewPage
@@ -4165,6 +4166,12 @@ export function App() {
           documents={data.documents.filter((document) => document.scooterFrame === selectedScooter.frameNumber)}
           onClose={() => setSelectedScooter(null)}
           onUpdate={updateScooter}
+          container={data.containers.find((container) => container.id === selectedScooter.containerId)}
+          onOpenContainer={(containerId) => {
+            setFocusedContainerId(containerId);
+            setSelectedScooter(null);
+            setView('containers');
+          }}
           onAddDocument={addDocument}
           onOpenDocument={openDocument}
           onDownloadDocument={downloadDocument}
@@ -6289,6 +6296,17 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
   useEffect(() => {
     setSortOrder(defaultSortOrder);
   }, [defaultSortOrder]);
+
+  function handleHeaderSort(ascValue: string, descValue: string) {
+    setSortOrder((current) => (current === ascValue ? descValue : ascValue));
+  }
+
+  function renderHeaderSortIcon(ascValue: string, descValue: string) {
+    if (sortOrder === ascValue) return <ChevronUp size={14} />;
+    if (sortOrder === descValue) return <ChevronDown size={14} />;
+    return <ArrowUpDown size={14} />;
+  }
+
   const filteredRows = scooters.filter((scooter) => {
     const dealer = dealerName(dealers, scooter.dealerId);
     const registrationComplete = isRegistrationComplete(scooter);
@@ -6313,16 +6331,36 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
         return a.color.localeCompare(b.color, 'nl', { sensitivity: 'base' }) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
       case 'color-desc':
         return b.color.localeCompare(a.color, 'nl', { sensitivity: 'base' }) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'color-number-asc':
+        return (a.colorNumber || '').localeCompare(b.colorNumber || '', 'nl', { sensitivity: 'base', numeric: true }) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'color-number-desc':
+        return (b.colorNumber || '').localeCompare(a.colorNumber || '', 'nl', { sensitivity: 'base', numeric: true }) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
       case 'speed-high':
         return Number(normalizeSpeedValue(b.speed) || 0) - Number(normalizeSpeedValue(a.speed) || 0) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
       case 'speed-low':
         return Number(normalizeSpeedValue(a.speed) || 0) - Number(normalizeSpeedValue(b.speed) || 0) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'status-asc':
+        return a.status.localeCompare(b.status, 'nl', { sensitivity: 'base' }) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'status-desc':
+        return b.status.localeCompare(a.status, 'nl', { sensitivity: 'base' }) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'dealer-asc':
+        return dealerName(dealers, a.dealerId).localeCompare(dealerName(dealers, b.dealerId), 'nl', { sensitivity: 'base' }) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'dealer-desc':
+        return dealerName(dealers, b.dealerId).localeCompare(dealerName(dealers, a.dealerId), 'nl', { sensitivity: 'base' }) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'unpacked-asc':
+        return Number(Boolean(b.isUnpacked)) - Number(Boolean(a.isUnpacked)) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'unpacked-desc':
+        return Number(Boolean(a.isUnpacked)) - Number(Boolean(b.isUnpacked)) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
       case 'newest-added':
         return new Date(b.arrivedAt || 0).getTime() - new Date(a.arrivedAt || 0).getTime() || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
       case 'registration-newest':
         return new Date(b.firstRegistrationDate || 0).getTime() - new Date(a.firstRegistrationDate || 0).getTime() || a.frameNumber.localeCompare(b.frameNumber, 'nl', { sensitivity: 'base' });
       case 'registration-oldest':
         return new Date(a.firstRegistrationDate || 0).getTime() - new Date(b.firstRegistrationDate || 0).getTime() || a.frameNumber.localeCompare(b.frameNumber, 'nl', { sensitivity: 'base' });
+      case 'registration-complete':
+        return Number(isRegistrationComplete(b)) - Number(isRegistrationComplete(a)) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
+      case 'registration-incomplete':
+        return Number(isRegistrationComplete(a)) - Number(isRegistrationComplete(b)) || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' });
       case 'model-asc':
       default:
         return a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' }) || a.frameNumber.localeCompare(b.frameNumber, 'nl', { sensitivity: 'base' });
@@ -6467,8 +6505,18 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
               <option value="registration-oldest">1e tenaamstelling oud-nieuw</option>
               <option value="color-asc">Kleur A-Z</option>
               <option value="color-desc">Kleur Z-A</option>
+              <option value="color-number-asc">Kleur No A-Z</option>
+              <option value="color-number-desc">Kleur No Z-A</option>
               <option value="speed-high">Snelheid hoog-laag</option>
               <option value="speed-low">Snelheid laag-hoog</option>
+              <option value="status-asc">Status A-Z</option>
+              <option value="status-desc">Status Z-A</option>
+              <option value="dealer-asc">Dealer A-Z</option>
+              <option value="dealer-desc">Dealer Z-A</option>
+              <option value="unpacked-asc">Uitgepakt eerst</option>
+              <option value="unpacked-desc">Niet uitgepakt eerst</option>
+              <option value="registration-complete">Tenaam compleet eerst</option>
+              <option value="registration-incomplete">Tenaam incompleet eerst</option>
               <option value="newest-added">Nieuwste eerst</option>
             </select>
           </label>
@@ -6478,7 +6526,19 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Model</th><th>Frame #</th><th>Kleur</th><th>Kleur No</th><th>Kenteken</th><th>Snelheid</th><th>Status</th><th>Dealer</th><th>Factuur</th><th>Uitgepakt</th><th>Tenaam</th></tr>
+            <tr>
+              <th><button type="button" className="column-sort-button" onClick={() => handleHeaderSort('model-asc', 'model-desc')}>Model {renderHeaderSortIcon('model-asc', 'model-desc')}</button></th>
+              <th>Frame #</th>
+              <th><button type="button" className="column-sort-button" onClick={() => handleHeaderSort('color-asc', 'color-desc')}>Kleur {renderHeaderSortIcon('color-asc', 'color-desc')}</button></th>
+              <th><button type="button" className="column-sort-button" onClick={() => handleHeaderSort('color-number-asc', 'color-number-desc')}>Kleur No {renderHeaderSortIcon('color-number-asc', 'color-number-desc')}</button></th>
+              <th>Kenteken</th>
+              <th><button type="button" className="column-sort-button" onClick={() => handleHeaderSort('speed-low', 'speed-high')}>Snelheid {renderHeaderSortIcon('speed-low', 'speed-high')}</button></th>
+              <th><button type="button" className="column-sort-button" onClick={() => handleHeaderSort('status-asc', 'status-desc')}>Status {renderHeaderSortIcon('status-asc', 'status-desc')}</button></th>
+              <th><button type="button" className="column-sort-button" onClick={() => handleHeaderSort('dealer-asc', 'dealer-desc')}>Dealer {renderHeaderSortIcon('dealer-asc', 'dealer-desc')}</button></th>
+              <th>Factuur</th>
+              <th><button type="button" className="column-sort-button" onClick={() => handleHeaderSort('unpacked-asc', 'unpacked-desc')}>Uitgepakt {renderHeaderSortIcon('unpacked-asc', 'unpacked-desc')}</button></th>
+              <th><button type="button" className="column-sort-button" onClick={() => handleHeaderSort('registration-complete', 'registration-incomplete')}>Tenaam {renderHeaderSortIcon('registration-complete', 'registration-incomplete')}</button></th>
+            </tr>
             <tr className="filter-row">
               <th>
                 <select value={columnFilters.model} onChange={(event) => setColumnFilter('model', event.target.value)} aria-label="Filter model">
@@ -6541,6 +6601,7 @@ function Containers({
   onImport,
   onSelect,
   onMarkContainerAvailable,
+  focusedContainerId,
 }: {
   data: AppData;
   message: string;
@@ -6548,6 +6609,7 @@ function Containers({
   onImport: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onSelect: (scooter: Scooter) => void;
   onMarkContainerAvailable: (container: Container, arrivedAtInput: string) => Promise<void>;
+  focusedContainerId?: string | null;
 }) {
   const [showImport, setShowImport] = useState(false);
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
@@ -6594,6 +6656,7 @@ function Containers({
             dealers={data.dealers}
             onSelect={onSelect}
             onMarkContainerAvailable={onMarkContainerAvailable}
+            focusedContainerId={focusedContainerId}
             green
             emptyMessage="Geen containers onderweg."
           />
@@ -6603,6 +6666,7 @@ function Containers({
             scooters={data.scooters}
             dealers={data.dealers}
             onSelect={onSelect}
+            focusedContainerId={focusedContainerId}
             green
             emptyMessage="Geen aangekomen containers."
           />
@@ -11352,6 +11416,7 @@ function ContainerListPanel({
   dealers,
   onSelect,
   onMarkContainerAvailable,
+  focusedContainerId,
   green = false,
   emptyMessage = 'N.V.T.',
 }: {
@@ -11361,10 +11426,16 @@ function ContainerListPanel({
   dealers: Dealer[];
   onSelect: (scooter: Scooter) => void;
   onMarkContainerAvailable?: (container: Container, arrivedAtInput: string) => Promise<void>;
+  focusedContainerId?: string | null;
   green?: boolean;
   emptyMessage?: string;
 }) {
   const [openContainerId, setOpenContainerId] = useState<string | null>(null);
+  useEffect(() => {
+    if (focusedContainerId && containers.some((container) => container.id === focusedContainerId)) {
+      setOpenContainerId(focusedContainerId);
+    }
+  }, [containers, focusedContainerId]);
   return (
     <section className="panel list-panel">
       <div className="panel-title"><Boxes size={16} /> {title}</div>
@@ -11402,22 +11473,26 @@ function ContainerListPanel({
 function ScooterDrawer({
   scooter,
   dealers,
+  container,
   warranties,
   maintenance,
   documents,
   onClose,
   onUpdate,
+  onOpenContainer,
   onAddDocument,
   onOpenDocument,
   onDownloadDocument,
 }: {
   scooter: Scooter;
   dealers: Dealer[];
+  container?: Container;
   warranties: WarrantyPart[];
   maintenance: MaintenanceRecord[];
   documents: DocumentRecord[];
   onClose: () => void;
   onUpdate: (scooter: Scooter) => void | Promise<void>;
+  onOpenContainer: (containerId: string) => void;
   onAddDocument: (scooterFrame: string, type: DocumentRecord['type'], note: string, file: File) => Promise<DocumentRecord>;
   onOpenDocument: (document: DocumentRecord) => Promise<void>;
   onDownloadDocument: (document: DocumentRecord) => Promise<void>;
@@ -11538,6 +11613,8 @@ function ScooterDrawer({
               <dt>Kleur No</dt><dd>{scooter.colorNumber || '-'}</dd>
               <dt>Snelheid</dt><dd>{normalizeSpeedValue(scooter.speed)}</dd>
               <dt>Kenteken</dt><dd>{scooter.licensePlate || '-'}</dd>
+              <dt>Container nummer</dt>
+              <dd>{container?.number ? <button type="button" className="link-button" onClick={() => onOpenContainer(container.id)}>{container.number}</button> : '-'}</dd>
               <dt>Factuur</dt><dd>{scooter.invoiceNumber || '-'}</dd>
               <dt>Status</dt><dd>{scooter.status}</dd>
               <dt>Uitgepakt</dt><dd>{scooter.isUnpacked ? <span className="registration-badge"><CheckCircle2 size={16} /> Ja</span> : 'Nee'}</dd>
