@@ -7208,11 +7208,22 @@ function CostBatchesPage({
                                         const oemInfo = componentParts.find((part) => part.startsWith('Item No.'))?.replace(/^Item No\.\s*/i, '');
                                         const ctnInfo = componentParts.find((part) => part.startsWith('Ctn'))?.replace(/^Ctn\s*/i, '');
                                         const supplierInfo = componentParts.find((part) => part.includes('Import') || part.includes('Limited') || part.includes('Co., Ltd.'));
-                                        const isPrinted = data.productPackagingRegistrations.some((registration) =>
+                                        const printedRegistrations = data.productPackagingRegistrations.filter((registration) =>
                                           registration.batchId === batch.id
                                           && registration.containerCostLineId === line.id
                                           && Boolean(registration.labelPrintedAt),
                                         );
+                                        const isPrinted = printedRegistrations.length > 0;
+                                        const printedLabelCount = printedRegistrations.reduce((highest, registration) => {
+                                          const candidate = parseDecimal(registration.labelPrintCount);
+                                          return candidate > 0 ? Math.max(highest, candidate) : highest;
+                                        }, 0);
+                                        const lastPrintedAt = printedRegistrations.reduce<string | undefined>((latest, registration) => {
+                                          const candidate = registration.labelPrintedAt?.trim();
+                                          if (!candidate) return latest;
+                                          if (!latest) return candidate;
+                                          return Date.parse(candidate) > Date.parse(latest) ? candidate : latest;
+                                        }, undefined);
                                         return (
                                           <tr key={line.id}>
                                             <td className="import-line-number">{index + 1}</td>
@@ -7300,20 +7311,27 @@ function CostBatchesPage({
                                               </label>
                                             </td>
                                             <td className="import-batch-label-cell">
-                                              <button
-                                                type="button"
-                                                className="icon-button import-label-print-button"
-                                                title={product ? 'Productlabel printen' : 'Productlabel printen vanaf batchregel'}
-                                                aria-label={`Productlabel printen voor ${line.referenceCode}`}
-                                                onClick={(event) => {
-                                                  event.stopPropagation();
-                                                  setPrintMessage('');
-                                                  onOpenBatchLabelProduct(batch, line, product);
-                                                }}
-                                              >
-                                                <Printer size={16} />
-                                              </button>
-                                              {isPrinted ? <CheckCircle2 className="import-label-printed-check" size={17} aria-label="Label geprint" /> : null}
+                                              <div className="import-batch-label-stack">
+                                                <button
+                                                  type="button"
+                                                  className="icon-button import-label-print-button"
+                                                  title={product ? 'Productlabel printen' : 'Productlabel printen vanaf batchregel'}
+                                                  aria-label={`Productlabel printen voor ${line.referenceCode}`}
+                                                  onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    setPrintMessage('');
+                                                    onOpenBatchLabelProduct(batch, line, product);
+                                                  }}
+                                                >
+                                                  <Printer size={16} />
+                                                </button>
+                                                <span className={`import-label-status ${isPrinted ? 'is-printed' : 'is-pending'}`}>
+                                                  {isPrinted ? `${printedLabelCount > 0 ? formatQuantity(printedLabelCount) : printedRegistrations.length}x geprint` : 'Niet geprint'}
+                                                </span>
+                                                {lastPrintedAt ? (
+                                                  <small className="import-label-meta">{formatDate(lastPrintedAt)}</small>
+                                                ) : null}
+                                              </div>
                                             </td>
                                           </tr>
                                         );
