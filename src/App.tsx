@@ -6766,6 +6766,7 @@ function CostBatchesPage({
   const [showCostModal, setShowCostModal] = useState(false);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
+  const [importBatchSearchQuery, setImportBatchSearchQuery] = useState('');
   const [printMessage, setPrintMessage] = useState('');
   const [packagingMessage, setPackagingMessage] = useState('');
   const [importToolTab, setImportToolTab] = useState<'batch' | 'scooterPackaging'>('batch');
@@ -6980,13 +6981,35 @@ function CostBatchesPage({
                       }
                       return left.description.localeCompare(right.description, 'nl', { numeric: true, sensitivity: 'base' });
                     });
-                  const purchaseOrderAddedCount = lines.filter((line) => line.purchaseOrderAdded).length;
                   const isExpanded = expandedBatchId === batch.id;
+                  const filteredLines = lines.filter((line) => {
+                    const needle = importBatchSearchQuery.trim().toLowerCase();
+                    if (!needle) return true;
+                    const product = findProductForCostLine(data.products, line);
+                    const componentParts = line.componentsNote
+                      ?.split(' - ')
+                      .map((part) => part.trim())
+                      .filter(Boolean) ?? [];
+                    const searchValues = [
+                      line.referenceCode,
+                      line.description,
+                      line.type,
+                      product?.barcode,
+                      product?.code,
+                      product?.description,
+                      product?.shortDescription,
+                      ...componentParts,
+                    ];
+                    return searchValues.some((value) => value?.toLowerCase().includes(needle));
+                  });
                   return (
                     <Fragment key={batch.id}>
                       <tr
                         className={`batch-summary-row${isExpanded ? ' is-expanded' : ''}`}
-                        onClick={() => setExpandedBatchId(isExpanded ? null : batch.id)}
+                        onClick={() => {
+                          setExpandedBatchId(isExpanded ? null : batch.id);
+                          setImportBatchSearchQuery('');
+                        }}
                       >
                         <td>
                           <button type="button" className="inline-expand-button">
@@ -7037,6 +7060,14 @@ function CostBatchesPage({
                                 </div>
                               </div>
                               <div className="container-command-actions">
+                                <label className="import-batch-search-field" onClick={(event) => event.stopPropagation()}>
+                                  <Search size={16} />
+                                  <input
+                                    value={importBatchSearchQuery}
+                                    onChange={(event) => setImportBatchSearchQuery(event.target.value)}
+                                    placeholder="Zoek in importregels"
+                                  />
+                                </label>
                                 <button
                                   type="button"
                                   className="secondary-button"
@@ -7055,6 +7086,12 @@ function CostBatchesPage({
                                   <strong>Geen regels gevonden</strong>
                                   <span>Deze importbatch heeft nog geen opgeslagen detailregels.</span>
                                 </div>
+                              ) : filteredLines.length === 0 ? (
+                                <div className="empty-state inline compact">
+                                  <Search size={18} />
+                                  <strong>Geen matches</strong>
+                                  <span>Pas je zoekopdracht aan om importregels te zien.</span>
+                                </div>
                               ) : (
                                 <div className="container-scooter-table-wrap import-batch-lines-wrap">
                                   <table className="container-scooter-table import-batch-lines-table">
@@ -7071,14 +7108,14 @@ function CostBatchesPage({
                                         <th>
                                           <span className="import-batch-header-stack">
                                             <span>Bestellijst</span>
-                                            <span>{purchaseOrderAddedCount}/{lines.length}</span>
+                                            <span>{filteredLines.filter((line) => line.purchaseOrderAdded).length}/{filteredLines.length}</span>
                                           </span>
                                         </th>
                                         <th>Label</th>
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {lines.map((line, index) => {
+                                      {filteredLines.map((line, index) => {
                                         const product = findProductForCostLine(data.products, line);
                                         const dutchDescription = product?.shortDescription?.trim()
                                           || product?.labelTitle?.trim()
@@ -8307,24 +8344,39 @@ function ContainerAvailabilityBoard({
       ) : null}
       {markMessage ? <div className={`inline-notice ${markMessageType === 'warning' ? 'warning-notice' : 'success-notice'}`}>{markMessage}</div> : null}
       <div className="container-board-filters">
-        <label>Model
-          <select value={filters.model} onChange={(event) => setFilters((current) => ({ ...current, model: event.target.value }))}>
-            <option value="">Alle modellen</option>
-            {modelOptions.map((model) => <option key={model.value} value={model.value}>{model.label}</option>)}
-          </select>
-        </label>
-        <label>Kleur
-          <select value={filters.color} onChange={(event) => setFilters((current) => ({ ...current, color: event.target.value }))}>
-            <option value="">Alle kleuren</option>
-            {colorOptions.map((color) => <option key={color} value={color}>{color}</option>)}
-          </select>
-        </label>
-        <label>Snelheid
-          <select value={filters.speed} onChange={(event) => setFilters((current) => ({ ...current, speed: event.target.value }))}>
-            <option value="">Alle snelheden</option>
-            {speedOptions.map((speed) => <option key={speed} value={speed}>{speed}</option>)}
-          </select>
-        </label>
+        <div className="container-board-filters-header">
+          <div>
+            <span className="container-board-filters-eyebrow">Snel filteren</span>
+            <strong>Toon alleen de scooters die je nu nodig hebt</strong>
+          </div>
+          <button
+            type="button"
+            className="secondary-button compact-button"
+            onClick={() => setFilters({ model: '', color: '', speed: '' })}
+          >
+            Reset filters
+          </button>
+        </div>
+        <div className="container-board-filters-grid">
+          <label>Model
+            <select value={filters.model} onChange={(event) => setFilters((current) => ({ ...current, model: event.target.value }))}>
+              <option value="">Alle modellen</option>
+              {modelOptions.map((model) => <option key={model.value} value={model.value}>{model.label}</option>)}
+            </select>
+          </label>
+          <label>Kleur
+            <select value={filters.color} onChange={(event) => setFilters((current) => ({ ...current, color: event.target.value }))}>
+              <option value="">Alle kleuren</option>
+              {colorOptions.map((color) => <option key={color} value={color}>{color}</option>)}
+            </select>
+          </label>
+          <label>Snelheid
+            <select value={filters.speed} onChange={(event) => setFilters((current) => ({ ...current, speed: event.target.value }))}>
+              <option value="">Alle snelheden</option>
+              {speedOptions.map((speed) => <option key={speed} value={speed}>{speed}</option>)}
+            </select>
+          </label>
+        </div>
       </div>
       <div className="container-card-status-grid container-card-status-grid-wide">
         {groups.map(({ status, label }) => {
@@ -8352,10 +8404,20 @@ function ContainerAvailabilityBoard({
                       key={scooter.id}
                       onClick={() => onSelect(scooter)}
                     >
-                      <strong>{scooter.frameNumber}</strong>
-                      <span>{scooter.model || '-'} - {scooter.color || '-'} - {normalizeSpeedValue(scooter.speed) || '-'}</span>
-                      {barcodeByScooterId.get(scooter.id) ? <img className="container-card-scooter-barcode" src={barcodeByScooterId.get(scooter.id)} alt={`Barcode ${scooter.frameNumber}`} /> : null}
-                      <small>{dealerName(dealers, scooter.dealerId) || '-'}</small>
+                      <div className="container-card-scooter-copy">
+                        <strong>{scooter.frameNumber}</strong>
+                        <span>{scooter.model || '-'}</span>
+                        <div className="container-card-scooter-tags">
+                          <small>{scooter.color || '-'}</small>
+                          <small>{normalizeSpeedValue(scooter.speed) || '-'}</small>
+                          <small>{dealerName(dealers, scooter.dealerId) || '-'}</small>
+                        </div>
+                      </div>
+                      {barcodeByScooterId.get(scooter.id) ? (
+                        <div className="container-card-scooter-barcode-wrap">
+                          <img className="container-card-scooter-barcode" src={barcodeByScooterId.get(scooter.id)} alt={`Barcode ${scooter.frameNumber}`} />
+                        </div>
+                      ) : null}
                     </button>
                   )) : <p className="container-card-empty">Geen scooters</p>}
                 </div>

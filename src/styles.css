@@ -3435,6 +3435,33 @@ tbody tr:hover {
   border-top: 1px solid #dce1e6;
 }
 
+.import-batch-search-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: min(320px, 100%);
+  padding: 0 12px;
+  border: 1px solid #d6dce2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.import-batch-search-field svg {
+  color: #65717d;
+  flex: 0 0 auto;
+}
+
+.import-batch-search-field input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 10px 0;
+}
+
+.import-batch-search-field input:focus {
+  outline: none;
+}
+
 .import-batch-meta {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4610,9 +4637,42 @@ tbody tr:hover {
 
 .container-board-filters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid #dce1e6;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f9fbfd 0%, #f2f6fa 100%);
+}
+
+.container-board-filters-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.container-board-filters-header strong {
+  display: block;
+  color: #17202a;
+  font-size: 14px;
+}
+
+.container-board-filters-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: #65717d;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.container-board-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .container-board-filters label {
@@ -4636,8 +4696,8 @@ tbody tr:hover {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px 12px;
-  background: #f6f8fa;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #fbfcfd 0%, #f4f7fa 100%);
   border-bottom: 1px solid #dce1e6;
   font-weight: 800;
 }
@@ -4656,8 +4716,8 @@ tbody tr:hover {
 }
 
 .container-card-status-header strong {
-  min-width: 28px;
-  padding: 2px 8px;
+  min-width: 32px;
+  padding: 4px 10px;
   border-radius: 999px;
   background: #e8eef5;
   text-align: center;
@@ -4672,33 +4732,39 @@ tbody tr:hover {
 .container-card-scooter-list {
   max-height: 320px;
   overflow-y: auto;
+  padding: 8px;
+  background: #f8fafc;
 }
 
 .container-card-scooter-row {
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
   width: 100%;
-  border-top: 0;
-  border-left: 0;
-  border-right: 0;
-  padding: 10px 12px;
-  border-bottom: 1px solid #dce1e6;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
   background: #fff;
   color: #17202a;
   text-align: left;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .container-card-scooter-row:last-child {
-  border-bottom: 0;
+  margin-bottom: 0;
 }
 
 .container-card-scooter-row:hover {
-  background: #f3f8ff;
+  background: #f8fbff;
+  border-color: #cfe0f5;
 }
 
 .container-card-scooter-row strong {
   min-width: 0;
   overflow-wrap: anywhere;
+  font-size: 15px;
 }
 
 .container-card-scooter-row span,
@@ -4707,11 +4773,41 @@ tbody tr:hover {
   line-height: 1.35;
 }
 
+.container-card-scooter-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.container-card-scooter-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.container-card-scooter-tags small {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #4f5f6f;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.container-card-scooter-barcode-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
 .container-card-scooter-barcode {
-  width: 220px;
+  width: 180px;
   max-width: 100%;
   height: auto;
-  margin: 2px 0;
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   background: #fff;
 }
 
@@ -4719,6 +4815,20 @@ tbody tr:hover {
   margin: 0;
   padding: 14px 12px;
   color: #65717d;
+}
+
+@media (max-width: 900px) {
+  .container-board-filters-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .container-card-scooter-row {
+    grid-template-columns: 1fr;
+  }
+
+  .container-card-scooter-barcode-wrap {
+    justify-content: flex-start;
+  }
 }
 
 dl {
