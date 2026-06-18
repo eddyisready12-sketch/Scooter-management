@@ -796,6 +796,70 @@ function getResolvedProductComplianceSource(
   };
 }
 
+function getRelevantProductPackagingRegistrations(
+  product: Product,
+  registrations: ProductPackagingRegistration[],
+) {
+  const normalizedProductCode = product.code.trim().toLowerCase();
+  const productId = product.id?.trim();
+  if (!normalizedProductCode && !productId) return [];
+
+  return registrations.filter((registration) => {
+    const registrationCode = registration.productCode?.trim().toLowerCase();
+    return (productId && registration.productId === productId)
+      || (normalizedProductCode && registrationCode === normalizedProductCode);
+  });
+}
+
+function getBatchDerivedPackagingLayers(registrations: ProductPackagingRegistration[]): ProductPackagingLayer[] {
+  if (registrations.length === 0) return [];
+
+  const grouped = new Map<string, ProductPackagingRegistration[]>();
+  registrations.forEach((registration) => {
+    const key = [
+      registration.batchNumber?.trim() || registration.batchOrderNumber?.trim() || registration.batchId,
+      registration.containerCostLineId || registration.productCode,
+    ].join('|');
+    const items = grouped.get(key) ?? [];
+    items.push(registration);
+    grouped.set(key, items);
+  });
+
+  const latestGroup = Array.from(grouped.values()).sort((left, right) => {
+    const leftTimestamp = left.reduce((latest, registration) => Math.max(
+      latest,
+      Date.parse(registration.labelPrintedAt || registration.registeredAt || '') || 0,
+    ), 0);
+    const rightTimestamp = right.reduce((latest, registration) => Math.max(
+      latest,
+      Date.parse(registration.labelPrintedAt || registration.registeredAt || '') || 0,
+    ), 0);
+    return rightTimestamp - leftTimestamp;
+  })[0] ?? [];
+
+  return latestGroup
+    .sort((left, right) => left.layerName.localeCompare(right.layerName, 'nl', { numeric: true, sensitivity: 'base' }))
+    .map((registration, index) => ({
+      name: registration.layerName || packagingLayerNames[index] || `Laag ${index + 1}`,
+      material: asOptionalTrimmedString(registration.material),
+      recycleCode: asOptionalTrimmedString(registration.recycleCode),
+      weightGrams: asOptionalTrimmedString(registration.weightGramsPerUnit),
+      recycledContentPercent: asOptionalTrimmedString(registration.recycledContentPercent),
+      recyclabilityClass: asOptionalTrimmedString(registration.recyclabilityClass) as ProductPackagingLayer['recyclabilityClass'],
+      packagingRole: asOptionalTrimmedString(registration.packagingRole) as ProductPackagingLayer['packagingRole'],
+      productStickerMaterial: asOptionalTrimmedString(registration.productStickerMaterial) as ProductPackagingLayer['productStickerMaterial'],
+    }))
+    .filter((layer) => (
+      layer.material
+      || layer.recycleCode
+      || layer.weightGrams
+      || layer.recycledContentPercent
+      || layer.recyclabilityClass
+      || layer.packagingRole
+      || layer.productStickerMaterial
+    ));
+}
+
 function getProductBatchOverviewRows(
   product: Product,
   batches: ContainerCostBatch[],
@@ -806,11 +870,7 @@ function getProductBatchOverviewRows(
   const productId = product.id?.trim();
   if (!normalizedProductCode && !productId) return [];
 
-  const relevantRegistrations = registrations.filter((registration) => {
-    const registrationCode = registration.productCode?.trim().toLowerCase();
-    return (productId && registration.productId === productId) ||
-      (normalizedProductCode && registrationCode === normalizedProductCode);
-  });
+  const relevantRegistrations = getRelevantProductPackagingRegistrations(product, registrations);
 
   const registrationGroups = new Map<string, ProductPackagingRegistration[]>();
   relevantRegistrations.forEach((registration) => {
@@ -899,7 +959,10 @@ function getProductComplianceSummary(
   importers: Importer[] = [],
 ): ProductComplianceSummary {
   const resolvedProduct = getResolvedProductComplianceSource(product, supplierRecords, importers);
-  const packagingLayers = normalizePackagingLayers(resolvedProduct);
+  const relevantRegistrations = getRelevantProductPackagingRegistrations(resolvedProduct, registrations);
+  const productPackagingLayers = normalizePackagingLayers(resolvedProduct);
+  const batchDerivedPackagingLayers = getBatchDerivedPackagingLayers(relevantRegistrations);
+  const packagingLayers = productPackagingLayers.length > 0 ? productPackagingLayers : batchDerivedPackagingLayers;
   const batchOverviewRows = getProductBatchOverviewRows(resolvedProduct, batches, costLines, registrations);
   const hasText = (value?: string) => Boolean(value?.trim());
   const percentage = (completed: number, total: number) => Math.max(0, Math.min(100, Math.round((completed / Math.max(1, total)) * 100)));
@@ -908,7 +971,15 @@ function getProductComplianceSummary(
     && hasText(resolvedProduct.importerPostalCode)
     && hasText(resolvedProduct.importerCity)
     && hasText(resolvedProduct.importerCountry);
-  const hasTraceability = hasText(resolvedProduct.batchNumber) || hasText(resolvedProduct.traceabilityCode);
+  const hasBatchRegistrationTraceability = relevantRegistrations.some((registration) =>
+    hasText(registration.batchNumber)
+    || hasText(registration.batchOrderNumber)
+    || Boolean(registration.labelPrintedAt)
+    || Boolean(registration.registeredAt),
+  );
+  const hasTraceability = hasText(resolvedProduct.batchNumber)
+    || hasText(resolvedProduct.traceabilityCode)
+    || hasBatchRegistrationTraceability;
   const hasResponsibleEntity = hasText(resolvedProduct.manufacturerName) || hasText(resolvedProduct.importerName);
 
   const gpsrIssues: ProductComplianceIssue[] = [];
@@ -992,7 +1063,10 @@ function getProductComplianceSummary(
     }
   });
 
-  const batchLinkAvailable = batchOverviewRows.length > 0 || hasText(resolvedProduct.batch) || hasText(resolvedProduct.batchNumber);
+  const batchLinkAvailable = batchOverviewRows.length > 0
+    || hasText(resolvedProduct.batch)
+    || hasText(resolvedProduct.batchNumber)
+    || relevantRegistrations.length > 0;
   const ppwrIssues: ProductComplianceIssue[] = [];
   const packagingErrorCount = packagingIssues.filter((issue) => issue.level === 'error').length;
   const packagingWarningCount = packagingIssues.filter((issue) => issue.level === 'warning').length;
