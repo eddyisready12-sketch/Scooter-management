@@ -2794,6 +2794,11 @@ function buildScooterModelFilterOptions(scooters: Scooter[]) {
     .sort((a, b) => a.label.localeCompare(b.label, 'nl', { sensitivity: 'base' }));
 }
 
+function formatScooterFailureLabel(scooter: Scooter) {
+  const licensePlate = scooter.licensePlate?.trim();
+  return licensePlate ? `${licensePlate} (${scooter.frameNumber})` : scooter.frameNumber;
+}
+
 function containerSortTime(container: Container) {
   const date = container.arrivedAt || container.eta;
   const time = date ? new Date(date).getTime() : 0;
@@ -3694,7 +3699,7 @@ export function App() {
           rdwExecution: rdwData.rdwExecution || scooter.rdwExecution,
         }));
       } catch {
-        failed.push(scooter.licensePlate ?? scooter.frameNumber);
+        failed.push(formatScooterFailureLabel(scooter));
       }
     }
 
@@ -3710,7 +3715,7 @@ export function App() {
 
     const parts = [`${updatedScooters.length} voertuigen bijgewerkt via RDW`];
     if (skipped) parts.push(`${skipped} zonder kenteken overgeslagen`);
-    if (failed.length) parts.push(`${failed.length} mislukt`);
+    if (failed.length) parts.push(`${failed.length} mislukt: ${failed.join(', ')}`);
     const message = `${parts.join(', ')}.`;
     showCsvMessage(message);
     return message;
