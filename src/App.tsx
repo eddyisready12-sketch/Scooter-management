@@ -1700,6 +1700,28 @@ function buildProductBarcodeBase64(value: string) {
   return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
 }
 
+function buildScooterBarcodeDataUrl(value: string) {
+  const barcodeValue = value.replace(/\s/g, '');
+  if (!barcodeValue) return '';
+  const canvas = document.createElement('canvas');
+  (bwipjs as unknown as { toCanvas: (canvas: HTMLCanvasElement, options: Record<string, unknown>) => HTMLCanvasElement }).toCanvas(canvas, {
+    bcid: 'code128',
+    text: barcodeValue,
+    scaleX: 2,
+    scaleY: 2,
+    height: 10,
+    includetext: true,
+    textxalign: 'center',
+    textsize: 10,
+    textyalign: 'below',
+    textyoffset: -2,
+    backgroundcolor: 'FFFFFF',
+    barcolor: '000000',
+    textcolor: '000000',
+  });
+  return canvas.toDataURL('image/png');
+}
+
 function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
   const barcodeValue = escapeLabelValue(scooter.frameNumber);
   const frameLabel = escapeLabelValue(scooter.frameNumber);
@@ -8204,6 +8226,27 @@ function ContainerAvailabilityBoard({
   const [markingAvailable, setMarkingAvailable] = useState(false);
   const [markMessage, setMarkMessage] = useState('');
   const [markMessageType, setMarkMessageType] = useState<'success' | 'warning'>('success');
+  const [filters, setFilters] = useState({
+    model: '',
+    color: '',
+    speed: '',
+  });
+  const modelOptions = buildScooterModelFilterOptions(scooters);
+  const colorOptions = Array.from(new Set(
+    scooters
+      .map((scooter) => scooter.color?.trim())
+      .filter(Boolean),
+  )).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const speedOptions = speedOptionsFromScooters(scooters);
+  const filteredScooters = useMemo(() => scooters.filter((scooter) => (
+    (!filters.model || normalizeScooterModelFilterKey(scooter.model) === filters.model) &&
+    (!filters.color || scooter.color === filters.color) &&
+    (!filters.speed || normalizeSpeedValue(scooter.speed) === filters.speed)
+  )), [filters.color, filters.model, filters.speed, scooters]);
+  const barcodeByScooterId = useMemo(() => {
+    const entries = filteredScooters.map((scooter) => [scooter.id, buildScooterBarcodeDataUrl(scooter.frameNumber)] as const);
+    return new Map(entries);
+  }, [filteredScooters]);
 
   return (
     <div className="container-availability-board">
@@ -8263,9 +8306,29 @@ function ContainerAvailabilityBoard({
         </div>
       ) : null}
       {markMessage ? <div className={`inline-notice ${markMessageType === 'warning' ? 'warning-notice' : 'success-notice'}`}>{markMessage}</div> : null}
+      <div className="container-board-filters">
+        <label>Model
+          <select value={filters.model} onChange={(event) => setFilters((current) => ({ ...current, model: event.target.value }))}>
+            <option value="">Alle modellen</option>
+            {modelOptions.map((model) => <option key={model.value} value={model.value}>{model.label}</option>)}
+          </select>
+        </label>
+        <label>Kleur
+          <select value={filters.color} onChange={(event) => setFilters((current) => ({ ...current, color: event.target.value }))}>
+            <option value="">Alle kleuren</option>
+            {colorOptions.map((color) => <option key={color} value={color}>{color}</option>)}
+          </select>
+        </label>
+        <label>Snelheid
+          <select value={filters.speed} onChange={(event) => setFilters((current) => ({ ...current, speed: event.target.value }))}>
+            <option value="">Alle snelheden</option>
+            {speedOptions.map((speed) => <option key={speed} value={speed}>{speed}</option>)}
+          </select>
+        </label>
+      </div>
       <div className="container-card-status-grid container-card-status-grid-wide">
         {groups.map(({ status, label }) => {
-          const statusScooters = scooters.filter((scooter) => scooter.status === status);
+          const statusScooters = filteredScooters.filter((scooter) => scooter.status === status);
           const isOpen = openStatus === status;
           return (
             <section className="container-card-status-column" key={status}>
@@ -8291,6 +8354,7 @@ function ContainerAvailabilityBoard({
                     >
                       <strong>{scooter.frameNumber}</strong>
                       <span>{scooter.model || '-'} - {scooter.color || '-'} - {normalizeSpeedValue(scooter.speed) || '-'}</span>
+                      {barcodeByScooterId.get(scooter.id) ? <img className="container-card-scooter-barcode" src={barcodeByScooterId.get(scooter.id)} alt={`Barcode ${scooter.frameNumber}`} /> : null}
                       <small>{dealerName(dealers, scooter.dealerId) || '-'}</small>
                     </button>
                   )) : <p className="container-card-empty">Geen scooters</p>}

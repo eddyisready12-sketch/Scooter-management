@@ -4608,6 +4608,21 @@ tbody tr:hover {
   padding: 0;
 }
 
+.container-board-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.container-board-filters label {
+  display: grid;
+  gap: 6px;
+  color: #425160;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .container-card-status-column {
   min-width: 0;
   overflow: hidden;
@@ -4690,6 +4705,14 @@ tbody tr:hover {
 .container-card-scooter-row small {
   color: #65717d;
   line-height: 1.35;
+}
+
+.container-card-scooter-barcode {
+  width: 220px;
+  max-width: 100%;
+  height: auto;
+  margin: 2px 0;
+  background: #fff;
 }
 
 .container-card-empty {
