@@ -2220,15 +2220,15 @@ function buildDymoOuterBoxLabelXml({
     <RoundRectangle X="0" Y="0" Width="${dymo99012Layout.width}" Height="${dymo99012Layout.height}" Rx="180" Ry="180" />
   </DrawCommands>
   ${textObject({ name: 'Title', value: 'OMDOOS STICKER', x: 220, y: 120, width: 1500, height: 220, size: 10, bold: true })}
-  ${textObject({ name: 'ArticleLabel', value: 'Artikelnummer', x: 220, y: 380, width: 920, height: 140, size: 7, bold: true })}
-  ${textObject({ name: 'ArticleValue', value: escapedArticleNumber, x: 220, y: 520, width: 2140, height: 230, size: 12, bold: true })}
-  ${textObject({ name: 'DescriptionLabel', value: 'Artikelomschrijving', x: 220, y: 730, width: 1300, height: 140, size: 7, bold: true })}
-  ${textObject({ name: 'DescriptionValue', value: escapedDescription, x: 220, y: 840, width: 2280, height: 560, size: 18, bold: true })}
+  ${textObject({ name: 'DescriptionLabel', value: 'Artikelomschrijving', x: 220, y: 350, width: 1300, height: 140, size: 7, bold: true })}
+  ${textObject({ name: 'DescriptionValue', value: escapedDescription, x: 220, y: 470, width: 2360, height: 660, size: 22, bold: true })}
+  ${textObject({ name: 'ArticleLabel', value: 'Artikelnummer', x: 220, y: 1180, width: 920, height: 140, size: 7, bold: true })}
+  ${textObject({ name: 'ArticleValue', value: escapedArticleNumber, x: 220, y: 1310, width: 2140, height: 230, size: 13, bold: true })}
   ${barcodeObject}
-  ${textObject({ name: 'QuantityLabel', value: 'Aantal', x: 2920, y: 140, width: 720, height: 140, size: 7, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'QuantityValue', value: escapedQuantity, x: 2920, y: 280, width: 720, height: 420, size: 20, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'BatchLabel', value: 'Batch', x: 3840, y: 140, width: 820, height: 140, size: 7, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'BatchValue', value: escapedBatchCode, x: 3660, y: 280, width: 1180, height: 260, size: 11, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'QuantityLabel', value: 'Aantal', x: 2720, y: 220, width: 760, height: 140, size: 7, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'QuantityValue', value: escapedQuantity, x: 2720, y: 360, width: 760, height: 420, size: 20, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'BatchLabel', value: 'Batch', x: 2720, y: 840, width: 760, height: 140, size: 7, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'BatchValue', value: escapedBatchCode, x: 2560, y: 980, width: 1080, height: 300, size: 11, bold: true, alignment: 'Center' })}
 </DieCutLabel>`;
 }
 
