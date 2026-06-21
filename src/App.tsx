@@ -131,6 +131,9 @@ const containerVolumePresets = [
 ] as const;
 
 const loginStorageKey = 'rso-admin-session';
+const appCommitSha = typeof __APP_COMMIT_SHA__ === 'string' && __APP_COMMIT_SHA__.trim()
+  ? __APP_COMMIT_SHA__.trim()
+  : 'onbekend';
 const packagingMaterialOptions = [
   { value: 'PAP 20', label: 'PAP 20 - Golfkarton', recycleCode: 'PAP 20', recycleFamily: 'PAP', recycleNumber: '20', wasteStream: 'Papier en karton' },
   { value: 'PAP 21', label: 'PAP 21 - Massief karton', recycleCode: 'PAP 21', recycleFamily: 'PAP', recycleNumber: '21', wasteStream: 'Papier en karton' },
@@ -2187,7 +2190,7 @@ function buildDymoOuterBoxLabelXml({
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="3500" Y="860" Width="1240" Height="940" />
+    <Bounds X="2560" Y="860" Width="2080" Height="940" />
   </ObjectInfo>` : `<ObjectInfo>
     <BarcodeObject>
       <Name>OuterBoxBarcode</Name>
@@ -2208,7 +2211,7 @@ function buildDymoOuterBoxLabelXml({
       <HorizontalAlignment>Center</HorizontalAlignment>
       <QuietZonesPadding Left="160" Top="0" Right="160" Bottom="0" />
     </BarcodeObject>
-    <Bounds X="3500" Y="920" Width="1240" Height="760" />
+    <Bounds X="2560" Y="920" Width="2080" Height="760" />
   </ObjectInfo>`;
 
   return `<?xml version="1.0" encoding="utf-8"?>
@@ -2410,7 +2413,7 @@ function openOuterBoxLabelPreview({
           }
           .bottom-row {
             display: grid;
-            grid-template-columns: 30mm 1fr;
+            grid-template-columns: 30mm 30mm;
             align-items: end;
             gap: 3mm;
           }
@@ -2440,10 +2443,11 @@ function openOuterBoxLabelPreview({
             justify-items: center;
             align-items: end;
             min-width: 0;
+            width: 100%;
           }
           .barcode-wrap img {
             width: 100%;
-            max-width: 44mm;
+            max-width: 100%;
             max-height: 12mm;
             object-fit: contain;
           }
@@ -4615,6 +4619,7 @@ export function App() {
           </button>
           <div className="topbar-actions">
             <span className={supabase ? 'live-pill online' : 'live-pill'}><DatabaseZap size={14} /> {supabase ? 'Supabase live' : 'Local demo'}</span>
+            <span className="commit-pill" title={`Laatste build commit: ${appCommitSha}`}>Commit {appCommitSha}</span>
             <span>{loginSession.name}</span>
             <button className="icon-button" aria-label="Log out" onClick={handleLogout}>
               <LogOut size={17} />
