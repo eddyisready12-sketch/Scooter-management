@@ -2223,7 +2223,7 @@ function buildDymoOuterBoxLabelXml({
   ${textObject({ name: 'ArticleLabel', value: 'Artikelnummer', x: 220, y: 380, width: 920, height: 140, size: 7, bold: true })}
   ${textObject({ name: 'ArticleValue', value: escapedArticleNumber, x: 220, y: 520, width: 2140, height: 230, size: 12, bold: true })}
   ${textObject({ name: 'DescriptionLabel', value: 'Artikelomschrijving', x: 220, y: 730, width: 1300, height: 140, size: 7, bold: true })}
-  ${textObject({ name: 'DescriptionValue', value: escapedDescription, x: 220, y: 860, width: 2280, height: 320, size: 11, bold: true })}
+  ${textObject({ name: 'DescriptionValue', value: escapedDescription, x: 220, y: 840, width: 2280, height: 560, size: 18, bold: true })}
   ${barcodeObject}
   ${textObject({ name: 'QuantityLabel', value: 'Aantal', x: 2920, y: 140, width: 720, height: 140, size: 7, bold: true, alignment: 'Center' })}
   ${textObject({ name: 'QuantityValue', value: escapedQuantity, x: 2920, y: 280, width: 720, height: 420, size: 20, bold: true, alignment: 'Center' })}
@@ -3689,10 +3689,16 @@ export function App() {
 
     const batchCode = batch.orderNumber?.trim() || sourceProduct.batchNumber?.trim() || batch.containerNumber?.trim() || line.batchId;
     const articleNumber = sourceProduct.code?.trim() || line.referenceCode.trim();
-    const description = sourceProduct.labelTitle?.trim()
+    const defaultDescription = sourceProduct.labelTitle?.trim()
       || sourceProduct.shortDescription?.trim()
       || sourceProduct.description?.trim()
       || line.description.trim();
+    const descriptionAnswer = window.prompt(
+      'Welke artikelomschrijving wil je op de omdoos-sticker zetten? Laat staan voor origineel of pas hem aan.',
+      defaultDescription,
+    );
+    if (descriptionAnswer === null) return null;
+    const description = descriptionAnswer.trim() || defaultDescription;
     const barcodeValue = sourceProduct.barcode?.trim() || articleNumber;
 
     return printOuterBoxDymoLabel({
