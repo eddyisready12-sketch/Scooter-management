@@ -2329,7 +2329,7 @@ function openOuterBoxLabelPreview({
   quantityPerLabel: number;
 }) {
   const barcodeBase64 = buildProductBarcodeBase64(barcodeValue);
-  const previewWindow = window.open('', '_blank', 'noopener,noreferrer,width=1100,height=700');
+  const previewWindow = window.open('', '_blank', 'width=1100,height=700');
   if (!previewWindow) {
     throw new Error('Voorbeeldvenster kon niet worden geopend.');
   }
@@ -2341,6 +2341,8 @@ function openOuterBoxLabelPreview({
   const barcodeHtml = escapeLabelValue(barcodeValue);
   const barcodeImage = barcodeBase64 ? `data:image/png;base64,${barcodeBase64}` : '';
 
+  previewWindow.opener = null;
+  previewWindow.document.open();
   previewWindow.document.write(`
     <html>
       <head>
