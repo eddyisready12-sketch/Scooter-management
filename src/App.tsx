@@ -2413,9 +2413,10 @@ function openOuterBoxLabelPreview({
           }
           .bottom-row {
             display: grid;
-            grid-template-columns: 30mm 30mm;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
             align-items: end;
-            gap: 3mm;
+            gap: 2.5mm;
+            width: 100%;
           }
           .details-grid {
             display: grid;
@@ -2439,8 +2440,8 @@ function openOuterBoxLabelPreview({
             word-break: break-word;
           }
           .barcode-wrap {
-            display: grid;
-            justify-items: center;
+            display: flex;
+            justify-content: flex-end;
             align-items: end;
             min-width: 0;
             width: 100%;
@@ -2450,6 +2451,8 @@ function openOuterBoxLabelPreview({
             max-width: 100%;
             max-height: 12mm;
             object-fit: contain;
+            object-position: right bottom;
+            display: block;
           }
           .barcode-fallback {
             font-size: 2.1mm;
