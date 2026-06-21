@@ -2104,6 +2104,136 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
 </DieCutLabel>`;
 }
 
+function buildDymoOuterBoxLabelXml({
+  articleNumber,
+  description,
+  barcodeValue,
+  batchCode,
+  quantity,
+}: {
+  articleNumber: string;
+  description: string;
+  barcodeValue: string;
+  batchCode: string;
+  quantity: string;
+}) {
+  const escapedArticleNumber = escapeLabelValue(articleNumber);
+  const escapedDescription = escapeLabelValue(description);
+  const escapedBatchCode = escapeLabelValue(batchCode);
+  const escapedQuantity = escapeLabelValue(quantity);
+  const escapedBarcode = escapeLabelValue(barcodeValue);
+  const barcodeBase64 = buildProductBarcodeBase64(barcodeValue);
+
+  const textObject = ({
+    name,
+    value,
+    x,
+    y,
+    width,
+    height,
+    size,
+    bold = false,
+    alignment = 'Left',
+  }: {
+    name: string;
+    value: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    size: number;
+    bold?: boolean;
+    alignment?: 'Left' | 'Center' | 'Right';
+  }) => `<ObjectInfo>
+    <TextObject>
+      <Name>${name}</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <HorizontalAlignment>${alignment}</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>False</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>${value}</String>
+          <Attributes>
+            <Font Family="Arial" Size="${size}" Bold="${bold ? 'True' : 'False'}" Italic="False" Underline="False" Strikeout="False" />
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="${x}" Y="${y}" Width="${width}" Height="${height}" />
+  </ObjectInfo>`;
+
+  const barcodeObject = barcodeBase64 ? `<ObjectInfo>
+    <ImageObject>
+      <Name>OuterBoxBarcode</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <Image>${escapeLabelValue(barcodeBase64)}</Image>
+      <ScaleMode>Uniform</ScaleMode>
+      <BorderWidth>0</BorderWidth>
+      <BorderColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    <Bounds X="220" Y="870" Width="2240" Height="920" />
+  </ObjectInfo>` : `<ObjectInfo>
+    <BarcodeObject>
+      <Name>OuterBoxBarcode</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
+      <LinkedObjectName />
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>True</IsVariable>
+      <Text>${escapedBarcode}</Text>
+      <Type>Code128Auto</Type>
+      <Size>Large</Size>
+      <TextPosition>Bottom</TextPosition>
+      <TextFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      <CheckSumFont Family="Arial" Size="8" Bold="False" Italic="False" Underline="False" Strikeout="False" />
+      <TextEmbedding>None</TextEmbedding>
+      <ECLevel>0</ECLevel>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <QuietZonesPadding Left="160" Top="0" Right="160" Bottom="0" />
+    </BarcodeObject>
+    <Bounds X="220" Y="930" Width="2240" Height="760" />
+  </ObjectInfo>`;
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>${dymo99012Layout.id}</Id>
+  <PaperName>${dymo99012Layout.paperName}</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="${dymo99012Layout.width}" Height="${dymo99012Layout.height}" Rx="180" Ry="180" />
+  </DrawCommands>
+  ${textObject({ name: 'Title', value: 'OMDOOS STICKER', x: 220, y: 120, width: 1500, height: 220, size: 10, bold: true })}
+  ${textObject({ name: 'ArticleLabel', value: 'Artikelnummer', x: 220, y: 380, width: 920, height: 140, size: 7, bold: true })}
+  ${textObject({ name: 'ArticleValue', value: escapedArticleNumber, x: 220, y: 520, width: 2000, height: 230, size: 12, bold: true })}
+  ${textObject({ name: 'DescriptionLabel', value: 'Artikelomschrijving', x: 220, y: 730, width: 1300, height: 140, size: 7, bold: true })}
+  ${textObject({ name: 'DescriptionValue', value: escapedDescription, x: 220, y: 860, width: 2400, height: 200, size: 9 })}
+  ${barcodeObject}
+  ${textObject({ name: 'QuantityLabel', value: 'Aantal', x: 2920, y: 420, width: 720, height: 140, size: 7, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'QuantityValue', value: escapedQuantity, x: 2920, y: 560, width: 720, height: 420, size: 20, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'BatchLabel', value: 'Batch', x: 3840, y: 420, width: 820, height: 140, size: 7, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'BatchValue', value: escapedBatchCode, x: 3660, y: 560, width: 1180, height: 260, size: 11, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'BarcodeLabel', value: 'Barcode', x: 2920, y: 980, width: 720, height: 140, size: 7, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'BarcodeValue', value: escapedBarcode, x: 2740, y: 1110, width: 2100, height: 220, size: 8, alignment: 'Center' })}
+</DieCutLabel>`;
+}
+
 async function getAvailableDymoPrinter() {
   const hosts = ['localhost', '127.0.0.1'];
   const ports = Array.from({ length: 10 }, (_, index) => 41951 + index);
@@ -2150,6 +2280,38 @@ async function printProductDymoLabel(product: Product, quantity = 1) {
   const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64, barcodeBase64);
   for (let index = 0; index < quantity; index += 1) {
     const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Product ${product.code || product.description} (${index + 1}/${quantity})` });
+    if (!printResult.success) {
+      throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
+    }
+  }
+  return printerName;
+}
+
+async function printOuterBoxDymoLabel({
+  articleNumber,
+  description,
+  barcodeValue,
+  batchCode,
+  quantityPerLabel,
+  labelsToPrint,
+}: {
+  articleNumber: string;
+  description: string;
+  barcodeValue: string;
+  batchCode: string;
+  quantityPerLabel: number;
+  labelsToPrint: number;
+}) {
+  const { dymo, printerName } = await getAvailableDymoPrinter();
+  const labelXml = buildDymoOuterBoxLabelXml({
+    articleNumber,
+    description,
+    barcodeValue,
+    batchCode,
+    quantity: formatQuantity(quantityPerLabel),
+  });
+  for (let index = 0; index < labelsToPrint; index += 1) {
+    const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Omdoos ${articleNumber} (${index + 1}/${labelsToPrint})` });
     if (!printResult.success) {
       throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
     }
@@ -3510,6 +3672,41 @@ export function App() {
     return printerName;
   }
 
+  async function printBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
+    const sourceProduct = productFromCostLine(line, product);
+    const defaultUnits = Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
+    const unitsAnswer = window.prompt('Hoeveel stuks moeten op de omdoos-sticker staan?', String(defaultUnits));
+    if (unitsAnswer === null) return null;
+    const quantityPerLabel = Number(unitsAnswer.replace(',', '.'));
+    if (!Number.isInteger(quantityPerLabel) || quantityPerLabel < 1 || quantityPerLabel > 100000) {
+      throw new Error('Vul een heel aantal stuks in tussen 1 en 100000.');
+    }
+
+    const labelsAnswer = window.prompt('Hoeveel omdoos-stickers wil je printen?', '1');
+    if (labelsAnswer === null) return null;
+    const labelsToPrint = Number(labelsAnswer.replace(',', '.'));
+    if (!Number.isInteger(labelsToPrint) || labelsToPrint < 1 || labelsToPrint > 100) {
+      throw new Error('Vul een heel aantal stickers in tussen 1 en 100.');
+    }
+
+    const batchCode = batch.orderNumber?.trim() || sourceProduct.batchNumber?.trim() || batch.containerNumber?.trim() || line.batchId;
+    const articleNumber = sourceProduct.code?.trim() || line.referenceCode.trim();
+    const description = sourceProduct.labelTitle?.trim()
+      || sourceProduct.shortDescription?.trim()
+      || sourceProduct.description?.trim()
+      || line.description.trim();
+    const barcodeValue = sourceProduct.barcode?.trim() || articleNumber;
+
+    return printOuterBoxDymoLabel({
+      articleNumber,
+      description,
+      barcodeValue,
+      batchCode,
+      quantityPerLabel,
+      labelsToPrint,
+    });
+  }
+
   async function togglePurchaseOrderLine(line: ContainerCostLine, purchaseOrderAdded: boolean) {
     const updatedLine = { ...line, purchaseOrderAdded };
     setData((current) => ({
@@ -4221,7 +4418,7 @@ export function App() {
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onMarkContainerAvailable={markContainerAvailable} focusedContainerId={focusedContainerId} />}
-          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
+          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onPrintOuterBoxLabel={printBatchOuterBoxLabel} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
           {view === 'packaging' && (
             <PackagingOverviewPage
               registrations={data.productPackagingRegistrations}
@@ -6827,6 +7024,7 @@ function CostBatchesPage({
   onSaveCostBatch,
   onSelectProduct,
   onOpenBatchLabelProduct,
+  onPrintOuterBoxLabel,
   onTogglePurchaseOrderLine,
   onSaveScooterPackagingSpec,
 }: {
@@ -6834,6 +7032,7 @@ function CostBatchesPage({
   onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
   onSelectProduct: (product: Product, tab?: ProductModalTab) => void;
   onOpenBatchLabelProduct: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
+  onPrintOuterBoxLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => Promise<string | null>;
   onTogglePurchaseOrderLine: (line: ContainerCostLine, purchaseOrderAdded: boolean) => Promise<void>;
   onSaveScooterPackagingSpec: (spec: ScooterPackagingSpec) => Promise<boolean>;
 }) {
@@ -7321,19 +7520,41 @@ function CostBatchesPage({
                                             </td>
                                             <td className="import-batch-label-cell">
                                               <div className="import-batch-label-stack">
-                                                <button
-                                                  type="button"
-                                                  className="icon-button import-label-print-button"
-                                                  title={product ? 'Productlabel printen' : 'Productlabel printen vanaf batchregel'}
-                                                  aria-label={`Productlabel printen voor ${line.referenceCode}`}
-                                                  onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    setPrintMessage('');
-                                                    onOpenBatchLabelProduct(batch, line, product);
-                                                  }}
-                                                >
-                                                  <Printer size={16} />
-                                                </button>
+                                                <div className="import-label-actions">
+                                                  <button
+                                                    type="button"
+                                                    className="icon-button import-label-print-button"
+                                                    title={product ? 'Productlabel printen' : 'Productlabel printen vanaf batchregel'}
+                                                    aria-label={`Productlabel printen voor ${line.referenceCode}`}
+                                                    onClick={(event) => {
+                                                      event.stopPropagation();
+                                                      setPrintMessage('');
+                                                      onOpenBatchLabelProduct(batch, line, product);
+                                                    }}
+                                                  >
+                                                    <Printer size={16} />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    className="icon-button import-label-print-button import-outer-box-button"
+                                                    title="Omdoos-sticker printen"
+                                                    aria-label={`Omdoos-sticker printen voor ${line.referenceCode}`}
+                                                    onClick={async (event) => {
+                                                      event.stopPropagation();
+                                                      setPrintMessage('');
+                                                      try {
+                                                        const printerName = await onPrintOuterBoxLabel(batch, line, product);
+                                                        if (printerName) {
+                                                          setPrintMessage(`Omdoos-sticker verstuurd naar ${printerName} voor ${line.referenceCode}.`);
+                                                        }
+                                                      } catch (error) {
+                                                        setPrintMessage(`Omdoos-sticker print mislukt: ${importErrorMessage(error)}`);
+                                                      }
+                                                    }}
+                                                  >
+                                                    <Boxes size={16} />
+                                                  </button>
+                                                </div>
                                                 <span className={`import-label-status ${isPrinted ? 'is-printed' : 'is-pending'}`}>
                                                   {isPrinted ? `${printedLabelCount > 0 ? formatQuantity(printedLabelCount) : printedRegistrations.length}x geprint` : 'Niet geprint'}
                                                 </span>

@@ -3602,6 +3602,12 @@ tbody tr:hover {
   gap: 6px;
 }
 
+.import-label-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .import-label-status {
   display: inline-flex;
   align-items: center;
@@ -3660,6 +3666,16 @@ tbody tr:hover {
   color: #0075ff;
   border-color: #8bbcff;
   background: #f4f9ff;
+}
+
+.import-outer-box-button {
+  color: #0f6a47;
+}
+
+.import-outer-box-button:hover:not(:disabled) {
+  color: #0b8a5d;
+  border-color: #82d4b5;
+  background: #eefcf6;
 }
 
 .import-label-printed-check {
