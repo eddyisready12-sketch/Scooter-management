@@ -7185,7 +7185,16 @@ function CostBatchesPage({
                                             <span>{filteredLines.filter((line) => line.purchaseOrderAdded).length}/{filteredLines.length}</span>
                                           </span>
                                         </th>
-                                        <th>Label</th>
+                                        <th>
+                                          <span className="import-batch-header-stack">
+                                            <span>Label</span>
+                                            <span>{filteredLines.filter((line) => data.productPackagingRegistrations.some((registration) =>
+                                              registration.batchId === batch.id
+                                              && registration.containerCostLineId === line.id
+                                              && Boolean(registration.labelPrintedAt),
+                                            )).length}/{filteredLines.length}</span>
+                                          </span>
+                                        </th>
                                       </tr>
                                     </thead>
                                     <tbody>
