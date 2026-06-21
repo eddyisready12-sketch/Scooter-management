@@ -2229,8 +2229,6 @@ function buildDymoOuterBoxLabelXml({
   ${textObject({ name: 'QuantityValue', value: escapedQuantity, x: 2920, y: 560, width: 720, height: 420, size: 20, bold: true, alignment: 'Center' })}
   ${textObject({ name: 'BatchLabel', value: 'Batch', x: 3840, y: 420, width: 820, height: 140, size: 7, bold: true, alignment: 'Center' })}
   ${textObject({ name: 'BatchValue', value: escapedBatchCode, x: 3660, y: 560, width: 1180, height: 260, size: 11, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'BarcodeLabel', value: 'Barcode', x: 2920, y: 980, width: 720, height: 140, size: 7, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'BarcodeValue', value: escapedBarcode, x: 2740, y: 1110, width: 2100, height: 220, size: 8, alignment: 'Center' })}
 </DieCutLabel>`;
 }
 
