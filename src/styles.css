@@ -3678,6 +3678,16 @@ tbody tr:hover {
   background: #eefcf6;
 }
 
+.import-preview-button {
+  color: #3b4f67;
+}
+
+.import-preview-button:hover:not(:disabled) {
+  color: #0057c2;
+  border-color: #9cbef0;
+  background: #eef5ff;
+}
+
 .import-label-printed-check {
   display: inline-block;
   color: #14b875;

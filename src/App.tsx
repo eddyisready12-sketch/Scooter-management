@@ -2315,6 +2315,176 @@ async function printOuterBoxDymoLabel({
   return printerName;
 }
 
+function openOuterBoxLabelPreview({
+  articleNumber,
+  description,
+  barcodeValue,
+  batchCode,
+  quantityPerLabel,
+}: {
+  articleNumber: string;
+  description: string;
+  barcodeValue: string;
+  batchCode: string;
+  quantityPerLabel: number;
+}) {
+  const barcodeBase64 = buildProductBarcodeBase64(barcodeValue);
+  const previewWindow = window.open('', '_blank', 'noopener,noreferrer,width=1100,height=700');
+  if (!previewWindow) {
+    throw new Error('Voorbeeldvenster kon niet worden geopend.');
+  }
+
+  const articleHtml = escapeLabelValue(articleNumber);
+  const descriptionHtml = escapeLabelValue(description);
+  const batchHtml = escapeLabelValue(batchCode);
+  const quantityHtml = escapeLabelValue(formatQuantity(quantityPerLabel));
+  const barcodeHtml = escapeLabelValue(barcodeValue);
+  const barcodeImage = barcodeBase64 ? `data:image/png;base64,${barcodeBase64}` : '';
+
+  previewWindow.document.write(`
+    <html>
+      <head>
+        <title>Omdoos sticker voorbeeld</title>
+        <style>
+          body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #eef2f6;
+            color: #0f172a;
+          }
+          .preview-shell {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 32px;
+            box-sizing: border-box;
+          }
+          .preview-panel {
+            width: min(100%, 1080px);
+          }
+          .preview-title {
+            margin: 0 0 16px;
+            font-size: 20px;
+            font-weight: 700;
+          }
+          .preview-note {
+            margin: 0 0 20px;
+            color: #52606d;
+            font-size: 14px;
+          }
+          .sticker {
+            width: 89mm;
+            height: 36mm;
+            background: #fff;
+            border: 2px solid #d6dde5;
+            border-radius: 10px;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+            padding: 3mm 4mm;
+            box-sizing: border-box;
+            display: grid;
+            grid-template-rows: auto auto 1fr auto;
+            gap: 1.5mm;
+          }
+          .article-number {
+            font-size: 4.6mm;
+            font-weight: 700;
+            line-height: 1.05;
+          }
+          .label-caption {
+            font-size: 1.8mm;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #64748b;
+            letter-spacing: 0.04em;
+          }
+          .description {
+            font-size: 3.1mm;
+            font-weight: 700;
+            line-height: 1.08;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+          }
+          .bottom-row {
+            display: grid;
+            grid-template-columns: 30mm 1fr;
+            align-items: end;
+            gap: 3mm;
+          }
+          .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.6mm;
+            align-items: end;
+          }
+          .detail-card {
+            border: 1px solid #d7dee6;
+            border-radius: 6px;
+            padding: 1.4mm 1.8mm;
+            min-height: 10mm;
+            box-sizing: border-box;
+            background: #f8fafc;
+          }
+          .detail-value {
+            margin-top: 0.8mm;
+            font-size: 2.9mm;
+            font-weight: 700;
+            line-height: 1.1;
+            word-break: break-word;
+          }
+          .barcode-wrap {
+            display: grid;
+            justify-items: center;
+            align-items: end;
+            min-width: 0;
+          }
+          .barcode-wrap img {
+            width: 100%;
+            max-width: 44mm;
+            max-height: 12mm;
+            object-fit: contain;
+          }
+          .barcode-fallback {
+            font-size: 2.1mm;
+            font-weight: 700;
+            text-align: center;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="preview-shell">
+          <div class="preview-panel">
+            <h1 class="preview-title">Omdoos sticker voorbeeld</h1>
+            <p class="preview-note">Lokale preview zonder printer. Verhouding is afgestemd op de DYMO-sticker.</p>
+            <div class="sticker">
+              <div class="article-number">${articleHtml}</div>
+              <div class="label-caption">Artikelomschrijving</div>
+              <div class="description">${descriptionHtml}</div>
+              <div class="bottom-row">
+                <div class="details-grid">
+                  <div class="detail-card">
+                    <div class="label-caption">Aantal</div>
+                    <div class="detail-value">${quantityHtml}</div>
+                  </div>
+                  <div class="detail-card">
+                    <div class="label-caption">Batch</div>
+                    <div class="detail-value">${batchHtml}</div>
+                  </div>
+                </div>
+                <div class="barcode-wrap">
+                  ${barcodeImage ? `<img src="${barcodeImage}" alt="Barcode ${barcodeHtml}" />` : `<div class="barcode-fallback">${barcodeHtml}</div>`}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </body>
+    </html>
+  `);
+  previewWindow.document.close();
+}
+
 function salesYearForScooter(scooter: Scooter) {
   if (!scooter.firstRegistrationDate) return 'Onbekend';
   const parsed = new Date(scooter.firstRegistrationDate);
@@ -3709,6 +3879,39 @@ export function App() {
     });
   }
 
+  function previewBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
+    const sourceProduct = productFromCostLine(line, product);
+    const defaultUnits = Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
+    const unitsAnswer = window.prompt('Hoeveel stuks moeten op de omdoos-sticker staan?', String(defaultUnits));
+    if (unitsAnswer === null) return;
+    const quantityPerLabel = Number(unitsAnswer.replace(',', '.'));
+    if (!Number.isInteger(quantityPerLabel) || quantityPerLabel < 1 || quantityPerLabel > 100000) {
+      throw new Error('Vul een heel aantal stuks in tussen 1 en 100000.');
+    }
+
+    const batchCode = batch.orderNumber?.trim() || sourceProduct.batchNumber?.trim() || batch.containerNumber?.trim() || line.batchId;
+    const articleNumber = sourceProduct.code?.trim() || line.referenceCode.trim();
+    const defaultDescription = sourceProduct.labelTitle?.trim()
+      || sourceProduct.shortDescription?.trim()
+      || sourceProduct.description?.trim()
+      || line.description.trim();
+    const descriptionAnswer = window.prompt(
+      'Welke artikelomschrijving wil je in het voorbeeld laten zien? Laat staan voor origineel of pas hem aan.',
+      defaultDescription,
+    );
+    if (descriptionAnswer === null) return;
+    const description = descriptionAnswer.trim() || defaultDescription;
+    const barcodeValue = sourceProduct.barcode?.trim() || articleNumber;
+
+    openOuterBoxLabelPreview({
+      articleNumber,
+      description,
+      barcodeValue,
+      batchCode,
+      quantityPerLabel,
+    });
+  }
+
   async function togglePurchaseOrderLine(line: ContainerCostLine, purchaseOrderAdded: boolean) {
     const updatedLine = { ...line, purchaseOrderAdded };
     setData((current) => ({
@@ -4420,7 +4623,7 @@ export function App() {
         <section className="content">
           {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onMarkContainerAvailable={markContainerAvailable} focusedContainerId={focusedContainerId} />}
-          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onPrintOuterBoxLabel={printBatchOuterBoxLabel} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
+          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onPrintOuterBoxLabel={printBatchOuterBoxLabel} onPreviewOuterBoxLabel={previewBatchOuterBoxLabel} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
           {view === 'packaging' && (
             <PackagingOverviewPage
               registrations={data.productPackagingRegistrations}
@@ -7027,6 +7230,7 @@ function CostBatchesPage({
   onSelectProduct,
   onOpenBatchLabelProduct,
   onPrintOuterBoxLabel,
+  onPreviewOuterBoxLabel,
   onTogglePurchaseOrderLine,
   onSaveScooterPackagingSpec,
 }: {
@@ -7035,6 +7239,7 @@ function CostBatchesPage({
   onSelectProduct: (product: Product, tab?: ProductModalTab) => void;
   onOpenBatchLabelProduct: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
   onPrintOuterBoxLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => Promise<string | null>;
+  onPreviewOuterBoxLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
   onTogglePurchaseOrderLine: (line: ContainerCostLine, purchaseOrderAdded: boolean) => Promise<void>;
   onSaveScooterPackagingSpec: (spec: ScooterPackagingSpec) => Promise<boolean>;
 }) {
@@ -7523,6 +7728,23 @@ function CostBatchesPage({
                                             <td className="import-batch-label-cell">
                                               <div className="import-batch-label-stack">
                                                 <div className="import-label-actions">
+                                                  <button
+                                                    type="button"
+                                                    className="icon-button import-label-print-button import-preview-button"
+                                                    title="Omdoos-sticker voorbeeld"
+                                                    aria-label={`Omdoos-sticker voorbeeld voor ${line.referenceCode}`}
+                                                    onClick={(event) => {
+                                                      event.stopPropagation();
+                                                      setPrintMessage('');
+                                                      try {
+                                                        onPreviewOuterBoxLabel(batch, line, product);
+                                                      } catch (error) {
+                                                        setPrintMessage(`Omdoos-sticker voorbeeld mislukt: ${importErrorMessage(error)}`);
+                                                      }
+                                                    }}
+                                                  >
+                                                    <FileText size={16} />
+                                                  </button>
                                                   <button
                                                     type="button"
                                                     className="icon-button import-label-print-button"
