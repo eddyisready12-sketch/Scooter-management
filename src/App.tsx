@@ -2413,7 +2413,7 @@ function openOuterBoxLabelPreview({
           }
           .bottom-row {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
             align-items: end;
             gap: 2.5mm;
             width: 100%;
@@ -2449,7 +2449,7 @@ function openOuterBoxLabelPreview({
           .barcode-wrap img {
             width: 100%;
             max-width: 100%;
-            max-height: 12mm;
+            max-height: 13.5mm;
             object-fit: contain;
             object-position: right bottom;
             display: block;
