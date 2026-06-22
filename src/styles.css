@@ -3609,6 +3609,8 @@ tbody tr:hover {
 .import-batch-label-cell {
   text-align: center;
   white-space: nowrap;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 .import-batch-label-stack {
@@ -3860,7 +3862,7 @@ tbody tr:hover {
 
 .container-scooter-table.import-batch-lines-table th:nth-child(3),
 .container-scooter-table.import-batch-lines-table td:nth-child(3) {
-  width: 29%;
+  width: 27%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(4),
@@ -3875,24 +3877,24 @@ tbody tr:hover {
 
 .container-scooter-table.import-batch-lines-table th:nth-child(6),
 .container-scooter-table.import-batch-lines-table td:nth-child(6) {
-  width: 10%;
+  width: 9%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(7),
 .container-scooter-table.import-batch-lines-table td:nth-child(7),
 .container-scooter-table.import-batch-lines-table th:nth-child(8),
 .container-scooter-table.import-batch-lines-table td:nth-child(8) {
-  width: 12%;
+  width: 11%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(9),
 .container-scooter-table.import-batch-lines-table td:nth-child(9) {
-  width: 7%;
+  width: 6%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(10),
 .container-scooter-table.import-batch-lines-table td:nth-child(10) {
-  width: 5%;
+  width: 6%;
 }
 
 .import-line-number {
