@@ -1777,6 +1777,31 @@ function buildProductBarcodeBase64(value: string) {
   return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
 }
 
+function buildOuterBoxBarcodeBase64(value: string) {
+  const barcodeValue = value.replace(/\s/g, '');
+  if (!barcodeValue) return null;
+  const canvas = document.createElement('canvas');
+  (bwipjs as unknown as { toCanvas: (canvas: HTMLCanvasElement, options: Record<string, unknown>) => HTMLCanvasElement }).toCanvas(canvas, {
+    bcid: 'code128',
+    text: barcodeValue,
+    scaleX: 4,
+    scaleY: 4,
+    height: 16,
+    includetext: true,
+    textxalign: 'center',
+    textsize: 10,
+    textyalign: 'below',
+    textyoffset: -2,
+    paddingwidth: 0,
+    paddingheight: 0,
+    backgroundcolor: 'FFFFFF',
+    barcolor: '000000',
+    textcolor: '000000',
+  });
+  const dataUrl = canvas.toDataURL('image/png');
+  return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+}
+
 function buildScooterBarcodeDataUrl(value: string) {
   const barcodeValue = value.replace(/\s/g, '');
   if (!barcodeValue) return '';
@@ -2125,7 +2150,7 @@ function buildDymoOuterBoxLabelXml({
   const escapedBatchCode = escapeLabelValue(batchCode);
   const escapedQuantity = escapeLabelValue(quantity);
   const escapedBarcode = escapeLabelValue(barcodeValue);
-  const barcodeBase64 = buildProductBarcodeBase64(barcodeValue);
+  const barcodeBase64 = buildOuterBoxBarcodeBase64(barcodeValue);
 
   const textObject = ({
     name,
@@ -2190,7 +2215,7 @@ function buildDymoOuterBoxLabelXml({
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="2560" Y="860" Width="2080" Height="940" />
+    <Bounds X="2450" Y="760" Width="2220" Height="1080" />
   </ObjectInfo>` : `<ObjectInfo>
     <BarcodeObject>
       <Name>OuterBoxBarcode</Name>
@@ -2209,9 +2234,9 @@ function buildDymoOuterBoxLabelXml({
       <TextEmbedding>None</TextEmbedding>
       <ECLevel>0</ECLevel>
       <HorizontalAlignment>Center</HorizontalAlignment>
-      <QuietZonesPadding Left="160" Top="0" Right="160" Bottom="0" />
+      <QuietZonesPadding Left="0" Top="0" Right="0" Bottom="0" />
     </BarcodeObject>
-    <Bounds X="2560" Y="920" Width="2080" Height="760" />
+    <Bounds X="2450" Y="820" Width="2220" Height="900" />
   </ObjectInfo>`;
 
   return `<?xml version="1.0" encoding="utf-8"?>
@@ -2331,7 +2356,7 @@ function openOuterBoxLabelPreview({
   batchCode: string;
   quantityPerLabel: number;
 }) {
-  const barcodeBase64 = buildProductBarcodeBase64(barcodeValue);
+  const barcodeBase64 = buildOuterBoxBarcodeBase64(barcodeValue);
   const previewWindow = window.open('', '_blank', 'width=1100,height=700');
   if (!previewWindow) {
     throw new Error('Voorbeeldvenster kon niet worden geopend.');
@@ -2413,9 +2438,9 @@ function openOuterBoxLabelPreview({
           }
           .bottom-row {
             display: grid;
-            grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+            grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
             align-items: end;
-            gap: 2.5mm;
+            gap: 2mm;
             width: 100%;
           }
           .details-grid {
@@ -2445,14 +2470,17 @@ function openOuterBoxLabelPreview({
             align-items: end;
             min-width: 0;
             width: 100%;
+            min-height: 15mm;
           }
           .barcode-wrap img {
             width: 100%;
             max-width: 100%;
-            max-height: 13.5mm;
-            object-fit: contain;
+            height: 100%;
+            max-height: 15mm;
+            object-fit: fill;
             object-position: right bottom;
             display: block;
+            image-rendering: crisp-edges;
           }
           .barcode-fallback {
             font-size: 2.1mm;
@@ -7740,6 +7768,19 @@ function CostBatchesPage({
                                                 <div className="import-label-actions">
                                                   <button
                                                     type="button"
+                                                    className="icon-button import-label-print-button"
+                                                    title={product ? 'Productlabel printen' : 'Productlabel printen vanaf batchregel'}
+                                                    aria-label={`Productlabel printen voor ${line.referenceCode}`}
+                                                    onClick={(event) => {
+                                                      event.stopPropagation();
+                                                      setPrintMessage('');
+                                                      onOpenBatchLabelProduct(batch, line, product);
+                                                    }}
+                                                  >
+                                                    <Printer size={16} />
+                                                  </button>
+                                                  <button
+                                                    type="button"
                                                     className="icon-button import-label-print-button import-preview-button"
                                                     title="Omdoos-sticker voorbeeld"
                                                     aria-label={`Omdoos-sticker voorbeeld voor ${line.referenceCode}`}
@@ -7754,19 +7795,6 @@ function CostBatchesPage({
                                                     }}
                                                   >
                                                     <FileText size={16} />
-                                                  </button>
-                                                  <button
-                                                    type="button"
-                                                    className="icon-button import-label-print-button"
-                                                    title={product ? 'Productlabel printen' : 'Productlabel printen vanaf batchregel'}
-                                                    aria-label={`Productlabel printen voor ${line.referenceCode}`}
-                                                    onClick={(event) => {
-                                                      event.stopPropagation();
-                                                      setPrintMessage('');
-                                                      onOpenBatchLabelProduct(batch, line, product);
-                                                    }}
-                                                  >
-                                                    <Printer size={16} />
                                                   </button>
                                                   <button
                                                     type="button"

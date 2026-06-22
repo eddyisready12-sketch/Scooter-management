@@ -3615,12 +3615,15 @@ tbody tr:hover {
   display: inline-grid;
   justify-items: center;
   gap: 6px;
+  width: 100%;
 }
 
 .import-label-actions {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  width: 100%;
 }
 
 .import-label-status {
@@ -3671,7 +3674,7 @@ tbody tr:hover {
 
 .import-label-print-button {
   display: inline-grid;
-  margin: 0 6px 0 auto;
+  margin: 0;
   border: 1px solid #cbd7e3;
   background: #fff;
   color: #1f3448;
