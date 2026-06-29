@@ -4136,6 +4136,10 @@ tbody tr:hover {
   padding: 8px 20px 22px;
 }
 
+.dealer-detail-form {
+  padding: 8px 20px 22px;
+}
+
 .dealer-detail-list dt,
 .dealer-detail-list dd {
   min-height: 42px;
