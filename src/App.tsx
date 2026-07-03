@@ -3888,8 +3888,8 @@ export function App() {
     const labelsAnswer = window.prompt('Hoeveel omdoos-stickers wil je printen?', '1');
     if (labelsAnswer === null) return null;
     const labelsToPrint = Number(labelsAnswer.replace(',', '.'));
-    if (!Number.isInteger(labelsToPrint) || labelsToPrint < 1 || labelsToPrint > 100) {
-      throw new Error('Vul een heel aantal stickers in tussen 1 en 100.');
+    if (!Number.isInteger(labelsToPrint) || labelsToPrint < 1) {
+      throw new Error('Vul een heel aantal stickers in vanaf 1.');
     }
 
     const batchCode = batch.orderNumber?.trim() || sourceProduct.batchNumber?.trim() || batch.containerNumber?.trim() || line.batchId;
@@ -10241,8 +10241,8 @@ function ProductDetailModal({
     const quantityAnswer = window.prompt('Hoeveel productlabels wil je printen?', '1');
     if (quantityAnswer === null) return;
     const quantity = Number(quantityAnswer.replace(',', '.'));
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
-      setDymoMessage('Vul een heel aantal labels in tussen 1 en 100.');
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      setDymoMessage('Vul een heel aantal labels in vanaf 1.');
       return;
     }
 
