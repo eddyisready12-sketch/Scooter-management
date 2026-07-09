@@ -238,6 +238,7 @@ export type Supplier = {
   id: string;
   name: string;
   isImportCompany?: boolean;
+  isPackagingSupplier?: boolean;
   importerId?: string;
   contactName?: string;
   email?: string;
@@ -248,6 +249,14 @@ export type Supplier = {
   postalCode?: string;
   city?: string;
   country?: string;
+  packagingMaterials?: string;
+  ppwrSupplierRole?: 'Producent' | 'Converter' | 'Handelaar' | 'Co-packer';
+  ppwrResponsibility?: 'Primair' | 'Secundair' | 'Tertiair' | 'Combinatie';
+  ppwrContractStatus?: 'Niet gestart' | 'In aanvraag' | 'Actief' | 'Geblokkeerd' | 'Verlopen';
+  ppwrDeclarationStatus?: 'Ontbreekt' | 'Aangevraagd' | 'Ontvangen' | 'Goedgekeurd';
+  ppwrEprNumber?: string;
+  ppwrLastDeclarationAt?: string;
+  ppwrNotes?: string;
   notes?: string;
   active?: boolean;
 };
@@ -279,10 +288,84 @@ export type SupplierContact = {
   active?: boolean;
 };
 
+export type ComplianceRiskLevel = 'low' | 'medium' | 'high' | 'critical';
+export type ComplianceFamilyStatus = 'concept' | 'in_review' | 'partial' | 'complete' | 'not_applicable' | 'archived';
+
+export type ComplianceProductFamily = {
+  id: string;
+  code: string;
+  name: string;
+  category?: string;
+  description?: string;
+  intendedUse?: string;
+  foreseeableMisuse?: string;
+  riskLevel?: ComplianceRiskLevel;
+  gpsrRequired?: boolean;
+  status?: ComplianceFamilyStatus;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ComplianceFamilyRisk = {
+  id: string;
+  familyId: string;
+  hazard: string;
+  riskDescription?: string;
+  severity?: string;
+  probability?: string;
+  mitigation?: string;
+  residualRisk?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ComplianceFamilyWarning = {
+  id: string;
+  familyId: string;
+  warningType?: string;
+  warningTextNl: string;
+  warningTextEn?: string;
+  requiredOnLabel?: boolean;
+  requiredInManual?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ComplianceFamilyDocument = {
+  id: string;
+  familyId: string;
+  documentType?: string;
+  documentName: string;
+  filePath?: string;
+  fileUrl?: string;
+  validFrom?: string;
+  validUntil?: string;
+  status?: 'active' | 'expired' | 'pending' | 'revoked';
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ComplianceProductLink = {
+  id: string;
+  productId: string;
+  familyId: string;
+  variantDescription?: string;
+  technicalDifferences?: string;
+  overrideWarnings?: string;
+  overrideManual?: string;
+  status?: 'active' | 'inactive';
+  linkedBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type ProductPackagingLayer = {
   name?: string;
   material?: string;
   recycleCode?: string;
+  packagingSupplier?: string;
   weightGrams?: string;
   recycledContentPercent?: string;
   recyclabilityClass?: 'Klasse A' | 'Klasse B' | 'Klasse C' | 'Klasse D' | 'Klasse E';
@@ -308,6 +391,7 @@ export type ProductPackagingRegistration = {
   layerName: string;
   material: string;
   recycleCode?: string;
+  packagingSupplier?: string;
   wasteStream?: string;
   recycledContentPercent?: string;
   recyclabilityClass?: string;
@@ -331,6 +415,7 @@ export type ExactSalesPackagingOverride = {
   layerName: string;
   material: string;
   recycleCode?: string;
+  packagingSupplier?: string;
   wasteStream?: string;
   recycledContentPercent?: string;
   recyclabilityClass?: string;
@@ -480,6 +565,11 @@ export type AppData = {
   scooterPackagingSpecs: ScooterPackagingSpec[];
   productPackagingRegistrations: ProductPackagingRegistration[];
   exactSalesPackagingOverrides: ExactSalesPackagingOverride[];
+  complianceFamilies: ComplianceProductFamily[];
+  complianceFamilyRisks: ComplianceFamilyRisk[];
+  complianceFamilyWarnings: ComplianceFamilyWarning[];
+  complianceFamilyDocuments: ComplianceFamilyDocument[];
+  complianceProductLinks: ComplianceProductLink[];
   dealers: Dealer[];
   products: Product[];
   suppliers: Supplier[];

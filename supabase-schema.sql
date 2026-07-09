@@ -58,6 +58,39 @@ add column if not exists "packagingWeightTotalGrams" text;
 alter table if exists products
 add column if not exists "packagingUnit" text;
 
+alter table if exists products
+add column if not exists "complianceCategory" text;
+
+alter table if exists products
+add column if not exists "eMarkRelevant" text;
+
+alter table if exists products
+add column if not exists "eMarkPresent" text;
+
+alter table if exists products
+add column if not exists "eMarkNumber" text;
+
+alter table if exists products
+add column if not exists "ceRelevant" text;
+
+alter table if exists products
+add column if not exists "cePresent" text;
+
+alter table if exists products
+add column if not exists "certificationNotes" text;
+
+alter table if exists products
+add column if not exists "certificateDocumentId" text;
+
+create index if not exists products_compliance_category_idx
+on products("complianceCategory");
+
+create index if not exists products_emark_relevant_idx
+on products("eMarkRelevant");
+
+create index if not exists products_ce_relevant_idx
+on products("ceRelevant");
+
 create table if not exists importers (
   id text primary key,
   name text not null,
@@ -90,7 +123,16 @@ create table if not exists suppliers (
 
 alter table suppliers add column if not exists mobile text;
 alter table suppliers add column if not exists "isImportCompany" boolean default false;
+alter table suppliers add column if not exists "isPackagingSupplier" boolean default false;
 alter table suppliers add column if not exists importer_id text references importers(id);
+alter table suppliers add column if not exists "packagingMaterials" text;
+alter table suppliers add column if not exists "ppwrSupplierRole" text;
+alter table suppliers add column if not exists "ppwrResponsibility" text;
+alter table suppliers add column if not exists "ppwrContractStatus" text;
+alter table suppliers add column if not exists "ppwrDeclarationStatus" text;
+alter table suppliers add column if not exists "ppwrEprNumber" text;
+alter table suppliers add column if not exists "ppwrLastDeclarationAt" text;
+alter table suppliers add column if not exists "ppwrNotes" text;
 
 create table if not exists supplier_contacts (
   id text primary key,
@@ -238,6 +280,7 @@ create table if not exists product_packaging_registrations (
   "layerName" text not null,
   material text not null,
   "recycleCode" text,
+  "packagingSupplier" text,
   "wasteStream" text,
   "recycledContentPercent" text,
   "recyclabilityClass" text,
@@ -261,6 +304,7 @@ create table if not exists exact_sales_packaging_overrides (
   "layerName" text not null,
   material text not null,
   "recycleCode" text,
+  "packagingSupplier" text,
   "wasteStream" text,
   "recycledContentPercent" text,
   "recyclabilityClass" text,
@@ -295,11 +339,102 @@ add column if not exists "packagingRole" text;
 alter table if exists product_packaging_registrations
 add column if not exists "productStickerMaterial" text;
 
+alter table if exists product_packaging_registrations
+add column if not exists "packagingSupplier" text;
+
+alter table if exists exact_sales_packaging_overrides
+add column if not exists "packagingSupplier" text;
+
 create index if not exists product_packaging_registrations_batch_idx
 on product_packaging_registrations("batchId");
 
 create index if not exists product_packaging_registrations_product_idx
 on product_packaging_registrations("productCode");
+
+create table if not exists compliance_product_families (
+  id text primary key,
+  code text not null unique,
+  name text not null,
+  category text,
+  description text,
+  "intendedUse" text,
+  "foreseeableMisuse" text,
+  "riskLevel" text default 'medium',
+  "gpsrRequired" boolean default true,
+  status text default 'concept',
+  notes text,
+  "createdAt" timestamptz default now(),
+  "updatedAt" timestamptz default now()
+);
+
+create table if not exists compliance_family_risks (
+  id text primary key,
+  "familyId" text not null references compliance_product_families(id) on delete cascade,
+  hazard text not null,
+  "riskDescription" text,
+  severity text,
+  probability text,
+  mitigation text,
+  "residualRisk" text,
+  "createdAt" timestamptz default now(),
+  "updatedAt" timestamptz default now()
+);
+
+create table if not exists compliance_family_warnings (
+  id text primary key,
+  "familyId" text not null references compliance_product_families(id) on delete cascade,
+  "warningType" text,
+  "warningTextNl" text not null,
+  "warningTextEn" text,
+  "requiredOnLabel" boolean default false,
+  "requiredInManual" boolean default true,
+  "createdAt" timestamptz default now(),
+  "updatedAt" timestamptz default now()
+);
+
+create table if not exists compliance_family_documents (
+  id text primary key,
+  "familyId" text not null references compliance_product_families(id) on delete cascade,
+  "documentType" text,
+  "documentName" text not null,
+  "filePath" text,
+  "fileUrl" text,
+  "validFrom" date,
+  "validUntil" date,
+  status text default 'active',
+  notes text,
+  "createdAt" timestamptz default now(),
+  "updatedAt" timestamptz default now()
+);
+
+create table if not exists compliance_product_links (
+  id text primary key,
+  "productId" text not null references products(id) on delete cascade,
+  "familyId" text not null references compliance_product_families(id) on delete cascade,
+  "variantDescription" text,
+  "technicalDifferences" text,
+  "overrideWarnings" text,
+  "overrideManual" text,
+  status text default 'active',
+  "linkedBy" text,
+  "createdAt" timestamptz default now(),
+  "updatedAt" timestamptz default now()
+);
+
+create unique index if not exists compliance_product_links_product_family_idx
+on compliance_product_links("productId", "familyId");
+
+create index if not exists compliance_family_risks_family_idx
+on compliance_family_risks("familyId");
+
+create index if not exists compliance_family_warnings_family_idx
+on compliance_family_warnings("familyId");
+
+create index if not exists compliance_family_documents_family_idx
+on compliance_family_documents("familyId");
+
+create index if not exists compliance_product_links_family_idx
+on compliance_product_links("familyId");
 
 create table if not exists scooters (
   id text primary key,
@@ -410,6 +545,11 @@ alter publication supabase_realtime add table containers;
 alter publication supabase_realtime add table container_cost_batches;
 alter publication supabase_realtime add table container_cost_lines;
 alter publication supabase_realtime add table product_packaging_registrations;
+alter publication supabase_realtime add table compliance_product_families;
+alter publication supabase_realtime add table compliance_family_risks;
+alter publication supabase_realtime add table compliance_family_warnings;
+alter publication supabase_realtime add table compliance_family_documents;
+alter publication supabase_realtime add table compliance_product_links;
 alter publication supabase_realtime add table exact_connections;
 alter publication supabase_realtime add table dealers;
 alter publication supabase_realtime add table suppliers;
@@ -429,6 +569,11 @@ alter table container_cost_lines enable row level security;
 alter table product_packaging_registrations enable row level security;
 alter table exact_sales_packaging_overrides enable row level security;
 alter table scooter_packaging_specs enable row level security;
+alter table compliance_product_families enable row level security;
+alter table compliance_family_risks enable row level security;
+alter table compliance_family_warnings enable row level security;
+alter table compliance_family_documents enable row level security;
+alter table compliance_product_links enable row level security;
 alter table exact_connections enable row level security;
 alter table batteries enable row level security;
 alter table battery_models enable row level security;
@@ -544,6 +689,21 @@ drop policy if exists "Allow authenticated read exact sales packaging overrides"
 drop policy if exists "Allow authenticated insert exact sales packaging overrides" on exact_sales_packaging_overrides;
 drop policy if exists "Allow authenticated update exact sales packaging overrides" on exact_sales_packaging_overrides;
 drop policy if exists "Allow authenticated delete exact sales packaging overrides" on exact_sales_packaging_overrides;
+drop policy if exists "Allow authenticated read compliance families" on compliance_product_families;
+drop policy if exists "Allow authenticated insert compliance families" on compliance_product_families;
+drop policy if exists "Allow authenticated update compliance families" on compliance_product_families;
+drop policy if exists "Allow authenticated read compliance risks" on compliance_family_risks;
+drop policy if exists "Allow authenticated insert compliance risks" on compliance_family_risks;
+drop policy if exists "Allow authenticated update compliance risks" on compliance_family_risks;
+drop policy if exists "Allow authenticated read compliance warnings" on compliance_family_warnings;
+drop policy if exists "Allow authenticated insert compliance warnings" on compliance_family_warnings;
+drop policy if exists "Allow authenticated update compliance warnings" on compliance_family_warnings;
+drop policy if exists "Allow authenticated read compliance documents" on compliance_family_documents;
+drop policy if exists "Allow authenticated insert compliance documents" on compliance_family_documents;
+drop policy if exists "Allow authenticated update compliance documents" on compliance_family_documents;
+drop policy if exists "Allow authenticated read compliance links" on compliance_product_links;
+drop policy if exists "Allow authenticated insert compliance links" on compliance_product_links;
+drop policy if exists "Allow authenticated update compliance links" on compliance_product_links;
 
 create policy "Allow authenticated read container cost batches"
 on container_cost_batches
@@ -638,6 +798,101 @@ on exact_sales_packaging_overrides
 for delete
 to authenticated
 using (true);
+
+create policy "Allow authenticated read compliance families"
+on compliance_product_families
+for select
+to authenticated
+using (true);
+
+create policy "Allow authenticated insert compliance families"
+on compliance_product_families
+for insert
+to authenticated
+with check (true);
+
+create policy "Allow authenticated update compliance families"
+on compliance_product_families
+for update
+to authenticated
+using (true)
+with check (true);
+
+create policy "Allow authenticated read compliance risks"
+on compliance_family_risks
+for select
+to authenticated
+using (true);
+
+create policy "Allow authenticated insert compliance risks"
+on compliance_family_risks
+for insert
+to authenticated
+with check (true);
+
+create policy "Allow authenticated update compliance risks"
+on compliance_family_risks
+for update
+to authenticated
+using (true)
+with check (true);
+
+create policy "Allow authenticated read compliance warnings"
+on compliance_family_warnings
+for select
+to authenticated
+using (true);
+
+create policy "Allow authenticated insert compliance warnings"
+on compliance_family_warnings
+for insert
+to authenticated
+with check (true);
+
+create policy "Allow authenticated update compliance warnings"
+on compliance_family_warnings
+for update
+to authenticated
+using (true)
+with check (true);
+
+create policy "Allow authenticated read compliance documents"
+on compliance_family_documents
+for select
+to authenticated
+using (true);
+
+create policy "Allow authenticated insert compliance documents"
+on compliance_family_documents
+for insert
+to authenticated
+with check (true);
+
+create policy "Allow authenticated update compliance documents"
+on compliance_family_documents
+for update
+to authenticated
+using (true)
+with check (true);
+
+create policy "Allow authenticated read compliance links"
+on compliance_product_links
+for select
+to authenticated
+using (true);
+
+create policy "Allow authenticated insert compliance links"
+on compliance_product_links
+for insert
+to authenticated
+with check (true);
+
+create policy "Allow authenticated update compliance links"
+on compliance_product_links
+for update
+to authenticated
+using (true)
+with check (true);
 
 drop policy if exists "Allow authenticated read scooter packaging specs" on scooter_packaging_specs;
 drop policy if exists "Allow authenticated insert scooter packaging specs" on scooter_packaging_specs;

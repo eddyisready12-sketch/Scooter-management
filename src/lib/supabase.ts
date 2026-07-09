@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactProductImportResponse, ExactSalesPackagingOverride, ExactSalesPreviewResponse, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
+import type { AppData, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRisk, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactProductImportResponse, ExactSalesPackagingOverride, ExactSalesPreviewResponse, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -103,6 +103,11 @@ const tableMap: Record<keyof AppData, string> = {
   scooterPackagingSpecs: 'scooter_packaging_specs',
   productPackagingRegistrations: 'product_packaging_registrations',
   exactSalesPackagingOverrides: 'exact_sales_packaging_overrides',
+  complianceFamilies: 'compliance_product_families',
+  complianceFamilyRisks: 'compliance_family_risks',
+  complianceFamilyWarnings: 'compliance_family_warnings',
+  complianceFamilyDocuments: 'compliance_family_documents',
+  complianceProductLinks: 'compliance_product_links',
   dealers: 'dealers',
   products: 'products',
   suppliers: 'suppliers',
@@ -138,6 +143,34 @@ async function loadAllRows(table: string) {
   return rows;
 }
 
+async function upsertWithSchemaFallback(
+  table: string,
+  records: Record<string, unknown>[],
+  fallbackMessage: string,
+  attempts = 8,
+) {
+  if (!supabase || records.length === 0) return;
+
+  let payload = records.map((record) => ({ ...record }));
+  const removedColumns = new Set<string>();
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const { error } = await supabase.from(table).upsert(payload);
+    if (!error) return;
+
+    const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
+    if (!missingColumn || removedColumns.has(missingColumn)) throw error;
+
+    removedColumns.add(missingColumn);
+    payload = payload.map((record) => {
+      const { [missingColumn]: _removed, ...rest } = record;
+      return rest;
+    });
+  }
+
+  throw new Error(fallbackMessage);
+}
+
 function normalizeSupplierContact(row: Record<string, unknown>): SupplierContact {
   return {
     id: String(row.id ?? ''),
@@ -159,6 +192,7 @@ function normalizeSupplier(row: Record<string, unknown>): Supplier {
     id: String(row.id ?? ''),
     name: String(row.name ?? ''),
     isImportCompany: Boolean(row.isImportCompany ?? row.is_import_company ?? false),
+    isPackagingSupplier: Boolean(row.isPackagingSupplier ?? row.is_packaging_supplier ?? false),
     importerId: row.importerId ? String(row.importerId) : row.importer_id ? String(row.importer_id) : undefined,
     contactName: row.contactName ? String(row.contactName) : row.contact_name ? String(row.contact_name) : undefined,
     email: row.email ? String(row.email) : undefined,
@@ -169,6 +203,14 @@ function normalizeSupplier(row: Record<string, unknown>): Supplier {
     postalCode: row.postalCode ? String(row.postalCode) : row.postal_code ? String(row.postal_code) : undefined,
     city: row.city ? String(row.city) : undefined,
     country: row.country ? String(row.country) : undefined,
+    packagingMaterials: row.packagingMaterials ? String(row.packagingMaterials) : row.packaging_materials ? String(row.packaging_materials) : undefined,
+    ppwrSupplierRole: row.ppwrSupplierRole ? String(row.ppwrSupplierRole) as Supplier['ppwrSupplierRole'] : row.ppwr_supplier_role ? String(row.ppwr_supplier_role) as Supplier['ppwrSupplierRole'] : undefined,
+    ppwrResponsibility: row.ppwrResponsibility ? String(row.ppwrResponsibility) as Supplier['ppwrResponsibility'] : row.ppwr_responsibility ? String(row.ppwr_responsibility) as Supplier['ppwrResponsibility'] : undefined,
+    ppwrContractStatus: row.ppwrContractStatus ? String(row.ppwrContractStatus) as Supplier['ppwrContractStatus'] : row.ppwr_contract_status ? String(row.ppwr_contract_status) as Supplier['ppwrContractStatus'] : undefined,
+    ppwrDeclarationStatus: row.ppwrDeclarationStatus ? String(row.ppwrDeclarationStatus) as Supplier['ppwrDeclarationStatus'] : row.ppwr_declaration_status ? String(row.ppwr_declaration_status) as Supplier['ppwrDeclarationStatus'] : undefined,
+    ppwrEprNumber: row.ppwrEprNumber ? String(row.ppwrEprNumber) : row.ppwr_epr_number ? String(row.ppwr_epr_number) : undefined,
+    ppwrLastDeclarationAt: row.ppwrLastDeclarationAt ? String(row.ppwrLastDeclarationAt) : row.ppwr_last_declaration_at ? String(row.ppwr_last_declaration_at) : undefined,
+    ppwrNotes: row.ppwrNotes ? String(row.ppwrNotes) : row.ppwr_notes ? String(row.ppwr_notes) : undefined,
     notes: row.notes ? String(row.notes) : undefined,
     active: row.active === false ? false : true,
   };
@@ -194,6 +236,7 @@ function supplierToDatabase(supplier: Supplier) {
     id: supplier.id,
     name: supplier.name,
     is_import_company: supplier.isImportCompany ?? false,
+    is_packaging_supplier: supplier.isPackagingSupplier ?? false,
     importer_id: supplier.importerId,
     contact_name: supplier.contactName,
     email: supplier.email,
@@ -204,6 +247,14 @@ function supplierToDatabase(supplier: Supplier) {
     postal_code: supplier.postalCode,
     city: supplier.city,
     country: supplier.country,
+    packaging_materials: supplier.packagingMaterials,
+    ppwr_supplier_role: supplier.ppwrSupplierRole,
+    ppwr_responsibility: supplier.ppwrResponsibility,
+    ppwr_contract_status: supplier.ppwrContractStatus,
+    ppwr_declaration_status: supplier.ppwrDeclarationStatus,
+    ppwr_epr_number: supplier.ppwrEprNumber,
+    ppwr_last_declaration_at: supplier.ppwrLastDeclarationAt,
+    ppwr_notes: supplier.ppwrNotes,
     notes: supplier.notes,
     active: supplier.active ?? true,
   };
@@ -454,11 +505,26 @@ export async function replaceProductPackagingRegistrations(batchId: string, regi
 export async function upsertExactSalesPackagingOverrides(overrides: ExactSalesPackagingOverride[]) {
   if (!supabase || overrides.length === 0) return;
 
-  const { error } = await supabase
-    .from('exact_sales_packaging_overrides')
-    .upsert(overrides);
+  let payload = overrides.map((override) => ({ ...override }) as Record<string, unknown>);
+  const removedColumns = new Set<string>();
 
-  if (error) throw error;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await supabase
+      .from('exact_sales_packaging_overrides')
+      .upsert(payload);
+
+    if (!error) return;
+
+    const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
+    if (!missingColumn || removedColumns.has(missingColumn)) throw error;
+
+    removedColumns.add(missingColumn);
+    payload = payload.map((row) => {
+      const nextRow = { ...row };
+      delete nextRow[missingColumn];
+      return nextRow;
+    });
+  }
 }
 
 export async function replaceContainerCostLines(batchId: string, lines: ContainerCostLine[], existingLineIds: string[] = []) {
@@ -511,6 +577,46 @@ export async function upsertDealers(dealers: Dealer[]) {
     .upsert(dealers);
 
   if (error) throw error;
+}
+
+export async function upsertComplianceFamilies(families: ComplianceProductFamily[]) {
+  await upsertWithSchemaFallback(
+    'compliance_product_families',
+    families.map((family) => ({ ...family }) as Record<string, unknown>),
+    'Compliance families opslaan mislukt: Supabase schema mist meerdere compliance kolommen.',
+  );
+}
+
+export async function upsertComplianceFamilyRisks(risks: ComplianceFamilyRisk[]) {
+  await upsertWithSchemaFallback(
+    'compliance_family_risks',
+    risks.map((risk) => ({ ...risk }) as Record<string, unknown>),
+    'Compliance risicoanalyse opslaan mislukt: Supabase schema mist meerdere risico kolommen.',
+  );
+}
+
+export async function upsertComplianceFamilyWarnings(warnings: ComplianceFamilyWarning[]) {
+  await upsertWithSchemaFallback(
+    'compliance_family_warnings',
+    warnings.map((warning) => ({ ...warning }) as Record<string, unknown>),
+    'Compliance waarschuwingen opslaan mislukt: Supabase schema mist meerdere waarschuwing kolommen.',
+  );
+}
+
+export async function upsertComplianceFamilyDocuments(documents: ComplianceFamilyDocument[]) {
+  await upsertWithSchemaFallback(
+    'compliance_family_documents',
+    documents.map((document) => ({ ...document }) as Record<string, unknown>),
+    'Compliance documenten opslaan mislukt: Supabase schema mist meerdere document kolommen.',
+  );
+}
+
+export async function upsertComplianceProductLinks(links: ComplianceProductLink[]) {
+  await upsertWithSchemaFallback(
+    'compliance_product_links',
+    links.map((link) => ({ ...link }) as Record<string, unknown>),
+    'Compliance productkoppelingen opslaan mislukt: Supabase schema mist meerdere link kolommen.',
+  );
 }
 
 export async function upsertProducts(products: Product[]) {

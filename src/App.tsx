@@ -37,12 +37,13 @@ import {
 import * as bwipjs from 'bwip-js';
 import Dymo from 'dymo-connect';
 import rsoLogoUrl from './assets/rso-logo.png';
+import { CompliancePage } from './components/CompliancePage';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseExactBatchTransactionsImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
+import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRisks, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRisk, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
-type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance';
+type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'compliance' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
 type ProductModalTab = 'basic' | 'gpsr' | 'packaging' | 'certification' | 'batches';
@@ -219,6 +220,7 @@ const views: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'suppliers', label: 'Leveranciers', icon: Factory },
   { id: 'maintenance', label: 'Onderhoud', icon: ClipboardList },
   { id: 'products', label: 'Producten', icon: BriefcaseBusiness },
+  { id: 'compliance', label: 'Compliance', icon: DatabaseZap },
   { id: 'scooters', label: 'Scooters', icon: Bike },
   { id: 'sales', label: 'Verkoop', icon: CircleDollarSign },
   { id: 'packaging', label: 'Verpakking', icon: PackagePlus },
@@ -639,6 +641,7 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
         name: readPackagingLayerField(record, ['name', 'layerName', 'title']) || packagingLayerNames[index],
         material: readPackagingLayerField(record, ['material', 'packagingMaterial', 'packaging_material']),
         recycleCode: readPackagingLayerField(record, ['recycleCode', 'recycle_code', 'code']),
+        packagingSupplier: readPackagingLayerField(record, ['packagingSupplier', 'packaging_supplier', 'supplier', 'supplierName', 'supplier_name']),
         weightGrams: readPackagingLayerField(record, ['weightGrams', 'weight', 'grams']),
         recycledContentPercent: readPackagingLayerField(record, ['recycledContentPercent', 'pcrPercent', 'pcr_percentage']),
         recyclabilityClass: readPackagingLayerField(record, ['recyclabilityClass', 'recyclability_class']) as ProductPackagingLayer['recyclabilityClass'],
@@ -649,6 +652,7 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
     .filter((layer) => (
       layer.material
       || layer.recycleCode
+      || layer.packagingSupplier
       || layer.weightGrams
       || layer.recycledContentPercent
       || layer.recyclabilityClass
@@ -686,6 +690,7 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
     name: asOptionalTrimmedString(layer.name) || packagingLayerNames[index],
     material: asOptionalTrimmedString(layer.material),
     recycleCode: asOptionalTrimmedString(layer.recycleCode),
+    packagingSupplier: asOptionalTrimmedString(layer.packagingSupplier),
     weightGrams: asOptionalTrimmedString(layer.weightGrams),
     recycledContentPercent: asOptionalTrimmedString(layer.recycledContentPercent),
     recyclabilityClass: layer.recyclabilityClass,
@@ -782,9 +787,7 @@ function getResolvedProductComplianceSource(
   supplierRecords: Supplier[] = [],
   importers: Importer[] = [],
 ) {
-  const selectedSupplier = product.supplier
-    ? supplierRecords.find((supplier) => supplierNameMatches(supplier, product.supplier))
-    : undefined;
+  const selectedSupplier = findSupplierByName(supplierRecords, product.supplier);
   const linkedImporter = importers.find((importer) => importer.id === selectedSupplier?.importerId);
 
   return {
@@ -846,6 +849,7 @@ function getBatchDerivedPackagingLayers(registrations: ProductPackagingRegistrat
       name: registration.layerName || packagingLayerNames[index] || `Laag ${index + 1}`,
       material: asOptionalTrimmedString(registration.material),
       recycleCode: asOptionalTrimmedString(registration.recycleCode),
+      packagingSupplier: asOptionalTrimmedString(registration.packagingSupplier),
       weightGrams: asOptionalTrimmedString(registration.weightGramsPerUnit),
       recycledContentPercent: asOptionalTrimmedString(registration.recycledContentPercent),
       recyclabilityClass: asOptionalTrimmedString(registration.recyclabilityClass) as ProductPackagingLayer['recyclabilityClass'],
@@ -855,6 +859,7 @@ function getBatchDerivedPackagingLayers(registrations: ProductPackagingRegistrat
     .filter((layer) => (
       layer.material
       || layer.recycleCode
+      || layer.packagingSupplier
       || layer.weightGrams
       || layer.recycledContentPercent
       || layer.recyclabilityClass
@@ -1032,17 +1037,26 @@ function getProductComplianceSummary(
   const activePackagingLayers = packagingLayers.filter((layer) => (
     hasText(layer.material)
     || hasText(layer.recycleCode)
+    || hasText(layer.packagingSupplier)
     || parseDecimal(layer.weightGrams) > 0
     || hasText(layer.recycledContentPercent)
     || hasText(layer.recyclabilityClass)
     || hasText(layer.packagingRole)
     || hasText(layer.productStickerMaterial)
   ));
+  const packagingSupplierStates = activePackagingLayers.map((layer) => {
+    const supplier = findSupplierByName(supplierRecords, layer.packagingSupplier);
+    return {
+      layer,
+      supplier,
+      hasProfile: hasPpwrSupplierProfile(supplier),
+    };
+  });
   const packagingIssues: ProductComplianceIssue[] = [];
   if (activePackagingLayers.length === 0) {
     packagingIssues.push({ id: 'packaging-layer', domain: 'packaging', level: 'error', label: 'Er is nog geen verpakkingslaag vastgelegd', tab: 'packaging', section: 'packagingLayers' });
   }
-  activePackagingLayers.forEach((layer, index) => {
+  packagingSupplierStates.forEach(({ layer, supplier, hasProfile }, index) => {
     const layerNumber = index + 1;
     const option = findPackagingMaterialOption(layer.material);
     const hasWasteStream = Boolean(option?.wasteStream);
@@ -1060,6 +1074,15 @@ function getProductComplianceSummary(
     }
     if (!hasText(layer.recycledContentPercent)) {
       packagingIssues.push({ id: `packaging-pcr-${index}`, domain: 'packaging', level: 'warning', label: `PCR% ontbreekt bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
+    }
+    if (!hasText(layer.packagingSupplier)) {
+      packagingIssues.push({ id: `packaging-supplier-${index}`, domain: 'packaging', level: 'warning', label: `Leverancier ontbreekt bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
+    } else if (!supplier) {
+      packagingIssues.push({ id: `packaging-supplier-card-${index}`, domain: 'packaging', level: 'warning', label: `Leverancierskaart ontbreekt bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
+    } else if (supplier.isPackagingSupplier !== true) {
+      packagingIssues.push({ id: `packaging-supplier-flag-${index}`, domain: 'packaging', level: 'warning', label: `Leverancier is nog niet gemarkeerd als verpakkingsleverancier bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
+    } else if (!hasProfile) {
+      packagingIssues.push({ id: `packaging-supplier-ppwr-${index}`, domain: 'packaging', level: 'warning', label: `PPWR-profiel van leverancier is onvolledig bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
     }
     if (!hasText(layer.productStickerMaterial)) {
       packagingIssues.push({ id: `packaging-label-${index}`, domain: 'packaging', level: 'warning', label: `Labelinformatie ontbreekt bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
@@ -1081,6 +1104,18 @@ function getProductComplianceSummary(
   }
   if (activePackagingLayers.some((layer) => parseDecimal(layer.weightGrams) <= 0)) {
     ppwrIssues.push({ id: 'ppwr-weight', domain: 'ppwr', level: 'error', label: 'Gewicht ontbreekt nog voor PPWR-export', tab: 'packaging', section: 'packagingLayers' });
+  }
+  if (activePackagingLayers.some((layer) => !hasText(layer.packagingSupplier))) {
+    ppwrIssues.push({ id: 'ppwr-supplier', domain: 'ppwr', level: 'warning', label: 'Verpakkingsleverancier ontbreekt nog voor PPWR-export', tab: 'packaging', section: 'packagingLayers' });
+  }
+  if (packagingSupplierStates.some(({ layer, supplier }) => hasText(layer.packagingSupplier) && !supplier)) {
+    ppwrIssues.push({ id: 'ppwr-supplier-card', domain: 'ppwr', level: 'warning', label: 'Minstens een verpakkingsleverancier is nog niet als leverancierskaart aangemaakt', tab: 'packaging', section: 'packagingLayers' });
+  }
+  if (packagingSupplierStates.some(({ supplier }) => supplier && supplier.isPackagingSupplier !== true)) {
+    ppwrIssues.push({ id: 'ppwr-supplier-flag', domain: 'ppwr', level: 'warning', label: 'Minstens een gekoppelde leverancier staat nog niet als verpakkingsleverancier ingesteld', tab: 'packaging', section: 'packagingLayers' });
+  }
+  if (packagingSupplierStates.some(({ layer, supplier, hasProfile }) => hasText(layer.packagingSupplier) && supplier?.isPackagingSupplier === true && !hasProfile)) {
+    ppwrIssues.push({ id: 'ppwr-supplier-profile', domain: 'ppwr', level: 'warning', label: 'PPWR-leveranciersprofiel is nog niet compleet voor alle verpakkingslagen', tab: 'packaging', section: 'packagingLayers' });
   }
   if (activePackagingLayers.some((layer) => {
     const option = findPackagingMaterialOption(layer.material);
@@ -1260,6 +1295,7 @@ function buildPackagingRegistrationsForBatch(
         layerName: layer.name || packagingLayerNames[index] || `Laag ${index + 1}`,
         material,
         recycleCode: layer.recycleCode,
+        packagingSupplier: layer.packagingSupplier,
         wasteStream,
         recycledContentPercent: layer.recycledContentPercent,
         recyclabilityClass: layer.recyclabilityClass,
@@ -1280,7 +1316,7 @@ function buildPackagingRegistrationsForExistingProduct(
 ): ProductPackagingRegistration[] {
   const unitsPerPackage = unitsPerPackageFromProduct(product);
   const layersWithValues = normalizePackagingLayers(product)
-    .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
+    .filter((layer) => layer.material || layer.recycleCode || layer.packagingSupplier || layer.weightGrams);
   const layers = layersWithValues.length > 0
     ? layersWithValues
     : [{ name: 'Onbekend', material: 'Onbekend', weightGrams: '0' }];
@@ -1325,6 +1361,7 @@ function buildPackagingRegistrationsForExistingProduct(
         layerName: layer.name || packagingLayerNames[index] || `Laag ${index + 1}`,
         material,
         recycleCode: layer.recycleCode,
+        packagingSupplier: layer.packagingSupplier,
         wasteStream,
         recycledContentPercent: layer.recycledContentPercent,
         recyclabilityClass: layer.recyclabilityClass,
@@ -1347,7 +1384,7 @@ function buildExactSalesPackagingOverridesForBatch(
   if (!normalizedBatch) return [];
 
   const layersWithValues = normalizePackagingLayers(product)
-    .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
+    .filter((layer) => layer.material || layer.recycleCode || layer.packagingSupplier || layer.weightGrams);
   const layers = layersWithValues.length > 0
     ? layersWithValues
     : [{ name: 'Onbekend', material: 'Onbekend', weightGrams: '0' }];
@@ -1363,6 +1400,7 @@ function buildExactSalesPackagingOverridesForBatch(
       layerName: layer.name || packagingLayerNames[index] || `Laag ${index + 1}`,
       material,
       recycleCode: layer.recycleCode,
+      packagingSupplier: layer.packagingSupplier,
       wasteStream: findPackagingMaterialOption(material)?.wasteStream,
       recycledContentPercent: layer.recycledContentPercent,
       recyclabilityClass: layer.recyclabilityClass,
@@ -2647,8 +2685,23 @@ function supplierNameMatches(supplier: Supplier, value?: string) {
   return candidate === supplierName || candidate === importedName;
 }
 
+function findSupplierByName(suppliers: Supplier[], value?: string) {
+  return suppliers.find((supplier) => supplierNameMatches(supplier, value));
+}
+
 function displaySupplierName(suppliers: Supplier[], value?: string) {
-  return suppliers.find((supplier) => supplierNameMatches(supplier, value))?.name ?? value ?? '';
+  return findSupplierByName(suppliers, value)?.name ?? value ?? '';
+}
+
+function hasPpwrSupplierProfile(supplier?: Supplier) {
+  if (!supplier || supplier.active === false || supplier.isPackagingSupplier !== true) return false;
+  return Boolean(
+    supplier.packagingMaterials?.trim()
+    && supplier.ppwrSupplierRole
+    && supplier.ppwrResponsibility
+    && supplier.ppwrContractStatus === 'Actief'
+    && (supplier.ppwrDeclarationStatus === 'Ontvangen' || supplier.ppwrDeclarationStatus === 'Goedgekeurd'),
+  );
 }
 
 function parseDecimal(value?: string | number | null) {
@@ -3408,6 +3461,7 @@ export function App() {
   const [csvMessageDetails, setCsvMessageDetails] = useState<string[]>([]);
   const [dealerImportMessage, setDealerImportMessage] = useState('');
   const [productMessage, setProductMessage] = useState('');
+  const [complianceMessage, setComplianceMessage] = useState('');
   const [exactProductImporting, setExactProductImporting] = useState(false);
   const [supplierMessage, setSupplierMessage] = useState('');
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
@@ -3808,6 +3862,143 @@ export function App() {
     setSelectedProduct(labelProduct);
   }
 
+  async function seedComplianceTemplates(seed: {
+    families: ComplianceProductFamily[];
+    risks: ComplianceFamilyRisk[];
+    warnings: ComplianceFamilyWarning[];
+    documents: ComplianceFamilyDocument[];
+  }) {
+    const mergedFamilies = new Map(data.complianceFamilies.map((family) => [family.id, family]));
+    seed.families.forEach((family) => mergedFamilies.set(family.id, { ...mergedFamilies.get(family.id), ...family }));
+    const mergedRisks = new Map(data.complianceFamilyRisks.map((risk) => [risk.id, risk]));
+    seed.risks.forEach((risk) => mergedRisks.set(risk.id, { ...mergedRisks.get(risk.id), ...risk }));
+    const mergedWarnings = new Map(data.complianceFamilyWarnings.map((warning) => [warning.id, warning]));
+    seed.warnings.forEach((warning) => mergedWarnings.set(warning.id, { ...mergedWarnings.get(warning.id), ...warning }));
+
+    setData((current) => ({
+      ...current,
+      complianceFamilies: Array.from(mergedFamilies.values()),
+      complianceFamilyRisks: Array.from(mergedRisks.values()),
+      complianceFamilyWarnings: Array.from(mergedWarnings.values()),
+    }));
+
+    await upsertComplianceFamilies(Array.from(mergedFamilies.values()));
+    await upsertComplianceFamilyRisks(Array.from(mergedRisks.values()));
+    await upsertComplianceFamilyWarnings(Array.from(mergedWarnings.values()));
+    setComplianceMessage(`${seed.families.length} compliance templates geladen.`);
+  }
+
+  async function saveComplianceFamilyBundle(payload: {
+    family: ComplianceProductFamily;
+    risks: ComplianceFamilyRisk[];
+    warnings: ComplianceFamilyWarning[];
+    documents: ComplianceFamilyDocument[];
+    links: ComplianceProductLink[];
+  }) {
+    const nextFamily = {
+      ...payload.family,
+      code: payload.family.code.trim(),
+      name: payload.family.name.trim(),
+      category: payload.family.category?.trim() || undefined,
+      description: payload.family.description?.trim() || undefined,
+      intendedUse: payload.family.intendedUse?.trim() || undefined,
+      foreseeableMisuse: payload.family.foreseeableMisuse?.trim() || undefined,
+      notes: payload.family.notes?.trim() || undefined,
+      gpsrRequired: payload.family.gpsrRequired ?? true,
+      riskLevel: payload.family.riskLevel ?? 'medium',
+      status: payload.family.status ?? 'concept',
+    };
+    const nextRisks = payload.risks
+      .map((risk) => ({
+        ...risk,
+        familyId: nextFamily.id,
+        hazard: risk.hazard.trim(),
+        riskDescription: risk.riskDescription?.trim() || undefined,
+        mitigation: risk.mitigation?.trim() || undefined,
+      }))
+      .filter((risk) => risk.hazard);
+    const nextWarnings = payload.warnings
+      .map((warning) => ({
+        ...warning,
+        familyId: nextFamily.id,
+        warningType: warning.warningType?.trim() || undefined,
+        warningTextNl: warning.warningTextNl.trim(),
+        warningTextEn: warning.warningTextEn?.trim() || undefined,
+        requiredOnLabel: warning.requiredOnLabel ?? false,
+        requiredInManual: warning.requiredInManual ?? true,
+      }))
+      .filter((warning) => warning.warningTextNl);
+    const nextDocuments = payload.documents
+      .map((document) => ({
+        ...document,
+        familyId: nextFamily.id,
+        documentType: document.documentType?.trim() || undefined,
+        documentName: document.documentName.trim(),
+        filePath: document.filePath?.trim() || undefined,
+        fileUrl: document.fileUrl?.trim() || undefined,
+        validFrom: document.validFrom?.trim() || undefined,
+        validUntil: document.validUntil?.trim() || undefined,
+        notes: document.notes?.trim() || undefined,
+        status: document.status ?? 'active',
+      }))
+      .filter((document) => document.documentName);
+    const nextLinks = payload.links.map((link) => ({
+      ...link,
+      familyId: nextFamily.id,
+      variantDescription: link.variantDescription?.trim() || undefined,
+      technicalDifferences: link.technicalDifferences?.trim() || undefined,
+      overrideWarnings: link.overrideWarnings?.trim() || undefined,
+      overrideManual: link.overrideManual?.trim() || undefined,
+      linkedBy: link.linkedBy?.trim() || undefined,
+      status: link.status ?? 'active',
+    }));
+
+    setData((current) => {
+      const familyMap = new Map(current.complianceFamilies.map((family) => [family.id, family]));
+      familyMap.set(nextFamily.id, nextFamily);
+
+      const replaceByFamily = <T extends { id: string; familyId: string }>(records: T[], nextRecords: T[]) => {
+        const otherRecords = records.filter((record) => record.familyId !== nextFamily.id);
+        return [...otherRecords, ...nextRecords];
+      };
+
+      return {
+        ...current,
+        complianceFamilies: Array.from(familyMap.values()),
+        complianceFamilyRisks: replaceByFamily(current.complianceFamilyRisks, nextRisks),
+        complianceFamilyWarnings: replaceByFamily(current.complianceFamilyWarnings, nextWarnings),
+        complianceFamilyDocuments: replaceByFamily(current.complianceFamilyDocuments, nextDocuments),
+        complianceProductLinks: replaceByFamily(current.complianceProductLinks, nextLinks),
+      };
+    });
+
+    await upsertComplianceFamilies([nextFamily]);
+    await upsertComplianceFamilyRisks(nextRisks);
+    await upsertComplianceFamilyWarnings(nextWarnings);
+    await upsertComplianceFamilyDocuments(nextDocuments);
+    await upsertComplianceProductLinks(nextLinks);
+    setComplianceMessage(`${nextFamily.name || nextFamily.code || 'Compliance familie'} opgeslagen.`);
+  }
+
+  async function autoLinkComplianceProducts(nextLinks: ComplianceProductLink[]) {
+    if (nextLinks.length === 0) {
+      setComplianceMessage('Geen nieuwe productkoppelingen gevonden.');
+      return;
+    }
+
+    setData((current) => {
+      const linkMap = new Map(current.complianceProductLinks.map((link) => [link.id, link]));
+      nextLinks.forEach((link) => linkMap.set(link.id, link));
+      return {
+        ...current,
+        complianceProductLinks: Array.from(linkMap.values()),
+      };
+    });
+
+    await upsertComplianceProductLinks(nextLinks);
+    setComplianceMessage(`${nextLinks.length} producten automatisch gekoppeld aan compliance families.`);
+  }
+
   async function saveContainerCostBatch(batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) {
     try {
       const uniqueLines = dedupeContainerCostLines(lines);
@@ -3997,26 +4188,83 @@ export function App() {
   async function upsertSupplierRecord(supplier: Supplier) {
     try {
       let productsToUpdate: Product[] = [];
+      let registrationsToUpdate: ProductPackagingRegistration[] = [];
+      let packagingOverridesToUpdate: ExactSalesPackagingOverride[] = [];
       setData((current) => {
         const byId = new Map(current.suppliers.map((item) => [item.id, item]));
         const existingSupplier = byId.get(supplier.id);
         byId.set(supplier.id, supplier);
         const updatedProducts = current.products.map((product) => {
-          if (!existingSupplier || !product.supplier || !supplierNameMatches(existingSupplier, product.supplier)) return product;
-          if (product.supplier === supplier.name) return product;
-          const updatedProduct = { ...product, supplier: supplier.name };
+          let changed = false;
+          let nextProduct = product;
+
+          if (existingSupplier && product.supplier && supplierNameMatches(existingSupplier, product.supplier) && product.supplier !== supplier.name) {
+            nextProduct = { ...nextProduct, supplier: supplier.name };
+            changed = true;
+          }
+
+          if (existingSupplier) {
+            const normalizedLayers = normalizePackagingLayers(nextProduct);
+            const updatedLayers = normalizedLayers.map((layer) => {
+              if (!layer.packagingSupplier || !supplierNameMatches(existingSupplier, layer.packagingSupplier)) return layer;
+              if (layer.packagingSupplier === supplier.name) return layer;
+              changed = true;
+              return { ...layer, packagingSupplier: supplier.name };
+            });
+            if (changed) {
+              nextProduct = { ...nextProduct, packagingLayers: updatedLayers };
+            }
+          }
+
+          if (!changed) return product;
+          const updatedProduct = nextProduct;
           productsToUpdate.push(updatedProduct);
           return updatedProduct;
         });
 
-        return { ...current, suppliers: Array.from(byId.values()), products: updatedProducts };
+        const updatedRegistrations = current.productPackagingRegistrations.map((registration) => {
+          if (!existingSupplier || !registration.packagingSupplier || !supplierNameMatches(existingSupplier, registration.packagingSupplier) || registration.packagingSupplier === supplier.name) {
+            return registration;
+          }
+          const updatedRegistration = { ...registration, packagingSupplier: supplier.name };
+          registrationsToUpdate.push(updatedRegistration);
+          return updatedRegistration;
+        });
+
+        const updatedPackagingOverrides = current.exactSalesPackagingOverrides.map((override) => {
+          if (!existingSupplier || !override.packagingSupplier || !supplierNameMatches(existingSupplier, override.packagingSupplier) || override.packagingSupplier === supplier.name) {
+            return override;
+          }
+          const updatedOverride = { ...override, packagingSupplier: supplier.name };
+          packagingOverridesToUpdate.push(updatedOverride);
+          return updatedOverride;
+        });
+
+        return {
+          ...current,
+          suppliers: Array.from(byId.values()),
+          products: updatedProducts,
+          productPackagingRegistrations: updatedRegistrations,
+          exactSalesPackagingOverrides: updatedPackagingOverrides,
+        };
       });
       await upsertSuppliers([supplier]);
       if (productsToUpdate.length > 0) {
         await upsertProducts(productsToUpdate);
       }
-      setSupplierMessage(productsToUpdate.length > 0
-        ? `${supplier.name} is opgeslagen. ${productsToUpdate.length} producten zijn mee gekoppeld aan deze naam.`
+      if (registrationsToUpdate.length > 0) {
+        await upsertProductPackagingRegistrations(registrationsToUpdate);
+      }
+      if (packagingOverridesToUpdate.length > 0) {
+        await upsertExactSalesPackagingOverrides(packagingOverridesToUpdate);
+      }
+      const syncParts = [
+        productsToUpdate.length > 0 ? `${productsToUpdate.length} producten` : '',
+        registrationsToUpdate.length > 0 ? `${registrationsToUpdate.length} PPWR-registraties` : '',
+        packagingOverridesToUpdate.length > 0 ? `${packagingOverridesToUpdate.length} Exact-koppelingen` : '',
+      ].filter(Boolean);
+      setSupplierMessage(syncParts.length > 0
+        ? `${supplier.name} is opgeslagen. ${syncParts.join(', ')} zijn mee bijgewerkt.`
         : `${supplier.name} is opgeslagen.`);
     } catch (error) {
       setSupplierMessage(`Leverancier opslaan mislukt: ${importErrorMessage(error)}`);
@@ -4689,6 +4937,23 @@ export function App() {
               onBulkUpdateProducts={bulkUpdateProducts}
               onSelectProduct={openProduct}
               message={productMessage}
+            />
+          )}
+          {view === 'compliance' && (
+            <CompliancePage
+              products={data.products}
+              families={data.complianceFamilies}
+              risks={data.complianceFamilyRisks}
+              warnings={data.complianceFamilyWarnings}
+              documents={data.complianceFamilyDocuments}
+              links={data.complianceProductLinks}
+              suppliers={data.suppliers}
+              message={complianceMessage}
+              onSeedTemplates={seedComplianceTemplates}
+              onSaveFamilyBundle={saveComplianceFamilyBundle}
+              onAutoLinkProducts={autoLinkComplianceProducts}
+              onSavePackagingSupplier={upsertSupplierRecord}
+              onSelectProduct={openProduct}
             />
           )}
           {view === 'suppliers' && <SuppliersPage suppliers={data.suppliers} importers={data.importers} supplierContacts={data.supplierContacts} products={data.products} onSaveSupplier={upsertSupplierRecord} onSaveImporter={upsertImporterRecord} onSaveSupplierContact={upsertSupplierContactRecord} onImportFromProducts={importSuppliersFromProducts} message={supplierMessage} />}
@@ -6181,6 +6446,7 @@ function PackagingOverviewPage({
       'Component',
       'Materiaal',
       'Recyclecode',
+      'Verpakkingsleverancier',
       'Afvalstroom',
       'Productsticker',
       'Gewicht per verpakking (g)',
@@ -6202,6 +6468,7 @@ function PackagingOverviewPage({
       registration.layerName,
       registration.material,
       registration.recycleCode ?? '',
+      registration.packagingSupplier ?? '',
       registration.wasteStream ?? '',
       registration.productStickerMaterial ?? '',
       registration.weightGramsPerUnit,
@@ -6444,6 +6711,7 @@ function PackagingOverviewPage({
                 <th>Product</th>
                 <th>Component</th>
                 <th>Materiaal</th>
+                <th>Leverancier</th>
                 <th>Sticker</th>
                 <th>Scope</th>
                 <th>Rapportage</th>
@@ -6454,7 +6722,7 @@ function PackagingOverviewPage({
             </thead>
             <tbody>
               {filteredRegistrations.length === 0 ? (
-                <tr><td colSpan={10}>Nog geen detailregels.</td></tr>
+                <tr><td colSpan={11}>Nog geen detailregels.</td></tr>
               ) : filteredRegistrations.map((registration) => {
                 const compliance = batchComplianceMap.get(registration.batchId);
                 return (
@@ -6463,6 +6731,7 @@ function PackagingOverviewPage({
                   <td><strong>{registration.productCode}</strong><br /><small>{registration.productDescription}</small></td>
                   <td>{registration.layerName}</td>
                   <td>{registration.material}<br /><small>{registration.recycleCode || '-'}</small></td>
+                  <td>{registration.packagingSupplier || '-'}</td>
                   <td>{registration.productStickerMaterial || '-'}</td>
                   <td>{compliance?.scope || 'Eigen import'}</td>
                   <td>{compliance?.reportingMode || 'Alles registreren'}</td>
@@ -9951,6 +10220,7 @@ function ProductDetailModal({
   const [saving, setSaving] = useState(false);
   const [saveMode, setSaveMode] = useState<'product' | 'apply'>('product');
   const [activeTab, setActiveTab] = useState<ProductModalTab>(initialTab);
+  const [checklistExpanded, setChecklistExpanded] = useState(false);
   const [dymoPrinting, setDymoPrinting] = useState(false);
   const [dymoMessage, setDymoMessage] = useState('');
   const [productImageFailed, setProductImageFailed] = useState(false);
@@ -9975,6 +10245,7 @@ function ProductDetailModal({
       } : {}),
     });
     setActiveTab(initialTab);
+    setChecklistExpanded(false);
   }, [product, supplierRecords, importers, initialTab]);
 
   useEffect(() => {
@@ -9992,6 +10263,11 @@ function ProductDetailModal({
     ...suppliers,
   ].filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
+  const packagingSupplierOptions = Array.from(new Set([
+    ...packagingLayers.map((layer) => layer.packagingSupplier).filter(Boolean) as string[],
+    ...supplierRecords.filter((supplier) => supplier.isPackagingSupplier === true).map((supplier) => supplier.name),
+    ...supplierOptions,
+  ])).sort((a, b) => a.localeCompare(b, 'nl', { sensitivity: 'base' }));
   const productImageUrl = draft.imageUrl?.trim() || '';
   const batchOverviewRows = useMemo(
     () => getProductBatchOverviewRows(draft, batches, costLines, registrations),
@@ -10024,6 +10300,10 @@ function ProductDetailModal({
     () => getProductComplianceSummary(draft, batches, costLines, registrations, supplierRecords, importers),
     [draft, batches, costLines, registrations, supplierRecords, importers],
   );
+  const visibleChecklistItems = checklistExpanded
+    ? complianceStatus.checklist
+    : complianceStatus.checklist.slice(0, 6);
+  const hiddenChecklistCount = Math.max(0, complianceStatus.checklist.length - visibleChecklistItems.length);
 
   function applySupplierManufacturer(supplierName: string) {
     const supplier = supplierRecords.find((item) => item.name === supplierName);
@@ -10068,13 +10348,14 @@ function ProductDetailModal({
             name: asOptionalTrimmedString(layer.name) || packagingLayerNames[index],
             material: asOptionalTrimmedString(layer.material),
             recycleCode: asOptionalTrimmedString(layer.recycleCode),
+            packagingSupplier: asOptionalTrimmedString(layer.packagingSupplier),
             weightGrams: normalizeNumericInput(layer.weightGrams),
             recycledContentPercent: normalizeNumericInput(layer.recycledContentPercent),
             recyclabilityClass: layer.recyclabilityClass,
             packagingRole: layer.packagingRole,
             productStickerMaterial: layer.productStickerMaterial,
           }))
-          .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams || layer.recycledContentPercent || layer.recyclabilityClass || layer.packagingRole || layer.productStickerMaterial);
+          .filter((layer) => layer.material || layer.recycleCode || layer.packagingSupplier || layer.weightGrams || layer.recycledContentPercent || layer.recyclabilityClass || layer.packagingRole || layer.productStickerMaterial);
 
       const primaryLayer = normalizedLayers[0];
       const secondaryLayer = normalizedLayers[1];
@@ -10310,18 +10591,34 @@ function ProductDetailModal({
                 </small>
               </div>
             </div>
-            <div className="product-compliance-checklist">
-              <div className="product-table-intro compact">
-                <strong>Checklist</strong>
-                <span>
-                  {complianceStatus.checklist.length > 0
-                    ? 'Klik op een punt om direct naar de juiste tab en sectie te gaan.'
-                    : 'Alle bekende compliance-velden voor deze eerste stap zijn ingevuld.'}
-                </span>
+            <div className="panel detail-card product-compliance-checklist">
+              <div className="product-compliance-checklist-header">
+                <div className="product-table-intro compact">
+                  <strong>Belangrijkste aandachtspunten</strong>
+                  <span>
+                    {complianceStatus.checklist.length > 0
+                      ? 'Klik op een punt om direct naar de juiste tab en sectie te gaan.'
+                      : 'Alle bekende compliance-velden voor deze eerste stap zijn ingevuld.'}
+                  </span>
+                </div>
+                {complianceStatus.checklist.length > 6 && (
+                  <button
+                    type="button"
+                    className="secondary-button product-compliance-toggle"
+                    onClick={() => setChecklistExpanded((current) => !current)}
+                  >
+                    {checklistExpanded ? 'Toon minder' : `Toon alles (${complianceStatus.checklist.length})`}
+                  </button>
+                )}
+              </div>
+              <div className="product-compliance-severity-row">
+                <span className="product-compliance-severity-badge critical">{complianceStatus.severityCounts.critical} kritiek</span>
+                <span className="product-compliance-severity-badge recommended">{complianceStatus.severityCounts.recommended} aanbevolen</span>
+                <span className="product-compliance-severity-badge informational">{complianceStatus.severityCounts.informational} informatief</span>
               </div>
               {complianceStatus.checklist.length > 0 ? (
                 <div className="product-compliance-checklist-grid">
-                  {complianceStatus.checklist.map((item) => (
+                  {visibleChecklistItems.map((item) => (
                     <button
                       key={item.id}
                       type="button"
@@ -10333,6 +10630,11 @@ function ProductDetailModal({
                       <span>{item.label}</span>
                     </button>
                   ))}
+                  {hiddenChecklistCount > 0 && (
+                    <div className="product-compliance-more">
+                      Nog {hiddenChecklistCount} punten verborgen.
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="inline-notice success-notice product-compliance-ok">
@@ -10687,6 +10989,7 @@ function ProductDetailModal({
                   <div className="packaging-layer-table-header">
                     <span>Component</span>
                     <span>Materiaalcode</span>
+                    <span>Leverancier</span>
                     <span>Rol</span>
                     <span>Afvalstroom</span>
                     <span>Gewicht (g)</span>
@@ -10713,6 +11016,13 @@ function ProductDetailModal({
                                 <option value="">Selecteer...</option>
                                 {layer.material && !selectedOption ? <option value={layer.material}>{layer.material}</option> : null}
                                 {packagingMaterialOptions.map((option) => <option key={`${index}-${option.recycleCode}`} value={option.value}>{option.label}</option>)}
+                              </select>
+                            </div>
+                            <div className="packaging-layer-field">
+                              <span className="packaging-layer-mobile-label">Leverancier</span>
+                              <select value={layer.packagingSupplier ?? ''} onChange={(event) => updatePackagingLayer(index, { packagingSupplier: event.target.value || undefined })}>
+                                <option value="">Selecteer...</option>
+                                {packagingSupplierOptions.map((supplier) => <option key={`${index}-packaging-supplier-${supplier}`} value={supplier}>{supplier}</option>)}
                               </select>
                             </div>
                             <div className="packaging-layer-field">
@@ -10767,7 +11077,7 @@ function ProductDetailModal({
                                 type="button"
                                 className="danger-icon-button"
                                 onClick={() => removePackagingLayer(index)}
-                                disabled={packagingLayers.length <= 2 && !layer.material && !layer.recycleCode && !layer.weightGrams && !layer.recycledContentPercent && !layer.recyclabilityClass && !layer.packagingRole && !layer.productStickerMaterial}
+                                disabled={packagingLayers.length <= 2 && !layer.material && !layer.recycleCode && !layer.packagingSupplier && !layer.weightGrams && !layer.recycledContentPercent && !layer.recyclabilityClass && !layer.packagingRole && !layer.productStickerMaterial}
                                 aria-label={`${layer.name ?? packagingLayerNames[index]} verwijderen`}
                               >
                                 <XCircle size={18} />
@@ -11060,6 +11370,7 @@ function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
   const notes = String(form.get('notes') ?? '').trim();
 
   return {
+    ...existing,
     id: existing?.id ?? stableId('supplier', name || email || website || mobile),
     name,
     isImportCompany,
