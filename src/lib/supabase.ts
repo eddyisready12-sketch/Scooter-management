@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRisk, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactProductImportResponse, ExactSalesPackagingOverride, ExactSalesPreviewResponse, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
+import type { AppData, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactProductImportResponse, ExactSalesPackagingOverride, ExactSalesPreviewResponse, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -107,6 +107,10 @@ const tableMap: Record<keyof AppData, string> = {
   complianceFamilyRisks: 'compliance_family_risks',
   complianceFamilyWarnings: 'compliance_family_warnings',
   complianceFamilyDocuments: 'compliance_family_documents',
+  complianceFamilyRequirements: 'compliance_family_requirements',
+  complianceFamilyTestPlans: 'compliance_family_test_plans',
+  complianceProductTests: 'compliance_product_tests',
+  complianceFamilyRevisions: 'compliance_family_revisions',
   complianceProductLinks: 'compliance_product_links',
   dealers: 'dealers',
   products: 'products',
@@ -608,6 +612,38 @@ export async function upsertComplianceFamilyDocuments(documents: ComplianceFamil
     'compliance_family_documents',
     documents.map((document) => ({ ...document }) as Record<string, unknown>),
     'Compliance documenten opslaan mislukt: Supabase schema mist meerdere document kolommen.',
+  );
+}
+
+export async function upsertComplianceFamilyRequirements(requirements: ComplianceFamilyRequirement[]) {
+  await upsertWithSchemaFallback(
+    'compliance_family_requirements',
+    requirements.map((requirement) => ({ ...requirement }) as Record<string, unknown>),
+    'Compliance keuringseisen opslaan mislukt: Supabase schema mist meerdere requirement kolommen.',
+  );
+}
+
+export async function upsertComplianceFamilyTestPlans(testPlans: ComplianceFamilyTestPlan[]) {
+  await upsertWithSchemaFallback(
+    'compliance_family_test_plans',
+    testPlans.map((plan) => ({ ...plan }) as Record<string, unknown>),
+    'Compliance testplannen opslaan mislukt: Supabase schema mist meerdere testplan kolommen.',
+  );
+}
+
+export async function upsertComplianceProductTests(tests: ComplianceProductTest[]) {
+  await upsertWithSchemaFallback(
+    'compliance_product_tests',
+    tests.map((test) => ({ ...test }) as Record<string, unknown>),
+    'Compliance testregistraties opslaan mislukt: Supabase schema mist meerdere test kolommen.',
+  );
+}
+
+export async function upsertComplianceFamilyRevisions(revisions: ComplianceFamilyRevision[]) {
+  await upsertWithSchemaFallback(
+    'compliance_family_revisions',
+    revisions.map((revision) => ({ ...revision }) as Record<string, unknown>),
+    'Compliance revisies opslaan mislukt: Supabase schema mist meerdere revisie kolommen.',
   );
 }
 

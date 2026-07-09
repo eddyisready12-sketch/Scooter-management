@@ -18,19 +18,25 @@ import {
   buildSuggestedComplianceLinks,
   createComplianceEntityId,
   getComplianceFamilyStats,
+  requirementFulfilled,
+  testPlanFulfilled,
 } from '../lib/compliance';
 import type {
   ComplianceFamilyDocument,
+  ComplianceFamilyRequirement,
+  ComplianceFamilyRevision,
   ComplianceFamilyRisk,
+  ComplianceFamilyTestPlan,
   ComplianceFamilyWarning,
   ComplianceProductFamily,
   ComplianceProductLink,
+  ComplianceProductTest,
   Product,
   Supplier,
 } from '../types';
 
 type ComplianceModuleView = 'dashboard' | 'families' | 'unlinked' | 'documents' | 'templates' | 'packagingSuppliers';
-type ComplianceDetailTab = 'basic' | 'risks' | 'warnings' | 'documents' | 'links' | 'dossier';
+type ComplianceDetailTab = 'basic' | 'risks' | 'warnings' | 'requirements' | 'tests' | 'documents' | 'links' | 'revisions' | 'dossier';
 
 type CompliancePageProps = {
   products: Product[];
@@ -38,6 +44,10 @@ type CompliancePageProps = {
   risks: ComplianceFamilyRisk[];
   warnings: ComplianceFamilyWarning[];
   documents: ComplianceFamilyDocument[];
+  requirements: ComplianceFamilyRequirement[];
+  testPlans: ComplianceFamilyTestPlan[];
+  tests: ComplianceProductTest[];
+  revisions: ComplianceFamilyRevision[];
   links: ComplianceProductLink[];
   suppliers: Supplier[];
   message?: string;
@@ -47,6 +57,10 @@ type CompliancePageProps = {
     risks: ComplianceFamilyRisk[];
     warnings: ComplianceFamilyWarning[];
     documents: ComplianceFamilyDocument[];
+    requirements: ComplianceFamilyRequirement[];
+    testPlans: ComplianceFamilyTestPlan[];
+    tests: ComplianceProductTest[];
+    revisions: ComplianceFamilyRevision[];
     links: ComplianceProductLink[];
   }) => Promise<void>;
   onAutoLinkProducts: (links: ComplianceProductLink[]) => Promise<void>;
@@ -67,8 +81,11 @@ const detailTabs: Array<{ id: ComplianceDetailTab; label: string }> = [
   { id: 'basic', label: 'Basisinformatie' },
   { id: 'risks', label: 'Risicoanalyse' },
   { id: 'warnings', label: 'Waarschuwingen' },
+  { id: 'requirements', label: 'Keuringseisen' },
+  { id: 'tests', label: 'Testplannen' },
   { id: 'documents', label: 'Documenten' },
   { id: 'links', label: 'Gekoppelde producten' },
+  { id: 'revisions', label: 'Revisies' },
   { id: 'dossier', label: 'Dossier genereren' },
 ];
 
@@ -167,6 +184,10 @@ export function CompliancePage({
   risks,
   warnings,
   documents,
+  requirements,
+  testPlans,
+  tests,
+  revisions,
   links,
   suppliers,
   message,
@@ -193,6 +214,10 @@ export function CompliancePage({
   const [draftRisks, setDraftRisks] = useState<ComplianceFamilyRisk[]>([]);
   const [draftWarnings, setDraftWarnings] = useState<ComplianceFamilyWarning[]>([]);
   const [draftDocuments, setDraftDocuments] = useState<ComplianceFamilyDocument[]>([]);
+  const [draftRequirements, setDraftRequirements] = useState<ComplianceFamilyRequirement[]>([]);
+  const [draftTestPlans, setDraftTestPlans] = useState<ComplianceFamilyTestPlan[]>([]);
+  const [draftTests, setDraftTests] = useState<ComplianceProductTest[]>([]);
+  const [draftRevisions, setDraftRevisions] = useState<ComplianceFamilyRevision[]>([]);
   const [draftLinks, setDraftLinks] = useState<ComplianceProductLink[]>([]);
 
   useEffect(() => {
@@ -208,14 +233,18 @@ export function CompliancePage({
     setDraftRisks(risks.filter((item) => item.familyId === selectedFamilyId).map((item) => ({ ...item })));
     setDraftWarnings(warnings.filter((item) => item.familyId === selectedFamilyId).map((item) => ({ ...item })));
     setDraftDocuments(documents.filter((item) => item.familyId === selectedFamilyId).map((item) => ({ ...item })));
+    setDraftRequirements(requirements.filter((item) => item.familyId === selectedFamilyId).map((item) => ({ ...item })));
+    setDraftTestPlans(testPlans.filter((item) => item.familyId === selectedFamilyId).map((item) => ({ ...item })));
+    setDraftTests(tests.filter((item) => item.familyId === selectedFamilyId).map((item) => ({ ...item })));
+    setDraftRevisions(revisions.filter((item) => item.familyId === selectedFamilyId).map((item) => ({ ...item })).sort((left, right) => (right.createdAt ?? '').localeCompare(left.createdAt ?? '')));
     setDraftLinks(links.filter((item) => item.familyId === selectedFamilyId).map((item) => ({ ...item })));
     setLinkPage(1);
-  }, [documents, families, links, risks, selectedFamilyId, warnings]);
+  }, [documents, families, links, requirements, revisions, risks, selectedFamilyId, testPlans, tests, warnings]);
 
   const familyRows = useMemo(() => families.map((family) => ({
     family,
-    stats: getComplianceFamilyStats(family, risks, warnings, documents, links),
-  })), [documents, families, links, risks, warnings]);
+    stats: getComplianceFamilyStats(family, risks, warnings, documents, requirements, testPlans, tests, links),
+  })), [documents, families, links, requirements, risks, testPlans, tests, warnings]);
 
   const filteredFamilies = useMemo(() => familyRows.filter(({ family }) => {
     const haystack = `${family.code} ${family.name} ${family.category ?? ''}`.toLowerCase();
@@ -241,11 +270,13 @@ export function CompliancePage({
     summary.families += 1;
     summary.linkedProducts += row.stats.activeLinks;
     summary.complete += row.stats.calculatedStatus === 'complete' ? 1 : 0;
+    summary.incomplete += row.stats.calculatedStatus !== 'complete' && row.stats.calculatedStatus !== 'not_applicable' ? 1 : 0;
     return summary;
   }, {
     families: 0,
     linkedProducts: 0,
     complete: 0,
+    incomplete: 0,
   }), [familyRows]);
 
   const templateSummary = buildComplianceTemplateSeed();
@@ -473,10 +504,18 @@ export function CompliancePage({
       gpsrRequired: true,
       status: 'concept',
       notes: '',
+      noWarningsNeeded: false,
+      manualText: '',
+      manufacturerName: '',
+      manufacturerContact: '',
     });
     setDraftRisks([]);
     setDraftWarnings([]);
     setDraftDocuments([]);
+    setDraftRequirements([]);
+    setDraftTestPlans([]);
+    setDraftTests([]);
+    setDraftRevisions([]);
     setDraftLinks([]);
   }
 
@@ -521,6 +560,55 @@ export function CompliancePage({
     }]);
   }
 
+  function addRequirement() {
+    if (!draftFamily) return;
+    setDraftRequirements((current) => [...current, {
+      id: createComplianceEntityId('compliance-requirement'),
+      familyId: draftFamily.id,
+      name: '',
+      regulation: '',
+      mandatory: true,
+      notes: '',
+    }]);
+  }
+
+  function addTestPlan() {
+    if (!draftFamily) return;
+    setDraftTestPlans((current) => [...current, {
+      id: createComplianceEntityId('compliance-test-plan'),
+      familyId: draftFamily.id,
+      name: '',
+      method: '',
+      frequency: '',
+      mandatory: true,
+    }]);
+  }
+
+  function addTest(planId?: string) {
+    if (!draftFamily) return;
+    setDraftTests((current) => [{
+      id: createComplianceEntityId('compliance-test'),
+      familyId: draftFamily.id,
+      planId,
+      testName: '',
+      testDate: new Date().toISOString().slice(0, 10),
+      result: 'pass',
+      findings: '',
+      correctiveAction: '',
+      testedBy: '',
+    }, ...current]);
+  }
+
+  function addRevision(note = 'Familiegegevens bijgewerkt') {
+    if (!draftFamily) return;
+    setDraftRevisions((current) => [{
+      id: createComplianceEntityId('compliance-revision'),
+      familyId: draftFamily.id,
+      changeNote: note,
+      createdAt: new Date().toISOString(),
+    }, ...current]);
+  }
+
   function addProductLink(product: Product) {
     if (!draftFamily || !product.id) return;
     setDraftLinks((current) => {
@@ -552,6 +640,15 @@ export function CompliancePage({
         risks: draftRisks,
         warnings: draftWarnings,
         documents: draftDocuments,
+        requirements: draftRequirements,
+        testPlans: draftTestPlans,
+        tests: draftTests,
+        revisions: draftRevisions.length > 0 ? draftRevisions : [{
+          id: createComplianceEntityId('compliance-revision'),
+          familyId: draftFamily.id,
+          changeNote: 'Familie opgeslagen',
+          createdAt: new Date().toISOString(),
+        }],
         links: draftLinks,
       });
     } finally {
@@ -642,98 +739,95 @@ export function CompliancePage({
   function renderDashboard() {
     return (
       <div className="compliance-view-stack">
-        <div className="stats-row compliance-stat-grid compliance-stat-grid-large">
-          <article className="stat-card compliance-dashboard-card blue">
+        <div className="compliance-stat-grid compliance-stat-grid-large compliance-dashboard-topcards">
+          <article className="stat-card compliance-dashboard-card blue compliance-dashboard-hero-card">
             <span>Productfamilies</span>
             <strong>{totals.families}</strong>
           </article>
-          <article className="stat-card compliance-dashboard-card green">
-            <span>Gekoppelde producten</span>
-            <strong>{totals.linkedProducts}</strong>
-          </article>
-          <article className="stat-card compliance-dashboard-card emerald">
-            <span>Complete dossiers</span>
+          <article className="stat-card compliance-dashboard-card green compliance-dashboard-hero-card">
+            <span>Compleet GPSR-dossier</span>
             <strong>{totals.complete}</strong>
           </article>
-          <article className="stat-card compliance-dashboard-card red">
+          <article className="stat-card compliance-dashboard-card amber compliance-dashboard-hero-card">
+            <span>Incompleet dossiers</span>
+            <strong>{totals.incomplete}</strong>
+          </article>
+          <article className="stat-card compliance-dashboard-card red compliance-dashboard-hero-card">
             <span>Producten zonder familie</span>
             <strong>{productsWithoutFamily.length}</strong>
           </article>
         </div>
 
         <div className="compliance-dashboard-grid">
-          <section className="panel">
+          <section className="panel compliance-dashboard-panel">
             <div className="panel-title">Incomplete dossiers</div>
-            <div className="compliance-panel-body">
+            <div className="compliance-panel-body compliance-dashboard-table">
               {incompleteFamilies.length === 0 ? <p className="empty">Geen incomplete dossiers.</p> : incompleteFamilies.map(({ family, stats }) => (
-                <button type="button" key={family.id} className="compliance-list-row" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); }}>
-                  <div>
-                    <strong>{family.name}</strong>
-                    <span>{stats.progress}% compleet</span>
+                <button type="button" key={family.id} className="compliance-dashboard-row" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); }}>
+                  <strong>{family.name}</strong>
+                  <div className="compliance-dashboard-row-progress">
+                    <div className="compliance-mini-progress">
+                      <div className="compliance-mini-progress-fill" style={{ width: `${stats.progress}%` }} />
+                    </div>
+                    <span>{stats.progress}%</span>
                   </div>
-                  <span className="compliance-inline-status warning">{stats.activeLinks === 0 ? 'Gekoppelde producten missen' : 'Aanvullen'}</span>
+                  <span className="compliance-inline-status danger">{stats.activeLinks === 0 ? 'Gekoppelde producten' : 'Aanvullen'}</span>
                 </button>
               ))}
             </div>
           </section>
 
-          <section className="panel">
+          <section className="panel compliance-dashboard-panel">
             <div className="panel-title">Hoog risico families</div>
-            <div className="compliance-panel-body">
+            <div className="compliance-panel-body compliance-dashboard-table">
               {highRiskFamilies.length === 0 ? <p className="empty">Geen hoog risico families.</p> : highRiskFamilies.map(({ family, stats }) => (
-                <button type="button" key={family.id} className="compliance-list-row" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); }}>
-                  <div>
+                <button type="button" key={family.id} className="compliance-dashboard-row" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); }}>
+                  <div className="compliance-dashboard-risk-main">
                     <strong>{family.name}</strong>
-                    <span>{stats.activeLinks} gekoppelde producten</span>
+                    <div className="compliance-dashboard-risk-tags">
+                      <span className="compliance-inline-status warning">{statusLabel(stats.calculatedStatus)}</span>
+                    </div>
                   </div>
                   <span className={`compliance-badge danger`}>{riskLabel(family.riskLevel)}</span>
                 </button>
               ))}
             </div>
           </section>
+        </div>
 
+        {(expiringDocuments.length > 0 || expiredDocuments.length > 0) ? (
           <section className="panel">
-            <div className="panel-title">Documenten bijna verlopen</div>
-            <div className="compliance-panel-body">
-              {expiringDocuments.length === 0 ? <p className="empty">Geen documenten verlopen binnen 60 dagen.</p> : expiringDocuments.map((document) => {
+            <div className="panel-title">Documenten aandacht</div>
+            <div className="compliance-panel-body compliance-dashboard-table">
+              {expiredDocuments.map((document) => {
                 const family = families.find((item) => item.id === document.familyId);
                 return (
-                  <button type="button" key={document.id} className="compliance-list-row" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
-                    <div>
-                      <strong>{document.documentName}</strong>
-                      <span>{family?.name || 'Onbekende familie'}</span>
-                    </div>
+                  <button type="button" key={document.id} className="compliance-dashboard-row" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
+                    <strong>{document.documentName}</strong>
+                    <span>{family?.name || 'Onbekende familie'}</span>
+                    <span className="compliance-inline-status danger">{formatDate(document.validUntil)}</span>
+                  </button>
+                );
+              })}
+              {expiringDocuments.map((document) => {
+                const family = families.find((item) => item.id === document.familyId);
+                return (
+                  <button type="button" key={document.id} className="compliance-dashboard-row" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
+                    <strong>{document.documentName}</strong>
+                    <span>{family?.name || 'Onbekende familie'}</span>
                     <span className="compliance-inline-status warning">{formatDate(document.validUntil)}</span>
                   </button>
                 );
               })}
             </div>
           </section>
-
-          <section className="panel">
-            <div className="panel-title">Verlopen documenten</div>
-            <div className="compliance-panel-body">
-              {expiredDocuments.length === 0 ? <p className="empty">Geen verlopen documenten.</p> : expiredDocuments.map((document) => {
-                const family = families.find((item) => item.id === document.familyId);
-                return (
-                  <button type="button" key={document.id} className="compliance-list-row" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
-                    <div>
-                      <strong>{document.documentName}</strong>
-                      <span>{family?.name || 'Onbekende familie'}</span>
-                    </div>
-                    <span className="compliance-inline-status danger">{formatDate(document.validUntil)}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        </div>
+        ) : null}
       </div>
     );
   }
 
   function renderFamiliesView() {
-    const selectedStats = draftFamily ? getComplianceFamilyStats(draftFamily, draftRisks, draftWarnings, draftDocuments, draftLinks) : null;
+    const selectedStats = draftFamily ? getComplianceFamilyStats(draftFamily, draftRisks, draftWarnings, draftDocuments, draftRequirements, draftTestPlans, draftTests, draftLinks) : null;
 
     return (
       <div className="compliance-layout">
@@ -794,6 +888,11 @@ export function CompliancePage({
                 <div className="compliance-progress-track">
                   <div className="compliance-progress-fill" style={{ width: `${selectedStats?.progress ?? 0}%` }} />
                 </div>
+                {selectedStats?.missingItems.length ? (
+                  <div className="compliance-progress-missing">
+                    Ontbreekt: {selectedStats.missingItems.join(', ')}
+                  </div>
+                ) : null}
               </div>
 
               <div className="compliance-tabs">
@@ -842,8 +941,6 @@ export function CompliancePage({
                             <select value={draftFamily.status || 'concept'} onChange={(event) => setDraftFamily((current) => current ? { ...current, status: event.target.value as ComplianceProductFamily['status'] } : current)}>
                               <option value="concept">Concept</option>
                               <option value="in_review">In review</option>
-                              <option value="partial">Gedeeltelijk</option>
-                              <option value="complete">Compleet</option>
                               <option value="not_applicable">Niet van toepassing</option>
                               <option value="archived">Archief</option>
                             </select>
@@ -851,6 +948,10 @@ export function CompliancePage({
                           <label className="checkbox-label">
                             <input type="checkbox" checked={draftFamily.gpsrRequired ?? true} onChange={(event) => setDraftFamily((current) => current ? { ...current, gpsrRequired: event.target.checked } : current)} />
                             <span>GPSR verplicht</span>
+                          </label>
+                          <label className="checkbox-label">
+                            <input type="checkbox" checked={draftFamily.noWarningsNeeded ?? false} onChange={(event) => setDraftFamily((current) => current ? { ...current, noWarningsNeeded: event.target.checked } : current)} />
+                            <span>Geen waarschuwingen nodig</span>
                           </label>
                         </div>
                         <div className="compliance-text-grid">
@@ -869,6 +970,18 @@ export function CompliancePage({
                           <label>
                             <span>Notities</span>
                             <textarea value={draftFamily.notes || ''} onChange={(event) => setDraftFamily((current) => current ? { ...current, notes: event.target.value } : current)} rows={4} />
+                          </label>
+                          <label>
+                            <span>Handleidingstekst</span>
+                            <textarea value={draftFamily.manualText || ''} onChange={(event) => setDraftFamily((current) => current ? { ...current, manualText: event.target.value } : current)} rows={4} />
+                          </label>
+                          <label>
+                            <span>Fabrikant / verantwoordelijke</span>
+                            <input value={draftFamily.manufacturerName || ''} onChange={(event) => setDraftFamily((current) => current ? { ...current, manufacturerName: event.target.value } : current)} />
+                          </label>
+                          <label>
+                            <span>Contact fabrikant / EU verantwoordelijke</span>
+                            <textarea value={draftFamily.manufacturerContact || ''} onChange={(event) => setDraftFamily((current) => current ? { ...current, manufacturerContact: event.target.value } : current)} rows={3} />
                           </label>
                         </div>
                       </div>
@@ -923,6 +1036,85 @@ export function CompliancePage({
                   </section>
                 )}
 
+                {detailTab === 'requirements' && (
+                  <section className="panel">
+                    <div className="panel-title">
+                      <span>Keuringseisen ({draftRequirements.length})</span>
+                      <button type="button" className="secondary-button" onClick={addRequirement}><Plus size={14} /> Eis</button>
+                    </div>
+                    <div className="compliance-panel-body compliance-grid-table">
+                      {draftRequirements.map((requirement, index) => {
+                        const fulfilled = requirementFulfilled(requirement, draftDocuments);
+                        return (
+                          <div className="compliance-warning-row" key={requirement.id}>
+                            <input value={requirement.name} onChange={(event) => setDraftRequirements((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} placeholder="Naam eis" />
+                            <input value={requirement.regulation || ''} onChange={(event) => setDraftRequirements((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, regulation: event.target.value } : item))} placeholder="Regeling / norm" />
+                            <label className="checkbox-label small"><input type="checkbox" checked={requirement.mandatory ?? true} onChange={(event) => setDraftRequirements((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, mandatory: event.target.checked } : item))} /><span>Verplicht</span></label>
+                            <span className={`compliance-inline-status ${fulfilled ? 'success' : 'warning'}`}>{fulfilled ? 'Document aanwezig' : 'Open'}</span>
+                            <button type="button" className="icon-button danger" onClick={() => setDraftRequirements((current) => current.filter((item) => item.id !== requirement.id))}><Trash2 size={14} /></button>
+                            <textarea value={requirement.notes || ''} onChange={(event) => setDraftRequirements((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, notes: event.target.value } : item))} placeholder="Notities / toelichting" rows={2} />
+                          </div>
+                        );
+                      })}
+                      {draftRequirements.length === 0 ? <p className="empty">Nog geen keuringseisen toegevoegd.</p> : null}
+                    </div>
+                  </section>
+                )}
+
+                {detailTab === 'tests' && (
+                  <section className="panel">
+                    <div className="panel-title">
+                      <span>Testplannen en testlogboek</span>
+                      <div className="page-title-actions">
+                        <button type="button" className="secondary-button" onClick={addTestPlan}><Plus size={14} /> Testplan</button>
+                        <button type="button" className="secondary-button" onClick={() => addTest()}><Plus size={14} /> Test</button>
+                      </div>
+                    </div>
+                    <div className="compliance-panel-body compliance-view-stack">
+                      <div className="compliance-grid-table">
+                        {draftTestPlans.map((plan, index) => {
+                          const fulfilled = testPlanFulfilled(plan, draftTests);
+                          return (
+                            <div className="compliance-document-row" key={plan.id}>
+                              <input value={plan.name} onChange={(event) => setDraftTestPlans((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} placeholder="Naam testplan" />
+                              <input value={plan.frequency || ''} onChange={(event) => setDraftTestPlans((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, frequency: event.target.value } : item))} placeholder="Frequentie" />
+                              <label className="checkbox-label small"><input type="checkbox" checked={plan.mandatory ?? true} onChange={(event) => setDraftTestPlans((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, mandatory: event.target.checked } : item))} /><span>Verplicht</span></label>
+                              <span className={`compliance-inline-status ${fulfilled ? 'success' : 'warning'}`}>{fulfilled ? 'Geslaagd' : 'Open'}</span>
+                              <button type="button" className="icon-button danger" onClick={() => setDraftTestPlans((current) => current.filter((item) => item.id !== plan.id))}><Trash2 size={14} /></button>
+                              <textarea value={plan.method || ''} onChange={(event) => setDraftTestPlans((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, method: event.target.value } : item))} placeholder="Methode / acceptatiecriteria" rows={2} />
+                              <button type="button" className="secondary-button" onClick={() => addTest(plan.id)}>+ Test op dit plan</button>
+                            </div>
+                          );
+                        })}
+                        {draftTestPlans.length === 0 ? <p className="empty">Nog geen testplannen toegevoegd.</p> : null}
+                      </div>
+
+                      <div className="compliance-grid-table">
+                        {draftTests.map((test, index) => (
+                          <div className="compliance-document-row" key={test.id}>
+                            <input type="date" value={test.testDate} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, testDate: event.target.value } : item))} />
+                            <select value={test.planId || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, planId: event.target.value || undefined } : item))}>
+                              <option value="">Losse test</option>
+                              {draftTestPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name || 'Onbenoemd plan'}</option>)}
+                            </select>
+                            <select value={test.result || 'pass'} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, result: event.target.value as ComplianceProductTest['result'] } : item))}>
+                              <option value="pass">Pass</option>
+                              <option value="fail">Fail</option>
+                              <option value="conditional">Conditional</option>
+                            </select>
+                            <input value={test.testedBy || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, testedBy: event.target.value } : item))} placeholder="Getest door" />
+                            <input value={test.batchRef || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, batchRef: event.target.value } : item))} placeholder="Batch / orderref" />
+                            <button type="button" className="icon-button danger" onClick={() => setDraftTests((current) => current.filter((item) => item.id !== test.id))}><Trash2 size={14} /></button>
+                            <textarea value={test.findings || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, findings: event.target.value } : item))} placeholder="Bevindingen" rows={2} />
+                            <textarea value={test.correctiveAction || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, correctiveAction: event.target.value } : item))} placeholder="Corrigerende actie" rows={2} />
+                          </div>
+                        ))}
+                        {draftTests.length === 0 ? <p className="empty">Nog geen testen geregistreerd.</p> : null}
+                      </div>
+                    </div>
+                  </section>
+                )}
+
                 {detailTab === 'documents' && (
                   <section className="panel">
                     <div className="panel-title">
@@ -932,6 +1124,10 @@ export function CompliancePage({
                     <div className="compliance-panel-body compliance-grid-table">
                       {draftDocuments.map((document, index) => (
                         <div className="compliance-document-row" key={document.id}>
+                          <select value={document.requirementId || ''} onChange={(event) => setDraftDocuments((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, requirementId: event.target.value || undefined } : item))}>
+                            <option value="">Geen keuringseis gekoppeld</option>
+                            {draftRequirements.map((requirement) => <option key={requirement.id} value={requirement.id}>{requirement.name || requirement.regulation || 'Nieuwe eis'}</option>)}
+                          </select>
                           <input value={document.documentType || ''} onChange={(event) => setDraftDocuments((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, documentType: event.target.value } : item))} placeholder="Type document" />
                           <input value={document.documentName} onChange={(event) => setDraftDocuments((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, documentName: event.target.value } : item))} placeholder="Bestandsnaam" />
                           <input value={document.fileUrl || ''} onChange={(event) => setDraftDocuments((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, fileUrl: event.target.value } : item))} placeholder="URL of pad" />
@@ -1019,6 +1215,26 @@ export function CompliancePage({
                       <div>
                         <button type="button" className="primary-button" onClick={openDossierPreview}>Afdrukken / PDF</button>
                       </div>
+                    </div>
+                  </section>
+                )}
+
+                {detailTab === 'revisions' && (
+                  <section className="panel">
+                    <div className="panel-title">
+                      <span>Revisiegeschiedenis ({draftRevisions.length})</span>
+                      <button type="button" className="secondary-button" onClick={() => addRevision()}><Plus size={14} /> Revisie</button>
+                    </div>
+                    <div className="compliance-panel-body compliance-grid-table">
+                      {draftRevisions.map((revision, index) => (
+                        <div className="compliance-document-row" key={revision.id}>
+                          <input type="datetime-local" value={(revision.createdAt || '').slice(0, 16)} onChange={(event) => setDraftRevisions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, createdAt: event.target.value } : item))} />
+                          <input value={revision.changedBy || ''} onChange={(event) => setDraftRevisions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, changedBy: event.target.value } : item))} placeholder="Gewijzigd door" />
+                          <button type="button" className="icon-button danger" onClick={() => setDraftRevisions((current) => current.filter((item) => item.id !== revision.id))}><Trash2 size={14} /></button>
+                          <textarea value={revision.changeNote} onChange={(event) => setDraftRevisions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, changeNote: event.target.value } : item))} placeholder="Wijzigingsnotitie" rows={2} />
+                        </div>
+                      ))}
+                      {draftRevisions.length === 0 ? <p className="empty">Nog geen revisies vastgelegd.</p> : null}
                     </div>
                   </section>
                 )}
@@ -1395,39 +1611,56 @@ export function CompliancePage({
   }
 
   return (
-    <div className="compliance-module-shell">
-      <div className="page-title-row">
-        <div>
-          <h1>Compliance</h1>
-          <span>GPSR Compliance-module op basis van je bestaande producten en koppelingen.</span>
+    <div className="compliance-module-shell compliance-module-shell-sidebar">
+      <aside className="compliance-sidebar">
+        <div className="compliance-sidebar-brand">
+          <strong>GPSR Compliance</strong>
+          <span>Productfamilie module</span>
         </div>
+        <div className="compliance-sidebar-nav">
+          <button type="button" className={moduleView === 'dashboard' ? 'active' : ''} onClick={() => setModuleView('dashboard')}>
+            <LayoutDashboard size={15} />
+            <span>Dashboard</span>
+          </button>
+          <button type="button" className={moduleView === 'families' ? 'active' : ''} onClick={() => setModuleView('families')}>
+            <FolderKanban size={15} />
+            <span>Productfamilies</span>
+          </button>
+          <button type="button" onClick={createNewFamily}>
+            <Plus size={15} />
+            <span>Nieuwe familie</span>
+          </button>
+          <button type="button" className={moduleView === 'unlinked' ? 'active' : ''} onClick={() => setModuleView('unlinked')}>
+            <PackageSearch size={15} />
+            <span>Producten</span>
+          </button>
+          <button type="button" className={moduleView === 'templates' ? 'active' : ''} onClick={() => setModuleView('templates')}>
+            <DatabaseZap size={15} />
+            <span>Templates laden</span>
+          </button>
+        </div>
+      </aside>
+
+      <div className="compliance-main">
+        <div className="page-title-row compliance-dashboard-header">
+          <div>
+            <h1>GPSR Compliance Dashboard</h1>
+            <span>Overzicht van families, dossiers en productkoppelingen.</span>
+          </div>
+          <button type="button" className="primary-button" onClick={() => void handleSeedTemplates()} disabled={saving}>
+            <Plus size={14} /> Templates laden
+          </button>
+        </div>
+
+        {message ? <div className="inline-notice success-notice">{message}</div> : null}
+
+        {moduleView === 'dashboard' && renderDashboard()}
+        {moduleView === 'families' && renderFamiliesView()}
+        {moduleView === 'unlinked' && renderUnlinkedProductsView()}
+        {moduleView === 'documents' && renderDocumentsView()}
+        {moduleView === 'templates' && renderTemplatesView()}
+        {moduleView === 'packagingSuppliers' && renderPackagingSuppliersView()}
       </div>
-
-      {message ? <div className="inline-notice success-notice">{message}</div> : null}
-
-      <div className="compliance-module-nav">
-        {moduleViews.map((view) => {
-          const Icon = view.icon;
-          return (
-            <button
-              type="button"
-              key={view.id}
-              className={moduleView === view.id ? 'active' : ''}
-              onClick={() => setModuleView(view.id)}
-            >
-              <Icon size={15} />
-              <span>{view.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {moduleView === 'dashboard' && renderDashboard()}
-      {moduleView === 'families' && renderFamiliesView()}
-      {moduleView === 'unlinked' && renderUnlinkedProductsView()}
-      {moduleView === 'documents' && renderDocumentsView()}
-      {moduleView === 'templates' && renderTemplatesView()}
-      {moduleView === 'packagingSuppliers' && renderPackagingSuppliersView()}
     </div>
   );
 }

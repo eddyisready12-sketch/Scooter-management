@@ -7,6 +7,7 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   CheckCircle2,
   CircleHelp,
@@ -40,8 +41,8 @@ import rsoLogoUrl from './assets/rso-logo.png';
 import { CompliancePage } from './components/CompliancePage';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseExactBatchTransactionsImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
-import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRisks, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRisk, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
+import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRequirements, upsertComplianceFamilyRevisions, upsertComplianceFamilyRisks, upsertComplianceFamilyTestPlans, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertComplianceProductTests, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'compliance' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
@@ -3532,6 +3533,7 @@ export function App() {
         .some((value) => String(value).toLowerCase().includes(needle))),
     );
   }, [data.dealers, data.scooters, query, statusFilter]);
+  const activeViewMeta = views.find((item) => item.id === view) ?? views[0];
 
   const productModalSuppliers = useMemo(() => {
     const productSupplierNames = data.products.map((product) => product.supplier).filter(Boolean) as string[];
@@ -3867,6 +3869,10 @@ export function App() {
     risks: ComplianceFamilyRisk[];
     warnings: ComplianceFamilyWarning[];
     documents: ComplianceFamilyDocument[];
+    requirements: ComplianceFamilyRequirement[];
+    testPlans: ComplianceFamilyTestPlan[];
+    tests: ComplianceProductTest[];
+    revisions: ComplianceFamilyRevision[];
   }) {
     const mergedFamilies = new Map(data.complianceFamilies.map((family) => [family.id, family]));
     seed.families.forEach((family) => mergedFamilies.set(family.id, { ...mergedFamilies.get(family.id), ...family }));
@@ -3874,17 +3880,25 @@ export function App() {
     seed.risks.forEach((risk) => mergedRisks.set(risk.id, { ...mergedRisks.get(risk.id), ...risk }));
     const mergedWarnings = new Map(data.complianceFamilyWarnings.map((warning) => [warning.id, warning]));
     seed.warnings.forEach((warning) => mergedWarnings.set(warning.id, { ...mergedWarnings.get(warning.id), ...warning }));
+    const mergedRequirements = new Map(data.complianceFamilyRequirements.map((requirement) => [requirement.id, requirement]));
+    seed.requirements.forEach((requirement) => mergedRequirements.set(requirement.id, { ...mergedRequirements.get(requirement.id), ...requirement }));
+    const mergedTestPlans = new Map(data.complianceFamilyTestPlans.map((testPlan) => [testPlan.id, testPlan]));
+    seed.testPlans.forEach((testPlan) => mergedTestPlans.set(testPlan.id, { ...mergedTestPlans.get(testPlan.id), ...testPlan }));
 
     setData((current) => ({
       ...current,
       complianceFamilies: Array.from(mergedFamilies.values()),
       complianceFamilyRisks: Array.from(mergedRisks.values()),
       complianceFamilyWarnings: Array.from(mergedWarnings.values()),
+      complianceFamilyRequirements: Array.from(mergedRequirements.values()),
+      complianceFamilyTestPlans: Array.from(mergedTestPlans.values()),
     }));
 
     await upsertComplianceFamilies(Array.from(mergedFamilies.values()));
     await upsertComplianceFamilyRisks(Array.from(mergedRisks.values()));
     await upsertComplianceFamilyWarnings(Array.from(mergedWarnings.values()));
+    await upsertComplianceFamilyRequirements(Array.from(mergedRequirements.values()));
+    await upsertComplianceFamilyTestPlans(Array.from(mergedTestPlans.values()));
     setComplianceMessage(`${seed.families.length} compliance templates geladen.`);
   }
 
@@ -3893,6 +3907,10 @@ export function App() {
     risks: ComplianceFamilyRisk[];
     warnings: ComplianceFamilyWarning[];
     documents: ComplianceFamilyDocument[];
+    requirements: ComplianceFamilyRequirement[];
+    testPlans: ComplianceFamilyTestPlan[];
+    tests: ComplianceProductTest[];
+    revisions: ComplianceFamilyRevision[];
     links: ComplianceProductLink[];
   }) {
     const nextFamily = {
@@ -3903,6 +3921,10 @@ export function App() {
       description: payload.family.description?.trim() || undefined,
       intendedUse: payload.family.intendedUse?.trim() || undefined,
       foreseeableMisuse: payload.family.foreseeableMisuse?.trim() || undefined,
+      noWarningsNeeded: payload.family.noWarningsNeeded ?? false,
+      manualText: payload.family.manualText?.trim() || undefined,
+      manufacturerName: payload.family.manufacturerName?.trim() || undefined,
+      manufacturerContact: payload.family.manufacturerContact?.trim() || undefined,
       notes: payload.family.notes?.trim() || undefined,
       gpsrRequired: payload.family.gpsrRequired ?? true,
       riskLevel: payload.family.riskLevel ?? 'medium',
@@ -3940,8 +3962,53 @@ export function App() {
         validUntil: document.validUntil?.trim() || undefined,
         notes: document.notes?.trim() || undefined,
         status: document.status ?? 'active',
+        requirementId: document.requirementId?.trim() || undefined,
       }))
       .filter((document) => document.documentName);
+    const nextRequirements = payload.requirements
+      .map((requirement) => ({
+        ...requirement,
+        familyId: nextFamily.id,
+        name: requirement.name.trim(),
+        regulation: requirement.regulation?.trim() || undefined,
+        mandatory: requirement.mandatory ?? true,
+        notes: requirement.notes?.trim() || undefined,
+      }))
+      .filter((requirement) => requirement.name);
+    const nextTestPlans = payload.testPlans
+      .map((testPlan) => ({
+        ...testPlan,
+        familyId: nextFamily.id,
+        name: testPlan.name.trim(),
+        method: testPlan.method?.trim() || undefined,
+        frequency: testPlan.frequency?.trim() || undefined,
+        mandatory: testPlan.mandatory ?? true,
+      }))
+      .filter((testPlan) => testPlan.name);
+    const validPlanIds = new Set(nextTestPlans.map((plan) => plan.id));
+    const nextTests = payload.tests
+      .map((test) => ({
+        ...test,
+        familyId: nextFamily.id,
+        planId: test.planId && validPlanIds.has(test.planId) ? test.planId : undefined,
+        testName: test.testName?.trim() || undefined,
+        batchRef: test.batchRef?.trim() || undefined,
+        findings: test.findings?.trim() || undefined,
+        correctiveAction: test.correctiveAction?.trim() || undefined,
+        testedBy: test.testedBy?.trim() || undefined,
+        result: test.result ?? 'pass',
+        testDate: test.testDate?.trim() || new Date().toISOString().slice(0, 10),
+      }))
+      .filter((test) => test.testDate);
+    const nextRevisions = payload.revisions
+      .map((revision) => ({
+        ...revision,
+        familyId: nextFamily.id,
+        changeNote: revision.changeNote.trim(),
+        changedBy: revision.changedBy?.trim() || undefined,
+        createdAt: revision.createdAt || new Date().toISOString(),
+      }))
+      .filter((revision) => revision.changeNote);
     const nextLinks = payload.links.map((link) => ({
       ...link,
       familyId: nextFamily.id,
@@ -3968,6 +4035,10 @@ export function App() {
         complianceFamilyRisks: replaceByFamily(current.complianceFamilyRisks, nextRisks),
         complianceFamilyWarnings: replaceByFamily(current.complianceFamilyWarnings, nextWarnings),
         complianceFamilyDocuments: replaceByFamily(current.complianceFamilyDocuments, nextDocuments),
+        complianceFamilyRequirements: replaceByFamily(current.complianceFamilyRequirements, nextRequirements),
+        complianceFamilyTestPlans: replaceByFamily(current.complianceFamilyTestPlans, nextTestPlans),
+        complianceProductTests: replaceByFamily(current.complianceProductTests, nextTests),
+        complianceFamilyRevisions: replaceByFamily(current.complianceFamilyRevisions, nextRevisions),
         complianceProductLinks: replaceByFamily(current.complianceProductLinks, nextLinks),
       };
     });
@@ -3976,6 +4047,10 @@ export function App() {
     await upsertComplianceFamilyRisks(nextRisks);
     await upsertComplianceFamilyWarnings(nextWarnings);
     await upsertComplianceFamilyDocuments(nextDocuments);
+    await upsertComplianceFamilyRequirements(nextRequirements);
+    await upsertComplianceFamilyTestPlans(nextTestPlans);
+    await upsertComplianceProductTests(nextTests);
+    await upsertComplianceFamilyRevisions(nextRevisions);
     await upsertComplianceProductLinks(nextLinks);
     setComplianceMessage(`${nextFamily.name || nextFamily.code || 'Compliance familie'} opgeslagen.`);
   }
@@ -4875,8 +4950,13 @@ export function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">R</div>
-          <span>RSOAdmin</span>
+          <div className="brand-mark">
+            <img src={rsoLogoUrl} alt="RSO" />
+          </div>
+          <div className="brand-copy">
+            <strong>RSO Admin</strong>
+            <span>Backoffice</span>
+          </div>
         </div>
         <nav>
           {views.map((item) => {
@@ -4896,6 +4976,21 @@ export function App() {
           <button className="icon-button" aria-label="Menu">
             <Menu size={18} />
           </button>
+          <div className="topbar-center">
+            <div className="topbar-breadcrumb">
+              <span>Backoffice</span>
+              <ChevronRight size={14} />
+              <strong>{activeViewMeta.label}</strong>
+            </div>
+            <label className="topbar-search" aria-label="Zoeken in app">
+              <Search size={16} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Zoeken in de huidige pagina"
+              />
+            </label>
+          </div>
           <div className="topbar-actions">
             <span className={supabase ? 'live-pill online' : 'live-pill'}><DatabaseZap size={14} /> {supabase ? 'Supabase live' : 'Local demo'}</span>
             <span className="commit-pill" title={`Laatste build commit: ${appCommitSha}`}>Commit {appCommitSha}</span>
@@ -4946,6 +5041,10 @@ export function App() {
               risks={data.complianceFamilyRisks}
               warnings={data.complianceFamilyWarnings}
               documents={data.complianceFamilyDocuments}
+              requirements={data.complianceFamilyRequirements}
+              testPlans={data.complianceFamilyTestPlans}
+              tests={data.complianceProductTests}
+              revisions={data.complianceFamilyRevisions}
               links={data.complianceProductLinks}
               suppliers={data.suppliers}
               message={complianceMessage}

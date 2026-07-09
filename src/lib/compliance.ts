@@ -1,10 +1,14 @@
 import type {
   ComplianceFamilyDocument,
+  ComplianceFamilyRequirement,
+  ComplianceFamilyRevision,
   ComplianceFamilyRisk,
+  ComplianceFamilyTestPlan,
   ComplianceFamilyStatus,
   ComplianceFamilyWarning,
   ComplianceProductFamily,
   ComplianceProductLink,
+  ComplianceProductTest,
   ComplianceRiskLevel,
   Product,
 } from '../types';
@@ -35,6 +39,20 @@ type ComplianceTemplate = {
   }>;
 };
 
+type ComplianceRequirementTemplate = {
+  name: string;
+  regulation?: string;
+  mandatory?: boolean;
+  notes?: string;
+};
+
+type ComplianceTestPlanTemplate = {
+  name: string;
+  method?: string;
+  frequency?: string;
+  mandatory?: boolean;
+};
+
 function slugify(value: string) {
   return value
     .normalize('NFD')
@@ -63,9 +81,124 @@ function warningIdForCode(code: string, index: number) {
   return `compliance-warning-${slugify(code)}-${index + 1}`;
 }
 
+function requirementIdForCode(code: string, index: number) {
+  return `compliance-requirement-${slugify(code)}-${index + 1}`;
+}
+
+function testPlanIdForCode(code: string, index: number) {
+  return `compliance-test-plan-${slugify(code)}-${index + 1}`;
+}
+
 export function createComplianceEntityId(prefix: string) {
   const random = Math.random().toString(36).slice(2, 8);
   return `${prefix}-${Date.now()}-${random}`;
+}
+
+const requirementTemplates: Partial<Record<string, ComplianceRequirementTemplate[]>> = {
+  VERL: [
+    { name: 'E-keurmerk verlichtingsunit (typegoedkeuring)', regulation: 'ECE R148/R149/R150', mandatory: true, notes: 'Controleer E-markering en certificaat voor gebruik op de openbare weg.' },
+    { name: 'EMC-verklaring (bij LED-driver/elektronica)', regulation: 'ECE R10', mandatory: false, notes: 'Relevant voor LED-units met elektronica of driver.' },
+  ],
+  REMBLK: [
+    { name: 'Typegoedkeuring vervangingsremblokken (E-markering)', regulation: 'ECE R90', mandatory: true, notes: 'Vraag certificaat op en controleer markering op product en verpakking.' },
+  ],
+  REMSCH: [
+    { name: 'Typegoedkeuring vervangingsremschijven (E-markering)', regulation: 'ECE R90', mandatory: true, notes: 'Sinds R90-02 ook relevant voor vervangingsremschijven.' },
+  ],
+  SPIEG: [
+    { name: 'Typegoedkeuring spiegels (E-markering)', regulation: 'ECE R81', mandatory: true, notes: 'Spiegels voor brom- en motorfietsen moeten E-gemarkeerd zijn.' },
+  ],
+  ECU: [
+    { name: 'EMC-goedkeuring elektronische regeleenheid', regulation: 'ECE R10', mandatory: true, notes: 'Elektronische componenten die voertuigwerking beïnvloeden moeten EMC-conform zijn.' },
+  ],
+  BOB: [
+    { name: 'EMC-verklaring ontstekingscomponent', regulation: 'ECE R10', mandatory: false, notes: 'Vraag een EMC-verklaring of testrapport op bij de fabrikant.' },
+  ],
+  START: [
+    { name: 'EMC-verklaring startmotor', regulation: 'ECE R10', mandatory: false, notes: 'Vraag een EMC-verklaring of testrapport op bij de fabrikant.' },
+  ],
+  ACCU: [
+    { name: 'CE-conformiteit batterij', regulation: 'Batterijverordening (EU) 2023/1542', mandatory: true, notes: 'Batterijen moeten CE-gemarkeerd zijn met EU-conformiteitsverklaring.' },
+    { name: 'UN 38.3 transporttestrapport (lithium)', regulation: 'UN Handboek deel III, 38.3', mandatory: false, notes: 'Voor lithium-accu’s belangrijk voor transport en importcontrole.' },
+  ],
+};
+
+const testPlanTemplates: Partial<Record<string, ComplianceTestPlanTemplate[]>> = {
+  WIND: [
+    { name: 'Ingangscontrole zending', method: 'Visuele controle op transportschade, krassen, scheuren en compleetheid.', frequency: 'Elke zending', mandatory: true },
+    { name: 'Pasvorm-/montagetest', method: 'Proefmontage op doelmodel: uitlijning en bevestiging controleren.', frequency: 'Eenmalig per type/leverancier', mandatory: false },
+  ],
+  STUUR: [
+    { name: 'Ingangscontrole zending', method: 'Controle op deuken, scheuren, lasnaden en corrosie.', frequency: 'Elke zending', mandatory: true },
+    { name: 'Pasvorm-/montagetest', method: 'Proefmontage: klemming, uitlijning en vrije kabelloop controleren.', frequency: 'Eenmalig per type/leverancier', mandatory: true },
+  ],
+  CYL: [
+    { name: 'Ingangscontrole zending', method: 'Controle op gietfouten, schade en compleetheid van de set.', frequency: 'Elke zending', mandatory: true },
+    { name: 'Maatcontrole boring', method: 'Steekproef: boringdiameter meten en vergelijken met specificatie.', frequency: 'Steekproef per zending', mandatory: false },
+  ],
+  ZUIS: [
+    { name: 'Ingangscontrole zending', method: 'Controle op transportschade, gietfouten en compleetheid.', frequency: 'Elke zending', mandatory: true },
+    { name: 'Maatcontrole diameter', method: 'Steekproef: zuigerdiameter meten en vergelijken met specificatie.', frequency: 'Steekproef per zending', mandatory: false },
+  ],
+  VAR: [
+    { name: 'Gewichtscontrole rollen', method: 'Steekproef: rollen wegen en set onderling controleren.', frequency: 'Steekproef per zending', mandatory: true },
+    { name: 'Ingangscontrole zending', method: 'Visuele controle op vervorming, bramen en beschadiging.', frequency: 'Elke zending', mandatory: false },
+  ],
+  VSNA: [
+    { name: 'Ingangscontrole zending', method: 'Controle op scheuren, rafels en maataanduiding.', frequency: 'Elke zending', mandatory: true },
+    { name: 'Maatcontrole', method: 'Steekproef: lengte, breedte en hoek meten tegen specificatie.', frequency: 'Steekproef per zending', mandatory: false },
+  ],
+  REMBLK: [
+    { name: 'Controle R90-markering', method: 'Controleer E-/R90-goedkeuringsnummer op product en verpakking.', frequency: 'Elke zending', mandatory: true },
+    { name: 'Ingangscontrole en maatcontrole', method: 'Visuele controle en steekproef maatcontrole.', frequency: 'Elke zending', mandatory: true },
+  ],
+  REMSCH: [
+    { name: 'Controle R90-/E-markering', method: 'Goedkeuringsmarkering op schijf controleren en matchen met certificaat.', frequency: 'Elke zending', mandatory: true },
+    { name: 'Maatcontrole dikte en slag', method: 'Steekproef: dikte meten en slag controleren.', frequency: 'Steekproef per zending', mandatory: false },
+  ],
+  BOB: [
+    { name: 'Elektrische functietest', method: 'Steekproef: weerstandsmeting en werkingstest op testvoertuig.', frequency: 'Steekproef per zending', mandatory: true },
+  ],
+  ECU: [
+    { name: 'Functietest op testvoertuig', method: 'Werkingstest: starten, stationair en gasrespons controleren.', frequency: 'Eenmalig per type/leverancier', mandatory: true },
+    { name: 'Controle E-markering', method: 'ECE R10 markering op de unit controleren.', frequency: 'Elke zending', mandatory: false },
+  ],
+  SPIEG: [
+    { name: 'Controle E-markering', method: 'E-keurmerk op spiegelglas of huis controleren.', frequency: 'Elke zending', mandatory: true },
+    { name: 'Bevestigings-/pasvormtest', method: 'Steekproef: montage en klemming op doelmodel controleren.', frequency: 'Eenmalig per type/leverancier', mandatory: false },
+  ],
+  KAB: [
+    { name: 'Functietest', method: 'Steekproef: soepele werking en lengtecontrole tegen specificatie.', frequency: 'Steekproef per zending', mandatory: true },
+  ],
+  VERL: [
+    { name: 'Controle E-keurmerk op unit', method: 'E-nummer op unit controleren en matchen met certificaat.', frequency: 'Elke zending', mandatory: true },
+    { name: 'Elektrische functietest', method: 'Steekproef: aansluiten op 12V en functies testen.', frequency: 'Steekproef per zending', mandatory: true },
+  ],
+  ACCU: [
+    { name: 'Spanningsmeting bij ontvangst', method: 'Rustspanning meten; controle op lekkage en bolling.', frequency: 'Elke zending', mandatory: true },
+    { name: 'Controle CE-markering en etikettering', method: 'CE-markering, capaciteit en veiligheidspictogrammen controleren.', frequency: 'Elke zending', mandatory: false },
+  ],
+  START: [
+    { name: 'Elektrische functietest', method: 'Steekproef: stroomopname en werking testen op testbank of voertuig.', frequency: 'Steekproef per zending', mandatory: false },
+  ],
+};
+
+function genericTestPlan(family: ComplianceProductFamily): ComplianceTestPlanTemplate[] {
+  const highRisk = family.riskLevel === 'high' || family.riskLevel === 'critical';
+  return [
+    {
+      name: 'Ingangscontrole zending',
+      method: 'Visuele controle op transportschade, compleetheid en zichtbare gebreken.',
+      frequency: 'Elke zending',
+      mandatory: highRisk,
+    },
+    {
+      name: 'Pasvorm-/functietest',
+      method: 'Steekproef: pasvorm of werking controleren op doelmodel.',
+      frequency: 'Eenmalig per type/leverancier',
+      mandatory: false,
+    },
+  ];
 }
 
 export const complianceTemplates: ComplianceTemplate[] = [
@@ -539,6 +672,470 @@ export const complianceTemplates: ComplianceTemplate[] = [
       },
     ],
   },
+  {
+    code: 'SCHOK',
+    name: 'Schokdempers',
+    category: 'Ophanging',
+    description: 'Vervangende schokdempers voor voor- en achtervering van scooters en bromfietsen.',
+    intendedUse: 'Vervanging van versleten of defecte schokdempers voor herstel van rijcomfort en wegligging.',
+    foreseeableMisuse: 'Gebruik van niet-passende schokdempers of rijden met lekkende of kromme dempers.',
+    riskLevel: 'high',
+    keywords: ['schokdemper', 'veerpoot', 'rear shock', 'fork shock'],
+    risks: [
+      {
+        hazard: 'Instabiel rijgedrag',
+        riskDescription: 'Versleten of onjuist gemonteerde schokdempers verminderen stabiliteit en remcontrole.',
+        severity: '5',
+        probability: '2',
+        mitigation: 'Alleen passende dempers leveren en montagecontrole voorschrijven.',
+        residualRisk: '2',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'installation',
+        warningTextNl: 'Veiligheidsonderdeel: controleer na montage direct de stabiliteit, vrije slag en bevestiging.',
+        requiredOnLabel: true,
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'KABOOM',
+    name: 'Kabelbomen',
+    category: 'Elektrisch',
+    description: 'Complete kabelbomen met connectors en zekeringhouders voor scooters en bromfietsen.',
+    intendedUse: 'Vervanging van beschadigde of doorgebrande voertuigbedrading.',
+    foreseeableMisuse: 'Montage zonder elektrisch schema of met onjuiste connectoren en zekeringen.',
+    riskLevel: 'high',
+    keywords: ['kabelboom', 'wiring harness', 'loom'],
+    risks: [
+      {
+        hazard: 'Kortsluiting of uitval',
+        riskDescription: 'Verkeerd aangesloten bedrading kan kortsluiting of uitval van voertuigfuncties veroorzaken.',
+        severity: '5',
+        probability: '2',
+        mitigation: 'Schema en aansluitcontrole verplicht stellen.',
+        residualRisk: '2',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'electrical',
+        warningTextNl: 'Koppel de accu los en volg het juiste elektrisch schema voordat de kabelboom wordt aangesloten.',
+        requiredOnLabel: true,
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'LAG',
+    name: 'Lagers',
+    category: 'Transmissie',
+    description: 'Kogellagers, naaldlagers en rollagers voor wielen, stuur, variomatiek en motoren.',
+    intendedUse: 'Vervanging van versleten of beschadigde lagers voor soepele rotatie met minimale wrijving.',
+    foreseeableMisuse: 'Hergebruik van verwijderde lagers of montage zonder juiste passing en smering.',
+    riskLevel: 'high',
+    keywords: ['lager', 'bearing', 'kogellager', 'naaldlager'],
+    risks: [
+      {
+        hazard: 'Blokkeren of speling',
+        riskDescription: 'Defecte lagers kunnen blokkeren of gevaarlijke speling veroorzaken.',
+        severity: '5',
+        probability: '2',
+        mitigation: 'Juiste passing en inspectie na montage verplicht stellen.',
+        residualRisk: '2',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'general',
+        warningTextNl: 'Vervang beschadigde of ruw lopende lagers direct en hergebruik nooit een verwijderd lager.',
+        requiredOnLabel: true,
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'AFDICHT',
+    name: 'Afdichtingen & Keerringen',
+    category: 'Transmissie',
+    description: 'Olie-afdichtingen, keerringen, O-ringen en stofkappen voor scooters en bromfietsen.',
+    intendedUse: 'Vervanging van versleten afdichtingen om lekkage van olie, vet of vloeistoffen te voorkomen.',
+    foreseeableMisuse: 'Montage met beschadigde asvlakken of zonder correcte inbouwrichting.',
+    riskLevel: 'medium',
+    keywords: ['keerring', 'afdichting', 'seal', 'o-ring'],
+    risks: [
+      {
+        hazard: 'Lekkage',
+        riskDescription: 'Slechte afdichting leidt tot verlies van smering of vervuiling van andere onderdelen.',
+        severity: '4',
+        probability: '2',
+        mitigation: 'Nieuwe afdichtingen en lekcontrole na montage voorschrijven.',
+        residualRisk: '2',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'installation',
+        warningTextNl: 'Gebruik altijd een nieuwe afdichting en controleer na montage op lekkage.',
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'ZADEL',
+    name: 'Zadels & Buddyseats',
+    category: 'Carrosserie',
+    description: 'Vervangende zadels, buddyseats en zitbankjes voor scooters en bromfietsen.',
+    intendedUse: 'Vervanging van een beschadigd of versleten zadel voor veilig zitcomfort van bestuurder en passagier.',
+    foreseeableMisuse: 'Montage zonder correcte vergrendeling of gebruik met gebroken zadelbasis.',
+    riskLevel: 'medium',
+    keywords: ['zadel', 'buddyseat', 'seat'],
+    risks: [
+      {
+        hazard: 'Losraken tijdens rijden',
+        riskDescription: 'Een slecht vergrendeld zadel kan openklappen of verschuiven tijdens gebruik.',
+        severity: '4',
+        probability: '2',
+        mitigation: 'Vergrendelingscontrole na montage voorschrijven.',
+        residualRisk: '2',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'installation',
+        warningTextNl: 'Controleer voor gebruik of het zadel volledig vergrendeld is in het slotmechanisme.',
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'LUCHT',
+    name: 'Luchtfilters',
+    category: 'Motor',
+    description: 'Vervangende luchtfilters met papier-, schuim- of katoenfilterelement voor scooters.',
+    intendedUse: 'Vervanging van het luchtfilter op interval om een schone luchttoevoer naar de motor te garanderen.',
+    foreseeableMisuse: 'Gebruik van een vervuild of verkeerd filter waardoor het mengsel en motorvermogen verslechteren.',
+    riskLevel: 'low',
+    keywords: ['luchtfilter', 'air filter'],
+    risks: [
+      {
+        hazard: 'Verminderde motorprestatie',
+        riskDescription: 'Een verkeerd of vervuild luchtfilter kan een te rijk of te arm mengsel veroorzaken.',
+        severity: '2',
+        probability: '3',
+        mitigation: 'Onderhoudsinterval en juiste passing communiceren.',
+        residualRisk: '1',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'maintenance',
+        warningTextNl: 'Vervang of reinig het luchtfilter op tijd volgens onderhoudsinterval en gebruik alleen passende filters.',
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'KLAU',
+    name: 'Remklauwen',
+    category: 'Remmen',
+    description: 'Remklauwen voor schijfremsystemen van scooters en bromfietsen.',
+    intendedUse: 'Vervanging van defecte, lekkende of gecorrodeerde remklauwen als veiligheidsonderdeel.',
+    foreseeableMisuse: 'Montage zonder ontluchten of met beschadigde remleiding of afdichtingen.',
+    riskLevel: 'high',
+    keywords: ['remklauw', 'brake caliper', 'caliper'],
+    risks: [
+      {
+        hazard: 'Remfalen',
+        riskDescription: 'Een defecte of verkeerd gemonteerde remklauw kan direct leiden tot verlies van remwerking.',
+        severity: '5',
+        probability: '2',
+        mitigation: 'Ontluchten en functietest na montage verplicht stellen.',
+        residualRisk: '2',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'installation',
+        warningTextNl: 'Veiligheidsonderdeel: ontlucht het remsysteem volledig en test de remwerking direct na montage.',
+        requiredOnLabel: true,
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'STAND',
+    name: 'Standaarden (zij- en middenstandaard)',
+    category: 'Frame',
+    description: 'Zijstandaarden en middenstandaarden voor scooters en bromfietsen.',
+    intendedUse: 'Vervanging van beschadigde of versleten parkeerstandaarden voor stabiel parkeren.',
+    foreseeableMisuse: 'Gebruik met versleten veer of montage waardoor de standaard tijdens rijden niet goed inklapt.',
+    riskLevel: 'medium',
+    keywords: ['standaard', 'zijstandaard', 'middenstandaard', 'kickstand'],
+    risks: [
+      {
+        hazard: 'Contact met wegdek',
+        riskDescription: 'Een slecht inklappende standaard kan tijdens het rijden het wegdek raken.',
+        severity: '4',
+        probability: '2',
+        mitigation: 'Vrije beweging en veerspanning controleren na montage.',
+        residualRisk: '2',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'inspection',
+        warningTextNl: 'Controleer of de standaard na montage volledig inklapt en stevig vergrendeld blijft tijdens rijden.',
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'HITTE',
+    name: 'Hitteschermen',
+    category: 'Uitlaat',
+    description: 'Hitteschermen en uitlaatbeschermers ter bescherming tegen hete uitlaatdelen.',
+    intendedUse: 'Bescherming van berijder en omliggende onderdelen tegen uitlaathitte.',
+    foreseeableMisuse: 'Gebruik zonder alle bevestigingspunten of met contact tegen bewegende of smeltbare delen.',
+    riskLevel: 'medium',
+    keywords: ['hitteschild', 'hittescherm', 'heat shield'],
+    risks: [
+      {
+        hazard: 'Brandwonden of smeltschade',
+        riskDescription: 'Ontbrekende of loszittende hitteschermen vergroten risico op aanraking of warmteschade.',
+        severity: '3',
+        probability: '2',
+        mitigation: 'Bevestigingscontrole en afstand tot hete delen voorschrijven.',
+        residualRisk: '1',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'general',
+        warningTextNl: 'Controleer na montage of het hittescherm stevig vastzit en niet tegen hete of bewegende delen schuurt.',
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'KICK',
+    name: 'Kickstartpedalen & Onderdelen',
+    category: 'Motor',
+    description: 'Kickstartpedalen en onderdelen van het kickstartmechanisme voor scooters en bromfietsen.',
+    intendedUse: 'Vervanging van beschadigde kickstartarmen of mechaniek voor handmatig starten van de motor.',
+    foreseeableMisuse: 'Gebruik van verbogen of loszittende kickstartdelen of montage zonder correcte terugloop.',
+    riskLevel: 'medium',
+    keywords: ['kickstart', 'kickstarter', 'starter pedal'],
+    risks: [
+      {
+        hazard: 'Terugslaan of afbreken',
+        riskDescription: 'Een defect kickstartmechanisme kan plots doorslaan of afbreken tijdens gebruik.',
+        severity: '3',
+        probability: '2',
+        mitigation: 'Mechanische controle en vrije terugloop na montage verplicht stellen.',
+        residualRisk: '2',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'installation',
+        warningTextNl: 'Controleer na montage de vrije beweging en terugloop van het kickstartmechanisme voordat de scooter wordt gestart.',
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'BEEN',
+    name: 'Beenschermen (Leg Shields)',
+    category: 'Carrosserie',
+    description: 'Beenschermen voor scooters en bromfietsen die berijder beschermen tegen wind, regen en vuil.',
+    intendedUse: 'Vervanging van een beschadigd beenscherm als carrosserie- en beschermingsonderdeel.',
+    foreseeableMisuse: 'Montage op verkeerde modellen of zonder complete bevestiging waardoor losraken ontstaat.',
+    riskLevel: 'low',
+    keywords: ['beenscherm', 'leg shield'],
+    risks: [
+      {
+        hazard: 'Losraken paneel',
+        riskDescription: 'Een slecht gemonteerd beenscherm kan tijdens het rijden loskomen.',
+        severity: '3',
+        probability: '2',
+        mitigation: 'Alle bevestigingspunten en pasvorm controleren na montage.',
+        residualRisk: '1',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'installation',
+        warningTextNl: 'Controleer voor gebruik alle clips, schroeven en pasvorm van het beenscherm.',
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'KENT',
+    name: 'Kentekenplaathouders',
+    category: 'Frame',
+    description: 'Kentekenplaathouders en nummerplaatbeugels voor scooters en bromfietsen.',
+    intendedUse: 'Vervanging van een beschadigde kentekenplaathouder voor zichtbare en correcte kentekenmontage.',
+    foreseeableMisuse: 'Montage waardoor kenteken slecht leesbaar is of houder losraakt tijdens rijden.',
+    riskLevel: 'low',
+    keywords: ['kentekenplaat', 'nummerplaathouder', 'plate bracket'],
+    risks: [
+      {
+        hazard: 'Verlies van kentekenplaat',
+        riskDescription: 'Een slecht gemonteerde houder kan kentekenplaat of verlichting verliezen.',
+        severity: '2',
+        probability: '2',
+        mitigation: 'Bevestiging en zichtbaarheid conform wettelijke eisen controleren.',
+        residualRisk: '1',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'legal',
+        warningTextNl: 'Controleer na montage of de kentekenplaat stevig vastzit en volledig leesbaar blijft volgens de wettelijke eisen.',
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'TOP',
+    name: 'Topsets (Cilinder + Zuiger kits)',
+    category: 'Motor',
+    description: 'Complete topsets met cilinder, zuiger en zuigerringen voor scooterrevisie of prestatie-upgrade.',
+    intendedUse: 'Vervanging of revisie van bovenmotoronderdelen als complete set.',
+    foreseeableMisuse: 'Montage zonder juiste afstelling of gebruik boven wettelijk toegestane limieten.',
+    riskLevel: 'medium',
+    keywords: ['topset', 'cylinder kit', 'zuiger kit'],
+    risks: [
+      {
+        hazard: 'Motorschade',
+        riskDescription: 'Verkeerd ingemeten of afgestelde topsets kunnen ernstige motorschade veroorzaken.',
+        severity: '4',
+        probability: '2',
+        mitigation: 'Complete montage- en afstelinstructies meeleveren.',
+        residualRisk: '2',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'installation',
+        warningTextNl: 'Monteer topsets alleen met nieuwe pakkingen en controleer afstelling en compressie na montage.',
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'PAK',
+    name: 'Pakkingen',
+    category: 'Motor',
+    description: 'Motorpakkingen voor cilinder, uitlaat, deksels en carburateurverbindingen.',
+    intendedUse: 'Afdichting van verbindingen in motorsystemen bij revisie of vervanging van onderdelen.',
+    foreseeableMisuse: 'Hergebruik van oude pakkingen of montage op vervuilde of vervormde oppervlakken.',
+    riskLevel: 'medium',
+    keywords: ['pakking', 'gasket'],
+    risks: [
+      {
+        hazard: 'Lekkage van olie, brandstof of gassen',
+        riskDescription: 'Slecht afdichtende pakkingen kunnen lekkage en vervolgschade veroorzaken.',
+        severity: '4',
+        probability: '2',
+        mitigation: 'Nieuwe pakking en nacontrole na opwarmen verplicht stellen.',
+        residualRisk: '2',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'installation',
+        warningTextNl: 'Gebruik nooit een oude pakking opnieuw en controleer na de eerste warme rit op lekkage.',
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'SCHAK',
+    name: 'Schakelaars & Bedieningselementen',
+    category: 'Elektrisch',
+    description: 'Stuurschakelaars, lichtknoppen, richtingaanwijzerschakelaars en startschakelaars.',
+    intendedUse: 'Vervanging van defecte of beschadigde bedieningsschakelaars op het stuur.',
+    foreseeableMisuse: 'Gebruik van schakelaars met verkeerde elektrische specificaties of foutieve aansluiting.',
+    riskLevel: 'low',
+    keywords: ['schakelaar', 'lichtknop', 'switchgear', 'bediening'],
+    risks: [
+      {
+        hazard: 'Uitval van voertuigfuncties',
+        riskDescription: 'Defecte of verkeerd aangesloten schakelaars kunnen verlichting of startfunctie uitschakelen.',
+        severity: '3',
+        probability: '2',
+        mitigation: 'Functietest na montage verplicht stellen.',
+        residualRisk: '1',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'electrical',
+        warningTextNl: 'Test na montage alle functies van de schakelaar voor gebruik op de openbare weg.',
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'CARB',
+    name: 'Carburateuronderdelen & Sproeiers',
+    category: 'Motor',
+    description: 'Hoofdsproeiers, stationairsproeiers, naalden, membranen en andere carburateuronderdelen.',
+    intendedUse: 'Vervanging van versleten of verstopte carburateuronderdelen voor correcte brandstofmenging.',
+    foreseeableMisuse: 'Gebruik van een verkeerde sproeiermaat of rijden met lekkende carburateuronderdelen.',
+    riskLevel: 'medium',
+    keywords: ['carburateur', 'sproeier', 'jet', 'carb'],
+    risks: [
+      {
+        hazard: 'Brandstoflekkage of verkeerd mengsel',
+        riskDescription: 'Foute onderdelen of montage kunnen lekkage of onjuiste verbranding veroorzaken.',
+        severity: '4',
+        probability: '2',
+        mitigation: 'Maatvoering en lekcontrole na montage verplicht stellen.',
+        residualRisk: '2',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'fire',
+        warningTextNl: 'Werk nooit aan carburateuronderdelen in de buurt van open vuur en controleer na montage op lekkage.',
+        requiredOnLabel: true,
+        requiredInManual: true,
+      },
+    ],
+  },
+  {
+    code: 'BODYKIT',
+    name: 'Carrosserie sets (Body kits)',
+    category: 'Carrosserie',
+    description: 'Complete carrosseriesets met meerdere bijpassende bodypanelen voor scooters.',
+    intendedUse: 'Volledige carrosserievervanging of esthetische upgrade als complete set.',
+    foreseeableMisuse: 'Combineren met niet-passende panelen of montage zonder volledige bevestigingsset.',
+    riskLevel: 'low',
+    keywords: ['bodykit', 'carrosserie set', 'panelen set'],
+    risks: [
+      {
+        hazard: 'Losraken van panelen',
+        riskDescription: 'Meerdere onjuist gemonteerde panelen kunnen loskomen en een verkeersgevaar vormen.',
+        severity: '3',
+        probability: '2',
+        mitigation: 'Montagevolgorde en systematische bevestigingscontrole voorschrijven.',
+        residualRisk: '1',
+      },
+    ],
+    warnings: [
+      {
+        warningType: 'installation',
+        warningTextNl: 'Controleer na montage alle panelen systematisch op pasvorm en vergrendeling voordat het voertuig wordt gebruikt.',
+        requiredInManual: true,
+      },
+    ],
+  },
 ];
 
 export function buildComplianceTemplateSeed() {
@@ -552,6 +1149,10 @@ export function buildComplianceTemplateSeed() {
     foreseeableMisuse: template.foreseeableMisuse,
     riskLevel: template.riskLevel,
     gpsrRequired: true,
+    noWarningsNeeded: false,
+    manualText: '',
+    manufacturerName: '',
+    manufacturerContact: '',
     status: 'concept',
   }));
 
@@ -580,12 +1181,55 @@ export function buildComplianceTemplateSeed() {
     })),
   );
 
+  const requirements: ComplianceFamilyRequirement[] = families.flatMap((family) =>
+    (requirementTemplates[family.code] ?? []).map((requirement, index) => ({
+      id: requirementIdForCode(family.code, index),
+      familyId: family.id,
+      name: requirement.name,
+      regulation: requirement.regulation,
+      mandatory: requirement.mandatory ?? true,
+      notes: requirement.notes,
+    })),
+  );
+
+  const testPlans: ComplianceFamilyTestPlan[] = families.flatMap((family) =>
+    (testPlanTemplates[family.code] ?? genericTestPlan(family)).map((testPlan, index) => ({
+      id: testPlanIdForCode(family.code, index),
+      familyId: family.id,
+      name: testPlan.name,
+      method: testPlan.method,
+      frequency: testPlan.frequency,
+      mandatory: testPlan.mandatory ?? true,
+    })),
+  );
+
   return {
     families,
     risks,
     warnings,
     documents: [] as ComplianceFamilyDocument[],
+    requirements,
+    testPlans,
+    tests: [] as ComplianceProductTest[],
+    revisions: [] as ComplianceFamilyRevision[],
   };
+}
+
+export function requirementFulfilled(
+  requirement: ComplianceFamilyRequirement,
+  documents: ComplianceFamilyDocument[],
+) {
+  return documents.some((document) =>
+    document.familyId === requirement.familyId
+    && document.requirementId === requirement.id
+    && (document.status ?? 'active') === 'active');
+}
+
+export function testPlanFulfilled(
+  testPlan: ComplianceFamilyTestPlan,
+  tests: ComplianceProductTest[],
+) {
+  return tests.some((test) => test.planId === testPlan.id && (test.result ?? 'pass') === 'pass');
 }
 
 export function getComplianceFamilyStats(
@@ -593,23 +1237,41 @@ export function getComplianceFamilyStats(
   risks: ComplianceFamilyRisk[],
   warnings: ComplianceFamilyWarning[],
   documents: ComplianceFamilyDocument[],
+  requirements: ComplianceFamilyRequirement[],
+  testPlans: ComplianceFamilyTestPlan[],
+  tests: ComplianceProductTest[],
   links: ComplianceProductLink[],
 ) {
   const familyRisks = risks.filter((item) => item.familyId === family.id);
   const familyWarnings = warnings.filter((item) => item.familyId === family.id);
   const familyDocuments = documents.filter((item) => item.familyId === family.id);
+  const activeDocuments = familyDocuments.filter((item) => (item.status ?? 'active') === 'active');
+  const familyRequirements = requirements.filter((item) => item.familyId === family.id);
+  const mandatoryRequirements = familyRequirements.filter((item) => item.mandatory !== false);
+  const openRequirements = mandatoryRequirements.filter((item) => !requirementFulfilled(item, familyDocuments));
+  const familyTestPlans = testPlans.filter((item) => item.familyId === family.id);
+  const mandatoryTestPlans = familyTestPlans.filter((item) => item.mandatory !== false);
+  const openTestPlans = mandatoryTestPlans.filter((item) => !testPlanFulfilled(item, tests));
+  const familyTests = tests.filter((item) => item.familyId === family.id);
   const activeLinks = links.filter((item) => item.familyId === family.id && (item.status ?? 'active') === 'active');
 
   const checks = [
-    Boolean(family.description?.trim()),
-    Boolean(family.intendedUse?.trim()),
-    Boolean(family.foreseeableMisuse?.trim()),
-    familyRisks.length > 0,
-    familyWarnings.length > 0,
-    activeLinks.length > 0,
+    { ok: Boolean(family.description?.trim()), label: 'Omschrijving' },
+    { ok: Boolean(family.intendedUse?.trim()), label: 'Bedoeld gebruik' },
+    { ok: Boolean(family.foreseeableMisuse?.trim()), label: 'Voorzienbaar verkeerd gebruik' },
+    { ok: familyRisks.length > 0, label: 'Minimaal 1 risicoanalyse' },
+    { ok: familyWarnings.length > 0 || family.noWarningsNeeded === true, label: 'Waarschuwingen of expliciet niet nodig' },
+    { ok: activeLinks.length > 0, label: 'Gekoppelde producten' },
+    { ok: Boolean(family.manufacturerName?.trim()) || activeDocuments.length > 0, label: 'Fabrikant/leverancier of documentverwijzing' },
   ];
-  const completedChecks = checks.filter(Boolean).length;
-  const progress = Math.round((completedChecks / checks.length) * 100);
+  if (mandatoryRequirements.length > 0) {
+    checks.push({ ok: openRequirements.length === 0, label: `Verplichte keuringen (${openRequirements.length} open)` });
+  }
+  if (mandatoryTestPlans.length > 0) {
+    checks.push({ ok: openTestPlans.length === 0, label: `Verplichte tests (${openTestPlans.length} open)` });
+  }
+  const completedChecks = checks.filter((check) => check.ok).length;
+  const progress = checks.length > 0 ? Math.round((completedChecks / checks.length) * 100) : 0;
   const expiringDocuments = familyDocuments.filter((document) => {
     if (!document.validUntil) return false;
     const days = (new Date(document.validUntil).getTime() - Date.now()) / 86400000;
@@ -620,6 +1282,7 @@ export function getComplianceFamilyStats(
   if (family.status === 'archived') calculatedStatus = 'archived';
   else if (family.gpsrRequired === false) calculatedStatus = 'not_applicable';
   else if (progress === 100) calculatedStatus = 'complete';
+  else if (family.status === 'in_review') calculatedStatus = 'in_review';
   else if (progress >= 50) calculatedStatus = 'partial';
 
   return {
@@ -628,7 +1291,13 @@ export function getComplianceFamilyStats(
     riskCount: familyRisks.length,
     warningCount: familyWarnings.length,
     documentCount: familyDocuments.length,
+    requirementCount: familyRequirements.length,
+    openRequirementCount: openRequirements.length,
+    testPlanCount: familyTestPlans.length,
+    openTestPlanCount: openTestPlans.length,
+    testCount: familyTests.length,
     expiringDocuments: expiringDocuments.length,
+    missingItems: checks.filter((check) => !check.ok).map((check) => check.label),
     calculatedStatus,
   };
 }

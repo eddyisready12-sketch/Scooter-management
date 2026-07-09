@@ -301,6 +301,10 @@ export type ComplianceProductFamily = {
   foreseeableMisuse?: string;
   riskLevel?: ComplianceRiskLevel;
   gpsrRequired?: boolean;
+  noWarningsNeeded?: boolean;
+  manualText?: string;
+  manufacturerName?: string;
+  manufacturerContact?: string;
   status?: ComplianceFamilyStatus;
   notes?: string;
   createdAt?: string;
@@ -335,6 +339,7 @@ export type ComplianceFamilyWarning = {
 export type ComplianceFamilyDocument = {
   id: string;
   familyId: string;
+  requirementId?: string;
   documentType?: string;
   documentName: string;
   filePath?: string;
@@ -345,6 +350,53 @@ export type ComplianceFamilyDocument = {
   notes?: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type ComplianceFamilyRequirement = {
+  id: string;
+  familyId: string;
+  name: string;
+  regulation?: string;
+  mandatory?: boolean;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ComplianceFamilyTestPlan = {
+  id: string;
+  familyId: string;
+  name: string;
+  method?: string;
+  frequency?: string;
+  mandatory?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ComplianceProductTestResult = 'pass' | 'fail' | 'conditional';
+
+export type ComplianceProductTest = {
+  id: string;
+  familyId: string;
+  planId?: string;
+  productId?: string;
+  testName?: string;
+  batchRef?: string;
+  testDate: string;
+  result?: ComplianceProductTestResult;
+  findings?: string;
+  correctiveAction?: string;
+  testedBy?: string;
+  createdAt?: string;
+};
+
+export type ComplianceFamilyRevision = {
+  id: string;
+  familyId: string;
+  changeNote: string;
+  changedBy?: string;
+  createdAt?: string;
 };
 
 export type ComplianceProductLink = {
@@ -569,6 +621,10 @@ export type AppData = {
   complianceFamilyRisks: ComplianceFamilyRisk[];
   complianceFamilyWarnings: ComplianceFamilyWarning[];
   complianceFamilyDocuments: ComplianceFamilyDocument[];
+  complianceFamilyRequirements: ComplianceFamilyRequirement[];
+  complianceFamilyTestPlans: ComplianceFamilyTestPlan[];
+  complianceProductTests: ComplianceProductTest[];
+  complianceFamilyRevisions: ComplianceFamilyRevision[];
   complianceProductLinks: ComplianceProductLink[];
   dealers: Dealer[];
   products: Product[];
