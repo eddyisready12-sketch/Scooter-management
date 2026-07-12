@@ -3702,6 +3702,32 @@ tbody tr:hover {
   outline: none;
 }
 
+.import-batch-filter-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid #d6dce2;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.import-batch-filter-switch button {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #607080;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.import-batch-filter-switch button.active {
+  background: #149be2;
+  color: #fff;
+}
+
 .import-batch-meta {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3833,9 +3859,10 @@ tbody tr:hover {
 
 .import-batch-label-cell {
   text-align: center;
-  white-space: nowrap;
-  padding-left: 10px;
-  padding-right: 10px;
+  white-space: normal;
+  padding-left: 8px;
+  padding-right: 8px;
+  vertical-align: middle;
 }
 
 .import-batch-label-stack {
@@ -3843,6 +3870,7 @@ tbody tr:hover {
   justify-items: center;
   gap: 6px;
   width: 100%;
+  min-width: 116px;
 }
 
 .import-label-actions {
@@ -3851,6 +3879,7 @@ tbody tr:hover {
   justify-content: center;
   gap: 6px;
   width: 100%;
+  flex-wrap: nowrap;
 }
 
 .import-label-status {
@@ -3879,6 +3908,7 @@ tbody tr:hover {
   color: #7a8795;
   font-size: 11px;
   line-height: 1.2;
+  text-align: center;
 }
 
 .import-batch-order-cell {
@@ -4106,20 +4136,23 @@ tbody tr:hover {
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(7),
-.container-scooter-table.import-batch-lines-table td:nth-child(7),
+.container-scooter-table.import-batch-lines-table td:nth-child(7) {
+  width: 10%;
+}
+
 .container-scooter-table.import-batch-lines-table th:nth-child(8),
 .container-scooter-table.import-batch-lines-table td:nth-child(8) {
-  width: 11%;
+  width: 10%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(9),
 .container-scooter-table.import-batch-lines-table td:nth-child(9) {
-  width: 6%;
+  width: 5%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(10),
 .container-scooter-table.import-batch-lines-table td:nth-child(10) {
-  width: 6%;
+  width: 11%;
 }
 
 .import-line-number {
@@ -5943,6 +5976,38 @@ dd {
   grid-template-columns: 230px minmax(0, 1fr);
   gap: 18px;
   align-items: start;
+}
+
+.compliance-topnav-panel {
+  margin-bottom: 0;
+}
+
+.compliance-topnav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.compliance-topnav button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid #d6dce2;
+  border-radius: 4px;
+  background: #fff;
+  color: #465667;
+  font-weight: 700;
+}
+
+.compliance-topnav button:hover,
+.compliance-topnav button.active {
+  border-color: #149be2;
+  background: #149be2;
+  color: #fff;
 }
 
 .compliance-sidebar {

@@ -1611,45 +1611,38 @@ export function CompliancePage({
   }
 
   return (
-    <div className="compliance-module-shell compliance-module-shell-sidebar">
-      <aside className="compliance-sidebar">
-        <div className="compliance-sidebar-brand">
-          <strong>GPSR Compliance</strong>
-          <span>Productfamilie module</span>
-        </div>
-        <div className="compliance-sidebar-nav">
-          <button type="button" className={moduleView === 'dashboard' ? 'active' : ''} onClick={() => setModuleView('dashboard')}>
-            <LayoutDashboard size={15} />
-            <span>Dashboard</span>
-          </button>
-          <button type="button" className={moduleView === 'families' ? 'active' : ''} onClick={() => setModuleView('families')}>
-            <FolderKanban size={15} />
-            <span>Productfamilies</span>
-          </button>
-          <button type="button" onClick={createNewFamily}>
-            <Plus size={15} />
-            <span>Nieuwe familie</span>
-          </button>
-          <button type="button" className={moduleView === 'unlinked' ? 'active' : ''} onClick={() => setModuleView('unlinked')}>
-            <PackageSearch size={15} />
-            <span>Producten</span>
-          </button>
-          <button type="button" className={moduleView === 'templates' ? 'active' : ''} onClick={() => setModuleView('templates')}>
-            <DatabaseZap size={15} />
-            <span>Templates laden</span>
-          </button>
-        </div>
-      </aside>
-
+    <div className="compliance-module-shell">
       <div className="compliance-main">
         <div className="page-title-row compliance-dashboard-header">
           <div>
             <h1>GPSR Compliance Dashboard</h1>
             <span>Overzicht van families, dossiers en productkoppelingen.</span>
           </div>
-          <button type="button" className="primary-button" onClick={() => void handleSeedTemplates()} disabled={saving}>
-            <Plus size={14} /> Templates laden
-          </button>
+        </div>
+
+        <div className="panel compliance-topnav-panel">
+          <div className="compliance-topnav">
+            <button type="button" className={moduleView === 'dashboard' ? 'active' : ''} onClick={() => setModuleView('dashboard')}>
+              <LayoutDashboard size={15} />
+              <span>Dashboard</span>
+            </button>
+            <button type="button" className={moduleView === 'families' ? 'active' : ''} onClick={() => setModuleView('families')}>
+              <FolderKanban size={15} />
+              <span>Productfamilies</span>
+            </button>
+            <button type="button" onClick={createNewFamily}>
+              <Plus size={15} />
+              <span>Nieuwe familie</span>
+            </button>
+            <button type="button" className={moduleView === 'unlinked' ? 'active' : ''} onClick={() => setModuleView('unlinked')}>
+              <PackageSearch size={15} />
+              <span>Producten</span>
+            </button>
+            <button type="button" className={moduleView === 'templates' ? 'active' : ''} onClick={() => setModuleView('templates')}>
+              <DatabaseZap size={15} />
+              <span>Templates laden</span>
+            </button>
+          </div>
         </div>
 
         {message ? <div className="inline-notice success-notice">{message}</div> : null}

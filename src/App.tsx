@@ -7653,6 +7653,7 @@ function CostBatchesPage({
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [importBatchSearchQuery, setImportBatchSearchQuery] = useState('');
+  const [importBatchLabelFilter, setImportBatchLabelFilter] = useState<'all' | 'printed' | 'pending'>('all');
   const [printMessage, setPrintMessage] = useState('');
   const [packagingMessage, setPackagingMessage] = useState('');
   const [importToolTab, setImportToolTab] = useState<'batch' | 'scooterPackaging'>('batch');
@@ -7870,6 +7871,13 @@ function CostBatchesPage({
                   const isExpanded = expandedBatchId === batch.id;
                   const filteredLines = lines.filter((line) => {
                     const needle = importBatchSearchQuery.trim().toLowerCase();
+                    const isPrinted = data.productPackagingRegistrations.some((registration) =>
+                      registration.batchId === batch.id
+                      && registration.containerCostLineId === line.id
+                      && Boolean(registration.labelPrintedAt),
+                    );
+                    if (importBatchLabelFilter === 'printed' && !isPrinted) return false;
+                    if (importBatchLabelFilter === 'pending' && isPrinted) return false;
                     if (!needle) return true;
                     const product = findProductForCostLine(data.products, line);
                     const componentParts = line.componentsNote
@@ -7895,6 +7903,7 @@ function CostBatchesPage({
                         onClick={() => {
                           setExpandedBatchId(isExpanded ? null : batch.id);
                           setImportBatchSearchQuery('');
+                          setImportBatchLabelFilter('all');
                         }}
                       >
                         <td>
@@ -7954,6 +7963,29 @@ function CostBatchesPage({
                                     placeholder="Zoek in importregels"
                                   />
                                 </label>
+                                <div className="import-batch-filter-switch" onClick={(event) => event.stopPropagation()} role="group" aria-label="Filter labelstatus">
+                                  <button
+                                    type="button"
+                                    className={importBatchLabelFilter === 'all' ? 'active' : ''}
+                                    onClick={() => setImportBatchLabelFilter('all')}
+                                  >
+                                    Alle
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={importBatchLabelFilter === 'printed' ? 'active' : ''}
+                                    onClick={() => setImportBatchLabelFilter('printed')}
+                                  >
+                                    Geprint
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={importBatchLabelFilter === 'pending' ? 'active' : ''}
+                                    onClick={() => setImportBatchLabelFilter('pending')}
+                                  >
+                                    Niet geprint
+                                  </button>
+                                </div>
                                 <button
                                   type="button"
                                   className="secondary-button"
