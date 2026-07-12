@@ -3702,6 +3702,44 @@ tbody tr:hover {
   outline: none;
 }
 
+.import-batch-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.import-batch-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: min(320px, 100%);
+  flex: 1 1 320px;
+}
+
+.import-batch-toolbar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.import-batch-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.import-batch-filter-group > span {
+  color: #607080;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .import-batch-filter-switch {
   display: inline-flex;
   align-items: center;
@@ -6128,7 +6166,7 @@ dd {
 
 .compliance-dashboard-card strong {
   color: #17212b;
-  font-size: 34px;
+  font-size: 24px;
   line-height: 1;
 }
 
@@ -6150,7 +6188,8 @@ dd {
 }
 
 .compliance-dashboard-hero-card {
-  min-height: 112px;
+  min-height: 82px;
+  align-content: center;
 }
 
 .compliance-dashboard-grid {
@@ -6159,17 +6198,22 @@ dd {
   gap: 16px;
 }
 
+.compliance-dashboard-grid-secondary {
+  align-items: start;
+}
+
 .compliance-dashboard-header {
   align-items: center;
 }
 
 .compliance-dashboard-panel .panel-title {
-  padding-bottom: 10px;
+  padding-bottom: 8px;
 }
 
 .compliance-dashboard-table {
   padding: 0;
   gap: 0;
+  align-content: start;
 }
 
 .compliance-dashboard-row {
@@ -6182,6 +6226,10 @@ dd {
   border-top: 1px solid #edf1f5;
   background: #fff;
   text-align: left;
+}
+
+.compliance-dashboard-row-wide {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .compliance-dashboard-row:first-child {
@@ -6221,6 +6269,10 @@ dd {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.compliance-dashboard-topcards {
+  align-items: stretch;
 }
 
 .compliance-layout {

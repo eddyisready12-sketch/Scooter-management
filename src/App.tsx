@@ -7954,49 +7954,56 @@ function CostBatchesPage({
                                   <strong>EUR {batch.importCostEur}</strong>
                                 </div>
                               </div>
-                              <div className="container-command-actions">
-                                <label className="import-batch-search-field" onClick={(event) => event.stopPropagation()}>
-                                  <Search size={16} />
-                                  <input
-                                    value={importBatchSearchQuery}
-                                    onChange={(event) => setImportBatchSearchQuery(event.target.value)}
-                                    placeholder="Zoek in importregels"
-                                  />
-                                </label>
-                                <div className="import-batch-filter-switch" onClick={(event) => event.stopPropagation()} role="group" aria-label="Filter labelstatus">
+                              <div className="import-batch-toolbar">
+                                <div className="import-batch-toolbar-left">
+                                  <label className="import-batch-search-field" onClick={(event) => event.stopPropagation()}>
+                                    <Search size={16} />
+                                    <input
+                                      value={importBatchSearchQuery}
+                                      onChange={(event) => setImportBatchSearchQuery(event.target.value)}
+                                      placeholder="Zoek in importregels"
+                                    />
+                                  </label>
+                                </div>
+                                <div className="import-batch-toolbar-right">
+                                  <div className="import-batch-filter-group" onClick={(event) => event.stopPropagation()}>
+                                    <span>Labelstatus</span>
+                                    <div className="import-batch-filter-switch" role="group" aria-label="Filter labelstatus">
+                                      <button
+                                        type="button"
+                                        className={importBatchLabelFilter === 'all' ? 'active' : ''}
+                                        onClick={() => setImportBatchLabelFilter('all')}
+                                      >
+                                        Alle
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={importBatchLabelFilter === 'printed' ? 'active' : ''}
+                                        onClick={() => setImportBatchLabelFilter('printed')}
+                                      >
+                                        Geprint
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={importBatchLabelFilter === 'pending' ? 'active' : ''}
+                                        onClick={() => setImportBatchLabelFilter('pending')}
+                                      >
+                                        Niet geprint
+                                      </button>
+                                    </div>
+                                  </div>
                                   <button
                                     type="button"
-                                    className={importBatchLabelFilter === 'all' ? 'active' : ''}
-                                    onClick={() => setImportBatchLabelFilter('all')}
+                                    className="secondary-button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setEditingBatchId(batch.id);
+                                      setShowCostModal(true);
+                                    }}
                                   >
-                                    Alle
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={importBatchLabelFilter === 'printed' ? 'active' : ''}
-                                    onClick={() => setImportBatchLabelFilter('printed')}
-                                  >
-                                    Geprint
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={importBatchLabelFilter === 'pending' ? 'active' : ''}
-                                    onClick={() => setImportBatchLabelFilter('pending')}
-                                  >
-                                    Niet geprint
+                                    Bewerken
                                   </button>
                                 </div>
-                                <button
-                                  type="button"
-                                  className="secondary-button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setEditingBatchId(batch.id);
-                                    setShowCostModal(true);
-                                  }}
-                                >
-                                  Bewerken
-                                </button>
                               </div>
                               {lines.length === 0 ? (
                                 <div className="empty-state inline compact">

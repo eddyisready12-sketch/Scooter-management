@@ -265,6 +265,9 @@ export function CompliancePage({
   const expiredDocuments = useMemo(() => documents.filter((document) => expiryState(document.validUntil) === 'expired'), [documents]);
   const incompleteFamilies = useMemo(() => familyRows.filter((row) => row.stats.calculatedStatus !== 'complete' && row.stats.calculatedStatus !== 'not_applicable'), [familyRows]);
   const highRiskFamilies = useMemo(() => familyRows.filter((row) => row.family.riskLevel === 'high' || row.family.riskLevel === 'critical'), [familyRows]);
+  const familiesWithOpenRequirements = useMemo(() => familyRows.filter((row) => row.stats.openRequirementCount > 0), [familyRows]);
+  const familiesWithOpenTests = useMemo(() => familyRows.filter((row) => row.stats.openTestPlanCount > 0), [familyRows]);
+  const familiesMissingDocuments = useMemo(() => familyRows.filter((row) => row.family.gpsrRequired !== false && row.stats.documentCount === 0), [familyRows]);
 
   const totals = useMemo(() => familyRows.reduce((summary, row) => {
     summary.families += 1;
@@ -795,33 +798,73 @@ export function CompliancePage({
           </section>
         </div>
 
-        {(expiringDocuments.length > 0 || expiredDocuments.length > 0) ? (
-          <section className="panel">
-            <div className="panel-title">Documenten aandacht</div>
+        <div className="compliance-dashboard-grid compliance-dashboard-grid-secondary">
+          <section className="panel compliance-dashboard-panel">
+            <div className="panel-title">Ontbrekende verplichte keuringen <span className="compliance-inline-status danger">{familiesWithOpenRequirements.length}</span></div>
             <div className="compliance-panel-body compliance-dashboard-table">
-              {expiredDocuments.map((document) => {
+              {familiesWithOpenRequirements.length === 0 ? <p className="empty">Alle verplichte keuringen zijn vervuld of nog niet vastgelegd.</p> : familiesWithOpenRequirements.map(({ family, stats }) => (
+                <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('requirements'); }}>
+                  <strong>{family.name}</strong>
+                  <span className="compliance-inline-status warning">{stats.openRequirementCount} open</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel compliance-dashboard-panel">
+            <div className="panel-title">Openstaande verplichte tests <span className="compliance-inline-status danger">{familiesWithOpenTests.length}</span></div>
+            <div className="compliance-panel-body compliance-dashboard-table">
+              {familiesWithOpenTests.length === 0 ? <p className="empty">Alle verplichte tests zijn uitgevoerd of nog niet vastgelegd.</p> : familiesWithOpenTests.map(({ family, stats }) => (
+                <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('tests'); }}>
+                  <strong>{family.name}</strong>
+                  <span className="compliance-inline-status warning">{stats.openTestPlanCount} open</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel compliance-dashboard-panel">
+            <div className="panel-title">Ontbrekende documenten <span className="compliance-inline-status danger">{familiesMissingDocuments.length}</span></div>
+            <div className="compliance-panel-body compliance-dashboard-table">
+              {familiesMissingDocuments.length === 0 ? <p className="empty">Alle families hebben minimaal een document.</p> : familiesMissingDocuments.map(({ family }) => (
+                <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('documents'); }}>
+                  <strong>{family.name}</strong>
+                  <span className="compliance-inline-status danger">Geen actief document gekoppeld</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel compliance-dashboard-panel">
+            <div className="panel-title">Binnenkort verlopen documenten <span className="compliance-inline-status warning">{expiringDocuments.length}</span></div>
+            <div className="compliance-panel-body compliance-dashboard-table">
+              {expiringDocuments.length === 0 ? <p className="empty">Geen documenten verlopen binnen 60 dagen.</p> : expiringDocuments.map((document) => {
                 const family = families.find((item) => item.id === document.familyId);
                 return (
-                  <button type="button" key={document.id} className="compliance-dashboard-row" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
-                    <strong>{document.documentName}</strong>
-                    <span>{family?.name || 'Onbekende familie'}</span>
-                    <span className="compliance-inline-status danger">{formatDate(document.validUntil)}</span>
-                  </button>
-                );
-              })}
-              {expiringDocuments.map((document) => {
-                const family = families.find((item) => item.id === document.familyId);
-                return (
-                  <button type="button" key={document.id} className="compliance-dashboard-row" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
-                    <strong>{document.documentName}</strong>
-                    <span>{family?.name || 'Onbekende familie'}</span>
+                  <button type="button" key={document.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
+                    <strong>{family?.name || document.documentName}</strong>
                     <span className="compliance-inline-status warning">{formatDate(document.validUntil)}</span>
                   </button>
                 );
               })}
             </div>
           </section>
-        ) : null}
+
+          <section className="panel compliance-dashboard-panel">
+            <div className="panel-title">Verlopen documenten <span className="compliance-inline-status danger">{expiredDocuments.length}</span></div>
+            <div className="compliance-panel-body compliance-dashboard-table">
+              {expiredDocuments.length === 0 ? <p className="empty">Geen verlopen documenten.</p> : expiredDocuments.map((document) => {
+                const family = families.find((item) => item.id === document.familyId);
+                return (
+                  <button type="button" key={document.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
+                    <strong>{family?.name || document.documentName}</strong>
+                    <span className="compliance-inline-status danger">{formatDate(document.validUntil)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </div>
       </div>
     );
   }
