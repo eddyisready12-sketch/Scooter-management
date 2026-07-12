@@ -20,6 +20,9 @@ function resolveCommitSha() {
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    chunkSizeWarningLimit: 2200,
+  },
   define: {
     __APP_COMMIT_SHA__: JSON.stringify(resolveCommitSha()),
   },
