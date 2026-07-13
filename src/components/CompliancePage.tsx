@@ -251,6 +251,7 @@ export function CompliancePage({
   const [draftRevisions, setDraftRevisions] = useState<ComplianceFamilyRevision[]>([]);
   const [draftLinks, setDraftLinks] = useState<ComplianceProductLink[]>([]);
   const familyDetailRef = useRef<HTMLElement | null>(null);
+  const previousSelectedFamilyIdRef = useRef<string>('');
 
   useEffect(() => {
     if (!selectedFamilyId && families[0]?.id) {
@@ -270,7 +271,11 @@ export function CompliancePage({
     setDraftTests(tests.filter((item) => item.familyId === selectedFamilyId).map((item) => ({ ...item })));
     setDraftRevisions(revisions.filter((item) => item.familyId === selectedFamilyId).map((item) => ({ ...item })).sort((left, right) => (right.createdAt ?? '').localeCompare(left.createdAt ?? '')));
     setDraftLinks(links.filter((item) => item.familyId === selectedFamilyId).map((item) => ({ ...item })));
-    setLinkPage(1);
+
+    if (previousSelectedFamilyIdRef.current !== selectedFamilyId) {
+      setLinkPage(1);
+      previousSelectedFamilyIdRef.current = selectedFamilyId;
+    }
   }, [documents, families, links, requirements, revisions, risks, selectedFamilyId, testPlans, tests, warnings]);
 
   function openFamilyDetail(familyId: string, tab: ComplianceDetailTab = 'basic') {
