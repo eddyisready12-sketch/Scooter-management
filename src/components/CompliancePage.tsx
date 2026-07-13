@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -250,6 +250,7 @@ export function CompliancePage({
   const [draftTests, setDraftTests] = useState<ComplianceProductTest[]>([]);
   const [draftRevisions, setDraftRevisions] = useState<ComplianceFamilyRevision[]>([]);
   const [draftLinks, setDraftLinks] = useState<ComplianceProductLink[]>([]);
+  const familyDetailRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!selectedFamilyId && families[0]?.id) {
@@ -271,6 +272,15 @@ export function CompliancePage({
     setDraftLinks(links.filter((item) => item.familyId === selectedFamilyId).map((item) => ({ ...item })));
     setLinkPage(1);
   }, [documents, families, links, requirements, revisions, risks, selectedFamilyId, testPlans, tests, warnings]);
+
+  function openFamilyDetail(familyId: string, tab: ComplianceDetailTab = 'basic') {
+    setModuleView('families');
+    setSelectedFamilyId(familyId);
+    setDetailTab(tab);
+    requestAnimationFrame(() => {
+      familyDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
 
   const familyRows = useMemo(() => families.map((family) => ({
     family,
@@ -856,7 +866,7 @@ export function CompliancePage({
             <div className="compliance-dashboard-table">
               {dashboardTab === 'incomplete' && (
                 incompleteFamilies.length === 0 ? <p className="empty">Geen incomplete dossiers.</p> : incompleteFamilies.map(({ family, stats }) => (
-                  <button type="button" key={family.id} className="compliance-dashboard-row" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); }}>
+                  <button type="button" key={family.id} className="compliance-dashboard-row" onClick={() => openFamilyDetail(family.id)}>
                     <strong>{family.name}</strong>
                     <div className="compliance-dashboard-row-progress">
                       <div className="compliance-mini-progress">
@@ -871,7 +881,7 @@ export function CompliancePage({
 
               {dashboardTab === 'highRisk' && (
                 highRiskFamilies.length === 0 ? <p className="empty">Geen hoog risico families.</p> : highRiskFamilies.map(({ family, stats }) => (
-                  <button type="button" key={family.id} className="compliance-dashboard-row" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); }}>
+                  <button type="button" key={family.id} className="compliance-dashboard-row" onClick={() => openFamilyDetail(family.id)}>
                     <div className="compliance-dashboard-risk-main">
                       <strong>{family.name}</strong>
                       <div className="compliance-dashboard-risk-tags">
@@ -885,7 +895,7 @@ export function CompliancePage({
 
               {dashboardTab === 'requirements' && (
                 familiesWithOpenRequirements.length === 0 ? <p className="empty">Alle verplichte keuringen zijn vervuld of nog niet vastgelegd.</p> : familiesWithOpenRequirements.map(({ family, stats }) => (
-                  <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('requirements'); }}>
+                  <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => openFamilyDetail(family.id, 'requirements')}>
                     <strong>{family.name}</strong>
                     <span className="compliance-inline-status warning">{stats.openRequirementCount} open</span>
                   </button>
@@ -894,7 +904,7 @@ export function CompliancePage({
 
               {dashboardTab === 'tests' && (
                 familiesWithOpenTests.length === 0 ? <p className="empty">Alle verplichte tests zijn uitgevoerd of nog niet vastgelegd.</p> : familiesWithOpenTests.map(({ family, stats }) => (
-                  <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('tests'); }}>
+                  <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => openFamilyDetail(family.id, 'tests')}>
                     <strong>{family.name}</strong>
                     <span className="compliance-inline-status warning">{stats.openTestPlanCount} open</span>
                   </button>
@@ -903,7 +913,7 @@ export function CompliancePage({
 
               {dashboardTab === 'missingDocuments' && (
                 familiesMissingDocuments.length === 0 ? <p className="empty">Alle families hebben minimaal een document.</p> : familiesMissingDocuments.map(({ family }) => (
-                  <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('documents'); }}>
+                  <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => openFamilyDetail(family.id, 'documents')}>
                     <strong>{family.name}</strong>
                     <span className="compliance-inline-status danger">Geen actief document gekoppeld</span>
                   </button>
@@ -984,7 +994,7 @@ export function CompliancePage({
                   <tr key={family.id} className={selectedFamilyId === family.id ? 'active' : ''}>
                     <td><strong>{family.code || '-'}</strong></td>
                     <td>
-                      <button type="button" className="compliance-family-link-button" onClick={() => { setSelectedFamilyId(family.id); setDetailTab('basic'); }}>
+                      <button type="button" className="compliance-family-link-button" onClick={() => openFamilyDetail(family.id)}>
                         {family.name}
                       </button>
                     </td>
@@ -1002,8 +1012,8 @@ export function CompliancePage({
                     </td>
                     <td>
                       <div className="compliance-family-table-actions">
-                        <button type="button" className="secondary-button" onClick={() => { setSelectedFamilyId(family.id); setDetailTab('basic'); }}>Detail</button>
-                        <button type="button" className="secondary-button" onClick={() => { setSelectedFamilyId(family.id); setDetailTab('basic'); }}>Bewerken</button>
+                        <button type="button" className="secondary-button" onClick={() => openFamilyDetail(family.id)}>Detail</button>
+                        <button type="button" className="secondary-button" onClick={() => openFamilyDetail(family.id)}>Bewerken</button>
                       </div>
                     </td>
                   </tr>
@@ -1018,7 +1028,7 @@ export function CompliancePage({
           </div>
         </section>
 
-        <section className="panel compliance-family-detail">
+        <section className="panel compliance-family-detail" ref={familyDetailRef}>
           {!draftFamily ? (
             <p className="empty compliance-empty">Kies een productfamilie links of maak een nieuwe aan.</p>
           ) : (
