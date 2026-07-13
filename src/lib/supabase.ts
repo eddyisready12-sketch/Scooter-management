@@ -175,6 +175,26 @@ async function upsertWithSchemaFallback(
   throw new Error(fallbackMessage);
 }
 
+async function replaceFamilyScopedRecords(
+  table: string,
+  familyId: string,
+  records: Record<string, unknown>[],
+  fallbackMessage: string,
+  attempts = 8,
+) {
+  if (!supabase || !familyId) return;
+
+  const { error: deleteError } = await supabase
+    .from(table)
+    .delete()
+    .eq('familyId', familyId);
+
+  if (deleteError) throw deleteError;
+  if (records.length === 0) return;
+
+  await upsertWithSchemaFallback(table, records, fallbackMessage, attempts);
+}
+
 function normalizeSupplierContact(row: Record<string, unknown>): SupplierContact {
   return {
     id: String(row.id ?? ''),
@@ -650,6 +670,78 @@ export async function upsertComplianceFamilyRevisions(revisions: ComplianceFamil
 export async function upsertComplianceProductLinks(links: ComplianceProductLink[]) {
   await upsertWithSchemaFallback(
     'compliance_product_links',
+    links.map((link) => ({ ...link }) as Record<string, unknown>),
+    'Compliance productkoppelingen opslaan mislukt: Supabase schema mist meerdere link kolommen.',
+  );
+}
+
+export async function replaceComplianceFamilyRisks(familyId: string, risks: ComplianceFamilyRisk[]) {
+  await replaceFamilyScopedRecords(
+    'compliance_family_risks',
+    familyId,
+    risks.map((risk) => ({ ...risk }) as Record<string, unknown>),
+    'Compliance risicoanalyse opslaan mislukt: Supabase schema mist meerdere risico kolommen.',
+  );
+}
+
+export async function replaceComplianceFamilyWarnings(familyId: string, warnings: ComplianceFamilyWarning[]) {
+  await replaceFamilyScopedRecords(
+    'compliance_family_warnings',
+    familyId,
+    warnings.map((warning) => ({ ...warning }) as Record<string, unknown>),
+    'Compliance waarschuwingen opslaan mislukt: Supabase schema mist meerdere waarschuwing kolommen.',
+  );
+}
+
+export async function replaceComplianceFamilyDocuments(familyId: string, documents: ComplianceFamilyDocument[]) {
+  await replaceFamilyScopedRecords(
+    'compliance_family_documents',
+    familyId,
+    documents.map((document) => ({ ...document }) as Record<string, unknown>),
+    'Compliance documenten opslaan mislukt: Supabase schema mist meerdere document kolommen.',
+  );
+}
+
+export async function replaceComplianceFamilyRequirements(familyId: string, requirements: ComplianceFamilyRequirement[]) {
+  await replaceFamilyScopedRecords(
+    'compliance_family_requirements',
+    familyId,
+    requirements.map((requirement) => ({ ...requirement }) as Record<string, unknown>),
+    'Compliance keuringseisen opslaan mislukt: Supabase schema mist meerdere requirement kolommen.',
+  );
+}
+
+export async function replaceComplianceFamilyTestPlans(familyId: string, testPlans: ComplianceFamilyTestPlan[]) {
+  await replaceFamilyScopedRecords(
+    'compliance_family_test_plans',
+    familyId,
+    testPlans.map((plan) => ({ ...plan }) as Record<string, unknown>),
+    'Compliance testplannen opslaan mislukt: Supabase schema mist meerdere testplan kolommen.',
+  );
+}
+
+export async function replaceComplianceProductTests(familyId: string, tests: ComplianceProductTest[]) {
+  await replaceFamilyScopedRecords(
+    'compliance_product_tests',
+    familyId,
+    tests.map((test) => ({ ...test }) as Record<string, unknown>),
+    'Compliance testregistraties opslaan mislukt: Supabase schema mist meerdere test kolommen.',
+  );
+}
+
+export async function replaceComplianceFamilyRevisions(familyId: string, revisions: ComplianceFamilyRevision[]) {
+  await replaceFamilyScopedRecords(
+    'compliance_family_revisions',
+    familyId,
+    revisions.map((revision) => ({ ...revision }) as Record<string, unknown>),
+    'Compliance revisies opslaan mislukt: Supabase schema mist meerdere revisie kolommen.',
+  );
+}
+
+export async function replaceComplianceProductLinks(familyId: string, links: ComplianceProductLink[]) {
+  await replaceFamilyScopedRecords(
+    'compliance_product_links',
+    familyId,
     links.map((link) => ({ ...link }) as Record<string, unknown>),
     'Compliance productkoppelingen opslaan mislukt: Supabase schema mist meerdere link kolommen.',
   );
