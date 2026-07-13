@@ -704,12 +704,21 @@ export function CompliancePage({
     if (!draftFamily) return;
 
     const removedLink = draftLinks.find((link) => link.id === linkId);
-    const nextLinks = draftLinks.filter((link) => link.id !== linkId);
+    const timestamp = new Date().toISOString();
+    const nextLinks = draftLinks.map((link) => (
+      link.id === linkId
+        ? {
+          ...link,
+          status: 'inactive' as const,
+          updatedAt: timestamp,
+        }
+        : link
+    ));
     const nextRevisions = [{
       id: createComplianceEntityId('compliance-revision'),
       familyId: draftFamily.id,
       changeNote: removedLink?.productId ? `Product ontkoppeld (${removedLink.productId})` : 'Product ontkoppeld',
-      createdAt: new Date().toISOString(),
+      createdAt: timestamp,
     }, ...draftRevisions];
 
     setDraftLinks(nextLinks);

@@ -3913,6 +3913,7 @@ export function App() {
     revisions: ComplianceFamilyRevision[];
     links: ComplianceProductLink[];
   }) {
+    const linkTimestamp = new Date().toISOString();
     const nextFamily = {
       ...payload.family,
       code: payload.family.code.trim(),
@@ -4019,8 +4020,10 @@ export function App() {
         overrideManual: link.overrideManual?.trim() || undefined,
         linkedBy: link.linkedBy?.trim() || undefined,
         status: link.status ?? 'active',
+        createdAt: link.createdAt || linkTimestamp,
+        updatedAt: link.updatedAt || linkTimestamp,
       }))
-      .filter((link) => link.status === 'active');
+      .filter((link) => link.productId);
 
     setData((current) => {
       const familyMap = new Map(current.complianceFamilies.map((family) => [family.id, family]));
@@ -4063,17 +4066,24 @@ export function App() {
       return;
     }
 
+    const timestamp = new Date().toISOString();
+    const linksToSave = nextLinks.map((link) => ({
+      ...link,
+      createdAt: link.createdAt || timestamp,
+      updatedAt: link.updatedAt || timestamp,
+    }));
+
     setData((current) => {
       const linkMap = new Map(current.complianceProductLinks.map((link) => [link.id, link]));
-      nextLinks.forEach((link) => linkMap.set(link.id, link));
+      linksToSave.forEach((link) => linkMap.set(link.id, link));
       return {
         ...current,
         complianceProductLinks: Array.from(linkMap.values()),
       };
     });
 
-    await upsertComplianceProductLinks(nextLinks);
-    setComplianceMessage(`${nextLinks.length} producten automatisch gekoppeld aan compliance families.`);
+    await upsertComplianceProductLinks(linksToSave);
+    setComplianceMessage(`${linksToSave.length} producten automatisch gekoppeld aan compliance families.`);
   }
 
   async function saveContainerCostBatch(batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) {

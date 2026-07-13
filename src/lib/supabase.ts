@@ -184,24 +184,21 @@ async function replaceFamilyScopedRecords(
 ) {
   if (!supabase || !familyId) return;
 
-  let deleted = false;
-  let lastError: Error | null = null;
+  const existingRows = await loadAllRows(table);
+  const idsToDelete = existingRows
+    .filter((row) => String(row.familyId ?? row.family_id ?? row.familyid ?? '') === familyId)
+    .map((row) => String(row.id ?? ''))
+    .filter(Boolean);
 
-  for (const column of ['familyId', 'family_id', 'familyid']) {
-    const result = await supabase
+  for (let index = 0; index < idsToDelete.length; index += 100) {
+    const batch = idsToDelete.slice(index, index + 100);
+    const { error } = await supabase
       .from(table)
       .delete()
-      .eq(column, familyId);
+      .in('id', batch);
 
-    if (!result.error) {
-      deleted = true;
-      continue;
-    }
-
-    lastError = result.error;
+    if (error) throw error;
   }
-
-  if (!deleted && lastError) throw lastError;
 
   if (records.length === 0) return;
 
@@ -209,45 +206,7 @@ async function replaceFamilyScopedRecords(
 }
 
 function addComplianceAliases(record: Record<string, unknown>) {
-  const next = { ...record };
-
-  if (typeof next.familyId === 'string') {
-    next.family_id = next.familyId;
-    next.familyid = next.familyId;
-  }
-  if (typeof next.productId === 'string') {
-    next.product_id = next.productId;
-    next.productid = next.productId;
-  }
-  if (typeof next.planId === 'string') {
-    next.plan_id = next.planId;
-    next.planid = next.planId;
-  }
-  if (typeof next.requirementId === 'string') {
-    next.requirement_id = next.requirementId;
-    next.requirementid = next.requirementId;
-  }
-  if (typeof next.warningTextNl === 'string') next.warning_text_nl = next.warningTextNl;
-  if (typeof next.warningTextEn === 'string') next.warning_text_en = next.warningTextEn;
-  if (typeof next.riskLevel === 'string') next.risk_level = next.riskLevel;
-  if (typeof next.intendedUse === 'string') next.intended_use = next.intendedUse;
-  if (typeof next.foreseeableMisuse === 'string') next.foreseeable_misuse = next.foreseeableMisuse;
-  if (typeof next.noWarningsNeeded === 'boolean') next.no_warnings_needed = next.noWarningsNeeded;
-  if (typeof next.manualText === 'string') next.manual_text = next.manualText;
-  if (typeof next.manufacturerName === 'string') next.manufacturer_name = next.manufacturerName;
-  if (typeof next.manufacturerContact === 'string') next.manufacturer_contact = next.manufacturerContact;
-  if (typeof next.validFrom === 'string') next.valid_from = next.validFrom;
-  if (typeof next.validUntil === 'string') next.valid_until = next.validUntil;
-  if (typeof next.variantDescription === 'string') next.variant_description = next.variantDescription;
-  if (typeof next.technicalDifferences === 'string') next.technical_differences = next.technicalDifferences;
-  if (typeof next.overrideWarnings === 'string') next.override_warnings = next.overrideWarnings;
-  if (typeof next.overrideManual === 'string') next.override_manual = next.overrideManual;
-  if (typeof next.linkedBy === 'string') next.linked_by = next.linkedBy;
-  if (typeof next.changedBy === 'string') next.changed_by = next.changedBy;
-  if (typeof next.createdAt === 'string') next.created_at = next.createdAt;
-  if (typeof next.updatedAt === 'string') next.updated_at = next.updatedAt;
-
-  return next;
+  return { ...record };
 }
 
 function normalizeComplianceFamily(row: Record<string, unknown>): ComplianceProductFamily {
@@ -286,6 +245,41 @@ function normalizeComplianceLink(row: Record<string, unknown>): ComplianceProduc
     createdAt: row.createdAt ? String(row.createdAt) : row.created_at ? String(row.created_at) : undefined,
     updatedAt: row.updatedAt ? String(row.updatedAt) : row.updated_at ? String(row.updated_at) : undefined,
   };
+}
+
+function complianceLinkTimestamp(link: ComplianceProductLink) {
+  const value = link.updatedAt ?? link.createdAt ?? '';
+  const timestamp = value ? Date.parse(value) : Number.NaN;
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function dedupeComplianceLinks(links: ComplianceProductLink[]) {
+  const byPair = new Map<string, ComplianceProductLink>();
+
+  links.forEach((link) => {
+    const key = `${link.productId}|${link.familyId}`;
+    const current = byPair.get(key);
+    if (!current) {
+      byPair.set(key, link);
+      return;
+    }
+
+    const nextTimestamp = complianceLinkTimestamp(link);
+    const currentTimestamp = complianceLinkTimestamp(current);
+
+    if (
+      nextTimestamp > currentTimestamp
+      || (
+        nextTimestamp === currentTimestamp
+        && current.status === 'active'
+        && link.status !== 'active'
+      )
+    ) {
+      byPair.set(key, link);
+    }
+  });
+
+  return Array.from(byPair.values());
 }
 
 function normalizeFamilyScopedRecord<T extends { id: string; familyId: string }>(row: Record<string, unknown>) {
@@ -489,7 +483,7 @@ export async function loadSupabaseData(): Promise<Partial<AppData>> {
           return [key, data.map(normalizeComplianceFamily)] as const;
         }
         if (key === 'complianceProductLinks') {
-          return [key, data.map(normalizeComplianceLink)] as const;
+          return [key, dedupeComplianceLinks(data.map(normalizeComplianceLink))] as const;
         }
         if (key === 'complianceFamilyRisks') {
           return [key, data.map((row) => normalizeFamilyScopedRecord<ComplianceFamilyRisk>(row as Record<string, unknown>))] as const;
