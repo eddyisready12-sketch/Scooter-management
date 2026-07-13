@@ -1684,32 +1684,30 @@ export function CompliancePage({
           ) : null}
         </div>
 
-        {moduleView !== 'dashboard' ? (
-          <div className="panel compliance-topnav-panel">
-            <div className="compliance-topnav">
-              <button type="button" onClick={() => setModuleView('dashboard')}>
-                <LayoutDashboard size={15} />
-                <span>Dashboard</span>
-              </button>
-              <button type="button" className={moduleView === 'families' ? 'active' : ''} onClick={() => setModuleView('families')}>
-                <FolderKanban size={15} />
-                <span>Productfamilies</span>
-              </button>
-              <button type="button" onClick={createNewFamily}>
-                <Plus size={15} />
-                <span>Nieuwe familie</span>
-              </button>
-              <button type="button" className={moduleView === 'unlinked' ? 'active' : ''} onClick={() => setModuleView('unlinked')}>
-                <PackageSearch size={15} />
-                <span>Producten</span>
-              </button>
-              <button type="button" className={moduleView === 'templates' ? 'active' : ''} onClick={() => setModuleView('templates')}>
-                <DatabaseZap size={15} />
-                <span>Templates laden</span>
-              </button>
-            </div>
+        <div className="panel compliance-topnav-panel">
+          <div className="compliance-topnav">
+            <button type="button" className={moduleView === 'dashboard' ? 'active' : ''} onClick={() => setModuleView('dashboard')}>
+              <LayoutDashboard size={15} />
+              <span>Dashboard</span>
+            </button>
+            <button type="button" className={moduleView === 'families' ? 'active' : ''} onClick={() => setModuleView('families')}>
+              <FolderKanban size={15} />
+              <span>Productfamilies</span>
+            </button>
+            <button type="button" onClick={createNewFamily}>
+              <Plus size={15} />
+              <span>Nieuwe familie</span>
+            </button>
+            <button type="button" className={moduleView === 'unlinked' ? 'active' : ''} onClick={() => setModuleView('unlinked')}>
+              <PackageSearch size={15} />
+              <span>Producten</span>
+            </button>
+            <button type="button" className={moduleView === 'templates' ? 'active' : ''} onClick={() => setModuleView('templates')}>
+              <DatabaseZap size={15} />
+              <span>Templates laden</span>
+            </button>
           </div>
-        ) : null}
+        </div>
 
         {message ? <div className="inline-notice success-notice">{message}</div> : null}
 
