@@ -5853,7 +5853,7 @@ function ExactConnectionPanel({
   }
 
   return (
-    <section className="panel">
+    <section className="panel scooter-table-panel">
       <div className="panel-title">
         <span className="panel-title-label"><Lock size={16} /> Exact koppeling</span>
         <button type="button" className="secondary-button panel-title-action" onClick={() => void loadStatus()}>
@@ -7446,7 +7446,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
           <label>Search: <input value={query} onChange={(event) => setQuery(event.target.value)} /></label>
         </div>
       </div>
-      <div className="table-wrap">
+      <div className="table-wrap scooter-table-wrap">
         <table>
           <thead>
             <tr>

@@ -1294,6 +1294,18 @@ textarea {
   padding: 0 0 8px;
 }
 
+.scooter-table-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: max(520px, calc(100vh - 320px));
+}
+
+.scooter-table-wrap {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
 .sales-table-wrap,
 .sales-detail-table-wrap,
 .scooter-packaging-table-wrap,
