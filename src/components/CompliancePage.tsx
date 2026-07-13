@@ -37,7 +37,7 @@ import type {
 
 type ComplianceModuleView = 'dashboard' | 'families' | 'unlinked' | 'documents' | 'templates' | 'packagingSuppliers';
 type ComplianceDetailTab = 'basic' | 'risks' | 'warnings' | 'requirements' | 'tests' | 'documents' | 'links' | 'revisions' | 'dossier';
-type ComplianceDashboardTab = 'requirements' | 'tests' | 'missingDocuments' | 'expiringDocuments' | 'expiredDocuments';
+type ComplianceDashboardTab = 'incomplete' | 'highRisk' | 'requirements' | 'tests' | 'missingDocuments' | 'expiringDocuments' | 'expiredDocuments';
 
 type CompliancePageProps = {
   products: Product[];
@@ -91,6 +91,8 @@ const detailTabs: Array<{ id: ComplianceDetailTab; label: string }> = [
 ];
 
 const dashboardTabs: Array<{ id: ComplianceDashboardTab; label: string }> = [
+  { id: 'incomplete', label: 'Incomplete dossiers' },
+  { id: 'highRisk', label: 'Hoog risico families' },
   { id: 'requirements', label: 'Keuringen' },
   { id: 'tests', label: 'Tests' },
   { id: 'missingDocuments', label: 'Ontbrekende documenten' },
@@ -208,7 +210,7 @@ export function CompliancePage({
 }: CompliancePageProps) {
   const [moduleView, setModuleView] = useState<ComplianceModuleView>('dashboard');
   const [detailTab, setDetailTab] = useState<ComplianceDetailTab>('basic');
-  const [dashboardTab, setDashboardTab] = useState<ComplianceDashboardTab>('requirements');
+  const [dashboardTab, setDashboardTab] = useState<ComplianceDashboardTab>('incomplete');
   const [familyQuery, setFamilyQuery] = useState('');
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('');
   const [saving, setSaving] = useState(false);
@@ -750,7 +752,7 @@ export function CompliancePage({
   }
 
   function renderDashboard() {
-    const dashboardTabTitle = dashboardTabs.find((tab) => tab.id === dashboardTab)?.label || 'Keuringen';
+    const dashboardTabTitle = dashboardTabs.find((tab) => tab.id === dashboardTab)?.label || 'Incomplete dossiers';
 
     return (
       <div className="compliance-view-stack">
@@ -790,47 +792,39 @@ export function CompliancePage({
           </div>
         </section>
 
-        <div className="compliance-dashboard-grid">
-          <section className="panel compliance-dashboard-panel">
-            <div className="panel-title">Incomplete dossiers</div>
-            <div className="compliance-panel-body compliance-dashboard-table">
-              {incompleteFamilies.length === 0 ? <p className="empty">Geen incomplete dossiers.</p> : incompleteFamilies.map(({ family, stats }) => (
-                <button type="button" key={family.id} className="compliance-dashboard-row" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); }}>
-                  <strong>{family.name}</strong>
-                  <div className="compliance-dashboard-row-progress">
-                    <div className="compliance-mini-progress">
-                      <div className="compliance-mini-progress-fill" style={{ width: `${stats.progress}%` }} />
-                    </div>
-                    <span>{stats.progress}%</span>
-                  </div>
-                  <span className="compliance-inline-status danger">{stats.activeLinks === 0 ? 'Gekoppelde producten' : 'Aanvullen'}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="panel compliance-dashboard-panel">
-            <div className="panel-title">Hoog risico families</div>
-            <div className="compliance-panel-body compliance-dashboard-table">
-              {highRiskFamilies.length === 0 ? <p className="empty">Geen hoog risico families.</p> : highRiskFamilies.map(({ family, stats }) => (
-                <button type="button" key={family.id} className="compliance-dashboard-row" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); }}>
-                  <div className="compliance-dashboard-risk-main">
-                    <strong>{family.name}</strong>
-                    <div className="compliance-dashboard-risk-tags">
-                      <span className="compliance-inline-status warning">{statusLabel(stats.calculatedStatus)}</span>
-                    </div>
-                  </div>
-                  <span className={`compliance-badge danger`}>{riskLabel(family.riskLevel)}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        </div>
-
         <section className="panel compliance-dashboard-panel">
           <div className="panel-title">{dashboardTabTitle}</div>
           <div className="compliance-panel-body compliance-dashboard-tab-panel">
             <div className="compliance-dashboard-table">
+              {dashboardTab === 'incomplete' && (
+                incompleteFamilies.length === 0 ? <p className="empty">Geen incomplete dossiers.</p> : incompleteFamilies.map(({ family, stats }) => (
+                  <button type="button" key={family.id} className="compliance-dashboard-row" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); }}>
+                    <strong>{family.name}</strong>
+                    <div className="compliance-dashboard-row-progress">
+                      <div className="compliance-mini-progress">
+                        <div className="compliance-mini-progress-fill" style={{ width: `${stats.progress}%` }} />
+                      </div>
+                      <span>{stats.progress}%</span>
+                    </div>
+                    <span className="compliance-inline-status danger">{stats.activeLinks === 0 ? 'Gekoppelde producten' : 'Aanvullen'}</span>
+                  </button>
+                ))
+              )}
+
+              {dashboardTab === 'highRisk' && (
+                highRiskFamilies.length === 0 ? <p className="empty">Geen hoog risico families.</p> : highRiskFamilies.map(({ family, stats }) => (
+                  <button type="button" key={family.id} className="compliance-dashboard-row" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); }}>
+                    <div className="compliance-dashboard-risk-main">
+                      <strong>{family.name}</strong>
+                      <div className="compliance-dashboard-risk-tags">
+                        <span className="compliance-inline-status warning">{statusLabel(stats.calculatedStatus)}</span>
+                      </div>
+                    </div>
+                    <span className={`compliance-badge danger`}>{riskLabel(family.riskLevel)}</span>
+                  </button>
+                ))
+              )}
+
               {dashboardTab === 'requirements' && (
                 familiesWithOpenRequirements.length === 0 ? <p className="empty">Alle verplichte keuringen zijn vervuld of nog niet vastgelegd.</p> : familiesWithOpenRequirements.map(({ family, stats }) => (
                   <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('requirements'); }}>
