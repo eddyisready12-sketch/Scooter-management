@@ -184,15 +184,71 @@ async function replaceFamilyScopedRecords(
 ) {
   if (!supabase || !familyId) return;
 
-  const { error: deleteError } = await supabase
+  const primaryDelete = await supabase
     .from(table)
     .delete()
     .eq('familyId', familyId);
 
-  if (deleteError) throw deleteError;
+  if (primaryDelete.error) {
+    const legacyDelete = await supabase
+      .from(table)
+      .delete()
+      .eq('family_id', familyId);
+
+    if (legacyDelete.error) throw primaryDelete.error;
+  }
+
   if (records.length === 0) return;
 
   await upsertWithSchemaFallback(table, records, fallbackMessage, attempts);
+}
+
+function normalizeComplianceFamily(row: Record<string, unknown>): ComplianceProductFamily {
+  return {
+    id: String(row.id ?? ''),
+    code: String(row.code ?? ''),
+    name: String(row.name ?? ''),
+    category: row.category ? String(row.category) : undefined,
+    description: row.description ? String(row.description) : undefined,
+    intendedUse: row.intendedUse ? String(row.intendedUse) : row.intended_use ? String(row.intended_use) : undefined,
+    foreseeableMisuse: row.foreseeableMisuse ? String(row.foreseeableMisuse) : row.foreseeable_misuse ? String(row.foreseeable_misuse) : undefined,
+    riskLevel: (row.riskLevel ?? row.risk_level ?? undefined) as ComplianceProductFamily['riskLevel'],
+    gpsrRequired: row.gpsrRequired === false || row.gpsr_required === false ? false : true,
+    noWarningsNeeded: Boolean(row.noWarningsNeeded ?? row.no_warnings_needed ?? false),
+    manualText: row.manualText ? String(row.manualText) : row.manual_text ? String(row.manual_text) : undefined,
+    manufacturerName: row.manufacturerName ? String(row.manufacturerName) : row.manufacturer_name ? String(row.manufacturer_name) : undefined,
+    manufacturerContact: row.manufacturerContact ? String(row.manufacturerContact) : row.manufacturer_contact ? String(row.manufacturer_contact) : undefined,
+    status: (row.status ?? undefined) as ComplianceProductFamily['status'],
+    notes: row.notes ? String(row.notes) : undefined,
+    createdAt: row.createdAt ? String(row.createdAt) : row.created_at ? String(row.created_at) : undefined,
+    updatedAt: row.updatedAt ? String(row.updatedAt) : row.updated_at ? String(row.updated_at) : undefined,
+  };
+}
+
+function normalizeComplianceLink(row: Record<string, unknown>): ComplianceProductLink {
+  return {
+    id: String(row.id ?? ''),
+    productId: String(row.productId ?? row.product_id ?? ''),
+    familyId: String(row.familyId ?? row.family_id ?? ''),
+    variantDescription: row.variantDescription ? String(row.variantDescription) : row.variant_description ? String(row.variant_description) : undefined,
+    technicalDifferences: row.technicalDifferences ? String(row.technicalDifferences) : row.technical_differences ? String(row.technical_differences) : undefined,
+    overrideWarnings: row.overrideWarnings ? String(row.overrideWarnings) : row.override_warnings ? String(row.override_warnings) : undefined,
+    overrideManual: row.overrideManual ? String(row.overrideManual) : row.override_manual ? String(row.override_manual) : undefined,
+    status: (row.status ?? 'active') as ComplianceProductLink['status'],
+    linkedBy: row.linkedBy ? String(row.linkedBy) : row.linked_by ? String(row.linked_by) : undefined,
+    createdAt: row.createdAt ? String(row.createdAt) : row.created_at ? String(row.created_at) : undefined,
+    updatedAt: row.updatedAt ? String(row.updatedAt) : row.updated_at ? String(row.updated_at) : undefined,
+  };
+}
+
+function normalizeFamilyScopedRecord<T extends { id: string; familyId: string }>(row: Record<string, unknown>) {
+  return {
+    ...row,
+    id: String(row.id ?? ''),
+    familyId: String(row.familyId ?? row.family_id ?? ''),
+    createdAt: row.createdAt ? String(row.createdAt) : row.created_at ? String(row.created_at) : undefined,
+    updatedAt: row.updatedAt ? String(row.updatedAt) : row.updated_at ? String(row.updated_at) : undefined,
+  } as unknown as T;
 }
 
 function normalizeSupplierContact(row: Record<string, unknown>): SupplierContact {
@@ -381,6 +437,33 @@ export async function loadSupabaseData(): Promise<Partial<AppData>> {
         }
         if (key === 'supplierContacts') {
           return [key, data.map(normalizeSupplierContact)] as const;
+        }
+        if (key === 'complianceFamilies') {
+          return [key, data.map(normalizeComplianceFamily)] as const;
+        }
+        if (key === 'complianceProductLinks') {
+          return [key, data.map(normalizeComplianceLink)] as const;
+        }
+        if (key === 'complianceFamilyRisks') {
+          return [key, data.map((row) => normalizeFamilyScopedRecord<ComplianceFamilyRisk>(row as Record<string, unknown>))] as const;
+        }
+        if (key === 'complianceFamilyWarnings') {
+          return [key, data.map((row) => normalizeFamilyScopedRecord<ComplianceFamilyWarning>(row as Record<string, unknown>))] as const;
+        }
+        if (key === 'complianceFamilyDocuments') {
+          return [key, data.map((row) => normalizeFamilyScopedRecord<ComplianceFamilyDocument>(row as Record<string, unknown>))] as const;
+        }
+        if (key === 'complianceFamilyRequirements') {
+          return [key, data.map((row) => normalizeFamilyScopedRecord<ComplianceFamilyRequirement>(row as Record<string, unknown>))] as const;
+        }
+        if (key === 'complianceFamilyTestPlans') {
+          return [key, data.map((row) => normalizeFamilyScopedRecord<ComplianceFamilyTestPlan>(row as Record<string, unknown>))] as const;
+        }
+        if (key === 'complianceProductTests') {
+          return [key, data.map((row) => normalizeFamilyScopedRecord<ComplianceProductTest>(row as Record<string, unknown>))] as const;
+        }
+        if (key === 'complianceFamilyRevisions') {
+          return [key, data.map((row) => normalizeFamilyScopedRecord<ComplianceFamilyRevision>(row as Record<string, unknown>))] as const;
         }
         return [key, data] as const;
       } catch {
