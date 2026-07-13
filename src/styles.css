@@ -6139,7 +6139,9 @@ dd {
 }
 
 .compliance-stat-grid {
+  display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
 }
 
 .compliance-stat-grid-large {
@@ -6281,6 +6283,20 @@ dd {
 .compliance-dashboard-table .empty {
   padding: 10px 12px;
   font-size: 12px;
+}
+
+.compliance-dashboard-tab-panel {
+  gap: 12px;
+}
+
+.compliance-tabs-compact {
+  padding: 0;
+}
+
+.compliance-tabs-compact button {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
 }
 
 .compliance-layout {

@@ -37,6 +37,7 @@ import type {
 
 type ComplianceModuleView = 'dashboard' | 'families' | 'unlinked' | 'documents' | 'templates' | 'packagingSuppliers';
 type ComplianceDetailTab = 'basic' | 'risks' | 'warnings' | 'requirements' | 'tests' | 'documents' | 'links' | 'revisions' | 'dossier';
+type ComplianceDashboardTab = 'requirements' | 'tests' | 'missingDocuments' | 'expiringDocuments' | 'expiredDocuments';
 
 type CompliancePageProps = {
   products: Product[];
@@ -87,6 +88,14 @@ const detailTabs: Array<{ id: ComplianceDetailTab; label: string }> = [
   { id: 'links', label: 'Gekoppelde producten' },
   { id: 'revisions', label: 'Revisies' },
   { id: 'dossier', label: 'Dossier genereren' },
+];
+
+const dashboardTabs: Array<{ id: ComplianceDashboardTab; label: string }> = [
+  { id: 'requirements', label: 'Keuringen' },
+  { id: 'tests', label: 'Tests' },
+  { id: 'missingDocuments', label: 'Ontbrekende documenten' },
+  { id: 'expiringDocuments', label: 'Verloopt binnenkort' },
+  { id: 'expiredDocuments', label: 'Verlopen documenten' },
 ];
 
 function formatDate(value?: string) {
@@ -199,6 +208,7 @@ export function CompliancePage({
 }: CompliancePageProps) {
   const [moduleView, setModuleView] = useState<ComplianceModuleView>('dashboard');
   const [detailTab, setDetailTab] = useState<ComplianceDetailTab>('basic');
+  const [dashboardTab, setDashboardTab] = useState<ComplianceDashboardTab>('requirements');
   const [familyQuery, setFamilyQuery] = useState('');
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('');
   const [saving, setSaving] = useState(false);
@@ -740,6 +750,8 @@ export function CompliancePage({
   }
 
   function renderDashboard() {
+    const dashboardTabTitle = dashboardTabs.find((tab) => tab.id === dashboardTab)?.label || 'Keuringen';
+
     return (
       <div className="compliance-view-stack">
         <div className="compliance-stat-grid compliance-stat-grid-large compliance-dashboard-topcards">
@@ -798,73 +810,77 @@ export function CompliancePage({
           </section>
         </div>
 
-        <div className="compliance-dashboard-grid compliance-dashboard-grid-secondary">
-          <section className="panel compliance-dashboard-panel">
-            <div className="panel-title">Ontbrekende verplichte keuringen <span className="compliance-inline-status danger">{familiesWithOpenRequirements.length}</span></div>
-            <div className="compliance-panel-body compliance-dashboard-table">
-              {familiesWithOpenRequirements.length === 0 ? <p className="empty">Alle verplichte keuringen zijn vervuld of nog niet vastgelegd.</p> : familiesWithOpenRequirements.map(({ family, stats }) => (
-                <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('requirements'); }}>
-                  <strong>{family.name}</strong>
-                  <span className="compliance-inline-status warning">{stats.openRequirementCount} open</span>
+        <section className="panel compliance-dashboard-panel">
+          <div className="panel-title">{dashboardTabTitle}</div>
+          <div className="compliance-panel-body compliance-dashboard-tab-panel">
+            <div className="compliance-tabs compliance-tabs-compact">
+              {dashboardTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={dashboardTab === tab.id ? 'active' : ''}
+                  onClick={() => setDashboardTab(tab.id)}
+                >
+                  {tab.label}
                 </button>
               ))}
             </div>
-          </section>
 
-          <section className="panel compliance-dashboard-panel">
-            <div className="panel-title">Openstaande verplichte tests <span className="compliance-inline-status danger">{familiesWithOpenTests.length}</span></div>
-            <div className="compliance-panel-body compliance-dashboard-table">
-              {familiesWithOpenTests.length === 0 ? <p className="empty">Alle verplichte tests zijn uitgevoerd of nog niet vastgelegd.</p> : familiesWithOpenTests.map(({ family, stats }) => (
-                <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('tests'); }}>
-                  <strong>{family.name}</strong>
-                  <span className="compliance-inline-status warning">{stats.openTestPlanCount} open</span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="panel compliance-dashboard-panel">
-            <div className="panel-title">Ontbrekende documenten <span className="compliance-inline-status danger">{familiesMissingDocuments.length}</span></div>
-            <div className="compliance-panel-body compliance-dashboard-table">
-              {familiesMissingDocuments.length === 0 ? <p className="empty">Alle families hebben minimaal een document.</p> : familiesMissingDocuments.map(({ family }) => (
-                <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('documents'); }}>
-                  <strong>{family.name}</strong>
-                  <span className="compliance-inline-status danger">Geen actief document gekoppeld</span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="panel compliance-dashboard-panel">
-            <div className="panel-title">Binnenkort verlopen documenten <span className="compliance-inline-status warning">{expiringDocuments.length}</span></div>
-            <div className="compliance-panel-body compliance-dashboard-table">
-              {expiringDocuments.length === 0 ? <p className="empty">Geen documenten verlopen binnen 60 dagen.</p> : expiringDocuments.map((document) => {
-                const family = families.find((item) => item.id === document.familyId);
-                return (
-                  <button type="button" key={document.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
-                    <strong>{family?.name || document.documentName}</strong>
-                    <span className="compliance-inline-status warning">{formatDate(document.validUntil)}</span>
+            <div className="compliance-dashboard-table">
+              {dashboardTab === 'requirements' && (
+                familiesWithOpenRequirements.length === 0 ? <p className="empty">Alle verplichte keuringen zijn vervuld of nog niet vastgelegd.</p> : familiesWithOpenRequirements.map(({ family, stats }) => (
+                  <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('requirements'); }}>
+                    <strong>{family.name}</strong>
+                    <span className="compliance-inline-status warning">{stats.openRequirementCount} open</span>
                   </button>
-                );
-              })}
-            </div>
-          </section>
+                ))
+              )}
 
-          <section className="panel compliance-dashboard-panel">
-            <div className="panel-title">Verlopen documenten <span className="compliance-inline-status danger">{expiredDocuments.length}</span></div>
-            <div className="compliance-panel-body compliance-dashboard-table">
-              {expiredDocuments.length === 0 ? <p className="empty">Geen verlopen documenten.</p> : expiredDocuments.map((document) => {
-                const family = families.find((item) => item.id === document.familyId);
-                return (
-                  <button type="button" key={document.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
-                    <strong>{family?.name || document.documentName}</strong>
-                    <span className="compliance-inline-status danger">{formatDate(document.validUntil)}</span>
+              {dashboardTab === 'tests' && (
+                familiesWithOpenTests.length === 0 ? <p className="empty">Alle verplichte tests zijn uitgevoerd of nog niet vastgelegd.</p> : familiesWithOpenTests.map(({ family, stats }) => (
+                  <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('tests'); }}>
+                    <strong>{family.name}</strong>
+                    <span className="compliance-inline-status warning">{stats.openTestPlanCount} open</span>
                   </button>
-                );
-              })}
+                ))
+              )}
+
+              {dashboardTab === 'missingDocuments' && (
+                familiesMissingDocuments.length === 0 ? <p className="empty">Alle families hebben minimaal een document.</p> : familiesMissingDocuments.map(({ family }) => (
+                  <button type="button" key={family.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('families'); setSelectedFamilyId(family.id); setDetailTab('documents'); }}>
+                    <strong>{family.name}</strong>
+                    <span className="compliance-inline-status danger">Geen actief document gekoppeld</span>
+                  </button>
+                ))
+              )}
+
+              {dashboardTab === 'expiringDocuments' && (
+                expiringDocuments.length === 0 ? <p className="empty">Geen documenten verlopen binnen 60 dagen.</p> : expiringDocuments.map((document) => {
+                  const family = families.find((item) => item.id === document.familyId);
+                  return (
+                    <button type="button" key={document.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
+                      <strong>{family?.name || document.documentName}</strong>
+                      <span className="compliance-inline-status warning">{formatDate(document.validUntil)}</span>
+                    </button>
+                  );
+                })
+              )}
+
+              {dashboardTab === 'expiredDocuments' && (
+                expiredDocuments.length === 0 ? <p className="empty">Geen verlopen documenten.</p> : expiredDocuments.map((document) => {
+                  const family = families.find((item) => item.id === document.familyId);
+                  return (
+                    <button type="button" key={document.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
+                      <strong>{family?.name || document.documentName}</strong>
+                      <span className="compliance-inline-status danger">{formatDate(document.validUntil)}</span>
+                    </button>
+                  );
+                })
+              )}
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
+
       </div>
     );
   }
