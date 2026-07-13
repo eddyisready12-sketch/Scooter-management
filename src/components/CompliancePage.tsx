@@ -773,6 +773,23 @@ export function CompliancePage({
           </article>
         </div>
 
+        <section className="panel compliance-dashboard-panel compliance-dashboard-tabs-shell">
+          <div className="compliance-panel-body compliance-dashboard-tab-panel">
+            <div className="compliance-tabs compliance-tabs-compact">
+              {dashboardTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={dashboardTab === tab.id ? 'active' : ''}
+                  onClick={() => setDashboardTab(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <div className="compliance-dashboard-grid">
           <section className="panel compliance-dashboard-panel">
             <div className="panel-title">Incomplete dossiers</div>
@@ -813,19 +830,6 @@ export function CompliancePage({
         <section className="panel compliance-dashboard-panel">
           <div className="panel-title">{dashboardTabTitle}</div>
           <div className="compliance-panel-body compliance-dashboard-tab-panel">
-            <div className="compliance-tabs compliance-tabs-compact">
-              {dashboardTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  className={dashboardTab === tab.id ? 'active' : ''}
-                  onClick={() => setDashboardTab(tab.id)}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
             <div className="compliance-dashboard-table">
               {dashboardTab === 'requirements' && (
                 familiesWithOpenRequirements.length === 0 ? <p className="empty">Alle verplichte keuringen zijn vervuld of nog niet vastgelegd.</p> : familiesWithOpenRequirements.map(({ family, stats }) => (

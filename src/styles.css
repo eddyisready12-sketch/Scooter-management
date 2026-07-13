@@ -6289,6 +6289,11 @@ dd {
   gap: 12px;
 }
 
+.compliance-dashboard-tabs-shell .compliance-panel-body {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
 .compliance-tabs-compact {
   padding: 0;
 }
