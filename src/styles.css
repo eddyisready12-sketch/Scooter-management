@@ -6696,9 +6696,18 @@ dd {
   text-transform: uppercase;
 }
 
+.compliance-linked-products-actions-heading {
+  text-align: right;
+}
+
 .compliance-linked-products-row {
   border-top: 1px solid #edf1f5;
   background: #fff;
+}
+
+.compliance-linked-products-row strong,
+.compliance-linked-products-row span {
+  min-width: 0;
 }
 
 .compliance-linked-products-button {
@@ -6709,6 +6718,35 @@ dd {
 
 .compliance-linked-products-button:hover {
   background: #f8fbff;
+}
+
+.compliance-link-add-field {
+  max-width: 320px;
+  margin-left: auto;
+}
+
+.compliance-linked-product-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.compliance-row-action-button {
+  min-width: 120px;
+}
+
+.compliance-linked-product-actions .secondary-button,
+.compliance-linked-product-actions .danger-button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.compliance-linked-product-actions .danger-button {
+  border-color: #f0cdcd;
+  background: #fff7f7;
 }
 
 .packaging-supplier-stat-grid {
@@ -6935,11 +6973,24 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .compliance-linked-products-actions-heading {
+    text-align: left;
+  }
+
   .compliance-link-toolbar,
   .compliance-pagination,
   .compliance-family-detail-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .compliance-link-add-field {
+    max-width: none;
+    margin-left: 0;
+  }
+
+  .compliance-linked-product-actions {
+    justify-content: flex-start;
   }
 
   .compliance-family-table-toolbar,

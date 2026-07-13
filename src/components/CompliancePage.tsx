@@ -1313,10 +1313,10 @@ export function CompliancePage({
                           <Search size={16} />
                           <input value={linkSearch} onChange={(event) => { setLinkSearch(event.target.value); setLinkPage(1); }} placeholder="Zoek in gekoppelde producten" />
                         </div>
-                        <div className="search-field">
+                        <label className="search-field compliance-link-add-field">
                           <Plus size={16} />
-                          <input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Koppel bestaand product" />
-                        </div>
+                          <input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Zoek product om te koppelen" />
+                        </label>
                       </div>
 
                       {productSearch.trim() ? (
@@ -1336,7 +1336,7 @@ export function CompliancePage({
                           <span>Artikelnummer</span>
                           <span>Omschrijving</span>
                           <span>Categorie</span>
-                          <span>Actie</span>
+                          <span className="compliance-linked-products-actions-heading">Acties</span>
                         </div>
                         {pagedLinkedProducts.map(({ link, product }) => (
                           <div className="compliance-linked-products-row" key={link.id}>
@@ -1344,8 +1344,8 @@ export function CompliancePage({
                             <span>{product?.description || link.variantDescription || '-'}</span>
                             <span>{product?.articleGroup || link.variantDescription || '-'}</span>
                             <div className="compliance-linked-product-actions">
-                              {product ? <button type="button" className="secondary-button" onClick={() => onSelectProduct(product, 'gpsr')}>Open product</button> : null}
-                              <button type="button" className="danger-button" onClick={() => void deactivateLink(link.id)} disabled={saving}>Ontkoppel</button>
+                              {product ? <button type="button" className="secondary-button compliance-row-action-button" onClick={() => onSelectProduct(product, 'gpsr')}>Open product</button> : null}
+                              <button type="button" className="danger-button compliance-row-action-button" onClick={() => void deactivateLink(link.id)} disabled={saving}>Ontkoppel</button>
                             </div>
                           </div>
                         ))}
