@@ -149,6 +149,23 @@ function riskLabel(value?: string) {
   }
 }
 
+function familyDocumentationLabel(value?: string) {
+  switch (value) {
+    case 'complete':
+      return 'Documentatie compleet';
+    case 'partial':
+    case 'in_review':
+      return 'Documentatie gedeeltelijk compleet';
+    case 'not_applicable':
+      return 'Niet van toepassing';
+    case 'archived':
+      return 'Archief';
+    case 'concept':
+    default:
+      return 'Concept';
+  }
+}
+
 function expiryState(value?: string) {
   if (!value) return 'none';
   const days = (new Date(value).getTime() - Date.now()) / 86400000;
@@ -212,6 +229,8 @@ export function CompliancePage({
   const [detailTab, setDetailTab] = useState<ComplianceDetailTab>('basic');
   const [dashboardTab, setDashboardTab] = useState<ComplianceDashboardTab>('incomplete');
   const [familyQuery, setFamilyQuery] = useState('');
+  const [familyCategoryFilter, setFamilyCategoryFilter] = useState('all');
+  const [familyStatusFilter, setFamilyStatusFilter] = useState('all');
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [productSearch, setProductSearch] = useState('');
@@ -258,10 +277,21 @@ export function CompliancePage({
     stats: getComplianceFamilyStats(family, risks, warnings, documents, requirements, testPlans, tests, links),
   })), [documents, families, links, requirements, risks, testPlans, tests, warnings]);
 
-  const filteredFamilies = useMemo(() => familyRows.filter(({ family }) => {
+  const filteredFamilies = useMemo(() => familyRows.filter(({ family, stats }) => {
     const haystack = `${family.code} ${family.name} ${family.category ?? ''}`.toLowerCase();
-    return haystack.includes(familyQuery.toLowerCase());
-  }), [familyQuery, familyRows]);
+    const matchesQuery = haystack.includes(familyQuery.toLowerCase());
+    const matchesCategory = familyCategoryFilter === 'all' || (family.category || '') === familyCategoryFilter;
+    const matchesStatus = familyStatusFilter === 'all' || (stats.calculatedStatus || 'concept') === familyStatusFilter;
+    return matchesQuery && matchesCategory && matchesStatus;
+  }), [familyCategoryFilter, familyQuery, familyRows, familyStatusFilter]);
+
+  const familyCategories = useMemo(() => Array.from(new Set(
+    familyRows.map(({ family }) => family.category || '').filter(Boolean),
+  )).sort((left, right) => left.localeCompare(right, 'nl')), [familyRows]);
+
+  const familyStatuses = useMemo(() => Array.from(new Set(
+    familyRows.map(({ stats }) => stats.calculatedStatus || 'concept'),
+  )), [familyRows]);
 
   const linkedProductIds = useMemo(() => new Set(
     links.filter((link) => (link.status ?? 'active') === 'active').map((link) => link.productId),
@@ -887,37 +917,76 @@ export function CompliancePage({
     const selectedStats = draftFamily ? getComplianceFamilyStats(draftFamily, draftRisks, draftWarnings, draftDocuments, draftRequirements, draftTestPlans, draftTests, draftLinks) : null;
 
     return (
-      <div className="compliance-layout">
-        <section className="panel compliance-family-list">
-          <div className="panel-title">
+      <div className="compliance-view-stack">
+        <section className="panel compliance-family-table-panel">
+          <div className="panel-title compliance-family-table-header">
             <span className="panel-title-label">Productfamilies</span>
             <button type="button" className="primary-button" onClick={createNewFamily}><Plus size={14} /> Nieuwe familie</button>
           </div>
-          <div className="compliance-family-toolbar">
+          <div className="compliance-family-table-toolbar">
             <div className="search-field">
               <Search size={16} />
               <input value={familyQuery} onChange={(event) => setFamilyQuery(event.target.value)} placeholder="Zoeken op naam of code..." />
             </div>
+            <select value={familyCategoryFilter} onChange={(event) => setFamilyCategoryFilter(event.target.value)}>
+              <option value="all">Alle categorieen</option>
+              {familyCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+            <select value={familyStatusFilter} onChange={(event) => setFamilyStatusFilter(event.target.value)}>
+              <option value="all">Alle statussen</option>
+              {familyStatuses.map((status) => <option key={status} value={status}>{familyDocumentationLabel(status)}</option>)}
+            </select>
           </div>
-          <div className="compliance-family-scroll compact">
-            {filteredFamilies.map(({ family, stats }) => (
-              <button
-                type="button"
-                key={family.id}
-                className={`compliance-family-compact-item ${selectedFamilyId === family.id ? 'active' : ''}`}
-                onClick={() => { setSelectedFamilyId(family.id); setDetailTab('basic'); }}
-              >
-                <div className="compliance-family-compact-top">
-                  <strong>{family.code}</strong>
-                  <span className={`compliance-status-pill ${stats.calculatedStatus}`}>{statusLabel(stats.calculatedStatus)}</span>
-                </div>
-                <div className="compliance-family-compact-name">{family.name}</div>
-                <div className="compliance-family-compact-meta">
-                  <span>{stats.activeLinks} producten</span>
-                  <span>{stats.progress}% compleet</span>
-                </div>
-              </button>
-            ))}
+
+          <div className="compliance-family-table-scroll">
+            <table className="compliance-family-table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Naam</th>
+                  <th>Categorie</th>
+                  <th>Risico</th>
+                  <th>Producten</th>
+                  <th>Status</th>
+                  <th>Acties</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredFamilies.map(({ family, stats }) => (
+                  <tr key={family.id} className={selectedFamilyId === family.id ? 'active' : ''}>
+                    <td><strong>{family.code || '-'}</strong></td>
+                    <td>
+                      <button type="button" className="compliance-family-link-button" onClick={() => { setSelectedFamilyId(family.id); setDetailTab('basic'); }}>
+                        {family.name}
+                      </button>
+                    </td>
+                    <td>{family.category || '-'}</td>
+                    <td>
+                      <span className={`compliance-badge ${family.riskLevel === 'low' ? 'success' : family.riskLevel === 'medium' ? 'warning' : 'danger'}`}>
+                        {riskLabel(family.riskLevel)}
+                      </span>
+                    </td>
+                    <td>{stats.activeLinks}</td>
+                    <td>
+                      <span className={`compliance-status-pill ${stats.calculatedStatus}`}>
+                        {familyDocumentationLabel(stats.calculatedStatus)}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="compliance-family-table-actions">
+                        <button type="button" className="secondary-button" onClick={() => { setSelectedFamilyId(family.id); setDetailTab('basic'); }}>Detail</button>
+                        <button type="button" className="secondary-button" onClick={() => { setSelectedFamilyId(family.id); setDetailTab('basic'); }}>Bewerken</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredFamilies.length === 0 ? (
+                  <tr>
+                    <td colSpan={7}><p className="empty">Geen productfamilies gevonden voor deze filters.</p></td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
           </div>
         </section>
 

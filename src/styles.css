@@ -6311,6 +6311,76 @@ dd {
   align-items: start;
 }
 
+.compliance-family-table-header {
+  align-items: center;
+}
+
+.compliance-family-table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid #edf1f5;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.compliance-family-table-toolbar .search-field {
+  flex: 1 1 280px;
+}
+
+.compliance-family-table-toolbar select {
+  min-width: 170px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #cfd7df;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.compliance-family-table-scroll {
+  overflow: auto;
+  padding: 0 12px 12px;
+}
+
+.compliance-family-table {
+  width: 100%;
+  min-width: 980px;
+}
+
+.compliance-family-table thead th {
+  color: #6b7885;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.compliance-family-table tbody tr.active {
+  background: #f6f9ff;
+}
+
+.compliance-family-table tbody td {
+  vertical-align: middle;
+}
+
+.compliance-family-link-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #2c74d8;
+  font-weight: 600;
+  text-align: left;
+}
+
+.compliance-family-link-button:hover {
+  text-decoration: underline;
+}
+
+.compliance-family-table-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .compliance-family-toolbar,
 .compliance-panel-body {
   padding: 16px;
@@ -6868,6 +6938,12 @@ dd {
   .compliance-link-toolbar,
   .compliance-pagination,
   .compliance-family-detail-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .compliance-family-table-toolbar,
+  .compliance-family-table-actions {
     flex-direction: column;
     align-items: stretch;
   }
