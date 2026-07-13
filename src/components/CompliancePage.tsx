@@ -672,11 +672,10 @@ export function CompliancePage({
     setProductSearch('');
   }
 
-  function deactivateLink(linkId: string) {
-    setDraftLinks((current) => current.map((link) => (link.id === linkId ? { ...link, status: 'inactive' } : link)));
-  }
-
-  async function saveFamilyBundle() {
+  async function saveFamilyBundle(overrides?: {
+    links?: ComplianceProductLink[];
+    revisions?: ComplianceFamilyRevision[];
+  }) {
     if (!draftFamily) return;
     setSaving(true);
     try {
@@ -688,17 +687,37 @@ export function CompliancePage({
         requirements: draftRequirements,
         testPlans: draftTestPlans,
         tests: draftTests,
-        revisions: draftRevisions.length > 0 ? draftRevisions : [{
+        revisions: overrides?.revisions ?? (draftRevisions.length > 0 ? draftRevisions : [{
           id: createComplianceEntityId('compliance-revision'),
           familyId: draftFamily.id,
           changeNote: 'Familie opgeslagen',
           createdAt: new Date().toISOString(),
-        }],
-        links: draftLinks,
+        }]),
+        links: overrides?.links ?? draftLinks,
       });
     } finally {
       setSaving(false);
     }
+  }
+
+  async function deactivateLink(linkId: string) {
+    if (!draftFamily) return;
+
+    const removedLink = draftLinks.find((link) => link.id === linkId);
+    const nextLinks = draftLinks.filter((link) => link.id !== linkId);
+    const nextRevisions = [{
+      id: createComplianceEntityId('compliance-revision'),
+      familyId: draftFamily.id,
+      changeNote: removedLink?.productId ? `Product ontkoppeld (${removedLink.productId})` : 'Product ontkoppeld',
+      createdAt: new Date().toISOString(),
+    }, ...draftRevisions];
+
+    setDraftLinks(nextLinks);
+    setDraftRevisions(nextRevisions);
+    await saveFamilyBundle({
+      links: nextLinks,
+      revisions: nextRevisions,
+    });
   }
 
   function openDossierPreview() {
@@ -1307,7 +1326,7 @@ export function CompliancePage({
                             <span>{product?.articleGroup || link.variantDescription || '-'}</span>
                             <div className="compliance-linked-product-actions">
                               {product ? <button type="button" className="secondary-button" onClick={() => onSelectProduct(product, 'gpsr')}>Open product</button> : null}
-                              <button type="button" className="danger-button" onClick={() => deactivateLink(link.id)}>Ontkoppel</button>
+                              <button type="button" className="danger-button" onClick={() => void deactivateLink(link.id)} disabled={saving}>Ontkoppel</button>
                             </div>
                           </div>
                         ))}

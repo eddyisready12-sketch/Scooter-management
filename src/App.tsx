@@ -4009,16 +4009,18 @@ export function App() {
         createdAt: revision.createdAt || new Date().toISOString(),
       }))
       .filter((revision) => revision.changeNote);
-    const nextLinks = payload.links.map((link) => ({
-      ...link,
-      familyId: nextFamily.id,
-      variantDescription: link.variantDescription?.trim() || undefined,
-      technicalDifferences: link.technicalDifferences?.trim() || undefined,
-      overrideWarnings: link.overrideWarnings?.trim() || undefined,
-      overrideManual: link.overrideManual?.trim() || undefined,
-      linkedBy: link.linkedBy?.trim() || undefined,
-      status: link.status ?? 'active',
-    }));
+    const nextLinks = payload.links
+      .map((link) => ({
+        ...link,
+        familyId: nextFamily.id,
+        variantDescription: link.variantDescription?.trim() || undefined,
+        technicalDifferences: link.technicalDifferences?.trim() || undefined,
+        overrideWarnings: link.overrideWarnings?.trim() || undefined,
+        overrideManual: link.overrideManual?.trim() || undefined,
+        linkedBy: link.linkedBy?.trim() || undefined,
+        status: link.status ?? 'active',
+      }))
+      .filter((link) => link.status === 'active');
 
     setData((current) => {
       const familyMap = new Map(current.complianceFamilies.map((family) => [family.id, family]));
