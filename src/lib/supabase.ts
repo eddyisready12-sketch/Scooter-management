@@ -184,23 +184,70 @@ async function replaceFamilyScopedRecords(
 ) {
   if (!supabase || !familyId) return;
 
-  const primaryDelete = await supabase
-    .from(table)
-    .delete()
-    .eq('familyId', familyId);
+  let deleted = false;
+  let lastError: Error | null = null;
 
-  if (primaryDelete.error) {
-    const legacyDelete = await supabase
+  for (const column of ['familyId', 'family_id', 'familyid']) {
+    const result = await supabase
       .from(table)
       .delete()
-      .eq('family_id', familyId);
+      .eq(column, familyId);
 
-    if (legacyDelete.error) throw primaryDelete.error;
+    if (!result.error) {
+      deleted = true;
+      continue;
+    }
+
+    lastError = result.error;
   }
+
+  if (!deleted && lastError) throw lastError;
 
   if (records.length === 0) return;
 
   await upsertWithSchemaFallback(table, records, fallbackMessage, attempts);
+}
+
+function addComplianceAliases(record: Record<string, unknown>) {
+  const next = { ...record };
+
+  if (typeof next.familyId === 'string') {
+    next.family_id = next.familyId;
+    next.familyid = next.familyId;
+  }
+  if (typeof next.productId === 'string') {
+    next.product_id = next.productId;
+    next.productid = next.productId;
+  }
+  if (typeof next.planId === 'string') {
+    next.plan_id = next.planId;
+    next.planid = next.planId;
+  }
+  if (typeof next.requirementId === 'string') {
+    next.requirement_id = next.requirementId;
+    next.requirementid = next.requirementId;
+  }
+  if (typeof next.warningTextNl === 'string') next.warning_text_nl = next.warningTextNl;
+  if (typeof next.warningTextEn === 'string') next.warning_text_en = next.warningTextEn;
+  if (typeof next.riskLevel === 'string') next.risk_level = next.riskLevel;
+  if (typeof next.intendedUse === 'string') next.intended_use = next.intendedUse;
+  if (typeof next.foreseeableMisuse === 'string') next.foreseeable_misuse = next.foreseeableMisuse;
+  if (typeof next.noWarningsNeeded === 'boolean') next.no_warnings_needed = next.noWarningsNeeded;
+  if (typeof next.manualText === 'string') next.manual_text = next.manualText;
+  if (typeof next.manufacturerName === 'string') next.manufacturer_name = next.manufacturerName;
+  if (typeof next.manufacturerContact === 'string') next.manufacturer_contact = next.manufacturerContact;
+  if (typeof next.validFrom === 'string') next.valid_from = next.validFrom;
+  if (typeof next.validUntil === 'string') next.valid_until = next.validUntil;
+  if (typeof next.variantDescription === 'string') next.variant_description = next.variantDescription;
+  if (typeof next.technicalDifferences === 'string') next.technical_differences = next.technicalDifferences;
+  if (typeof next.overrideWarnings === 'string') next.override_warnings = next.overrideWarnings;
+  if (typeof next.overrideManual === 'string') next.override_manual = next.overrideManual;
+  if (typeof next.linkedBy === 'string') next.linked_by = next.linkedBy;
+  if (typeof next.changedBy === 'string') next.changed_by = next.changedBy;
+  if (typeof next.createdAt === 'string') next.created_at = next.createdAt;
+  if (typeof next.updatedAt === 'string') next.updated_at = next.updatedAt;
+
+  return next;
 }
 
 function normalizeComplianceFamily(row: Record<string, unknown>): ComplianceProductFamily {
@@ -228,8 +275,8 @@ function normalizeComplianceFamily(row: Record<string, unknown>): ComplianceProd
 function normalizeComplianceLink(row: Record<string, unknown>): ComplianceProductLink {
   return {
     id: String(row.id ?? ''),
-    productId: String(row.productId ?? row.product_id ?? ''),
-    familyId: String(row.familyId ?? row.family_id ?? ''),
+    productId: String(row.productId ?? row.product_id ?? row.productid ?? ''),
+    familyId: String(row.familyId ?? row.family_id ?? row.familyid ?? ''),
     variantDescription: row.variantDescription ? String(row.variantDescription) : row.variant_description ? String(row.variant_description) : undefined,
     technicalDifferences: row.technicalDifferences ? String(row.technicalDifferences) : row.technical_differences ? String(row.technical_differences) : undefined,
     overrideWarnings: row.overrideWarnings ? String(row.overrideWarnings) : row.override_warnings ? String(row.override_warnings) : undefined,
@@ -245,7 +292,7 @@ function normalizeFamilyScopedRecord<T extends { id: string; familyId: string }>
   return {
     ...row,
     id: String(row.id ?? ''),
-    familyId: String(row.familyId ?? row.family_id ?? ''),
+    familyId: String(row.familyId ?? row.family_id ?? row.familyid ?? ''),
     createdAt: row.createdAt ? String(row.createdAt) : row.created_at ? String(row.created_at) : undefined,
     updatedAt: row.updatedAt ? String(row.updatedAt) : row.updated_at ? String(row.updated_at) : undefined,
   } as unknown as T;
@@ -689,7 +736,7 @@ export async function upsertDealers(dealers: Dealer[]) {
 export async function upsertComplianceFamilies(families: ComplianceProductFamily[]) {
   await upsertWithSchemaFallback(
     'compliance_product_families',
-    families.map((family) => ({ ...family }) as Record<string, unknown>),
+    families.map((family) => addComplianceAliases({ ...family }) as Record<string, unknown>),
     'Compliance families opslaan mislukt: Supabase schema mist meerdere compliance kolommen.',
   );
 }
@@ -697,7 +744,7 @@ export async function upsertComplianceFamilies(families: ComplianceProductFamily
 export async function upsertComplianceFamilyRisks(risks: ComplianceFamilyRisk[]) {
   await upsertWithSchemaFallback(
     'compliance_family_risks',
-    risks.map((risk) => ({ ...risk }) as Record<string, unknown>),
+    risks.map((risk) => addComplianceAliases({ ...risk }) as Record<string, unknown>),
     'Compliance risicoanalyse opslaan mislukt: Supabase schema mist meerdere risico kolommen.',
   );
 }
@@ -705,7 +752,7 @@ export async function upsertComplianceFamilyRisks(risks: ComplianceFamilyRisk[])
 export async function upsertComplianceFamilyWarnings(warnings: ComplianceFamilyWarning[]) {
   await upsertWithSchemaFallback(
     'compliance_family_warnings',
-    warnings.map((warning) => ({ ...warning }) as Record<string, unknown>),
+    warnings.map((warning) => addComplianceAliases({ ...warning }) as Record<string, unknown>),
     'Compliance waarschuwingen opslaan mislukt: Supabase schema mist meerdere waarschuwing kolommen.',
   );
 }
@@ -713,7 +760,7 @@ export async function upsertComplianceFamilyWarnings(warnings: ComplianceFamilyW
 export async function upsertComplianceFamilyDocuments(documents: ComplianceFamilyDocument[]) {
   await upsertWithSchemaFallback(
     'compliance_family_documents',
-    documents.map((document) => ({ ...document }) as Record<string, unknown>),
+    documents.map((document) => addComplianceAliases({ ...document }) as Record<string, unknown>),
     'Compliance documenten opslaan mislukt: Supabase schema mist meerdere document kolommen.',
   );
 }
@@ -721,7 +768,7 @@ export async function upsertComplianceFamilyDocuments(documents: ComplianceFamil
 export async function upsertComplianceFamilyRequirements(requirements: ComplianceFamilyRequirement[]) {
   await upsertWithSchemaFallback(
     'compliance_family_requirements',
-    requirements.map((requirement) => ({ ...requirement }) as Record<string, unknown>),
+    requirements.map((requirement) => addComplianceAliases({ ...requirement }) as Record<string, unknown>),
     'Compliance keuringseisen opslaan mislukt: Supabase schema mist meerdere requirement kolommen.',
   );
 }
@@ -729,7 +776,7 @@ export async function upsertComplianceFamilyRequirements(requirements: Complianc
 export async function upsertComplianceFamilyTestPlans(testPlans: ComplianceFamilyTestPlan[]) {
   await upsertWithSchemaFallback(
     'compliance_family_test_plans',
-    testPlans.map((plan) => ({ ...plan }) as Record<string, unknown>),
+    testPlans.map((plan) => addComplianceAliases({ ...plan }) as Record<string, unknown>),
     'Compliance testplannen opslaan mislukt: Supabase schema mist meerdere testplan kolommen.',
   );
 }
@@ -737,7 +784,7 @@ export async function upsertComplianceFamilyTestPlans(testPlans: ComplianceFamil
 export async function upsertComplianceProductTests(tests: ComplianceProductTest[]) {
   await upsertWithSchemaFallback(
     'compliance_product_tests',
-    tests.map((test) => ({ ...test }) as Record<string, unknown>),
+    tests.map((test) => addComplianceAliases({ ...test }) as Record<string, unknown>),
     'Compliance testregistraties opslaan mislukt: Supabase schema mist meerdere test kolommen.',
   );
 }
@@ -745,7 +792,7 @@ export async function upsertComplianceProductTests(tests: ComplianceProductTest[
 export async function upsertComplianceFamilyRevisions(revisions: ComplianceFamilyRevision[]) {
   await upsertWithSchemaFallback(
     'compliance_family_revisions',
-    revisions.map((revision) => ({ ...revision }) as Record<string, unknown>),
+    revisions.map((revision) => addComplianceAliases({ ...revision }) as Record<string, unknown>),
     'Compliance revisies opslaan mislukt: Supabase schema mist meerdere revisie kolommen.',
   );
 }
@@ -753,7 +800,7 @@ export async function upsertComplianceFamilyRevisions(revisions: ComplianceFamil
 export async function upsertComplianceProductLinks(links: ComplianceProductLink[]) {
   await upsertWithSchemaFallback(
     'compliance_product_links',
-    links.map((link) => ({ ...link }) as Record<string, unknown>),
+    links.map((link) => addComplianceAliases({ ...link }) as Record<string, unknown>),
     'Compliance productkoppelingen opslaan mislukt: Supabase schema mist meerdere link kolommen.',
   );
 }
@@ -762,7 +809,7 @@ export async function replaceComplianceFamilyRisks(familyId: string, risks: Comp
   await replaceFamilyScopedRecords(
     'compliance_family_risks',
     familyId,
-    risks.map((risk) => ({ ...risk }) as Record<string, unknown>),
+    risks.map((risk) => addComplianceAliases({ ...risk }) as Record<string, unknown>),
     'Compliance risicoanalyse opslaan mislukt: Supabase schema mist meerdere risico kolommen.',
   );
 }
@@ -771,7 +818,7 @@ export async function replaceComplianceFamilyWarnings(familyId: string, warnings
   await replaceFamilyScopedRecords(
     'compliance_family_warnings',
     familyId,
-    warnings.map((warning) => ({ ...warning }) as Record<string, unknown>),
+    warnings.map((warning) => addComplianceAliases({ ...warning }) as Record<string, unknown>),
     'Compliance waarschuwingen opslaan mislukt: Supabase schema mist meerdere waarschuwing kolommen.',
   );
 }
@@ -780,7 +827,7 @@ export async function replaceComplianceFamilyDocuments(familyId: string, documen
   await replaceFamilyScopedRecords(
     'compliance_family_documents',
     familyId,
-    documents.map((document) => ({ ...document }) as Record<string, unknown>),
+    documents.map((document) => addComplianceAliases({ ...document }) as Record<string, unknown>),
     'Compliance documenten opslaan mislukt: Supabase schema mist meerdere document kolommen.',
   );
 }
@@ -789,7 +836,7 @@ export async function replaceComplianceFamilyRequirements(familyId: string, requ
   await replaceFamilyScopedRecords(
     'compliance_family_requirements',
     familyId,
-    requirements.map((requirement) => ({ ...requirement }) as Record<string, unknown>),
+    requirements.map((requirement) => addComplianceAliases({ ...requirement }) as Record<string, unknown>),
     'Compliance keuringseisen opslaan mislukt: Supabase schema mist meerdere requirement kolommen.',
   );
 }
@@ -798,7 +845,7 @@ export async function replaceComplianceFamilyTestPlans(familyId: string, testPla
   await replaceFamilyScopedRecords(
     'compliance_family_test_plans',
     familyId,
-    testPlans.map((plan) => ({ ...plan }) as Record<string, unknown>),
+    testPlans.map((plan) => addComplianceAliases({ ...plan }) as Record<string, unknown>),
     'Compliance testplannen opslaan mislukt: Supabase schema mist meerdere testplan kolommen.',
   );
 }
@@ -807,7 +854,7 @@ export async function replaceComplianceProductTests(familyId: string, tests: Com
   await replaceFamilyScopedRecords(
     'compliance_product_tests',
     familyId,
-    tests.map((test) => ({ ...test }) as Record<string, unknown>),
+    tests.map((test) => addComplianceAliases({ ...test }) as Record<string, unknown>),
     'Compliance testregistraties opslaan mislukt: Supabase schema mist meerdere test kolommen.',
   );
 }
@@ -816,7 +863,7 @@ export async function replaceComplianceFamilyRevisions(familyId: string, revisio
   await replaceFamilyScopedRecords(
     'compliance_family_revisions',
     familyId,
-    revisions.map((revision) => ({ ...revision }) as Record<string, unknown>),
+    revisions.map((revision) => addComplianceAliases({ ...revision }) as Record<string, unknown>),
     'Compliance revisies opslaan mislukt: Supabase schema mist meerdere revisie kolommen.',
   );
 }
@@ -825,7 +872,7 @@ export async function replaceComplianceProductLinks(familyId: string, links: Com
   await replaceFamilyScopedRecords(
     'compliance_product_links',
     familyId,
-    links.map((link) => ({ ...link }) as Record<string, unknown>),
+    links.map((link) => addComplianceAliases({ ...link }) as Record<string, unknown>),
     'Compliance productkoppelingen opslaan mislukt: Supabase schema mist meerdere link kolommen.',
   );
 }
