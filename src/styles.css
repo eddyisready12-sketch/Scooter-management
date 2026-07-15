@@ -6507,6 +6507,11 @@ dd {
   color: #8a4b00;
 }
 
+.compliance-status-pill.danger {
+  background: #fff0f0;
+  color: #b42318;
+}
+
 .compliance-status-pill.concept,
 .compliance-status-pill.archived,
 .compliance-status-pill.not_applicable,
@@ -6772,6 +6777,10 @@ dd {
   gap: 12px;
 }
 
+.packaging-supplier-summary-grid.single-status {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .packaging-supplier-summary-card {
   display: grid;
   gap: 6px;
@@ -6808,6 +6817,73 @@ dd {
 .packaging-supplier-summary-card.is-warning {
   border-color: #ffd699;
   background: #fffaf0;
+}
+
+.packaging-supplier-summary-card.status-compleet {
+  border-color: #b9e3c5;
+  background: #f4fcf6;
+}
+
+.packaging-supplier-summary-card.status-aanvullen {
+  border-color: #ffd699;
+  background: #fffaf0;
+}
+
+.packaging-supplier-summary-card.status-geblokkeerd {
+  border-color: #f1b8b8;
+  background: #fff5f5;
+}
+
+.supplier-profile-stack {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.supplier-profile-layer {
+  padding: 16px;
+  border: 1px solid #dce4eb;
+  border-radius: 12px;
+  background: #f9fbfd;
+}
+
+.supplier-profile-layer-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.supplier-profile-layer .profile-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.compliance-linked-products-table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.compliance-linked-products-total {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1.5fr) minmax(0, 1fr) 220px;
+  gap: 12px;
+  padding: 12px 14px;
+  border-top: 2px solid #d8e1e9;
+  background: #f8fafc;
+}
+
+.compliance-linked-products-total > :first-child {
+  grid-column: 1 / 4;
+}
+
+.compliance-linked-products-total > :last-child {
+  grid-column: 4;
+}
+
+@media (max-width: 1100px) {
+  .supplier-profile-layer .profile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .compliance-checkbox-label {

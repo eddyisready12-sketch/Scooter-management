@@ -41,6 +41,7 @@ import rsoLogoUrl from './assets/rso-logo.png';
 import { CompliancePage } from './components/CompliancePage';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseExactBatchTransactionsImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
+import { migratePpwrLocalStorage, migrateSupplierPpwr, ppwrSupplierStatus } from './lib/ppwr-suppliers';
 import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceComplianceFamilyDocuments, replaceComplianceFamilyRequirements, replaceComplianceFamilyRevisions, replaceComplianceFamilyRisks, replaceComplianceFamilyTestPlans, replaceComplianceFamilyWarnings, replaceComplianceProductLinks, replaceComplianceProductTests, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRequirements, upsertComplianceFamilyRevisions, upsertComplianceFamilyRisks, upsertComplianceFamilyTestPlans, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertComplianceProductTests, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
@@ -2695,14 +2696,7 @@ function displaySupplierName(suppliers: Supplier[], value?: string) {
 }
 
 function hasPpwrSupplierProfile(supplier?: Supplier) {
-  if (!supplier || supplier.active === false || supplier.isPackagingSupplier !== true) return false;
-  return Boolean(
-    supplier.packagingMaterials?.trim()
-    && supplier.ppwrSupplierRole
-    && supplier.ppwrResponsibility
-    && supplier.ppwrContractStatus === 'Actief'
-    && (supplier.ppwrDeclarationStatus === 'Ontvangen' || supplier.ppwrDeclarationStatus === 'Goedgekeurd'),
-  );
+  return Boolean(supplier && supplier.active !== false && supplier.isPackagingSupplier === true && ppwrSupplierStatus(supplier) === 'compleet');
 }
 
 function parseDecimal(value?: string | number | null) {
@@ -3476,12 +3470,20 @@ export function App() {
   }
 
   useEffect(() => {
+    migratePpwrLocalStorage();
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
     async function hydrate() {
       try {
         const remote = await loadSupabaseData();
         if (mounted && Object.keys(remote).length > 0) {
-          setData((current) => ({ ...current, ...remote }));
+          setData((current) => ({
+            ...current,
+            ...remote,
+            suppliers: (remote.suppliers ?? current.suppliers).map(migrateSupplierPpwr),
+          }));
         }
       } catch {
         showCsvMessage('Supabase kon niet laden, demo data blijft actief.');
@@ -4273,6 +4275,7 @@ export function App() {
   }
 
   async function upsertSupplierRecord(supplier: Supplier) {
+    supplier = migrateSupplierPpwr(supplier);
     try {
       let productsToUpdate: Product[] = [];
       let registrationsToUpdate: ProductPackagingRegistration[] = [];

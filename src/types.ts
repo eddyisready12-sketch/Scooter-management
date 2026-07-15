@@ -234,6 +234,30 @@ export type Product = {
   certificateDocumentId?: string;
 };
 
+export type Herkomst = 'eu' | 'niet_eu';
+export type PpwrSupplierRole = 'fabrikant_eu' | 'distributeur_eu' | 'productleverancier_niet_eu';
+export type DocStatus = 'niet_gevraagd' | 'gevraagd' | 'toegezegd' | 'ontvangen' | 'kan_niet_leveren';
+
+export type SupplierDocStatus = {
+  status: DocStatus;
+  statusDatum: string;
+  toegezegdVoor?: string;
+  bestandsnaam?: string;
+  notitie?: string;
+};
+
+export type VerpakkingsLaag = {
+  id: string;
+  rol: 'primair' | 'secundair' | 'transport';
+  materiaalcode: string;
+  gewichtGram: number;
+  gewichtBasis: 'per_stuk' | 'per_doos';
+  recyclaatPercentage?: number;
+  herbruikbaar: boolean;
+  zorgwekkendeStoffen: 'geen_bekend' | 'onderzoek_loopt' | 'aanwezig';
+  bron: 'opgave_leverancier' | 'eigen_meting' | 'schatting';
+};
+
 export type Supplier = {
   id: string;
   name: string;
@@ -249,8 +273,12 @@ export type Supplier = {
   postalCode?: string;
   city?: string;
   country?: string;
+  supplierSchemaVersion?: number;
+  herkomst?: Herkomst;
+  docStatus?: SupplierDocStatus;
+  packagingProfile?: VerpakkingsLaag[];
   packagingMaterials?: string;
-  ppwrSupplierRole?: 'Producent' | 'Converter' | 'Handelaar' | 'Co-packer';
+  ppwrSupplierRole?: PpwrSupplierRole | 'Producent' | 'Converter' | 'Handelaar' | 'Co-packer';
   ppwrResponsibility?: 'Primair' | 'Secundair' | 'Tertiair' | 'Combinatie';
   ppwrContractStatus?: 'Niet gestart' | 'In aanvraag' | 'Actief' | 'Geblokkeerd' | 'Verlopen';
   ppwrDeclarationStatus?: 'Ontbreekt' | 'Aangevraagd' | 'Ontvangen' | 'Goedgekeurd';

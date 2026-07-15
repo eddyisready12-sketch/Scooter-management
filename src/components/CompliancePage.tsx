@@ -21,6 +21,7 @@ import {
   requirementFulfilled,
   testPlanFulfilled,
 } from '../lib/compliance';
+import { createPackagingProfileLayer, migrateSupplierPpwr, ppwrSupplierStatus, roleHerkomst } from '../lib/ppwr-suppliers';
 import type {
   ComplianceFamilyDocument,
   ComplianceFamilyRequirement,
@@ -188,22 +189,12 @@ function normalizeSupplierName(value?: string) {
 }
 
 function packagingSupplierProfileReady(supplier?: Supplier) {
-  if (!supplier || supplier.active === false || supplier.isPackagingSupplier !== true) return false;
-  return Boolean(
-    supplier.packagingMaterials?.trim()
-    && supplier.ppwrSupplierRole
-    && supplier.ppwrResponsibility
-    && supplier.ppwrContractStatus === 'Actief'
-    && (supplier.ppwrDeclarationStatus === 'Ontvangen' || supplier.ppwrDeclarationStatus === 'Goedgekeurd'),
-  );
+  return ppwrSupplierStatus(supplier) === 'compleet';
 }
 
-function packagingSupplierContractLabel(value?: Supplier['ppwrContractStatus']) {
-  return value || 'Niet gestart';
-}
-
-function packagingSupplierDeclarationLabel(value?: Supplier['ppwrDeclarationStatus']) {
-  return value || 'Ontbreekt';
+function supplierStatusLabel(supplier?: Supplier) {
+  const status = ppwrSupplierStatus(supplier);
+  return status === 'compleet' ? 'Compleet' : status === 'geblokkeerd' ? 'Geblokkeerd' : 'Aanvullen';
 }
 
 export function CompliancePage({
@@ -411,7 +402,8 @@ export function CompliancePage({
       isReady: boolean;
     }> = suppliers
       .filter((supplier) => supplier.isPackagingSupplier === true || usageMap.has(normalizeSupplierName(supplier.name)))
-      .map((supplier) => {
+      .map((rawSupplier) => {
+        const supplier = migrateSupplierPpwr(rawSupplier);
         const key = normalizeSupplierName(supplier.name) || supplier.id;
         const usage = usageMap.get(key);
         return {
@@ -436,7 +428,8 @@ export function CompliancePage({
       .filter((row) => {
         const needle = supplierQuery.trim().toLowerCase();
         if (!needle) return true;
-        const haystack = `${row.supplier?.name ?? row.usage?.name ?? ''} ${row.supplier?.packagingMaterials ?? ''} ${Array.from(row.usage?.materials ?? []).join(' ')}`.toLowerCase();
+        const profileMaterials = row.supplier?.packagingProfile?.map((layer) => layer.materiaalcode).join(' ') ?? '';
+        const haystack = `${row.supplier?.name ?? row.usage?.name ?? ''} ${profileMaterials} ${Array.from(row.usage?.materials ?? []).join(' ')}`.toLowerCase();
         return haystack.includes(needle);
       })
       .sort((left, right) => {
@@ -454,6 +447,7 @@ export function CompliancePage({
     summary.total += 1;
     if (row.supplier) summary.linked += 1;
     if (row.isReady) summary.ready += 1;
+    if (ppwrSupplierStatus(row.supplier) === 'geblokkeerd') summary.blocked += 1;
     if (!row.supplier) summary.missing += 1;
     return summary;
   }, {
@@ -461,6 +455,7 @@ export function CompliancePage({
     linked: 0,
     ready: 0,
     missing: 0,
+    blocked: 0,
   }), [packagingSupplierRows]);
 
   useEffect(() => {
@@ -473,7 +468,7 @@ export function CompliancePage({
     const selectedRow = packagingSupplierRows.find((row) => row.key === selectedPackagingSupplierKey);
     if (!selectedRow) return;
     if (selectedRow.supplier) {
-      setDraftPackagingSupplier({ ...selectedRow.supplier });
+      setDraftPackagingSupplier({ ...migrateSupplierPpwr(selectedRow.supplier) });
       return;
     }
     setDraftPackagingSupplier({
@@ -481,7 +476,10 @@ export function CompliancePage({
       name: selectedRow.usage?.name ?? '',
       isPackagingSupplier: true,
       active: true,
-      packagingMaterials: Array.from(selectedRow.usage?.materials ?? []).join(', '),
+      supplierSchemaVersion: 2,
+      herkomst: 'niet_eu',
+      ppwrSupplierRole: 'productleverancier_niet_eu',
+      packagingProfile: [],
     });
   }, [packagingSupplierRows, selectedPackagingSupplierKey]);
 
@@ -1533,8 +1531,10 @@ export function CompliancePage({
       name: '',
       isPackagingSupplier: true,
       active: true,
-      ppwrContractStatus: 'Niet gestart',
-      ppwrDeclarationStatus: 'Ontbreekt',
+      supplierSchemaVersion: 2,
+      herkomst: 'niet_eu',
+      ppwrSupplierRole: 'productleverancier_niet_eu',
+      packagingProfile: [],
     };
     setDraftPackagingSupplier(supplier);
     setSelectedPackagingSupplierKey(`draft-${supplier.id}`);
@@ -1544,8 +1544,9 @@ export function CompliancePage({
     if (!draftPackagingSupplier) return;
     setSaving(true);
     try {
+      const migrated = migrateSupplierPpwr(draftPackagingSupplier);
       await onSavePackagingSupplier({
-        ...draftPackagingSupplier,
+        ...migrated,
         name: draftPackagingSupplier.name.trim(),
         contactName: draftPackagingSupplier.contactName?.trim() || undefined,
         email: draftPackagingSupplier.email?.trim() || undefined,
@@ -1556,9 +1557,13 @@ export function CompliancePage({
         postalCode: draftPackagingSupplier.postalCode?.trim() || undefined,
         city: draftPackagingSupplier.city?.trim() || undefined,
         country: draftPackagingSupplier.country?.trim() || undefined,
-        packagingMaterials: draftPackagingSupplier.packagingMaterials?.trim() || undefined,
-        ppwrEprNumber: draftPackagingSupplier.ppwrEprNumber?.trim() || undefined,
-        ppwrLastDeclarationAt: draftPackagingSupplier.ppwrLastDeclarationAt?.trim() || undefined,
+        supplierSchemaVersion: 2,
+        herkomst: roleHerkomst(migrated.ppwrSupplierRole),
+        ppwrResponsibility: undefined,
+        ppwrContractStatus: undefined,
+        ppwrDeclarationStatus: undefined,
+        ppwrEprNumber: undefined,
+        ppwrLastDeclarationAt: undefined,
         ppwrNotes: draftPackagingSupplier.ppwrNotes?.trim() || undefined,
         notes: draftPackagingSupplier.notes?.trim() || undefined,
         isPackagingSupplier: draftPackagingSupplier.isPackagingSupplier !== false,
@@ -1572,6 +1577,11 @@ export function CompliancePage({
 
   function renderPackagingSuppliersView() {
     const selectedUsage = packagingSupplierRows.find((row) => row.key === selectedPackagingSupplierKey)?.usage;
+    const profileLayers = draftPackagingSupplier?.packagingProfile ?? [];
+    const profileBases = new Set(profileLayers.map((layer) => layer.gewichtBasis));
+    const profileBasisLabel = profileBases.size > 1 ? 'gemengd' : profileLayers[0]?.gewichtBasis === 'per_doos' ? 'doos' : 'stuk';
+    const linkedProductWeights = (selectedUsage?.products ?? []).map((product) => Number(product.packagingWeightTotalGrams || product.packagingWeightPrimaryGrams || 0));
+    const linkedProductWeightTotal = linkedProductWeights.reduce((total, weight) => total + (Number.isFinite(weight) ? weight : 0), 0);
 
     return (
       <div className="compliance-layout">
@@ -1586,7 +1596,7 @@ export function CompliancePage({
             <section className="stat-grid packaging-supplier-stat-grid">
               <div className="stat-card"><ShieldCheck size={18} /><div><span>Kaarten</span><strong>{packagingSupplierTotals.total}</strong></div></div>
               <div className="stat-card"><CheckCircle2 size={18} /><div><span>PPWR gereed</span><strong>{packagingSupplierTotals.ready}</strong></div></div>
-              <div className="stat-card"><AlertTriangle size={18} /><div><span>Ontbrekend</span><strong>{packagingSupplierTotals.missing}</strong></div></div>
+              <div className="stat-card"><AlertTriangle size={18} /><div><span>Geblokkeerd</span><strong>{packagingSupplierTotals.blocked}</strong></div></div>
             </section>
             <div className="search-field">
               <Search size={16} />
@@ -1602,11 +1612,13 @@ export function CompliancePage({
                 >
                   <div className="compliance-family-compact-top">
                     <strong>{row.supplier?.name || row.usage?.name || 'Naam ontbreekt'}</strong>
-                    <span className={`compliance-status-pill ${row.isReady ? 'complete' : row.supplier ? 'partial' : 'concept'}`}>
-                      {row.isReady ? 'PPWR gereed' : row.supplier ? 'Aanvullen' : 'Nog aanmaken'}
+                    <span className={`compliance-status-pill ${ppwrSupplierStatus(row.supplier) === 'compleet' ? 'complete' : ppwrSupplierStatus(row.supplier) === 'geblokkeerd' ? 'danger' : row.supplier ? 'partial' : 'concept'}`}>
+                      {row.supplier ? supplierStatusLabel(row.supplier) : 'Nog aanmaken'}
                     </span>
                   </div>
-                  <div className="compliance-family-compact-name">{row.supplier?.packagingMaterials || Array.from(row.usage?.materials ?? []).join(', ') || 'Nog geen materiaalprofiel'}</div>
+                  <div className="compliance-family-compact-name">{row.supplier?.herkomst === 'eu'
+                    ? `DoC: ${row.supplier.docStatus?.status?.replace(/_/g, ' ') ?? 'niet gevraagd'}`
+                    : row.supplier?.packagingProfile?.map((layer) => layer.materiaalcode).filter(Boolean).join(', ') || Array.from(row.usage?.materials ?? []).join(', ') || 'Nog geen materiaalprofiel'}</div>
                   <div className="compliance-family-compact-meta">
                     <span>{row.usage?.products.length ?? 0} producten</span>
                     <span>{row.usage?.layers ?? 0} lagen</span>
@@ -1641,27 +1653,19 @@ export function CompliancePage({
               <div className="compliance-panel-body compliance-view-stack">
                 <section className="panel packaging-supplier-summary-panel">
                   <div className="panel-title">PPWR status</div>
-                  <div className="packaging-supplier-summary-grid">
-                    <div className={`packaging-supplier-summary-card ${packagingSupplierProfileReady(draftPackagingSupplier) ? 'is-ready' : 'is-warning'}`}>
-                      <span>Profiel</span>
-                      <strong>{packagingSupplierProfileReady(draftPackagingSupplier) ? 'Gereed' : 'Aanvullen'}</strong>
-                      <small>Contract, aangifte en materiaalprofiel moeten gevuld zijn.</small>
-                    </div>
-                    <div className="packaging-supplier-summary-card">
-                      <span>Contract</span>
-                      <strong>{packagingSupplierContractLabel(draftPackagingSupplier.ppwrContractStatus)}</strong>
-                      <small>{draftPackagingSupplier.ppwrSupplierRole || 'Rol nog niet gekozen'}</small>
-                    </div>
-                    <div className="packaging-supplier-summary-card">
-                      <span>Aangifte</span>
-                      <strong>{packagingSupplierDeclarationLabel(draftPackagingSupplier.ppwrDeclarationStatus)}</strong>
-                      <small>{draftPackagingSupplier.ppwrLastDeclarationAt ? `Laatste update ${formatDate(draftPackagingSupplier.ppwrLastDeclarationAt)}` : 'Nog geen datum vastgelegd'}</small>
+                  <div className="packaging-supplier-summary-grid single-status">
+                    <div className={`packaging-supplier-summary-card status-${ppwrSupplierStatus(draftPackagingSupplier)}`}>
+                      <span>Afgeleide status</span>
+                      <strong>{supplierStatusLabel(draftPackagingSupplier)}</strong>
+                      <small>{draftPackagingSupplier.herkomst === 'eu'
+                        ? 'Bepaald door de DoC-status.'
+                        : 'Bepaald door het verpakkingsprofiel, de databronnen en zorgwekkende stoffen.'}</small>
                     </div>
                   </div>
                 </section>
 
                 <section className="panel">
-                  <div className="panel-title">Leverancierskaart</div>
+                  <div className="panel-title">Contactgegevens en rol</div>
                   <div className="compliance-form-grid">
                     <label>
                       <span>Bedrijfsnaam</span>
@@ -1680,76 +1684,88 @@ export function CompliancePage({
                       <input value={draftPackagingSupplier.phone || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, phone: event.target.value } : current)} />
                     </label>
                     <label>
+                      <span>Mobiel</span>
+                      <input value={draftPackagingSupplier.mobile || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, mobile: event.target.value } : current)} />
+                    </label>
+                    <label>
+                      <span>Website</span>
+                      <input value={draftPackagingSupplier.website || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, website: event.target.value } : current)} />
+                    </label>
+                    <label className="span-2">
+                      <span>Adres</span>
+                      <input value={draftPackagingSupplier.address || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, address: event.target.value } : current)} />
+                    </label>
+                    <label>
+                      <span>Postcode</span>
+                      <input value={draftPackagingSupplier.postalCode || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, postalCode: event.target.value } : current)} />
+                    </label>
+                    <label>
+                      <span>Plaats</span>
+                      <input value={draftPackagingSupplier.city || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, city: event.target.value } : current)} />
+                    </label>
+                    <label>
                       <span>Land</span>
                       <input value={draftPackagingSupplier.country || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, country: event.target.value } : current)} />
                     </label>
                     <label>
-                      <span>Materialen / scope</span>
-                      <input value={draftPackagingSupplier.packagingMaterials || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, packagingMaterials: event.target.value } : current)} placeholder="Bijv. PAP 20, PE-LD 04, labels" />
-                    </label>
-                    <label>
                       <span>PPWR rol</span>
-                      <select value={draftPackagingSupplier.ppwrSupplierRole || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrSupplierRole: (event.target.value || undefined) as Supplier['ppwrSupplierRole'] } : current)}>
-                        <option value="">Selecteer...</option>
-                        <option value="Producent">Producent</option>
-                        <option value="Converter">Converter</option>
-                        <option value="Handelaar">Handelaar</option>
-                        <option value="Co-packer">Co-packer</option>
+                      <select value={draftPackagingSupplier.ppwrSupplierRole || 'productleverancier_niet_eu'} onChange={(event) => setDraftPackagingSupplier((current) => current ? {
+                        ...current,
+                        ppwrSupplierRole: event.target.value as Supplier['ppwrSupplierRole'],
+                        herkomst: roleHerkomst(event.target.value as Supplier['ppwrSupplierRole']),
+                        docStatus: current.docStatus ?? { status: 'niet_gevraagd', statusDatum: '' },
+                        packagingProfile: current.packagingProfile ?? [],
+                      } : current)}>
+                        <option value="fabrikant_eu">Fabrikant in de EU</option>
+                        <option value="distributeur_eu">Distributeur in de EU</option>
+                        <option value="productleverancier_niet_eu">Productleverancier buiten de EU</option>
                       </select>
-                    </label>
-                    <label>
-                      <span>Verantwoordelijkheid</span>
-                      <select value={draftPackagingSupplier.ppwrResponsibility || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrResponsibility: (event.target.value || undefined) as Supplier['ppwrResponsibility'] } : current)}>
-                        <option value="">Selecteer...</option>
-                        <option value="Primair">Primair</option>
-                        <option value="Secundair">Secundair</option>
-                        <option value="Tertiair">Tertiair</option>
-                        <option value="Combinatie">Combinatie</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Contractstatus</span>
-                      <select value={draftPackagingSupplier.ppwrContractStatus || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrContractStatus: (event.target.value || undefined) as Supplier['ppwrContractStatus'] } : current)}>
-                        <option value="">Selecteer...</option>
-                        <option value="Niet gestart">Niet gestart</option>
-                        <option value="In aanvraag">In aanvraag</option>
-                        <option value="Actief">Actief</option>
-                        <option value="Geblokkeerd">Geblokkeerd</option>
-                        <option value="Verlopen">Verlopen</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>Aangiftestatus</span>
-                      <select value={draftPackagingSupplier.ppwrDeclarationStatus || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrDeclarationStatus: (event.target.value || undefined) as Supplier['ppwrDeclarationStatus'] } : current)}>
-                        <option value="">Selecteer...</option>
-                        <option value="Ontbreekt">Ontbreekt</option>
-                        <option value="Aangevraagd">Aangevraagd</option>
-                        <option value="Ontvangen">Ontvangen</option>
-                        <option value="Goedgekeurd">Goedgekeurd</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>EPR / registratienummer</span>
-                      <input value={draftPackagingSupplier.ppwrEprNumber || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrEprNumber: event.target.value } : current)} />
-                    </label>
-                    <label>
-                      <span>Laatste PPWR update</span>
-                      <input type="date" value={draftPackagingSupplier.ppwrLastDeclarationAt || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrLastDeclarationAt: event.target.value } : current)} />
                     </label>
                     <label className="compliance-checkbox-label">
                       <input type="checkbox" checked={draftPackagingSupplier.isPackagingSupplier !== false} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, isPackagingSupplier: event.target.checked } : current)} />
                       <span>Actieve verpakkingsleverancier</span>
                     </label>
-                    <label className="compliance-checkbox-label">
-                      <input type="checkbox" checked={draftPackagingSupplier.active !== false} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, active: event.target.checked } : current)} />
-                      <span>Actief record</span>
-                    </label>
-                    <label className="span-2">
-                      <span>PPWR notities</span>
-                      <textarea value={draftPackagingSupplier.ppwrNotes || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrNotes: event.target.value } : current)} />
-                    </label>
                   </div>
                 </section>
+
+                {draftPackagingSupplier.herkomst === 'eu' ? (
+                  <section className="panel">
+                    <div className="panel-title">Declaration of Conformity (DoC)</div>
+                    <div className="compliance-form-grid">
+                      <label><span>DoC-status</span><select value={draftPackagingSupplier.docStatus?.status || 'niet_gevraagd'} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, docStatus: { ...(current.docStatus ?? { statusDatum: '' }), status: event.target.value as NonNullable<Supplier['docStatus']>['status'] } } : current)}>
+                        <option value="niet_gevraagd">Niet gevraagd</option><option value="gevraagd">Gevraagd</option><option value="toegezegd">Toegezegd</option><option value="ontvangen">Ontvangen</option><option value="kan_niet_leveren">Kan niet leveren</option>
+                      </select></label>
+                      <label><span>Statusdatum</span><input type="date" value={draftPackagingSupplier.docStatus?.statusDatum || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, docStatus: { ...(current.docStatus ?? { status: 'niet_gevraagd' }), statusDatum: event.target.value } } : current)} /></label>
+                      {draftPackagingSupplier.docStatus?.status === 'toegezegd' ? <label><span>Toegezegd voor</span><input type="date" value={draftPackagingSupplier.docStatus?.toegezegdVoor || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, docStatus: { ...(current.docStatus ?? { status: 'toegezegd', statusDatum: '' }), toegezegdVoor: event.target.value } } : current)} /></label> : null}
+                      <label><span>Bestandsnaam</span><input value={draftPackagingSupplier.docStatus?.bestandsnaam || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, docStatus: { ...(current.docStatus ?? { status: 'niet_gevraagd', statusDatum: '' }), bestandsnaam: event.target.value } } : current)} /></label>
+                      <label className="span-2"><span>DoC-notitie</span><textarea value={draftPackagingSupplier.docStatus?.notitie || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, docStatus: { ...(current.docStatus ?? { status: 'niet_gevraagd', statusDatum: '' }), notitie: event.target.value } } : current)} /></label>
+                    </div>
+                  </section>
+                ) : (
+                  <section className="panel">
+                    <div className="panel-title"><span>Verpakkingsprofiel</span><button type="button" className="secondary-button" onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, packagingProfile: [...(current.packagingProfile ?? []), createPackagingProfileLayer()] } : current)}><Plus size={14} /> Laag toevoegen</button></div>
+                    <div className="supplier-profile-stack">
+                      {(draftPackagingSupplier.packagingProfile ?? []).map((layer, index) => (
+                        <div className="supplier-profile-layer" key={layer.id}>
+                          <div className="supplier-profile-layer-title"><strong>Laag {index + 1}</strong><button type="button" className="danger-icon-button" aria-label={`Laag ${index + 1} verwijderen`} onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, packagingProfile: (current.packagingProfile ?? []).filter((item) => item.id !== layer.id) } : current)}><Trash2 size={16} /></button></div>
+                          <div className="compliance-form-grid profile-grid">
+                            <label><span>Rol</span><select value={layer.rol} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, packagingProfile: (current.packagingProfile ?? []).map((item) => item.id === layer.id ? { ...item, rol: event.target.value as typeof layer.rol } : item) } : current)}><option value="primair">Primair</option><option value="secundair">Secundair</option><option value="transport">Transport</option></select></label>
+                            <label><span>Materiaalcode</span><input value={layer.materiaalcode} placeholder="Bijv. PE-LD 04" onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, packagingProfile: (current.packagingProfile ?? []).map((item) => item.id === layer.id ? { ...item, materiaalcode: event.target.value } : item) } : current)} /></label>
+                            <label><span>Gewicht (g)</span><input type="number" min="0" step="0.01" value={layer.gewichtGram || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, packagingProfile: (current.packagingProfile ?? []).map((item) => item.id === layer.id ? { ...item, gewichtGram: Number(event.target.value) } : item) } : current)} /></label>
+                            <label><span>Gewichtsbasis</span><select value={layer.gewichtBasis} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, packagingProfile: (current.packagingProfile ?? []).map((item) => item.id === layer.id ? { ...item, gewichtBasis: event.target.value as typeof layer.gewichtBasis } : item) } : current)}><option value="per_stuk">Per stuk</option><option value="per_doos">Per doos</option></select></label>
+                            <label><span>Recyclaat (%)</span><input type="number" min="0" max="100" value={layer.recyclaatPercentage ?? ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, packagingProfile: (current.packagingProfile ?? []).map((item) => item.id === layer.id ? { ...item, recyclaatPercentage: event.target.value === '' ? undefined : Number(event.target.value) } : item) } : current)} /></label>
+                            <label><span>Zorgwekkende stoffen</span><select value={layer.zorgwekkendeStoffen} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, packagingProfile: (current.packagingProfile ?? []).map((item) => item.id === layer.id ? { ...item, zorgwekkendeStoffen: event.target.value as typeof layer.zorgwekkendeStoffen } : item) } : current)}><option value="geen_bekend">Geen bekend</option><option value="onderzoek_loopt">Onderzoek loopt</option><option value="aanwezig">Aanwezig</option></select></label>
+                            <label><span>Bron</span><select value={layer.bron} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, packagingProfile: (current.packagingProfile ?? []).map((item) => item.id === layer.id ? { ...item, bron: event.target.value as typeof layer.bron } : item) } : current)}><option value="opgave_leverancier">Opgave leverancier</option><option value="eigen_meting">Eigen meting</option><option value="schatting">Schatting</option></select></label>
+                            <label className="compliance-checkbox-label"><input type="checkbox" checked={layer.herbruikbaar} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, packagingProfile: (current.packagingProfile ?? []).map((item) => item.id === layer.id ? { ...item, herbruikbaar: event.target.checked } : item) } : current)} /><span>Herbruikbaar</span></label>
+                          </div>
+                        </div>
+                      ))}
+                      {(draftPackagingSupplier.packagingProfile ?? []).length === 0 ? <p className="empty">Nog geen verpakkingslagen toegevoegd.</p> : null}
+                    </div>
+                  </section>
+                )}
+
+                <section className="panel"><div className="panel-title">Notities</div><div className="compliance-form-grid"><label className="span-2"><span>Leveranciersnotities</span><textarea value={draftPackagingSupplier.ppwrNotes || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrNotes: event.target.value } : current)} /></label></div></section>
 
                 <section className="panel">
                   <div className="panel-title">Gekoppelde producten</div>
@@ -1758,16 +1774,17 @@ export function CompliancePage({
                       <span>Artikelnummer</span>
                       <span>Omschrijving</span>
                       <span>Materialen</span>
-                      <span>PPWR</span>
+                      <span className="numeric">Verpakking (g/{profileBasisLabel})</span>
                     </div>
                     {(selectedUsage?.products ?? []).map((product) => (
                       <button key={product.id} type="button" className="compliance-linked-products-row compliance-linked-products-button" onClick={() => onSelectProduct(product, 'gpsr')}>
                         <strong>{product.code || '-'}</strong>
                         <span>{product.description || '-'}</span>
                         <span>{Array.from(selectedUsage?.materials ?? []).join(', ') || '-'}</span>
-                        <span>{product.packagingWeightTotalGrams || product.packagingWeightPrimaryGrams || '-'}</span>
+                        <span className="numeric">{product.packagingWeightTotalGrams || product.packagingWeightPrimaryGrams || '-'}</span>
                       </button>
                     ))}
+                    {(selectedUsage?.products.length ?? 0) > 0 ? <div className="compliance-linked-products-total"><strong>Totaal</strong><strong className="numeric">{linkedProductWeightTotal.toLocaleString('nl-NL', { maximumFractionDigits: 2 })}</strong></div> : null}
                     {(selectedUsage?.products.length ?? 0) === 0 ? <p className="empty">Nog geen producten gekoppeld aan deze leverancier.</p> : null}
                   </div>
                 </section>
