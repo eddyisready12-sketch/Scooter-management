@@ -4368,6 +4368,11 @@ tbody tr:hover {
   grid-template-columns: minmax(260px, 1.7fr) minmax(140px, 0.8fr) minmax(120px, 0.7fr) minmax(150px, 0.6fr) 72px;
 }
 
+.ppwr-supplier-table .supplier-table-header,
+.ppwr-supplier-table .supplier-table-row {
+  grid-template-columns: minmax(240px, 1.7fr) minmax(130px, 0.8fr) minmax(110px, 0.7fr) minmax(140px, 0.6fr) 100px 72px;
+}
+
 .supplier-contacts-section {
   border-top: 1px solid #dce1e6;
   padding: 16px;

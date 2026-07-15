@@ -11406,12 +11406,13 @@ function SuppliersPage({
         {sortedSuppliers.length === 0 ? (
           <div className="empty-state inline"><Factory size={22} /><strong>Geen leveranciers aangemaakt</strong><span>Maak leveranciers aan zodat producten fabrikantgegevens kunnen overnemen.</span></div>
         ) : (
-          <div className="dealer-table supplier-table">
+          <div className="dealer-table supplier-table ppwr-supplier-table">
             <div className="dealer-table-header supplier-table-header">
               <span>Leverancier</span>
               <span>Plaats</span>
               <span>Land</span>
               <span>Gekoppelde producten</span>
+              <span>Verpakking</span>
               <span>Actief</span>
             </div>
             {sortedSuppliers.map((supplier) => (
@@ -11420,6 +11421,9 @@ function SuppliersPage({
                 <span>{supplier.city || '-'}</span>
                 <span>{supplier.country || '-'}</span>
                 <span>{productsForSupplier(supplier).length}</span>
+                <span className={supplier.isPackagingSupplier ? 'active-status' : 'inactive-status'}>
+                  {supplier.isPackagingSupplier ? <CheckCircle2 size={18} aria-label="Verpakkingsleverancier" /> : '-'}
+                </span>
                 <span className={supplier.active === false ? 'inactive-status' : 'active-status'}>
                   {supplier.active === false ? '-' : <CheckCircle2 size={18} aria-label="Actief" />}
                 </span>
@@ -11510,6 +11514,7 @@ function SuppliersPage({
 function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
   const name = String(form.get('name') ?? '').trim();
   const isImportCompany = form.get('isImportCompany') === 'on';
+  const isPackagingSupplier = form.get('isPackagingSupplier') === 'on';
   const contactName = String(form.get('contactName') ?? '').trim();
   const email = String(form.get('email') ?? '').trim();
   const phone = String(form.get('phone') ?? '').trim();
@@ -11527,6 +11532,7 @@ function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
     id: existing?.id ?? stableId('supplier', name || email || website || mobile),
     name,
     isImportCompany,
+    isPackagingSupplier,
     importerId: importerId || undefined,
     contactName: contactName || undefined,
     email: email || undefined,
@@ -11611,6 +11617,7 @@ function SupplierModal({
 }) {
   const isActive = supplier?.active !== false;
   const isImportCompany = supplier?.isImportCompany === true;
+  const isPackagingSupplier = supplier?.isPackagingSupplier === true;
   const [showAddContact, setShowAddContact] = useState(false);
   const [selectedContact, setSelectedContact] = useState<SupplierContact | null>(null);
   const sortedContacts = [...contacts].sort((a, b) => {
@@ -11658,6 +11665,10 @@ function SupplierModal({
           <label className="checkbox-field">
             <input name="isImportCompany" type="checkbox" defaultChecked={isImportCompany} />
             Tonen bij Eigen import
+          </label>
+          <label className="checkbox-field">
+            <input name="isPackagingSupplier" type="checkbox" defaultChecked={isPackagingSupplier} />
+            Verpakkingsleverancier
           </label>
           <label className="span-2">Notities<textarea name="notes" defaultValue={supplier?.notes ?? ''} /></label>
         </div>
