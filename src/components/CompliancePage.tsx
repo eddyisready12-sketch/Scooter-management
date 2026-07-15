@@ -1816,6 +1816,10 @@ export function CompliancePage({
               <DatabaseZap size={15} />
               <span>Templates laden</span>
             </button>
+            <button type="button" className={moduleView === 'packagingSuppliers' ? 'active' : ''} onClick={() => setModuleView('packagingSuppliers')}>
+              <ShieldCheck size={15} />
+              <span>PPWR leveranciers</span>
+            </button>
           </div>
         </div>
 

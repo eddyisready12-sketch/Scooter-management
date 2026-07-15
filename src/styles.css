@@ -3124,62 +3124,39 @@ tbody tr:hover {
 
 .packaging-layer-stack {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .packaging-layer-table-header {
-  display: grid;
-  grid-template-columns:
-    minmax(120px, 0.75fr)
-    minmax(220px, 1.25fr)
-    minmax(180px, 1fr)
-    minmax(130px, 0.75fr)
-    minmax(150px, 0.85fr)
-    minmax(120px, 0.65fr)
-    minmax(100px, 0.55fr)
-    minmax(130px, 0.7fr)
-    minmax(120px, 0.65fr)
-    minmax(160px, 0.85fr)
-    auto;
-  gap: 12px;
-  margin-bottom: 10px;
-  padding: 0 14px;
-  color: #5f6f7f;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  display: none;
 }
 
 .packaging-layer-card {
-  border: 1px solid #dce2e8;
-  border-radius: 12px;
-  background: #f9fbfd;
-  padding: 14px;
+  border: 1px solid #d8e1eb;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  padding: 16px;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
 }
 
 .packaging-layer-grid {
   display: grid;
-  grid-template-columns:
-    minmax(120px, 0.75fr)
-    minmax(220px, 1.25fr)
-    minmax(180px, 1fr)
-    minmax(130px, 0.75fr)
-    minmax(150px, 0.85fr)
-    minmax(120px, 0.65fr)
-    minmax(100px, 0.55fr)
-    minmax(130px, 0.7fr)
-    minmax(120px, 0.65fr)
-    minmax(160px, 0.85fr)
-    auto;
-  gap: 12px;
-  align-items: center;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px 12px;
+  align-items: end;
 }
 
 .packaging-layer-field {
   display: grid;
   gap: 6px;
   align-content: center;
+  min-width: 0;
+}
+
+.packaging-layer-field select,
+.packaging-layer-field input {
+  width: 100%;
+  min-width: 0;
 }
 
 .packaging-layer-preview {
@@ -3202,10 +3179,13 @@ tbody tr:hover {
 }
 
 .packaging-layer-mobile-label {
-  display: none;
-  font-size: 0.84rem;
-  font-weight: 700;
-  color: #213547;
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: #64748b;
 }
 
 .packaging-preview-card {
@@ -3229,17 +3209,38 @@ tbody tr:hover {
   display: grid;
   gap: 4px;
   align-content: center;
+  grid-column: 1 / -2;
+  align-self: center;
+  padding-bottom: 2px;
 }
 
 .packaging-layer-name strong {
-  font-size: 1rem;
-  color: #1f2937;
+  font-size: 1.02rem;
+  color: #172033;
 }
 
 .packaging-layer-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  grid-column: -2 / -1;
+  grid-row: 1;
+}
+
+@media (max-width: 1180px) {
+  .packaging-layer-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .packaging-layer-name {
+    grid-column: 1 / -2;
+  }
+}
+
+@media (max-width: 760px) {
+  .packaging-layer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .danger-icon-button {
