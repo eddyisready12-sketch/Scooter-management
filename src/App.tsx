@@ -2294,7 +2294,7 @@ function buildDymoOuterBoxLabelXml({
   </DrawCommands>
   ${textObject({ name: 'ArticleValue', value: escapedArticleNumber, x: 220, y: 130, width: 2200, height: 260, size: 16, bold: true })}
   ${textObject({ name: 'DescriptionLabel', value: 'Artikelomschrijving', x: 220, y: 440, width: 1800, height: 140, size: 7, bold: true })}
-  ${textObject({ name: 'DescriptionValue', value: escapedDescription, x: 220, y: 560, width: 4520, height: 520, size: 24, bold: true })}
+  ${textObject({ name: 'DescriptionValue', value: escapedDescription, x: 220, y: 560, width: 2080, height: 700, size: 20, bold: true })}
   ${barcodeObject}
   ${textObject({ name: 'QuantityLabel', value: 'Aantal', x: 320, y: 1360, width: 760, height: 120, size: 7, bold: true, alignment: 'Center' })}
   ${textObject({ name: 'QuantityValue', value: escapedQuantity, x: 320, y: 1480, width: 760, height: 230, size: 16, bold: true, alignment: 'Center' })}
