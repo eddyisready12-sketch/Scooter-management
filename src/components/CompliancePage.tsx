@@ -667,22 +667,32 @@ export function CompliancePage({
     }, ...current]);
   }
 
-  function addProductLink(product: Product) {
+  async function addProductLink(product: Product) {
     if (!draftFamily || !product.id) return;
-    setDraftLinks((current) => {
-      if (current.some((link) => link.productId === product.id && (link.status ?? 'active') === 'active')) {
-        return current;
-      }
-      return [...current, {
-        id: createComplianceEntityId('compliance-link'),
-        familyId: draftFamily.id,
-        productId: product.id,
-        variantDescription: product.articleGroup || '',
-        status: 'active',
-        linkedBy: 'handmatig',
-      }];
-    });
+    if (draftLinks.some((link) => link.productId === product.id && (link.status ?? 'active') === 'active')) return;
+
+    const timestamp = new Date().toISOString();
+    const nextLinks = [...draftLinks, {
+      id: createComplianceEntityId('compliance-link'),
+      familyId: draftFamily.id,
+      productId: product.id,
+      variantDescription: product.articleGroup || '',
+      status: 'active' as const,
+      linkedBy: 'handmatig',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }];
+    const nextRevisions = [{
+      id: createComplianceEntityId('compliance-revision'),
+      familyId: draftFamily.id,
+      changeNote: `Product gekoppeld (${product.code || product.id})`,
+      createdAt: timestamp,
+    }, ...draftRevisions];
+
+    setDraftLinks(nextLinks);
+    setDraftRevisions(nextRevisions);
     setProductSearch('');
+    await saveFamilyBundle({ links: nextLinks, revisions: nextRevisions });
   }
 
   async function saveFamilyBundle(overrides?: {
