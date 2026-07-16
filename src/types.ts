@@ -213,6 +213,13 @@ export type Product = {
   importerCountry?: string;
   importerEmail?: string;
   importerWebsite?: string;
+  euResponsiblePersonName?: string;
+  euResponsiblePersonAddress?: string;
+  euResponsiblePersonPostalCode?: string;
+  euResponsiblePersonCity?: string;
+  euResponsiblePersonCountry?: string;
+  euResponsiblePersonEmail?: string;
+  euResponsiblePersonWebsite?: string;
   packagingUnit?: string;
   packagingLayers?: ProductPackagingLayer[];
   packagingMaterialPrimary?: string;
@@ -286,6 +293,7 @@ export type Supplier = {
   isImportCompany?: boolean;
   isPackagingSupplier?: boolean;
   importerId?: string;
+  euResponsiblePersonId?: string;
   contactName?: string;
   email?: string;
   phone?: string;

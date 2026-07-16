@@ -796,6 +796,7 @@ function getResolvedProductComplianceSource(
 ) {
   const selectedSupplier = findSupplierByName(supplierRecords, product.supplier);
   const linkedImporter = importers.find((importer) => importer.id === selectedSupplier?.importerId);
+  const linkedEuResponsiblePerson = importers.find((party) => party.id === selectedSupplier?.euResponsiblePersonId);
 
   return {
     ...product,
@@ -806,6 +807,13 @@ function getResolvedProductComplianceSource(
     importerPostalCode: product.importerPostalCode || linkedImporter?.postalCode,
     importerCity: product.importerCity || linkedImporter?.city,
     importerCountry: product.importerCountry || linkedImporter?.country,
+    euResponsiblePersonName: product.euResponsiblePersonName || linkedEuResponsiblePerson?.name,
+    euResponsiblePersonEmail: product.euResponsiblePersonEmail || linkedEuResponsiblePerson?.email,
+    euResponsiblePersonAddress: product.euResponsiblePersonAddress || linkedEuResponsiblePerson?.address,
+    euResponsiblePersonWebsite: product.euResponsiblePersonWebsite || linkedEuResponsiblePerson?.website,
+    euResponsiblePersonPostalCode: product.euResponsiblePersonPostalCode || linkedEuResponsiblePerson?.postalCode,
+    euResponsiblePersonCity: product.euResponsiblePersonCity || linkedEuResponsiblePerson?.city,
+    euResponsiblePersonCountry: product.euResponsiblePersonCountry || linkedEuResponsiblePerson?.country,
   };
 }
 
@@ -1008,6 +1016,8 @@ function getProductComplianceSummary(
     };
   }
   const resolvedProduct = getResolvedProductComplianceSource(product, supplierRecords, importers);
+  const complianceSupplier = findSupplierByName(supplierRecords, product.supplier);
+  const euResponsibleRequired = complianceSupplier?.herkomst === 'niet_eu';
   const relevantRegistrations = getRelevantProductPackagingRegistrations(resolvedProduct, registrations);
   const productPackagingLayers = normalizePackagingLayers(resolvedProduct);
   const batchDerivedPackagingLayers = getBatchDerivedPackagingLayers(relevantRegistrations);
@@ -1020,6 +1030,11 @@ function getProductComplianceSummary(
     && hasText(resolvedProduct.importerPostalCode)
     && hasText(resolvedProduct.importerCity)
     && hasText(resolvedProduct.importerCountry);
+  const euResponsibleHasContact = hasText(resolvedProduct.euResponsiblePersonEmail) || hasText(resolvedProduct.euResponsiblePersonWebsite);
+  const euResponsibleHasAddress = hasText(resolvedProduct.euResponsiblePersonAddress)
+    && hasText(resolvedProduct.euResponsiblePersonPostalCode)
+    && hasText(resolvedProduct.euResponsiblePersonCity)
+    && hasText(resolvedProduct.euResponsiblePersonCountry);
   const hasBatchRegistrationTraceability = relevantRegistrations.some((registration) =>
     hasText(registration.batchNumber)
     || hasText(registration.batchOrderNumber)
@@ -1029,7 +1044,7 @@ function getProductComplianceSummary(
   const hasTraceability = hasText(resolvedProduct.batchNumber)
     || hasText(resolvedProduct.traceabilityCode)
     || hasBatchRegistrationTraceability;
-  const hasResponsibleEntity = hasText(resolvedProduct.manufacturerName) || hasText(resolvedProduct.importerName);
+  const hasResponsibleEntity = hasText(resolvedProduct.manufacturerName) || hasText(resolvedProduct.euResponsiblePersonName);
 
   const gpsrIssues: ProductComplianceIssue[] = [];
   if (!hasText(resolvedProduct.code)) {
@@ -1049,6 +1064,15 @@ function getProductComplianceSummary(
   }
   if (!importerHasAddress) {
     gpsrIssues.push({ id: 'gpsr-importer-address', domain: 'gpsr', level: 'error', label: 'Importeur adresgegevens zijn niet compleet', tab: 'gpsr', section: 'importer' });
+  }
+  if (euResponsibleRequired && !hasText(resolvedProduct.euResponsiblePersonName)) {
+    gpsrIssues.push({ id: 'gpsr-eu-responsible-name', domain: 'gpsr', level: 'error', label: 'EU-verantwoordelijke persoon ontbreekt', tab: 'gpsr', section: 'importer' });
+  }
+  if (euResponsibleRequired && !euResponsibleHasContact) {
+    gpsrIssues.push({ id: 'gpsr-eu-responsible-contact', domain: 'gpsr', level: 'error', label: 'EU-verantwoordelijke e-mail of website ontbreekt', tab: 'gpsr', section: 'importer' });
+  }
+  if (euResponsibleRequired && !euResponsibleHasAddress) {
+    gpsrIssues.push({ id: 'gpsr-eu-responsible-address', domain: 'gpsr', level: 'error', label: 'EU-verantwoordelijke adresgegevens zijn niet compleet', tab: 'gpsr', section: 'importer' });
   }
   if (!hasText(resolvedProduct.countryOfOrigin)) {
     gpsrIssues.push({ id: 'gpsr-origin', domain: 'gpsr', level: 'error', label: 'Land van herkomst ontbreekt', tab: 'basic', section: 'planning' });
@@ -1174,7 +1198,7 @@ function getProductComplianceSummary(
     return 'green';
   };
 
-  const gpsrTotalChecks = 11
+  const gpsrTotalChecks = 11 + (euResponsibleRequired ? 3 : 0)
     + ((resolvedProduct.complianceCategory === 'E_MARK_RELEVANT' || resolvedProduct.complianceCategory === 'TYPE_APPROVAL_RELATED') ? 1 : 0)
     + (resolvedProduct.eMarkRelevant === 'ja' ? 1 : 0)
     + (resolvedProduct.ceRelevant === 'ja' ? 1 : 0);
@@ -1281,6 +1305,13 @@ function productFromCostLine(line: ContainerCostLine, product?: Product): Produc
     importerCountry: product?.importerCountry,
     importerEmail: product?.importerEmail,
     importerWebsite: product?.importerWebsite,
+    euResponsiblePersonName: product?.euResponsiblePersonName,
+    euResponsiblePersonAddress: product?.euResponsiblePersonAddress,
+    euResponsiblePersonPostalCode: product?.euResponsiblePersonPostalCode,
+    euResponsiblePersonCity: product?.euResponsiblePersonCity,
+    euResponsiblePersonCountry: product?.euResponsiblePersonCountry,
+    euResponsiblePersonEmail: product?.euResponsiblePersonEmail,
+    euResponsiblePersonWebsite: product?.euResponsiblePersonWebsite,
     packagingUnit: product?.packagingUnit,
     packagingLayers: product?.packagingLayers,
     packagingMaterialPrimary: product?.packagingMaterialPrimary,
@@ -10492,6 +10523,7 @@ function ProductDetailModal({
       ? supplierRecords.find((supplier) => supplierNameMatches(supplier, nextDraft.supplier))
       : undefined;
     const linkedImporter = importers.find((importer) => importer.id === selectedSupplier?.importerId);
+    const linkedEuResponsiblePerson = importers.find((party) => party.id === selectedSupplier?.euResponsiblePersonId);
 
     setDraft({
       ...nextDraft,
@@ -10503,6 +10535,15 @@ function ProductDetailModal({
         importerPostalCode: nextDraft.importerPostalCode || linkedImporter.postalCode,
         importerCity: nextDraft.importerCity || linkedImporter.city,
         importerCountry: nextDraft.importerCountry || linkedImporter.country,
+      } : {}),
+      ...(linkedEuResponsiblePerson ? {
+        euResponsiblePersonName: nextDraft.euResponsiblePersonName || linkedEuResponsiblePerson.name,
+        euResponsiblePersonEmail: nextDraft.euResponsiblePersonEmail || linkedEuResponsiblePerson.email,
+        euResponsiblePersonAddress: nextDraft.euResponsiblePersonAddress || linkedEuResponsiblePerson.address,
+        euResponsiblePersonWebsite: nextDraft.euResponsiblePersonWebsite || linkedEuResponsiblePerson.website,
+        euResponsiblePersonPostalCode: nextDraft.euResponsiblePersonPostalCode || linkedEuResponsiblePerson.postalCode,
+        euResponsiblePersonCity: nextDraft.euResponsiblePersonCity || linkedEuResponsiblePerson.city,
+        euResponsiblePersonCountry: nextDraft.euResponsiblePersonCountry || linkedEuResponsiblePerson.country,
       } : {}),
     });
     setActiveTab(initialTab);
@@ -10570,6 +10611,7 @@ function ProductDetailModal({
   function applySupplierManufacturer(supplierName: string) {
     const supplier = supplierRecords.find((item) => item.name === supplierName);
     const linkedImporter = importers.find((importer) => importer.id === supplier?.importerId);
+    const linkedEuResponsiblePerson = importers.find((party) => party.id === supplier?.euResponsiblePersonId);
     setDraft((current) => ({
       ...current,
       supplier: supplierName || undefined,
@@ -10590,6 +10632,15 @@ function ProductDetailModal({
         importerPostalCode: linkedImporter.postalCode || current.importerPostalCode,
         importerCity: linkedImporter.city || current.importerCity,
         importerCountry: linkedImporter.country || current.importerCountry,
+      } : {}),
+      ...(linkedEuResponsiblePerson ? {
+        euResponsiblePersonName: linkedEuResponsiblePerson.name || current.euResponsiblePersonName,
+        euResponsiblePersonEmail: linkedEuResponsiblePerson.email || current.euResponsiblePersonEmail,
+        euResponsiblePersonAddress: linkedEuResponsiblePerson.address || current.euResponsiblePersonAddress,
+        euResponsiblePersonWebsite: linkedEuResponsiblePerson.website || current.euResponsiblePersonWebsite,
+        euResponsiblePersonPostalCode: linkedEuResponsiblePerson.postalCode || current.euResponsiblePersonPostalCode,
+        euResponsiblePersonCity: linkedEuResponsiblePerson.city || current.euResponsiblePersonCity,
+        euResponsiblePersonCountry: linkedEuResponsiblePerson.country || current.euResponsiblePersonCountry,
       } : {}),
     }));
   }
@@ -10666,6 +10717,13 @@ function ProductDetailModal({
         importerCountry: draft.importerCountry?.trim() || undefined,
         importerEmail: draft.importerEmail?.trim() || undefined,
         importerWebsite: draft.importerWebsite?.trim() || undefined,
+        euResponsiblePersonName: draft.euResponsiblePersonName?.trim() || undefined,
+        euResponsiblePersonAddress: draft.euResponsiblePersonAddress?.trim() || undefined,
+        euResponsiblePersonPostalCode: draft.euResponsiblePersonPostalCode?.trim() || undefined,
+        euResponsiblePersonCity: draft.euResponsiblePersonCity?.trim() || undefined,
+        euResponsiblePersonCountry: draft.euResponsiblePersonCountry?.trim() || undefined,
+        euResponsiblePersonEmail: draft.euResponsiblePersonEmail?.trim() || undefined,
+        euResponsiblePersonWebsite: draft.euResponsiblePersonWebsite?.trim() || undefined,
         complianceCategory: draft.complianceCategory,
         eMarkRelevant: draft.eMarkRelevant,
         eMarkPresent: draft.eMarkPresent,
@@ -11127,9 +11185,9 @@ function ProductDetailModal({
                 </div>
               </div>
               <div className="product-form-subsection" ref={importerSectionRef}>
-                <h3>Importeur / EU-verantwoordelijke</h3>
+                <h3>Importeur</h3>
                 <div className="product-table-intro compact">
-                  <span>Deze velden worden automatisch gevuld vanuit jullie eigen importeurprofiel, maar blijven handmatig aanpasbaar.</span>
+                  <span>De EU-partij die het product op de markt brengt. Automatisch gevuld vanuit de leverancier, maar handmatig aanpasbaar.</span>
                 </div>
                 <div className="form-grid">
                   <label>Importeur naam
@@ -11152,6 +11210,33 @@ function ProductDetailModal({
                   </label>
                   <label>Importeur land
                     <input value={draft.importerCountry ?? ''} onChange={(event) => setDraft((current) => ({ ...current, importerCountry: event.target.value }))} />
+                  </label>
+                </div>
+                <h3>EU-verantwoordelijke persoon</h3>
+                <div className="product-table-intro compact">
+                  <span>Het afzonderlijke aanspreekpunt volgens Art. 16 GPSR. Dit mag dezelfde partij zijn als de importeur.</span>
+                </div>
+                <div className="form-grid">
+                  <label>EU-verantwoordelijke naam
+                    <input value={draft.euResponsiblePersonName ?? ''} onChange={(event) => setDraft((current) => ({ ...current, euResponsiblePersonName: event.target.value }))} />
+                  </label>
+                  <label>EU-verantwoordelijke e-mail
+                    <input value={draft.euResponsiblePersonEmail ?? ''} onChange={(event) => setDraft((current) => ({ ...current, euResponsiblePersonEmail: event.target.value }))} />
+                  </label>
+                  <label>EU-verantwoordelijke straat + huisnummer
+                    <input value={draft.euResponsiblePersonAddress ?? ''} onChange={(event) => setDraft((current) => ({ ...current, euResponsiblePersonAddress: event.target.value }))} />
+                  </label>
+                  <label>EU-verantwoordelijke website
+                    <input value={draft.euResponsiblePersonWebsite ?? ''} onChange={(event) => setDraft((current) => ({ ...current, euResponsiblePersonWebsite: event.target.value }))} />
+                  </label>
+                  <label>EU-verantwoordelijke postcode
+                    <input value={draft.euResponsiblePersonPostalCode ?? ''} onChange={(event) => setDraft((current) => ({ ...current, euResponsiblePersonPostalCode: event.target.value }))} />
+                  </label>
+                  <label>EU-verantwoordelijke plaats
+                    <input value={draft.euResponsiblePersonCity ?? ''} onChange={(event) => setDraft((current) => ({ ...current, euResponsiblePersonCity: event.target.value }))} />
+                  </label>
+                  <label>EU-verantwoordelijke land
+                    <input value={draft.euResponsiblePersonCountry ?? ''} onChange={(event) => setDraft((current) => ({ ...current, euResponsiblePersonCountry: event.target.value }))} />
                   </label>
                 </div>
               </div>
@@ -11560,7 +11645,7 @@ function SuppliersPage({
         </div>
         <div className="header-actions">
           <button className="secondary-button" onClick={() => void onImportFromProducts()}><DatabaseZap size={16} /> Uit producten halen</button>
-          <button className="secondary-button" onClick={() => setShowAddImporter(true)}><Plus size={16} /> Importeur</button>
+          <button className="secondary-button" onClick={() => setShowAddImporter(true)}><Plus size={16} /> EU-contactpartij</button>
           <button className="secondary-button" onClick={() => setShowAddSupplier(true)}><Plus size={16} /> Leverancier</button>
         </div>
       </div>
@@ -11597,13 +11682,13 @@ function SuppliersPage({
         )}
       </section>
       <section className="panel table-panel">
-        <div className="panel-title"><ShieldCheck size={16} /> Importeurs / EU-verantwoordelijke</div>
+        <div className="panel-title"><ShieldCheck size={16} /> EU-contactpartijen</div>
         {sortedImporters.length === 0 ? (
           <div className="empty-state inline"><ShieldCheck size={22} /><strong>Nog geen importeurs aangemaakt</strong><span>Maak hier jullie eigen importeursprofielen aan en koppel ze daarna aan fabrikanten.</span></div>
         ) : (
           <div className="dealer-table supplier-table">
             <div className="dealer-table-header supplier-table-header">
-              <span>Importeur</span>
+              <span>Contactpartij</span>
               <span>Plaats</span>
               <span>Land</span>
               <span>Gekoppelde fabrikanten</span>
@@ -11614,7 +11699,7 @@ function SuppliersPage({
                 <span>{importer.name}</span>
                 <span>{importer.city || '-'}</span>
                 <span>{importer.country || '-'}</span>
-                <span>{suppliers.filter((supplier) => supplier.importerId === importer.id).length}</span>
+                <span>{suppliers.filter((supplier) => supplier.importerId === importer.id || supplier.euResponsiblePersonId === importer.id).length}</span>
                 <span className={importer.active === false ? 'inactive-status' : 'active-status'}>
                   {importer.active === false ? '-' : <CheckCircle2 size={18} aria-label="Actief" />}
                 </span>
@@ -11689,6 +11774,7 @@ function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
   const city = String(form.get('city') ?? '').trim();
   const country = String(form.get('country') ?? '').trim();
   const importerId = String(form.get('importerId') ?? '').trim();
+  const euResponsiblePersonId = String(form.get('euResponsiblePersonId') ?? '').trim();
   const notes = String(form.get('notes') ?? '').trim();
   const complianceResponsibility = String(form.get('complianceResponsibility') ?? 'own') as 'own' | 'outsourced';
   const complianceResponsibilityReference = String(form.get('complianceResponsibilityReference') ?? '').trim();
@@ -11701,6 +11787,7 @@ function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
     isImportCompany,
     isPackagingSupplier,
     importerId: importerId || undefined,
+    euResponsiblePersonId: euResponsiblePersonId || undefined,
     contactName: contactName || undefined,
     email: email || undefined,
     phone: phone || undefined,
@@ -11827,10 +11914,16 @@ function SupplierModal({
           <label>Postcode<input name="postalCode" defaultValue={supplier?.postalCode ?? ''} /></label>
           <label>Plaats<input name="city" defaultValue={supplier?.city ?? ''} /></label>
           <label>Land<input name="country" defaultValue={supplier?.country ?? ''} /></label>
-          <label>Importeur / EU-verantwoordelijke
+          <label>Importeur
             <select name="importerId" defaultValue={supplier?.importerId ?? ''}>
               <option value="">Geen gekoppelde importeur</option>
               {importerOptions.map((importer) => <option key={importer.id} value={importer.id}>{importer.name}</option>)}
+            </select>
+          </label>
+          <label>EU-verantwoordelijke persoon
+            <select name="euResponsiblePersonId" defaultValue={supplier?.euResponsiblePersonId ?? ''}>
+              <option value="">Geen EU-verantwoordelijke gekoppeld</option>
+              {importerOptions.map((party) => <option key={party.id} value={party.id}>{party.name}</option>)}
             </select>
           </label>
           <label className="checkbox-field">
@@ -11957,7 +12050,7 @@ function ImporterModal({
       <form className="modal-card dealer-modal" onSubmit={submitImporter} onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <span>Importeur / EU-verantwoordelijke</span>
+            <span>EU-contactpartij</span>
             <h2>{title}</h2>
           </div>
           <button type="button" onClick={onClose}>Close</button>

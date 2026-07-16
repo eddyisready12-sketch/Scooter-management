@@ -143,11 +143,19 @@ alter table suppliers add column if not exists compliance_responsibility_referen
 alter table suppliers add column if not exists compliance_responsibility_established_at timestamptz;
 alter table suppliers add column if not exists compliance_responsibility_set_by text;
 alter table suppliers add column if not exists compliance_responsibility_audit jsonb not null default '[]'::jsonb;
+alter table suppliers add column if not exists eu_responsible_person_id text references importers(id);
 
 alter table products add column if not exists "complianceResponsibilityOverride" text check ("complianceResponsibilityOverride" in ('own', 'outsourced'));
 alter table products add column if not exists "complianceResponsibilityReference" text;
 alter table products add column if not exists "complianceResponsibilitySetAt" timestamptz;
 alter table products add column if not exists "complianceResponsibilitySetBy" text;
+alter table products add column if not exists "euResponsiblePersonName" text;
+alter table products add column if not exists "euResponsiblePersonAddress" text;
+alter table products add column if not exists "euResponsiblePersonPostalCode" text;
+alter table products add column if not exists "euResponsiblePersonCity" text;
+alter table products add column if not exists "euResponsiblePersonCountry" text;
+alter table products add column if not exists "euResponsiblePersonEmail" text;
+alter table products add column if not exists "euResponsiblePersonWebsite" text;
 
 do $$
 begin
