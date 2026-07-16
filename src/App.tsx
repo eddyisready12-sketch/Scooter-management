@@ -2191,7 +2191,6 @@ function buildDymoOuterBoxLabelXml({
   quantity: string;
 }) {
   const escapedArticleNumber = escapeLabelValue(articleNumber);
-  const escapedDescription = escapeLabelValue(description);
   const escapedBatchCode = escapeLabelValue(batchCode);
   const escapedQuantity = escapeLabelValue(quantity);
   const escapedBarcode = escapeLabelValue(barcodeValue);
@@ -2293,13 +2292,11 @@ function buildDymoOuterBoxLabelXml({
     <RoundRectangle X="0" Y="0" Width="${dymo99012Layout.width}" Height="${dymo99012Layout.height}" Rx="180" Ry="180" />
   </DrawCommands>
   ${textObject({ name: 'ArticleValue', value: escapedArticleNumber, x: 220, y: 130, width: 2200, height: 260, size: 16, bold: true })}
-  ${textObject({ name: 'DescriptionLabel', value: 'Artikelomschrijving', x: 220, y: 440, width: 1800, height: 140, size: 7, bold: true })}
-  ${textObject({ name: 'DescriptionValue', value: escapedDescription, x: 220, y: 560, width: 2080, height: 700, size: 20, bold: true })}
   ${barcodeObject}
-  ${textObject({ name: 'QuantityLabel', value: 'Aantal', x: 320, y: 1360, width: 760, height: 120, size: 7, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'QuantityValue', value: escapedQuantity, x: 320, y: 1480, width: 760, height: 230, size: 16, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'BatchLabel', value: 'Batch', x: 1140, y: 1360, width: 1220, height: 120, size: 7, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'BatchValue', value: escapedBatchCode, x: 1140, y: 1480, width: 1220, height: 230, size: 10, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'QuantityLabel', value: 'Aantal', x: 260, y: 760, width: 820, height: 180, size: 10, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'QuantityValue', value: escapedQuantity, x: 260, y: 960, width: 820, height: 520, size: 26, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'BatchLabel', value: 'Batch', x: 1160, y: 760, width: 1160, height: 180, size: 10, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'BatchValue', value: escapedBatchCode, x: 1160, y: 960, width: 1160, height: 520, size: 22, bold: true, alignment: 'Center' })}
 </DieCutLabel>`;
 }
 
@@ -2408,7 +2405,6 @@ function openOuterBoxLabelPreview({
   }
 
   const articleHtml = escapeLabelValue(articleNumber);
-  const descriptionHtml = escapeLabelValue(description);
   const batchHtml = escapeLabelValue(batchCode);
   const quantityHtml = escapeLabelValue(formatQuantity(quantityPerLabel));
   const barcodeHtml = escapeLabelValue(barcodeValue);
@@ -2457,7 +2453,7 @@ function openOuterBoxLabelPreview({
             padding: 3mm 4mm;
             box-sizing: border-box;
             display: grid;
-            grid-template-rows: auto auto 1fr auto;
+            grid-template-rows: auto 1fr;
             gap: 1.5mm;
           }
           .article-number {
@@ -2472,19 +2468,10 @@ function openOuterBoxLabelPreview({
             color: #64748b;
             letter-spacing: 0.04em;
           }
-          .description {
-            font-size: 3.1mm;
-            font-weight: 700;
-            line-height: 1.08;
-            overflow: hidden;
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-          }
           .bottom-row {
             display: grid;
             grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-            align-items: end;
+            align-items: center;
             gap: 2mm;
             width: 100%;
           }
@@ -2492,19 +2479,19 @@ function openOuterBoxLabelPreview({
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1.6mm;
-            align-items: end;
+            align-items: center;
           }
           .detail-card {
             border: 1px solid #d7dee6;
             border-radius: 6px;
             padding: 1.4mm 1.8mm;
-            min-height: 10mm;
+            min-height: 16mm;
             box-sizing: border-box;
             background: #f8fafc;
           }
           .detail-value {
             margin-top: 0.8mm;
-            font-size: 2.9mm;
+            font-size: 5mm;
             font-weight: 700;
             line-height: 1.1;
             word-break: break-word;
@@ -2541,8 +2528,6 @@ function openOuterBoxLabelPreview({
             <p class="preview-note">Lokale preview zonder printer. Verhouding is afgestemd op de DYMO-sticker.</p>
             <div class="sticker">
               <div class="article-number">${articleHtml}</div>
-              <div class="label-caption">Artikelomschrijving</div>
-              <div class="description">${descriptionHtml}</div>
               <div class="bottom-row">
                 <div class="details-grid">
                   <div class="detail-card">
