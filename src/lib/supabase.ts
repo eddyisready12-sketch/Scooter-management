@@ -339,6 +339,11 @@ function normalizeSupplier(row: Record<string, unknown>): Supplier {
     ppwrNotes: row.ppwrNotes ? String(row.ppwrNotes) : row.ppwr_notes ? String(row.ppwr_notes) : undefined,
     notes: row.notes ? String(row.notes) : undefined,
     active: row.active === false ? false : true,
+    complianceResponsibility: (row.complianceResponsibility ?? row.compliance_responsibility ?? 'own') as Supplier['complianceResponsibility'],
+    complianceResponsibilityReference: String(row.complianceResponsibilityReference ?? row.compliance_responsibility_reference ?? '') || undefined,
+    complianceResponsibilityEstablishedAt: String(row.complianceResponsibilityEstablishedAt ?? row.compliance_responsibility_established_at ?? '') || undefined,
+    complianceResponsibilitySetBy: String(row.complianceResponsibilitySetBy ?? row.compliance_responsibility_set_by ?? '') || undefined,
+    complianceResponsibilityAudit: (row.complianceResponsibilityAudit ?? row.compliance_responsibility_audit ?? []) as Supplier['complianceResponsibilityAudit'],
   };
 }
 
@@ -388,6 +393,11 @@ function supplierToDatabase(supplier: Supplier) {
     ppwr_notes: supplier.ppwrNotes,
     notes: supplier.notes,
     active: supplier.active ?? true,
+    compliance_responsibility: supplier.complianceResponsibility ?? 'own',
+    compliance_responsibility_reference: supplier.complianceResponsibilityReference,
+    compliance_responsibility_established_at: supplier.complianceResponsibilityEstablishedAt,
+    compliance_responsibility_set_by: supplier.complianceResponsibilitySetBy,
+    compliance_responsibility_audit: supplier.complianceResponsibilityAudit ?? [],
   };
 }
 
@@ -417,6 +427,11 @@ function supplierToLegacyDatabase(supplier: Supplier) {
     ppwrNotes: supplier.ppwrNotes,
     notes: supplier.notes,
     active: supplier.active ?? true,
+    complianceResponsibility: supplier.complianceResponsibility ?? 'own',
+    complianceResponsibilityReference: supplier.complianceResponsibilityReference,
+    complianceResponsibilityEstablishedAt: supplier.complianceResponsibilityEstablishedAt,
+    complianceResponsibilitySetBy: supplier.complianceResponsibilitySetBy,
+    complianceResponsibilityAudit: supplier.complianceResponsibilityAudit ?? [],
   };
 }
 

@@ -7100,3 +7100,25 @@ dd {
     align-items: stretch;
   }
 }
+.product-compliance-pill.outsourced,
+.product-compliance-table-pill.outsourced {
+  background: #e8f1fb;
+  color: #245d91;
+  border-color: #9fc3e5;
+}
+
+.product-responsibility-banner {
+  display: flex;
+  gap: 16px;
+  align-items: end;
+  justify-content: space-between;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  border: 1px solid #d7dee8;
+  border-radius: 10px;
+  background: #f6f8fb;
+}
+
+.product-responsibility-banner.outsourced { background: #edf5fc; border-color: #a9c9e7; color: #245d91; }
+.product-responsibility-banner > div { display: grid; gap: 3px; }
+.supplier-compliance-audit { display: grid; gap: 5px; padding: 10px; background: #f6f8fb; border-radius: 8px; }

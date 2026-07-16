@@ -49,7 +49,7 @@ type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'complian
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
 type ProductModalTab = 'basic' | 'gpsr' | 'packaging' | 'certification' | 'batches';
-type ProductComplianceLevel = 'green' | 'yellow' | 'red';
+type ProductComplianceLevel = 'green' | 'yellow' | 'red' | 'outsourced';
 type ProductComplianceDomain = 'gpsr' | 'packaging' | 'ppwr';
 type ProductComplianceSection = 'identification' | 'planning' | 'traceability' | 'manufacturer' | 'importer' | 'safety' | 'certification' | 'packagingGeneral' | 'packagingLayers' | 'batches';
 type ProductComplianceIssueLevel = 'error' | 'warning' | 'info';
@@ -68,7 +68,7 @@ type ProductComplianceSummary = {
   ppwr: { level: ProductComplianceLevel; issues: ProductComplianceIssue[]; progress: number };
   checklist: ProductComplianceIssue[];
   overallLevel: ProductComplianceLevel;
-  overallLabel: 'Compleet' | 'Controleren' | 'Onvolledig';
+  overallLabel: 'Compleet' | 'Controleren' | 'Onvolledig' | 'Uitbesteed aan leverancier';
   overallProgress: number;
   severityCounts: { critical: number; recommended: number; informational: number };
 };
@@ -809,6 +809,26 @@ function getResolvedProductComplianceSource(
   };
 }
 
+function getProductComplianceResponsibility(product: Product, supplierRecords: Supplier[] = []) {
+  const supplier = findSupplierByName(supplierRecords, product.supplier);
+  const responsibility = product.complianceResponsibilityOverride
+    ?? supplier?.complianceResponsibility
+    ?? 'own';
+  return {
+    responsibility,
+    reference: product.complianceResponsibilityOverride === 'outsourced'
+      ? product.complianceResponsibilityReference
+      : supplier?.complianceResponsibilityReference,
+    establishedAt: product.complianceResponsibilityOverride
+      ? product.complianceResponsibilitySetAt
+      : supplier?.complianceResponsibilityEstablishedAt,
+    setBy: product.complianceResponsibilityOverride
+      ? product.complianceResponsibilitySetBy
+      : supplier?.complianceResponsibilitySetBy,
+    source: product.complianceResponsibilityOverride ? 'product' as const : 'supplier' as const,
+  };
+}
+
 function getRelevantProductPackagingRegistrations(
   product: Product,
   registrations: ProductPackagingRegistration[],
@@ -973,6 +993,20 @@ function getProductComplianceSummary(
   supplierRecords: Supplier[] = [],
   importers: Importer[] = [],
 ): ProductComplianceSummary {
+  const responsibility = getProductComplianceResponsibility(product, supplierRecords);
+  if (responsibility.responsibility === 'outsourced') {
+    const outsourced = { level: 'outsourced' as const, issues: [], progress: 100 };
+    return {
+      gpsr: outsourced,
+      packaging: outsourced,
+      ppwr: outsourced,
+      checklist: [],
+      overallLevel: 'outsourced',
+      overallLabel: 'Uitbesteed aan leverancier',
+      overallProgress: 100,
+      severityCounts: { critical: 0, recommended: 0, informational: 0 },
+    };
+  }
   const resolvedProduct = getResolvedProductComplianceSource(product, supplierRecords, importers);
   const relevantRegistrations = getRelevantProductPackagingRegistrations(resolvedProduct, registrations);
   const productPackagingLayers = normalizePackagingLayers(resolvedProduct);
@@ -4292,6 +4326,28 @@ export function App() {
 
   async function upsertSupplierRecord(supplier: Supplier) {
     supplier = migrateSupplierPpwr(supplier);
+    const previousSupplier = data.suppliers.find((item) => item.id === supplier.id);
+    const responsibilityChanged = (previousSupplier?.complianceResponsibility ?? 'own') !== (supplier.complianceResponsibility ?? 'own')
+      || (previousSupplier?.complianceResponsibilityReference ?? '') !== (supplier.complianceResponsibilityReference ?? '');
+    if (supplier.complianceResponsibility === 'outsourced' && !supplier.complianceResponsibilityReference?.trim()) {
+      setSupplierMessage('Onderbouwing / referentie is verplicht bij overdracht aan de leverancier.');
+      return;
+    }
+    if (responsibilityChanged) {
+      const establishedAt = supplier.complianceResponsibilityEstablishedAt || new Date().toISOString();
+      const auditEntry = {
+        responsibility: supplier.complianceResponsibility ?? 'own' as const,
+        reference: supplier.complianceResponsibilityReference,
+        establishedAt,
+        changedBy: loginSession?.name || 'Onbekende gebruiker',
+      };
+      supplier = {
+        ...supplier,
+        complianceResponsibilityEstablishedAt: establishedAt,
+        complianceResponsibilitySetBy: auditEntry.changedBy,
+        complianceResponsibilityAudit: [...(previousSupplier?.complianceResponsibilityAudit ?? []), auditEntry],
+      };
+    }
     try {
       let productsToUpdate: Product[] = [];
       let registrationsToUpdate: ProductPackagingRegistration[] = [];
@@ -9833,6 +9889,7 @@ function ProductsPage({
   const [lifecycleFilter, setLifecycleFilter] = useState('');
   const [availableFromFilter, setAvailableFromFilter] = useState('');
   const [complianceFilter, setComplianceFilter] = useState('');
+  const [responsibilityFilter, setResponsibilityFilter] = useState('');
   const [codeFilter, setCodeFilter] = useState('');
   const [descriptionFilter, setDescriptionFilter] = useState('');
   const [barcodeFilter, setBarcodeFilter] = useState('');
@@ -9921,10 +9978,12 @@ function ProductsPage({
       const lifecycleMatch = !lifecycleFilter
         || (lifecycleFilter === 'endOfLife' ? hasEndDate : !hasEndDate);
       const compliance = complianceByProductId.get(product.id);
+      const responsibility = getProductComplianceResponsibility(product, supplierRecords).responsibility;
       const complianceMatch = !complianceFilter
         || (complianceFilter === 'complete' && compliance?.overallLevel === 'green')
         || (complianceFilter === 'attention' && compliance?.overallLevel === 'yellow')
         || (complianceFilter === 'blocking' && compliance?.overallLevel === 'red');
+      const responsibilityMatch = !responsibilityFilter || responsibility === responsibilityFilter;
 
       return inQuery
         && (!codeNeedle || product.code?.toLowerCase().includes(codeNeedle))
@@ -9939,6 +9998,7 @@ function ProductsPage({
         && availableFromMatch
         && lifecycleMatch
         && complianceMatch
+        && responsibilityMatch
     }).sort((a, b) => {
       const codeA = (a.code || '').trim();
       const codeB = (b.code || '').trim();
@@ -9977,18 +10037,20 @@ function ProductsPage({
           return codeA.localeCompare(codeB, 'nl', { sensitivity: 'base', numeric: true }) * direction;
       }
     });
-  }, [scopedProducts, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, importCompanyFilter, lifecycleFilter, availableFromFilter, complianceFilter, sortField, sortDirection, complianceByProductId]);
+  }, [scopedProducts, query, codeFilter, descriptionFilter, barcodeFilter, groupFilter, supplierFilter, stockFilter, importCompanyFilter, lifecycleFilter, availableFromFilter, complianceFilter, responsibilityFilter, sortField, sortDirection, complianceByProductId]);
   const complianceSummaryCounts = useMemo(() => {
     return scopedProducts.reduce((summary, product) => {
       const compliance = complianceByProductId.get(product.id);
       if (compliance?.overallLevel === 'green') summary.complete += 1;
       else if (compliance?.overallLevel === 'yellow') summary.attention += 1;
       else if (compliance?.overallLevel === 'red') summary.blocking += 1;
+      else if (compliance?.overallLevel === 'outsourced') summary.outsourced += 1;
       return summary;
     }, {
       complete: 0,
       attention: 0,
       blocking: 0,
+      outsourced: 0,
     });
   }, [scopedProducts, complianceByProductId]);
   const certificationSummaryCounts = useMemo(() => {
@@ -10053,6 +10115,28 @@ function ProductsPage({
     }));
     if (updatedProducts.length === 0) return;
     await onBulkUpdateProducts(updatedProducts, 'E-mark niet van toepassing ingesteld');
+  }
+
+  async function outsourceSelectedProducts() {
+    const selectedSupplierNames = new Set(selectedProducts.map((product) => product.supplier?.trim()).filter(Boolean));
+    if (selectedProducts.length === 0) return;
+    if (selectedSupplierNames.size !== 1) {
+      window.alert('Selecteer producten van precies één leverancier voor deze bulkactie.');
+      return;
+    }
+    const reference = window.prompt('Verplichte onderbouwing / referentie voor deze overdracht:')?.trim();
+    if (!reference) {
+      window.alert('De bulkactie is niet uitgevoerd: onderbouwing / referentie is verplicht.');
+      return;
+    }
+    const now = new Date().toISOString();
+    await onBulkUpdateProducts(selectedProducts.map((product) => ({
+      ...product,
+      complianceResponsibilityOverride: 'outsourced' as const,
+      complianceResponsibilityReference: reference,
+      complianceResponsibilitySetAt: now,
+      complianceResponsibilitySetBy: 'Bulkactie Producten',
+    })), 'Compliance overgedragen aan leverancier');
   }
 
   const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(visibleProducts.length / pageSize));
@@ -10151,6 +10235,11 @@ function ProductsPage({
             <option value="attention">Controleren</option>
             <option value="blocking">Onvolledig</option>
           </select>
+          <select value={responsibilityFilter} onChange={(event) => setResponsibilityFilter(event.target.value)}>
+            <option value="">Alle verantwoordelijkheden</option>
+            <option value="own">Eigen dossier vereist</option>
+            <option value="outsourced">Uitbesteed aan leverancier</option>
+          </select>
           <label className="product-date-filter">
             <span>Toegevoegd / beschikbaar vanaf</span>
             <input type="date" value={availableFromFilter} onChange={(event) => setAvailableFromFilter(event.target.value)} />
@@ -10179,7 +10268,7 @@ function ProductsPage({
         <div className="product-table-intro">
           <strong>{visibleProducts.length} producten zichtbaar</strong>
           <span>
-            Compleet {complianceSummaryCounts.complete} · Controleren {complianceSummaryCounts.attention} · Onvolledig {complianceSummaryCounts.blocking}
+            Compleet {complianceSummaryCounts.complete} · Controleren {complianceSummaryCounts.attention} · Onvolledig {complianceSummaryCounts.blocking} · Uitbesteed {complianceSummaryCounts.outsourced}
             {certificationSummaryCounts.eMarkMissing > 0 ? ` · E-mark ontbrekend ${certificationSummaryCounts.eMarkMissing}` : ''}
             {certificationSummaryCounts.ceMissing > 0 ? ` · CE ontbrekend ${certificationSummaryCounts.ceMissing}` : ''}
           </span>
@@ -10209,6 +10298,9 @@ function ProductsPage({
                 onClick={() => void markSelectedProductsAsEMarkNotApplicable()}
               >
                 E-mark niet van toepassing
+              </button>
+              <button type="button" className="secondary-button" disabled={selectedProductIds.length === 0} onClick={() => void outsourceSelectedProducts()}>
+                Overdragen aan leverancier
               </button>
             </div>
             <div className="table-toolbar">
@@ -10275,7 +10367,7 @@ function ProductsPage({
                 {pagedProducts.map((product) => {
                   const compliance = complianceByProductId.get(product.id);
                   const levelLabel = (level?: ProductComplianceLevel) => (
-                    level === 'green' ? 'groen' : level === 'yellow' ? 'geel' : 'rood'
+                    level === 'green' ? 'groen' : level === 'yellow' ? 'geel' : level === 'outsourced' ? 'uitbesteed' : 'rood'
                   );
                   const tooltipLines = compliance ? [
                     `GPSR ${levelLabel(compliance.gpsr.level)}`,
@@ -10469,6 +10561,7 @@ function ProductDetailModal({
     () => getProductComplianceSummary(draft, batches, costLines, registrations, supplierRecords, importers),
     [draft, batches, costLines, registrations, supplierRecords, importers],
   );
+  const complianceResponsibility = getProductComplianceResponsibility(draft, supplierRecords);
   const visibleChecklistItems = checklistExpanded
     ? complianceStatus.checklist
     : complianceStatus.checklist.slice(0, 6);
@@ -10748,28 +10841,53 @@ function ProductDetailModal({
         </div>
         <section className="panel form-panel product-form-shell">
           <div className="product-compliance-shell">
+            <div className={`product-responsibility-banner ${complianceResponsibility.responsibility}`}>
+              <div>
+                <strong>{complianceResponsibility.responsibility === 'outsourced' ? 'Uitbesteed aan leverancier' : 'Eigen dossier vereist'}</strong>
+                <span>{complianceResponsibility.source === 'supplier' ? 'Geërfd van leverancier' : 'Handmatige productoverride'}</span>
+                {complianceResponsibility.reference && (/^https?:\/\//i.test(complianceResponsibility.reference)
+                  ? <a href={complianceResponsibility.reference} target="_blank" rel="noreferrer">Open onderbouwing</a>
+                  : <small>Onderbouwing: {complianceResponsibility.reference}</small>)}
+              </div>
+              <label>Productoverride
+                <select value={draft.complianceResponsibilityOverride ?? ''} onChange={(event) => setDraft((current) => ({
+                  ...current,
+                  complianceResponsibilityOverride: (event.target.value || undefined) as Product['complianceResponsibilityOverride'],
+                  complianceResponsibilitySetAt: event.target.value ? new Date().toISOString() : undefined,
+                }))}>
+                  <option value="">Erven van leverancier</option>
+                  <option value="own">Eigen dossier vereist</option>
+                  <option value="outsourced">Overgedragen aan leverancier</option>
+                </select>
+              </label>
+              {draft.complianceResponsibilityOverride === 'outsourced' && (
+                <label>Onderbouwing / referentie*
+                  <input value={draft.complianceResponsibilityReference ?? ''} required onChange={(event) => setDraft((current) => ({ ...current, complianceResponsibilityReference: event.target.value }))} />
+                </label>
+              )}
+            </div>
             <div className="product-compliance-bar">
               <div className="panel detail-card product-compliance-card">
                 <span className="detail-card-title">GPSR status</span>
                 <span className={`product-compliance-pill ${complianceStatus.gpsr.level}`}>
-                  {complianceStatus.gpsr.level === 'green' ? <CheckCircle2 size={14} /> : complianceStatus.gpsr.level === 'yellow' ? <CircleHelp size={14} /> : <XCircle size={14} />}
-                  {complianceStatus.gpsr.level === 'green' ? 'Groen' : complianceStatus.gpsr.level === 'yellow' ? 'Geel' : 'Rood'}
+                  {complianceStatus.gpsr.level === 'outsourced' ? <ShieldCheck size={14} /> : complianceStatus.gpsr.level === 'green' ? <CheckCircle2 size={14} /> : complianceStatus.gpsr.level === 'yellow' ? <CircleHelp size={14} /> : <XCircle size={14} />}
+                  {complianceStatus.gpsr.level === 'outsourced' ? 'Uitbesteed' : complianceStatus.gpsr.level === 'green' ? 'Groen' : complianceStatus.gpsr.level === 'yellow' ? 'Geel' : 'Rood'}
                 </span>
                 <strong className="product-compliance-progress">{complianceStatus.gpsr.progress}% gereed</strong>
               </div>
               <div className="panel detail-card product-compliance-card">
                 <span className="detail-card-title">Verpakking status</span>
                 <span className={`product-compliance-pill ${complianceStatus.packaging.level}`}>
-                  {complianceStatus.packaging.level === 'green' ? <CheckCircle2 size={14} /> : complianceStatus.packaging.level === 'yellow' ? <CircleHelp size={14} /> : <XCircle size={14} />}
-                  {complianceStatus.packaging.level === 'green' ? 'Groen' : complianceStatus.packaging.level === 'yellow' ? 'Geel' : 'Rood'}
+                  {complianceStatus.packaging.level === 'outsourced' ? <ShieldCheck size={14} /> : complianceStatus.packaging.level === 'green' ? <CheckCircle2 size={14} /> : complianceStatus.packaging.level === 'yellow' ? <CircleHelp size={14} /> : <XCircle size={14} />}
+                  {complianceStatus.packaging.level === 'outsourced' ? 'Uitbesteed' : complianceStatus.packaging.level === 'green' ? 'Groen' : complianceStatus.packaging.level === 'yellow' ? 'Geel' : 'Rood'}
                 </span>
                 <strong className="product-compliance-progress">{complianceStatus.packaging.progress}% gereed</strong>
               </div>
               <div className="panel detail-card product-compliance-card">
                 <span className="detail-card-title">PPWR status</span>
                 <span className={`product-compliance-pill ${complianceStatus.ppwr.level}`}>
-                  {complianceStatus.ppwr.level === 'green' ? <CheckCircle2 size={14} /> : complianceStatus.ppwr.level === 'yellow' ? <CircleHelp size={14} /> : <XCircle size={14} />}
-                  {complianceStatus.ppwr.level === 'green' ? 'Groen' : complianceStatus.ppwr.level === 'yellow' ? 'Geel' : 'Rood'}
+                  {complianceStatus.ppwr.level === 'outsourced' ? <ShieldCheck size={14} /> : complianceStatus.ppwr.level === 'green' ? <CheckCircle2 size={14} /> : complianceStatus.ppwr.level === 'yellow' ? <CircleHelp size={14} /> : <XCircle size={14} />}
+                  {complianceStatus.ppwr.level === 'outsourced' ? 'Uitbesteed' : complianceStatus.ppwr.level === 'green' ? 'Groen' : complianceStatus.ppwr.level === 'yellow' ? 'Geel' : 'Rood'}
                 </span>
                 <strong className="product-compliance-progress">{complianceStatus.ppwr.progress}% gereed</strong>
               </div>
@@ -11572,6 +11690,9 @@ function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
   const country = String(form.get('country') ?? '').trim();
   const importerId = String(form.get('importerId') ?? '').trim();
   const notes = String(form.get('notes') ?? '').trim();
+  const complianceResponsibility = String(form.get('complianceResponsibility') ?? 'own') as 'own' | 'outsourced';
+  const complianceResponsibilityReference = String(form.get('complianceResponsibilityReference') ?? '').trim();
+  const complianceResponsibilityEstablishedAt = String(form.get('complianceResponsibilityEstablishedAt') ?? '').trim();
 
   return {
     ...existing,
@@ -11591,6 +11712,9 @@ function supplierFromForm(form: FormData, existing?: Supplier): Supplier {
     country: country || undefined,
     notes: notes || undefined,
     active: existing?.active ?? true,
+    complianceResponsibility,
+    complianceResponsibilityReference: complianceResponsibilityReference || undefined,
+    complianceResponsibilityEstablishedAt: complianceResponsibilityEstablishedAt || undefined,
   };
 }
 
@@ -11666,6 +11790,7 @@ function SupplierModal({
   const isPackagingSupplier = supplier?.isPackagingSupplier === true;
   const [showAddContact, setShowAddContact] = useState(false);
   const [selectedContact, setSelectedContact] = useState<SupplierContact | null>(null);
+  const [complianceResponsibility, setComplianceResponsibility] = useState(supplier?.complianceResponsibility ?? 'own');
   const sortedContacts = [...contacts].sort((a, b) => {
     const primaryRank = Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary));
     if (primaryRank !== 0) return primaryRank;
@@ -11716,6 +11841,27 @@ function SupplierModal({
             <input name="isPackagingSupplier" type="checkbox" defaultChecked={isPackagingSupplier} />
             Verpakkingsleverancier
           </label>
+          <label>Compliance-verantwoordelijkheid
+            <select name="complianceResponsibility" value={complianceResponsibility} onChange={(event) => setComplianceResponsibility(event.target.value as 'own' | 'outsourced')}>
+              <option value="own">Eigen dossier vereist</option>
+              <option value="outsourced">Overgedragen aan leverancier</option>
+            </select>
+          </label>
+          <label>Vastgesteld op
+            <input name="complianceResponsibilityEstablishedAt" type="date" defaultValue={(supplier?.complianceResponsibilityEstablishedAt ?? '').slice(0, 10)} />
+          </label>
+          <label className="span-2">Onderbouwing / referentie{complianceResponsibility === 'outsourced' ? '*' : ''}
+            <textarea name="complianceResponsibilityReference" defaultValue={supplier?.complianceResponsibilityReference ?? ''} required={complianceResponsibility === 'outsourced'} placeholder="Documentnaam, dossiernummer of URL naar conformiteitsverklaring" />
+          </label>
+          {supplier?.complianceResponsibilitySetBy && <div className="span-2 inline-notice">Laatst ingesteld door {supplier.complianceResponsibilitySetBy} op {formatDateOnly(supplier.complianceResponsibilityEstablishedAt)}.</div>}
+          {(supplier?.complianceResponsibilityAudit?.length ?? 0) > 0 && (
+            <div className="span-2 supplier-compliance-audit">
+              <strong>Audit-log</strong>
+              {supplier!.complianceResponsibilityAudit!.slice().reverse().map((entry, index) => (
+                <small key={`${entry.establishedAt}-${index}`}>{formatDateOnly(entry.establishedAt)} · {entry.changedBy} · {entry.responsibility === 'outsourced' ? 'Overgedragen' : 'Eigen dossier'} · {entry.reference || 'Geen referentie'}</small>
+              ))}
+            </div>
+          )}
           <label className="span-2">Notities<textarea name="notes" defaultValue={supplier?.notes ?? ''} /></label>
         </div>
         <section className="supplier-contacts-section">

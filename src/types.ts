@@ -232,6 +232,10 @@ export type Product = {
   cePresent?: 'ja' | 'nee' | 'niet_van_toepassing' | 'onbekend';
   certificationNotes?: string;
   certificateDocumentId?: string;
+  complianceResponsibilityOverride?: 'own' | 'outsourced';
+  complianceResponsibilityReference?: string;
+  complianceResponsibilitySetAt?: string;
+  complianceResponsibilitySetBy?: string;
 };
 
 export type Herkomst = 'eu' | 'niet_eu';
@@ -306,6 +310,16 @@ export type Supplier = {
   ppwrNotes?: string;
   notes?: string;
   active?: boolean;
+  complianceResponsibility?: 'own' | 'outsourced';
+  complianceResponsibilityReference?: string;
+  complianceResponsibilityEstablishedAt?: string;
+  complianceResponsibilitySetBy?: string;
+  complianceResponsibilityAudit?: Array<{
+    responsibility: 'own' | 'outsourced';
+    reference?: string;
+    establishedAt: string;
+    changedBy: string;
+  }>;
 };
 
 export type Importer = {

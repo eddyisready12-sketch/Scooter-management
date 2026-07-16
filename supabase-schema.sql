@@ -138,6 +138,40 @@ alter table suppliers add column if not exists herkomst text;
 alter table suppliers add column if not exists "docStatus" jsonb;
 alter table suppliers add column if not exists "packagingProfile" jsonb default '[]'::jsonb;
 alter table suppliers add column if not exists "packagingItems" jsonb default '[]'::jsonb;
+alter table suppliers add column if not exists compliance_responsibility text not null default 'own' check (compliance_responsibility in ('own', 'outsourced'));
+alter table suppliers add column if not exists compliance_responsibility_reference text;
+alter table suppliers add column if not exists compliance_responsibility_established_at timestamptz;
+alter table suppliers add column if not exists compliance_responsibility_set_by text;
+alter table suppliers add column if not exists compliance_responsibility_audit jsonb not null default '[]'::jsonb;
+
+alter table products add column if not exists "complianceResponsibilityOverride" text check ("complianceResponsibilityOverride" in ('own', 'outsourced'));
+alter table products add column if not exists "complianceResponsibilityReference" text;
+alter table products add column if not exists "complianceResponsibilitySetAt" timestamptz;
+alter table products add column if not exists "complianceResponsibilitySetBy" text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'suppliers_compliance_reference_required'
+  ) then
+    alter table suppliers add constraint suppliers_compliance_reference_required check (
+      compliance_responsibility <> 'outsourced'
+      or nullif(btrim(compliance_responsibility_reference), '') is not null
+    );
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'products_compliance_reference_required'
+  ) then
+    alter table products add constraint products_compliance_reference_required check (
+      "complianceResponsibilityOverride" <> 'outsourced'
+      or nullif(btrim("complianceResponsibilityReference"), '') is not null
+    );
+  end if;
+end $$;
 
 update suppliers
 set

@@ -38,7 +38,7 @@ import type {
 
 type ComplianceModuleView = 'dashboard' | 'families' | 'unlinked' | 'documents' | 'templates' | 'packagingSuppliers';
 type ComplianceDetailTab = 'basic' | 'risks' | 'warnings' | 'requirements' | 'tests' | 'documents' | 'links' | 'revisions' | 'dossier';
-type ComplianceDashboardTab = 'incomplete' | 'highRisk' | 'requirements' | 'tests' | 'missingDocuments' | 'expiringDocuments' | 'expiredDocuments';
+type ComplianceDashboardTab = 'incomplete' | 'outsourced' | 'highRisk' | 'requirements' | 'tests' | 'missingDocuments' | 'expiringDocuments' | 'expiredDocuments';
 
 type CompliancePageProps = {
   products: Product[];
@@ -93,6 +93,7 @@ const detailTabs: Array<{ id: ComplianceDetailTab; label: string }> = [
 
 const dashboardTabs: Array<{ id: ComplianceDashboardTab; label: string }> = [
   { id: 'incomplete', label: 'Incomplete dossiers' },
+  { id: 'outsourced', label: 'Uitbesteed aan leverancier' },
   { id: 'highRisk', label: 'Hoog risico families' },
   { id: 'requirements', label: 'Keuringen' },
   { id: 'tests', label: 'Tests' },
@@ -188,6 +189,12 @@ function normalizeSupplierName(value?: string) {
   return (value ?? '').replace(/[^a-z0-9]/gi, '').toLowerCase();
 }
 
+function productIsOutsourced(product: Product, suppliers: Supplier[]) {
+  if (product.complianceResponsibilityOverride) return product.complianceResponsibilityOverride === 'outsourced';
+  const supplier = suppliers.find((item) => normalizeSupplierName(item.name) === normalizeSupplierName(product.supplier));
+  return supplier?.complianceResponsibility === 'outsourced';
+}
+
 function packagingSupplierProfileReady(supplier?: Supplier) {
   return ppwrSupplierStatus(supplier) === 'compleet';
 }
@@ -278,10 +285,13 @@ export function CompliancePage({
     });
   }
 
+  const outsourcedProducts = useMemo(() => products.filter((product) => productIsOutsourced(product, suppliers)), [products, suppliers]);
+  const outsourcedProductIds = useMemo(() => new Set(outsourcedProducts.map((product) => product.id)), [outsourcedProducts]);
+  const dossierLinks = useMemo(() => links.filter((link) => !outsourcedProductIds.has(link.productId)), [links, outsourcedProductIds]);
   const familyRows = useMemo(() => families.map((family) => ({
     family,
-    stats: getComplianceFamilyStats(family, risks, warnings, documents, requirements, testPlans, tests, links),
-  })), [documents, families, links, requirements, risks, testPlans, tests, warnings]);
+    stats: getComplianceFamilyStats(family, risks, warnings, documents, requirements, testPlans, tests, dossierLinks),
+  })), [documents, families, dossierLinks, requirements, risks, testPlans, tests, warnings]);
 
   const filteredFamilies = useMemo(() => familyRows.filter(({ family, stats }) => {
     const haystack = `${family.code} ${family.name} ${family.category ?? ''}`.toLowerCase();
@@ -304,10 +314,10 @@ export function CompliancePage({
   ), [links]);
 
   const productsWithoutFamily = useMemo(() => products.filter((product) => {
-    if (!product.id || linkedProductIds.has(product.id)) return false;
+    if (!product.id || linkedProductIds.has(product.id) || outsourcedProductIds.has(product.id)) return false;
     const haystack = `${product.code} ${product.description} ${product.articleGroup ?? ''} ${product.brand ?? ''}`.toLowerCase();
     return haystack.includes(unlinkedQuery.toLowerCase());
-  }), [linkedProductIds, products, unlinkedQuery]);
+  }), [linkedProductIds, outsourcedProductIds, products, unlinkedQuery]);
 
   const expiringDocuments = useMemo(() => documents.filter((document) => expiryState(document.validUntil) === 'soon'), [documents]);
   const expiredDocuments = useMemo(() => documents.filter((document) => expiryState(document.validUntil) === 'expired'), [documents]);
@@ -854,6 +864,11 @@ export function CompliancePage({
             <span>Producten zonder familie</span>
             <strong>{productsWithoutFamily.length}</strong>
           </article>
+          <article className="stat-card compliance-dashboard-card blue compliance-dashboard-hero-card">
+            <span>Uitbesteed aan leverancier</span>
+            <strong>{outsourcedProducts.length}</strong>
+            <small>Niet als openstaand werk geteld</small>
+          </article>
         </div>
 
         <section className="panel compliance-dashboard-panel compliance-dashboard-tabs-shell">
@@ -888,6 +903,14 @@ export function CompliancePage({
                       <span>{stats.progress}%</span>
                     </div>
                     <span className="compliance-inline-status danger">{stats.activeLinks === 0 ? 'Gekoppelde producten' : 'Aanvullen'}</span>
+                  </button>
+                ))
+              )}
+              {dashboardTab === 'outsourced' && (
+                outsourcedProducts.length === 0 ? <p className="empty">Geen uitbestede producten.</p> : outsourcedProducts.map((product) => (
+                  <button type="button" key={product.id} className="compliance-dashboard-row" onClick={() => onSelectProduct(product, 'basic')}>
+                    <div><strong>{product.code}</strong><span>{product.description}</span></div>
+                    <span className="compliance-inline-status">{product.supplier || 'Geen leverancier'}</span>
                   </button>
                 ))
               )}
