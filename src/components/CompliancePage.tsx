@@ -21,7 +21,7 @@ import {
   requirementFulfilled,
   testPlanFulfilled,
 } from '../lib/compliance';
-import { createPackagingProfileLayer, migrateSupplierPpwr, ppwrSupplierStatus, roleHerkomst } from '../lib/ppwr-suppliers';
+import { createPackagingProfileLayer, createPurchasedPackagingItem, migrateSupplierPpwr, ppwrSupplierStatus, roleHerkomst } from '../lib/ppwr-suppliers';
 import type {
   ComplianceFamilyDocument,
   ComplianceFamilyRequirement,
@@ -1575,6 +1575,13 @@ export function CompliancePage({
     }
   }
 
+  function updatePurchasedPackagingItem(itemId: string, updates: Partial<NonNullable<Supplier['packagingItems']>[number]>) {
+    setDraftPackagingSupplier((current) => current ? {
+      ...current,
+      packagingItems: (current.packagingItems ?? []).map((item) => item.id === itemId ? { ...item, ...updates } : item),
+    } : current);
+  }
+
   function renderPackagingSuppliersView() {
     const selectedUsage = packagingSupplierRows.find((row) => row.key === selectedPackagingSupplierKey)?.usage;
     const profileLayers = draftPackagingSupplier?.packagingProfile ?? [];
@@ -1764,6 +1771,35 @@ export function CompliancePage({
                     </div>
                   </section>
                 )}
+
+                <section className="panel">
+                  <div className="panel-title"><span>Ingekochte verpakkingen</span><button type="button" className="secondary-button" onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, packagingItems: [...(current.packagingItems ?? []), createPurchasedPackagingItem()] } : current)}><Plus size={14} /> Verpakking toevoegen</button></div>
+                  <p className="packaging-catalog-hint">Leg een verpakking één keer per leveranciersorder vast. Daarna kan hetzelfde artikel aan meerdere producten worden gekoppeld.</p>
+                  <div className="supplier-profile-stack">
+                    {(draftPackagingSupplier.packagingItems ?? []).map((item) => (
+                      <article className="supplier-profile-layer" key={item.id}>
+                        <div className="supplier-profile-layer-title"><strong>{item.orderNummer ? `Order ${item.orderNummer}` : 'Nieuwe ingekochte verpakking'}{item.artikelCode ? ` · ${item.artikelCode}` : ''}</strong><button type="button" className="danger-icon-button" aria-label="Ingekochte verpakking verwijderen" onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, packagingItems: (current.packagingItems ?? []).filter((entry) => entry.id !== item.id) } : current)}><Trash2 size={16} /></button></div>
+                        <div className="compliance-form-grid profile-grid">
+                          <label><span>Ordernummer</span><input value={item.orderNummer} onChange={(event) => updatePurchasedPackagingItem(item.id, { orderNummer: event.target.value })} /></label>
+                          <label><span>Besteld op</span><input type="date" value={item.besteldOp || ''} onChange={(event) => updatePurchasedPackagingItem(item.id, { besteldOp: event.target.value || undefined })} /></label>
+                          <label><span>Artikelcode</span><input value={item.artikelCode} onChange={(event) => updatePurchasedPackagingItem(item.id, { artikelCode: event.target.value })} placeholder="Bijv. 00324" /></label>
+                          <label><span>Omschrijving</span><input value={item.omschrijving} onChange={(event) => updatePurchasedPackagingItem(item.id, { omschrijving: event.target.value })} placeholder="Bijv. LDPE-zak" /></label>
+                          <label><span>Afmetingen</span><input value={item.afmetingen || ''} onChange={(event) => updatePurchasedPackagingItem(item.id, { afmetingen: event.target.value || undefined })} placeholder="Bijv. 150 × 120 mm" /></label>
+                          <label><span>Materiaalcode</span><input value={item.materiaalcode} onChange={(event) => updatePurchasedPackagingItem(item.id, { materiaalcode: event.target.value })} placeholder="Bijv. PE-LD 04" /></label>
+                          <label><span>Gewicht (g)</span><input type="number" min="0" step="0.01" value={item.gewichtGram || ''} onChange={(event) => updatePurchasedPackagingItem(item.id, { gewichtGram: Number(event.target.value) })} /></label>
+                          <label><span>Gewichtsbasis</span><select value={item.gewichtBasis} onChange={(event) => updatePurchasedPackagingItem(item.id, { gewichtBasis: event.target.value as typeof item.gewichtBasis })}><option value="per_stuk">Per stuk</option><option value="per_doos">Per doos</option></select></label>
+                          <label><span>Aantal ingekocht</span><input type="number" min="0" step="1" value={item.aantalIngekocht ?? ''} onChange={(event) => updatePurchasedPackagingItem(item.id, { aantalIngekocht: event.target.value === '' ? undefined : Number(event.target.value) })} /></label>
+                          <label><span>Recyclaat (%)</span><input type="number" min="0" max="100" value={item.recyclaatPercentage ?? ''} onChange={(event) => updatePurchasedPackagingItem(item.id, { recyclaatPercentage: event.target.value === '' ? undefined : Number(event.target.value) })} /></label>
+                          <label><span>Zorgwekkende stoffen</span><select value={item.zorgwekkendeStoffen} onChange={(event) => updatePurchasedPackagingItem(item.id, { zorgwekkendeStoffen: event.target.value as typeof item.zorgwekkendeStoffen })}><option value="geen_bekend">Geen bekend</option><option value="onderzoek_loopt">Onderzoek loopt</option><option value="aanwezig">Aanwezig</option></select></label>
+                          <label><span>Bron</span><select value={item.bron} onChange={(event) => updatePurchasedPackagingItem(item.id, { bron: event.target.value as typeof item.bron })}><option value="opgave_leverancier">Opgave leverancier</option><option value="eigen_meting">Eigen meting</option><option value="schatting">Schatting</option></select></label>
+                          <label className="compliance-checkbox-label"><input type="checkbox" checked={item.herbruikbaar} onChange={(event) => updatePurchasedPackagingItem(item.id, { herbruikbaar: event.target.checked })} /><span>Herbruikbaar</span></label>
+                          <label className="compliance-checkbox-label"><input type="checkbox" checked={item.actief} onChange={(event) => updatePurchasedPackagingItem(item.id, { actief: event.target.checked })} /><span>Actief artikel</span></label>
+                        </div>
+                      </article>
+                    ))}
+                    {(draftPackagingSupplier.packagingItems ?? []).length === 0 ? <p className="empty">Nog geen ingekochte verpakkingen vastgelegd.</p> : null}
+                  </div>
+                </section>
 
                 <section className="panel"><div className="panel-title">Notities</div><div className="compliance-form-grid"><label className="span-2"><span>Leveranciersnotities</span><textarea value={draftPackagingSupplier.ppwrNotes || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrNotes: event.target.value } : current)} /></label></div></section>
 

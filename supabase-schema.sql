@@ -137,6 +137,7 @@ alter table suppliers add column if not exists "supplierSchemaVersion" integer d
 alter table suppliers add column if not exists herkomst text;
 alter table suppliers add column if not exists "docStatus" jsonb;
 alter table suppliers add column if not exists "packagingProfile" jsonb default '[]'::jsonb;
+alter table suppliers add column if not exists "packagingItems" jsonb default '[]'::jsonb;
 
 update suppliers
 set

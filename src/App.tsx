@@ -644,6 +644,8 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
         material: readPackagingLayerField(record, ['material', 'packagingMaterial', 'packaging_material']),
         recycleCode: readPackagingLayerField(record, ['recycleCode', 'recycle_code', 'code']),
         packagingSupplier: readPackagingLayerField(record, ['packagingSupplier', 'packaging_supplier', 'supplier', 'supplierName', 'supplier_name']),
+        packagingCatalogItemId: readPackagingLayerField(record, ['packagingCatalogItemId', 'packaging_catalog_item_id']),
+        weightBasis: readPackagingLayerField(record, ['weightBasis', 'weight_basis']) as ProductPackagingLayer['weightBasis'],
         weightGrams: readPackagingLayerField(record, ['weightGrams', 'weight', 'grams']),
         recycledContentPercent: readPackagingLayerField(record, ['recycledContentPercent', 'pcrPercent', 'pcr_percentage']),
         recyclabilityClass: readPackagingLayerField(record, ['recyclabilityClass', 'recyclability_class']) as ProductPackagingLayer['recyclabilityClass'],
@@ -655,6 +657,7 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
       layer.material
       || layer.recycleCode
       || layer.packagingSupplier
+      || layer.packagingCatalogItemId
       || layer.weightGrams
       || layer.recycledContentPercent
       || layer.recyclabilityClass
@@ -693,6 +696,8 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
     material: asOptionalTrimmedString(layer.material),
     recycleCode: asOptionalTrimmedString(layer.recycleCode),
     packagingSupplier: asOptionalTrimmedString(layer.packagingSupplier),
+    packagingCatalogItemId: asOptionalTrimmedString(layer.packagingCatalogItemId),
+    weightBasis: layer.weightBasis,
     weightGrams: asOptionalTrimmedString(layer.weightGrams),
     recycledContentPercent: asOptionalTrimmedString(layer.recycledContentPercent),
     recyclabilityClass: layer.recyclabilityClass,
@@ -10502,13 +10507,15 @@ function ProductDetailModal({
             material: asOptionalTrimmedString(layer.material),
             recycleCode: asOptionalTrimmedString(layer.recycleCode),
             packagingSupplier: asOptionalTrimmedString(layer.packagingSupplier),
+            packagingCatalogItemId: asOptionalTrimmedString(layer.packagingCatalogItemId),
+            weightBasis: layer.weightBasis,
             weightGrams: normalizeNumericInput(layer.weightGrams),
             recycledContentPercent: normalizeNumericInput(layer.recycledContentPercent),
             recyclabilityClass: layer.recyclabilityClass,
             packagingRole: layer.packagingRole,
             productStickerMaterial: layer.productStickerMaterial,
           }))
-          .filter((layer) => layer.material || layer.recycleCode || layer.packagingSupplier || layer.weightGrams || layer.recycledContentPercent || layer.recyclabilityClass || layer.packagingRole || layer.productStickerMaterial);
+          .filter((layer) => layer.material || layer.recycleCode || layer.packagingSupplier || layer.packagingCatalogItemId || layer.weightGrams || layer.recycledContentPercent || layer.recyclabilityClass || layer.packagingRole || layer.productStickerMaterial);
 
       const primaryLayer = normalizedLayers[0];
       const secondaryLayer = normalizedLayers[1];
@@ -10609,6 +10616,25 @@ function ProductDetailModal({
     updatePackagingLayer(index, {
       material: value || undefined,
       recycleCode: value ? option?.recycleCode ?? undefined : undefined,
+    });
+  }
+
+  function applyPackagingCatalogItem(index: number, itemId: string) {
+    const supplier = supplierRecords.find((record) => record.packagingItems?.some((item) => item.id === itemId));
+    const item = supplier?.packagingItems?.find((entry) => entry.id === itemId);
+    if (!item) {
+      updatePackagingLayer(index, { packagingCatalogItemId: undefined });
+      return;
+    }
+    const option = findPackagingMaterialOption(item.materiaalcode);
+    updatePackagingLayer(index, {
+      packagingCatalogItemId: item.id,
+      packagingSupplier: supplier?.name,
+      material: item.materiaalcode || undefined,
+      recycleCode: option?.recycleCode ?? (item.materiaalcode || undefined),
+      weightGrams: item.gewichtGram > 0 ? String(item.gewichtGram) : undefined,
+      weightBasis: item.gewichtBasis,
+      recycledContentPercent: item.recyclaatPercentage == null ? undefined : String(item.recyclaatPercentage),
     });
   }
 
@@ -11156,6 +11182,8 @@ function ProductDetailModal({
                     {packagingLayers.map((layer, index) => {
                       const selectedOption = findPackagingMaterialOption(layer.material);
                       const layerWasteStream = selectedOption?.wasteStream ?? '';
+                      const selectedPackagingSupplier = supplierRecords.find((supplier) => supplierNameMatches(supplier, layer.packagingSupplier));
+                      const availableCatalogItems = (selectedPackagingSupplier?.packagingItems ?? []).filter((item) => item.actief || item.id === layer.packagingCatalogItemId);
 
                       return (
                         <div key={`${layer.name ?? packagingLayerNames[index]}-${index}`} className="packaging-layer-card">
@@ -11173,9 +11201,16 @@ function ProductDetailModal({
                             </div>
                             <div className="packaging-layer-field">
                               <span className="packaging-layer-mobile-label">Leverancier</span>
-                              <select value={layer.packagingSupplier ?? ''} onChange={(event) => updatePackagingLayer(index, { packagingSupplier: event.target.value || undefined })}>
+                              <select value={layer.packagingSupplier ?? ''} onChange={(event) => updatePackagingLayer(index, { packagingSupplier: event.target.value || undefined, packagingCatalogItemId: undefined })}>
                                 <option value="">Selecteer...</option>
                                 {packagingSupplierOptions.map((supplier) => <option key={`${index}-packaging-supplier-${supplier}`} value={supplier}>{supplier}</option>)}
+                              </select>
+                            </div>
+                            <div className="packaging-layer-field">
+                              <span className="packaging-layer-mobile-label">Ingekochte verpakking</span>
+                              <select value={layer.packagingCatalogItemId ?? ''} onChange={(event) => applyPackagingCatalogItem(index, event.target.value)} disabled={!selectedPackagingSupplier || availableCatalogItems.length === 0}>
+                                <option value="">{selectedPackagingSupplier && availableCatalogItems.length === 0 ? 'Geen artikelen vastgelegd' : 'Selecteer artikel...'}</option>
+                                {availableCatalogItems.map((item) => <option key={item.id} value={item.id}>Order {item.orderNummer || '-'} · {item.artikelCode || item.omschrijving || 'Verpakking'}{item.afmetingen ? ` · ${item.afmetingen}` : ''}</option>)}
                               </select>
                             </div>
                             <div className="packaging-layer-field">
@@ -11190,7 +11225,7 @@ function ProductDetailModal({
                               <input value={layerWasteStream} readOnly />
                             </div>
                             <div className="packaging-layer-field">
-                              <span className="packaging-layer-mobile-label">Gewicht (g)</span>
+                              <span className="packaging-layer-mobile-label">Gewicht (g/{layer.weightBasis === 'per_doos' ? 'doos' : 'stuk'})</span>
                               <input
                                 value={layer.weightGrams ?? ''}
                                 inputMode="decimal"
@@ -11230,7 +11265,7 @@ function ProductDetailModal({
                                 type="button"
                                 className="danger-icon-button"
                                 onClick={() => removePackagingLayer(index)}
-                                disabled={packagingLayers.length <= 2 && !layer.material && !layer.recycleCode && !layer.packagingSupplier && !layer.weightGrams && !layer.recycledContentPercent && !layer.recyclabilityClass && !layer.packagingRole && !layer.productStickerMaterial}
+                                disabled={packagingLayers.length <= 2 && !layer.material && !layer.recycleCode && !layer.packagingSupplier && !layer.packagingCatalogItemId && !layer.weightGrams && !layer.recycledContentPercent && !layer.recyclabilityClass && !layer.packagingRole && !layer.productStickerMaterial}
                                 aria-label={`${layer.name ?? packagingLayerNames[index]} verwijderen`}
                               >
                                 <XCircle size={18} />

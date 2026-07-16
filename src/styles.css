@@ -6845,6 +6845,13 @@ dd {
   padding: 16px;
 }
 
+.packaging-catalog-hint {
+  margin: 0;
+  padding: 14px 16px 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
 .supplier-profile-layer {
   padding: 16px;
   border: 1px solid #dce4eb;

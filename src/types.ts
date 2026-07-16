@@ -258,6 +258,24 @@ export type VerpakkingsLaag = {
   bron: 'opgave_leverancier' | 'eigen_meting' | 'schatting';
 };
 
+export type IngekochtVerpakkingsartikel = {
+  id: string;
+  orderNummer: string;
+  besteldOp?: string;
+  artikelCode: string;
+  omschrijving: string;
+  afmetingen?: string;
+  materiaalcode: string;
+  gewichtGram: number;
+  gewichtBasis: 'per_stuk' | 'per_doos';
+  aantalIngekocht?: number;
+  recyclaatPercentage?: number;
+  herbruikbaar: boolean;
+  zorgwekkendeStoffen: 'geen_bekend' | 'onderzoek_loopt' | 'aanwezig';
+  bron: 'opgave_leverancier' | 'eigen_meting' | 'schatting';
+  actief: boolean;
+};
+
 export type Supplier = {
   id: string;
   name: string;
@@ -277,6 +295,7 @@ export type Supplier = {
   herkomst?: Herkomst;
   docStatus?: SupplierDocStatus;
   packagingProfile?: VerpakkingsLaag[];
+  packagingItems?: IngekochtVerpakkingsartikel[];
   packagingMaterials?: string;
   ppwrSupplierRole?: PpwrSupplierRole | 'Producent' | 'Converter' | 'Handelaar' | 'Co-packer';
   ppwrResponsibility?: 'Primair' | 'Secundair' | 'Tertiair' | 'Combinatie';
@@ -446,6 +465,8 @@ export type ProductPackagingLayer = {
   material?: string;
   recycleCode?: string;
   packagingSupplier?: string;
+  packagingCatalogItemId?: string;
+  weightBasis?: 'per_stuk' | 'per_doos';
   weightGrams?: string;
   recycledContentPercent?: string;
   recyclabilityClass?: 'Klasse A' | 'Klasse B' | 'Klasse C' | 'Klasse D' | 'Klasse E';

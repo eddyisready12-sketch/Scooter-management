@@ -1,4 +1,4 @@
-import type { DocStatus, Herkomst, PpwrSupplierRole, Supplier, VerpakkingsLaag } from '../types';
+import type { DocStatus, Herkomst, IngekochtVerpakkingsartikel, PpwrSupplierRole, Supplier, VerpakkingsLaag } from '../types';
 
 export const PPWR_SUPPLIER_SCHEMA_VERSION = 2;
 export type PpwrSupplierStatus = 'compleet' | 'aanvullen' | 'geblokkeerd';
@@ -84,6 +84,22 @@ export function createPackagingProfileLayer(): VerpakkingsLaag {
     herbruikbaar: false,
     zorgwekkendeStoffen: 'geen_bekend',
     bron: 'opgave_leverancier',
+  };
+}
+
+export function createPurchasedPackagingItem(): IngekochtVerpakkingsartikel {
+  return {
+    id: `verpakking-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    orderNummer: '',
+    artikelCode: '',
+    omschrijving: '',
+    materiaalcode: '',
+    gewichtGram: 0,
+    gewichtBasis: 'per_stuk',
+    herbruikbaar: false,
+    zorgwekkendeStoffen: 'geen_bekend',
+    bron: 'opgave_leverancier',
+    actief: true,
   };
 }
 
