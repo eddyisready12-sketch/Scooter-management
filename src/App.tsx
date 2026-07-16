@@ -2191,6 +2191,7 @@ function buildDymoOuterBoxLabelXml({
   quantity: string;
 }) {
   const escapedArticleNumber = escapeLabelValue(articleNumber);
+  const escapedDescription = escapeLabelValue(description);
   const escapedBatchCode = escapeLabelValue(batchCode);
   const escapedQuantity = escapeLabelValue(quantity);
   const escapedBarcode = escapeLabelValue(barcodeValue);
@@ -2259,7 +2260,7 @@ function buildDymoOuterBoxLabelXml({
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="2450" Y="760" Width="2220" Height="1080" />
+    <Bounds X="2450" Y="650" Width="2220" Height="1190" />
   </ObjectInfo>` : `<ObjectInfo>
     <BarcodeObject>
       <Name>OuterBoxBarcode</Name>
@@ -2280,7 +2281,7 @@ function buildDymoOuterBoxLabelXml({
       <HorizontalAlignment>Center</HorizontalAlignment>
       <QuietZonesPadding Left="0" Top="0" Right="0" Bottom="0" />
     </BarcodeObject>
-    <Bounds X="2450" Y="820" Width="2220" Height="900" />
+    <Bounds X="2450" Y="650" Width="2220" Height="1080" />
   </ObjectInfo>`;
 
   return `<?xml version="1.0" encoding="utf-8"?>
@@ -2292,11 +2293,12 @@ function buildDymoOuterBoxLabelXml({
     <RoundRectangle X="0" Y="0" Width="${dymo99012Layout.width}" Height="${dymo99012Layout.height}" Rx="180" Ry="180" />
   </DrawCommands>
   ${textObject({ name: 'ArticleValue', value: escapedArticleNumber, x: 220, y: 130, width: 2200, height: 260, size: 16, bold: true })}
+  ${textObject({ name: 'DescriptionValue', value: escapedDescription, x: 220, y: 440, width: 2050, height: 560, size: 18, bold: true })}
   ${barcodeObject}
-  ${textObject({ name: 'QuantityLabel', value: 'Aantal', x: 260, y: 760, width: 820, height: 180, size: 10, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'QuantityValue', value: escapedQuantity, x: 260, y: 960, width: 820, height: 520, size: 26, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'BatchLabel', value: 'Batch', x: 1160, y: 760, width: 1160, height: 180, size: 10, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'BatchValue', value: escapedBatchCode, x: 1160, y: 960, width: 1160, height: 520, size: 22, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'QuantityLabel', value: 'Aantal', x: 2450, y: 100, width: 2220, height: 130, size: 8, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'QuantityValue', value: escapedQuantity, x: 2450, y: 240, width: 2220, height: 300, size: 18, bold: true, alignment: 'Center' })}
+  ${textObject({ name: 'BatchLabel', value: 'Batch', x: 260, y: 1180, width: 1900, height: 140, size: 8, bold: true })}
+  ${textObject({ name: 'BatchValue', value: escapedBatchCode, x: 260, y: 1330, width: 1900, height: 340, size: 18, bold: true })}
 </DieCutLabel>`;
 }
 
@@ -2405,6 +2407,7 @@ function openOuterBoxLabelPreview({
   }
 
   const articleHtml = escapeLabelValue(articleNumber);
+  const descriptionHtml = escapeLabelValue(description);
   const batchHtml = escapeLabelValue(batchCode);
   const quantityHtml = escapeLabelValue(formatQuantity(quantityPerLabel));
   const barcodeHtml = escapeLabelValue(barcodeValue);
@@ -2453,7 +2456,7 @@ function openOuterBoxLabelPreview({
             padding: 3mm 4mm;
             box-sizing: border-box;
             display: grid;
-            grid-template-rows: auto 1fr;
+            grid-template-rows: auto auto 1fr;
             gap: 1.5mm;
           }
           .article-number {
@@ -2468,6 +2471,16 @@ function openOuterBoxLabelPreview({
             color: #64748b;
             letter-spacing: 0.04em;
           }
+          .description {
+            max-width: 42mm;
+            font-size: 3.6mm;
+            font-weight: 700;
+            line-height: 1.08;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+          }
           .bottom-row {
             display: grid;
             grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
@@ -2480,6 +2493,19 @@ function openOuterBoxLabelPreview({
             grid-template-columns: 1fr 1fr;
             gap: 1.6mm;
             align-items: center;
+          }
+          .barcode-column {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 1mm;
+            min-width: 0;
+          }
+          .quantity-block {
+            text-align: center;
+          }
+          .quantity-block .detail-value {
+            margin-top: 0.2mm;
+            font-size: 4mm;
           }
           .detail-card {
             border: 1px solid #d7dee6;
@@ -2528,19 +2554,19 @@ function openOuterBoxLabelPreview({
             <p class="preview-note">Lokale preview zonder printer. Verhouding is afgestemd op de DYMO-sticker.</p>
             <div class="sticker">
               <div class="article-number">${articleHtml}</div>
+              <div class="description">${descriptionHtml}</div>
               <div class="bottom-row">
                 <div class="details-grid">
-                  <div class="detail-card">
-                    <div class="label-caption">Aantal</div>
-                    <div class="detail-value">${quantityHtml}</div>
-                  </div>
                   <div class="detail-card">
                     <div class="label-caption">Batch</div>
                     <div class="detail-value">${batchHtml}</div>
                   </div>
                 </div>
-                <div class="barcode-wrap">
-                  ${barcodeImage ? `<img src="${barcodeImage}" alt="Barcode ${barcodeHtml}" />` : `<div class="barcode-fallback">${barcodeHtml}</div>`}
+                <div class="barcode-column">
+                  <div class="quantity-block"><div class="label-caption">Aantal</div><div class="detail-value">${quantityHtml}</div></div>
+                  <div class="barcode-wrap">
+                    ${barcodeImage ? `<img src="${barcodeImage}" alt="Barcode ${barcodeHtml}" />` : `<div class="barcode-fallback">${barcodeHtml}</div>`}
+                  </div>
                 </div>
               </div>
             </div>
