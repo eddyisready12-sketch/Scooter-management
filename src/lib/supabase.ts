@@ -408,8 +408,8 @@ function supplierToLegacyDatabase(supplier: Supplier) {
     id: supplier.id,
     name: supplier.name,
     isImportCompany: supplier.isImportCompany ?? false,
-    importerId: supplier.importerId,
-    euResponsiblePersonId: supplier.euResponsiblePersonId,
+    importer_id: supplier.importerId,
+    eu_responsible_person_id: supplier.euResponsiblePersonId,
     contactName: supplier.contactName,
     email: supplier.email,
     phone: supplier.phone,
@@ -430,11 +430,11 @@ function supplierToLegacyDatabase(supplier: Supplier) {
     ppwrNotes: supplier.ppwrNotes,
     notes: supplier.notes,
     active: supplier.active ?? true,
-    complianceResponsibility: supplier.complianceResponsibility ?? 'own',
-    complianceResponsibilityReference: supplier.complianceResponsibilityReference,
-    complianceResponsibilityEstablishedAt: supplier.complianceResponsibilityEstablishedAt,
-    complianceResponsibilitySetBy: supplier.complianceResponsibilitySetBy,
-    complianceResponsibilityAudit: supplier.complianceResponsibilityAudit ?? [],
+    compliance_responsibility: supplier.complianceResponsibility ?? 'own',
+    compliance_responsibility_reference: supplier.complianceResponsibilityReference,
+    compliance_responsibility_established_at: supplier.complianceResponsibilityEstablishedAt,
+    compliance_responsibility_set_by: supplier.complianceResponsibilitySetBy,
+    compliance_responsibility_audit: supplier.complianceResponsibilityAudit ?? [],
   };
 }
 
