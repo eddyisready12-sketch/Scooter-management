@@ -259,6 +259,7 @@ export type SupplierDocStatus = {
 
 export type VerpakkingsLaag = {
   id: string;
+  naam?: string;
   rol: 'primair' | 'secundair' | 'transport';
   materiaalcode: string;
   gewichtGram: number;

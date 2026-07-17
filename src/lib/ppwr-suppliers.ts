@@ -77,6 +77,7 @@ export function ppwrSupplierStatus(supplier?: Supplier): PpwrSupplierStatus {
 export function createPackagingProfileLayer(): VerpakkingsLaag {
   return {
     id: `laag-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    naam: '',
     rol: 'primair',
     materiaalcode: '',
     gewichtGram: 0,
