@@ -6832,6 +6832,38 @@ dd {
   line-height: 1.45;
 }
 
+.compliance-detail-dialog-backdrop {
+  z-index: 45;
+  padding: 22px;
+}
+
+.compliance-detail-dialog {
+  width: min(1220px, calc(100vw - 44px));
+  max-height: calc(100vh - 44px);
+  overflow-y: auto;
+  border-radius: 16px;
+  background: #f7f9fb;
+  box-shadow: 0 28px 80px rgba(17, 31, 46, 0.28);
+}
+
+.compliance-detail-dialog > .compliance-family-detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #fff;
+}
+
+.compliance-detail-dialog .compliance-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.compliance-detail-dialog .compliance-tabs {
+  position: sticky;
+  top: 86px;
+  z-index: 2;
+  background: #fff;
+}
+
 .packaging-supplier-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

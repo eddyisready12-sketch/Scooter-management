@@ -230,6 +230,7 @@ export function CompliancePage({
   const [familyCategoryFilter, setFamilyCategoryFilter] = useState('all');
   const [familyStatusFilter, setFamilyStatusFilter] = useState('all');
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('');
+  const [familyDialogOpen, setFamilyDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const [linkSearch, setLinkSearch] = useState('');
@@ -239,6 +240,8 @@ export function CompliancePage({
   const [supplierQuery, setSupplierQuery] = useState('');
   const [supplierStatusFilter, setSupplierStatusFilter] = useState<'all' | 'complete' | 'blocked' | 'attention'>('all');
   const [selectedPackagingSupplierKey, setSelectedPackagingSupplierKey] = useState('');
+  const [packagingDialogOpen, setPackagingDialogOpen] = useState(false);
+  const [packagingDetailTab, setPackagingDetailTab] = useState<'basic' | 'profile' | 'purchased' | 'documents'>('basic');
   const [draftPackagingSupplier, setDraftPackagingSupplier] = useState<Supplier | null>(null);
   const [draftFamily, setDraftFamily] = useState<ComplianceProductFamily | null>(null);
   const [draftRisks, setDraftRisks] = useState<ComplianceFamilyRisk[]>([]);
@@ -282,9 +285,7 @@ export function CompliancePage({
     setModuleView('families');
     setSelectedFamilyId(familyId);
     setDetailTab(tab);
-    requestAnimationFrame(() => {
-      familyDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    setFamilyDialogOpen(true);
   }
 
   const outsourcedProducts = useMemo(() => products.filter((product) => productIsOutsourced(product, suppliers)), [products, suppliers]);
@@ -569,6 +570,7 @@ export function CompliancePage({
     const familyId = createComplianceEntityId('compliance-family');
     setModuleView('families');
     setSelectedFamilyId(familyId);
+    setFamilyDialogOpen(true);
     setDetailTab('basic');
     setDraftFamily({
       id: familyId,
@@ -1074,7 +1076,9 @@ export function CompliancePage({
           </div>
         </section>
 
-        <section className="panel compliance-family-detail" ref={familyDetailRef}>
+        {familyDialogOpen && draftFamily ? (
+        <div className="modal-backdrop compliance-detail-dialog-backdrop" onMouseDown={() => setFamilyDialogOpen(false)}>
+        <section className="panel compliance-family-detail compliance-detail-dialog" ref={familyDetailRef} onMouseDown={(event) => event.stopPropagation()}>
           {!draftFamily ? (
             <p className="empty compliance-empty">Kies een productfamilie links of maak een nieuwe aan.</p>
           ) : (
@@ -1085,6 +1089,7 @@ export function CompliancePage({
                   <h2>{draftFamily.name || 'Nieuwe productfamilie'} <small>{draftFamily.code || 'Nieuw'}</small></h2>
                 </div>
                 <div className="page-title-actions">
+                  <button type="button" className="secondary-button" onClick={() => setFamilyDialogOpen(false)}>Sluiten</button>
                   <button type="button" className="secondary-button" onClick={() => void saveFamilyBundle()} disabled={saving}>Opslaan</button>
                   <button type="button" className="primary-button" onClick={openDossierPreview}>Dossier genereren</button>
                 </div>
@@ -1452,6 +1457,8 @@ export function CompliancePage({
             </>
           )}
         </section>
+        </div>
+        ) : null}
       </div>
     );
   }
@@ -1581,6 +1588,8 @@ export function CompliancePage({
     };
     setDraftPackagingSupplier(supplier);
     setSelectedPackagingSupplierKey(`draft-${supplier.id}`);
+    setPackagingDetailTab('basic');
+    setPackagingDialogOpen(true);
   }
 
   async function savePackagingSupplier() {
@@ -1632,10 +1641,25 @@ export function CompliancePage({
     const profileBasisLabel = profileBases.size > 1 ? 'gemengd' : profileLayers[0]?.gewichtBasis === 'per_doos' ? 'doos' : 'stuk';
     const linkedProductWeights = (selectedUsage?.products ?? []).map((product) => Number(product.packagingWeightTotalGrams || product.packagingWeightPrimaryGrams || 0));
     const linkedProductWeightTotal = linkedProductWeights.reduce((total, weight) => total + (Number.isFinite(weight) ? weight : 0), 0);
+    const ppwrMissingItems: string[] = [];
+    if (draftPackagingSupplier) {
+      if (!draftPackagingSupplier.ppwrSupplierRole) ppwrMissingItems.push('PPWR-rol');
+      if (draftPackagingSupplier.isPackagingSupplier === false) ppwrMissingItems.push('actieve verpakkingsleverancier');
+      if (draftPackagingSupplier.herkomst === 'eu') {
+        if (draftPackagingSupplier.docStatus?.status !== 'ontvangen') ppwrMissingItems.push('ontvangen conformiteitsverklaring');
+        if (!draftPackagingSupplier.docStatus?.bestandsnaam?.trim()) ppwrMissingItems.push('documentreferentie');
+      } else {
+        if (profileLayers.length === 0) ppwrMissingItems.push('minimaal één profiellaag');
+        if (profileLayers.some((layer) => !layer.materiaalcode.trim() || layer.gewichtGram <= 0)) ppwrMissingItems.push('materiaalcode of gewicht per laag');
+        if (profileLayers.length > 0 && !profileLayers.some((layer) => layer.bron !== 'schatting')) ppwrMissingItems.push('geverifieerde databron');
+      }
+    }
+    const ppwrTotalChecks = draftPackagingSupplier?.herkomst === 'eu' ? 4 : 5;
+    const ppwrProgress = draftPackagingSupplier ? Math.max(0, Math.round(((ppwrTotalChecks - ppwrMissingItems.length) / ppwrTotalChecks) * 100)) : 0;
 
     return (
-      <div className="compliance-layout">
-        <section className="panel compliance-family-list">
+      <div className="compliance-view-stack">
+        <section className="panel compliance-family-table-panel">
           <div className="panel-title">
             <span className="panel-title-label">PPWR leveranciers</span>
             <button type="button" className="primary-button" onClick={createPackagingSupplierDraft}>
@@ -1653,36 +1677,29 @@ export function CompliancePage({
               <Search size={16} />
               <input value={supplierQuery} onChange={(event) => setSupplierQuery(event.target.value)} placeholder="Zoeken op leverancier of materiaal..." />
             </div>
-            <div className="compliance-family-scroll compact">
-              {packagingSupplierRows.map((row) => (
-                <button
-                  type="button"
-                  key={row.key}
-                  className={`compliance-family-compact-item ${selectedPackagingSupplierKey === row.key ? 'active' : ''}`}
-                  onClick={() => setSelectedPackagingSupplierKey(row.key)}
-                >
-                  <div className="compliance-family-compact-top">
-                    <strong>{row.supplier?.name || row.usage?.name || 'Naam ontbreekt'}</strong>
-                    <span className={`compliance-status-pill ${ppwrSupplierStatus(row.supplier) === 'compleet' ? 'complete' : ppwrSupplierStatus(row.supplier) === 'geblokkeerd' ? 'danger' : row.supplier ? 'partial' : 'concept'}`}>
-                      {row.supplier ? supplierStatusLabel(row.supplier) : 'Nog aanmaken'}
-                    </span>
-                  </div>
-                  <div className="compliance-family-compact-name">{row.supplier?.herkomst === 'eu'
-                    ? `DoC: ${row.supplier.docStatus?.status?.replace(/_/g, ' ') ?? 'niet gevraagd'}`
-                    : row.supplier?.packagingProfile?.map((layer) => layer.materiaalcode).filter(Boolean).join(', ') || Array.from(row.usage?.materials ?? []).join(', ') || 'Nog geen materiaalprofiel'}</div>
-                  <div className="compliance-family-compact-meta">
-                    <span>{row.usage?.products.length ?? 0} producten</span>
-                    <span>{row.supplier?.packagingProfile?.length ?? 0} profiellagen</span>
-                    {(row.usage?.layers ?? 0) > 0 ? <span title="Afgeleid uit de verpakkingslagen van gekoppelde producten">{row.usage?.layers} productlagen</span> : null}
-                  </div>
-                </button>
-              ))}
-              {packagingSupplierRows.length === 0 ? <p className="empty compliance-empty">Nog geen verpakkingsleveranciers gevonden.</p> : null}
+            <div className="compliance-family-table-scroll">
+              <table className="compliance-family-table">
+                <thead><tr><th>Naam</th><th>Status</th><th>Profiellagen</th><th>Productlagen</th><th>Acties</th></tr></thead>
+                <tbody>
+                  {packagingSupplierRows.map((row) => (
+                    <tr key={row.key} className={selectedPackagingSupplierKey === row.key ? 'active' : ''}>
+                      <td><button type="button" className="compliance-family-link-button" onClick={() => { setSelectedPackagingSupplierKey(row.key); setPackagingDetailTab('basic'); setPackagingDialogOpen(true); }}>{row.supplier?.name || row.usage?.name || 'Naam ontbreekt'}</button></td>
+                      <td><span className={`compliance-status-pill ${ppwrSupplierStatus(row.supplier) === 'compleet' ? 'complete' : ppwrSupplierStatus(row.supplier) === 'geblokkeerd' ? 'danger' : row.supplier ? 'partial' : 'concept'}`}>{row.supplier ? supplierStatusLabel(row.supplier) : 'Nog aanmaken'}</span></td>
+                      <td>{row.supplier?.packagingProfile?.length ?? 0}</td>
+                      <td title="Afgeleid uit gekoppelde producten">{row.usage?.layers ?? 0}</td>
+                      <td><button type="button" className="secondary-button" onClick={() => { setSelectedPackagingSupplierKey(row.key); setPackagingDetailTab('basic'); setPackagingDialogOpen(true); }}>Detail / bewerken</button></td>
+                    </tr>
+                  ))}
+                  {packagingSupplierRows.length === 0 ? <tr><td colSpan={5}><p className="empty">Geen leveranciers gevonden voor deze filters.</p></td></tr> : null}
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
 
-        <section className="panel compliance-family-detail" ref={packagingDetailRef}>
+        {packagingDialogOpen && draftPackagingSupplier ? (
+        <div className="modal-backdrop compliance-detail-dialog-backdrop" onMouseDown={() => setPackagingDialogOpen(false)}>
+        <section className="panel compliance-family-detail compliance-detail-dialog" ref={packagingDetailRef} onMouseDown={(event) => event.stopPropagation()}>
           {!draftPackagingSupplier ? (
             <p className="empty compliance-empty">Kies links een verpakkingsleverancier of maak een nieuwe kaart aan.</p>
           ) : (
@@ -1693,6 +1710,7 @@ export function CompliancePage({
                   <h2>{draftPackagingSupplier.name || 'Nieuwe verpakkingsleverancier'}</h2>
                 </div>
                 <div className="page-title-actions">
+                  <button type="button" className="secondary-button" onClick={() => setPackagingDialogOpen(false)}>Sluiten</button>
                   <button type="button" className="secondary-button" onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, active: current.active === false } : current)}>
                     {draftPackagingSupplier.active === false ? 'Zet actief' : 'Zet niet actief'}
                   </button>
@@ -1703,20 +1721,23 @@ export function CompliancePage({
               </div>
 
               <div className="compliance-panel-body compliance-view-stack">
-                <section className="panel packaging-supplier-summary-panel">
-                  <div className="panel-title">PPWR status</div>
-                  <div className="packaging-supplier-summary-grid single-status">
-                    <div className={`packaging-supplier-summary-card status-${ppwrSupplierStatus(draftPackagingSupplier)}`}>
-                      <span>Afgeleide status</span>
-                      <strong>{supplierStatusLabel(draftPackagingSupplier)}</strong>
-                      <small>{draftPackagingSupplier.herkomst === 'eu'
-                        ? 'Bepaald door de DoC-status.'
-                        : 'Bepaald door het verpakkingsprofiel, de databronnen en zorgwekkende stoffen.'}</small>
-                    </div>
-                  </div>
-                </section>
+                <div className="compliance-progress-panel">
+                  <div className="compliance-progress-header"><strong>PPWR-dossier volledigheid</strong><span>{ppwrProgress}%</span></div>
+                  <div className="compliance-progress-track"><div className="compliance-progress-fill" style={{ width: `${ppwrProgress}%` }} /></div>
+                  <div className="compliance-progress-missing">{ppwrMissingItems.length > 0 ? `Ontbreekt: ${ppwrMissingItems.join(', ')}` : 'Alle vereiste PPWR-gegevens zijn aanwezig.'}</div>
+                </div>
 
-                <details className="panel packaging-contact-details">
+                <div className="compliance-tabs">
+                  {([
+                    ['basic', 'Basisgegevens'],
+                    ['profile', 'Verpakkingsprofiel'],
+                    ['purchased', 'Ingekochte verpakkingen'],
+                    ['documents', 'Documenten'],
+                  ] as const).map(([id, label]) => <button key={id} type="button" className={packagingDetailTab === id ? 'active' : ''} onClick={() => setPackagingDetailTab(id)}>{label}</button>)}
+                </div>
+
+                {packagingDetailTab === 'basic' && (<>
+                <details className="panel packaging-contact-details" open>
                   <summary className="panel-title">Basisgegevens leverancier <small>Gedeeld met Leveranciers · klik om te bewerken</small></summary>
                   <p className="packaging-section-explanation">Dit is hetzelfde leveranciersrecord als in de Leveranciers-module. Er bestaat geen aparte PPWR-kopie.</p>
                   <div className="compliance-form-grid">
@@ -1786,8 +1807,9 @@ export function CompliancePage({
                     </label>
                   </div>
                 </section>
+                </>)}
 
-                {draftPackagingSupplier.herkomst === 'eu' ? (
+                {packagingDetailTab === 'documents' && draftPackagingSupplier.herkomst === 'eu' && (
                   <section className="panel">
                     <div className="panel-title">Declaration of Conformity (DoC)</div>
                     <div className="compliance-form-grid">
@@ -1800,7 +1822,8 @@ export function CompliancePage({
                       <label className="span-2"><span>DoC-notitie</span><textarea value={draftPackagingSupplier.docStatus?.notitie || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, docStatus: { ...(current.docStatus ?? { status: 'niet_gevraagd', statusDatum: '' }), notitie: event.target.value } } : current)} /></label>
                     </div>
                   </section>
-                ) : (
+                )}
+                {packagingDetailTab === 'profile' && draftPackagingSupplier.herkomst !== 'eu' && (
                   <section className="panel">
                     <div className="panel-title"><span>Verpakkingsprofiel</span><button type="button" className="secondary-button" onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, packagingProfile: [...(current.packagingProfile ?? []), createPackagingProfileLayer()] } : current)}><Plus size={14} /> Laag toevoegen</button></div>
                     <p className="packaging-section-explanation">Gestructureerde materiaallagen voor PPWR-rapportage. Iedere fysieke materiaalcomponent is één laag; een samengestelde verpakking mag meerdere lagen met dezelfde naam hebben.</p>
@@ -1826,7 +1849,7 @@ export function CompliancePage({
                   </section>
                 )}
 
-                <section className="panel">
+                {packagingDetailTab === 'purchased' && (<section className="panel">
                   <div className="panel-title"><span>Ingekochte verpakkingen</span><button type="button" className="secondary-button" onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, packagingItems: [...(current.packagingItems ?? []), createPurchasedPackagingItem()] } : current)}><Plus size={14} /> Verpakking toevoegen</button></div>
                   <p className="packaging-section-explanation">Concrete inkooporders en verpakkingsartikelen van deze leverancier. Leg een artikel één keer vast; daarna kan het aan meerdere producten worden gekoppeld.</p>
                   <div className="supplier-profile-stack">
@@ -1853,11 +1876,11 @@ export function CompliancePage({
                     ))}
                     {(draftPackagingSupplier.packagingItems ?? []).length === 0 ? <p className="empty">Nog geen ingekochte verpakkingen vastgelegd.</p> : null}
                   </div>
-                </section>
+                </section>)}
 
-                <section className="panel"><div className="panel-title">Notities</div><div className="compliance-form-grid"><label className="span-2"><span>Leveranciersnotities</span><textarea value={draftPackagingSupplier.ppwrNotes || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrNotes: event.target.value } : current)} /></label></div></section>
+                {packagingDetailTab === 'documents' && <section className="panel"><div className="panel-title">Documentnotities</div><div className="compliance-form-grid"><label className="span-2"><span>Leveranciersnotities</span><textarea value={draftPackagingSupplier.ppwrNotes || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrNotes: event.target.value } : current)} /></label></div></section>}
 
-                <section className="panel">
+                {packagingDetailTab === 'profile' && (<section className="panel">
                   <div className="panel-title">Gekoppelde producten</div>
                   <div className="compliance-linked-products-table">
                     <div className="compliance-linked-products-header">
@@ -1877,11 +1900,13 @@ export function CompliancePage({
                     {(selectedUsage?.products.length ?? 0) > 0 ? <div className="compliance-linked-products-total"><strong>Totaal</strong><strong className="numeric">{linkedProductWeightTotal.toLocaleString('nl-NL', { maximumFractionDigits: 2 })}</strong></div> : null}
                     {(selectedUsage?.products.length ?? 0) === 0 ? <p className="empty">Nog geen producten gekoppeld aan deze leverancier.</p> : null}
                   </div>
-                </section>
+                </section>)}
               </div>
             </>
           )}
         </section>
+        </div>
+        ) : null}
       </div>
     );
   }
