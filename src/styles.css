@@ -6573,13 +6573,16 @@ dd {
 
 .compliance-tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
   gap: 8px;
   padding: 0 16px 16px;
   border-bottom: 1px solid #e4e9ee;
 }
 
 .compliance-tabs button {
+  flex: 0 0 auto;
   min-height: 36px;
   padding: 0 14px;
   border: 1px solid #d6dce2;
@@ -6856,6 +6859,50 @@ dd {
 .compliance-detail-dialog .compliance-form-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
+.compliance-detail-dialog .compliance-form-grid > :last-child:nth-child(odd),
+.compliance-detail-dialog .compliance-text-grid > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.compact-ppwr-settings .compliance-checkbox-label {
+  padding-top: 25px;
+  align-self: stretch;
+  align-content: center;
+}
+
+.supplier-document-upload {
+  position: relative;
+  cursor: pointer;
+}
+
+.supplier-document-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.supplier-document-list {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.supplier-document-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #dbe3ea;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.supplier-document-row > div { display: grid; gap: 3px; }
+.supplier-document-row span { color: #64748b; font-size: 12px; }
 
 .compliance-detail-dialog .compliance-tabs {
   position: sticky;

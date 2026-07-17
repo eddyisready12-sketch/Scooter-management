@@ -67,6 +67,7 @@ type CompliancePageProps = {
   }) => Promise<void>;
   onAutoLinkProducts: (links: ComplianceProductLink[]) => Promise<void>;
   onSavePackagingSupplier: (supplier: Supplier) => Promise<void>;
+  onUploadSupplierDocument: (file: File, supplierId: string) => Promise<string>;
   onSelectProduct: (product: Product, tab?: 'basic' | 'gpsr') => void;
 };
 
@@ -221,6 +222,7 @@ export function CompliancePage({
   onSaveFamilyBundle,
   onAutoLinkProducts,
   onSavePackagingSupplier,
+  onUploadSupplierDocument,
   onSelectProduct,
 }: CompliancePageProps) {
   const [moduleView, setModuleView] = useState<ComplianceModuleView>('dashboard');
@@ -243,6 +245,7 @@ export function CompliancePage({
   const [packagingDialogOpen, setPackagingDialogOpen] = useState(false);
   const [packagingDetailTab, setPackagingDetailTab] = useState<'basic' | 'profile' | 'purchased' | 'documents'>('basic');
   const [draftPackagingSupplier, setDraftPackagingSupplier] = useState<Supplier | null>(null);
+  const [supplierDocumentMessage, setSupplierDocumentMessage] = useState('');
   const [draftFamily, setDraftFamily] = useState<ComplianceProductFamily | null>(null);
   const [draftRisks, setDraftRisks] = useState<ComplianceFamilyRisk[]>([]);
   const [draftWarnings, setDraftWarnings] = useState<ComplianceFamilyWarning[]>([]);
@@ -1634,6 +1637,24 @@ export function CompliancePage({
     } : current);
   }
 
+  async function addSupplierDocument(file: File) {
+    if (!draftPackagingSupplier) return;
+    setSupplierDocumentMessage('Document uploaden...');
+    try {
+      const storagePath = await onUploadSupplierDocument(file, draftPackagingSupplier.id);
+      const document = {
+        id: createComplianceEntityId('supplier-document'),
+        fileName: file.name,
+        storagePath,
+        uploadedAt: new Date().toISOString(),
+      };
+      setDraftPackagingSupplier((current) => current ? { ...current, ppwrDocuments: [...(current.ppwrDocuments ?? []), document] } : current);
+      setSupplierDocumentMessage(`${file.name} toegevoegd. Klik op Opslaan om de koppeling te bewaren.`);
+    } catch (error) {
+      setSupplierDocumentMessage(error instanceof Error ? error.message : 'Document uploaden mislukt.');
+    }
+  }
+
   function renderPackagingSuppliersView() {
     const selectedUsage = allPackagingSupplierRows.find((row) => row.key === selectedPackagingSupplierKey)?.usage;
     const profileLayers = draftPackagingSupplier?.packagingProfile ?? [];
@@ -1878,7 +1899,26 @@ export function CompliancePage({
                   </div>
                 </section>)}
 
-                {packagingDetailTab === 'documents' && <section className="panel"><div className="panel-title">Documentnotities</div><div className="compliance-form-grid"><label className="span-2"><span>Leveranciersnotities</span><textarea value={draftPackagingSupplier.ppwrNotes || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrNotes: event.target.value } : current)} /></label></div></section>}
+                {packagingDetailTab === 'documents' && (<>
+                  <section className="panel">
+                    <div className="panel-title">
+                      <span>Documenten ({draftPackagingSupplier.ppwrDocuments?.length ?? 0})</span>
+                      <label className="secondary-button supplier-document-upload"><Plus size={14} /> Document<input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" onChange={(event) => { const file = event.target.files?.[0]; if (file) void addSupplierDocument(file); event.currentTarget.value = ''; }} /></label>
+                    </div>
+                    {supplierDocumentMessage ? <div className="inline-notice">{supplierDocumentMessage}</div> : null}
+                    <div className="supplier-document-list">
+                      {(draftPackagingSupplier.ppwrDocuments ?? []).map((document) => (
+                        <div className="supplier-document-row" key={document.id}>
+                          <FileText size={18} />
+                          <div><strong>{document.fileName}</strong><span>Geüpload op {formatDateTime(document.uploadedAt)}</span></div>
+                          <button type="button" className="icon-button danger" aria-label={`${document.fileName} verwijderen`} onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, ppwrDocuments: (current.ppwrDocuments ?? []).filter((item) => item.id !== document.id) } : current)}><Trash2 size={15} /></button>
+                        </div>
+                      ))}
+                      {(draftPackagingSupplier.ppwrDocuments?.length ?? 0) === 0 ? <p className="empty">Nog geen documenten gekoppeld.</p> : null}
+                    </div>
+                  </section>
+                  <section className="panel"><div className="panel-title">Documentnotities</div><div className="compliance-form-grid"><label className="span-2"><span>Leveranciersnotities</span><textarea value={draftPackagingSupplier.ppwrNotes || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, ppwrNotes: event.target.value } : current)} /></label></div></section>
+                </>)}
 
                 {packagingDetailTab === 'profile' && (<section className="panel">
                   <div className="panel-title">Gekoppelde producten</div>

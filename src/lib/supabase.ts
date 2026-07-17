@@ -345,6 +345,7 @@ function normalizeSupplier(row: Record<string, unknown>): Supplier {
     complianceResponsibilityEstablishedAt: String(row.complianceResponsibilityEstablishedAt ?? row.compliance_responsibility_established_at ?? '') || undefined,
     complianceResponsibilitySetBy: String(row.complianceResponsibilitySetBy ?? row.compliance_responsibility_set_by ?? '') || undefined,
     complianceResponsibilityAudit: (row.complianceResponsibilityAudit ?? row.compliance_responsibility_audit ?? []) as Supplier['complianceResponsibilityAudit'],
+    ppwrDocuments: (row.ppwrDocuments ?? row.ppwr_documents ?? []) as Supplier['ppwrDocuments'],
   };
 }
 
@@ -400,6 +401,7 @@ function supplierToDatabase(supplier: Supplier) {
     compliance_responsibility_established_at: supplier.complianceResponsibilityEstablishedAt,
     compliance_responsibility_set_by: supplier.complianceResponsibilitySetBy,
     compliance_responsibility_audit: supplier.complianceResponsibilityAudit ?? [],
+    ppwr_documents: supplier.ppwrDocuments ?? [],
   };
 }
 
@@ -435,6 +437,7 @@ function supplierToLegacyDatabase(supplier: Supplier) {
     compliance_responsibility_established_at: supplier.complianceResponsibilityEstablishedAt,
     compliance_responsibility_set_by: supplier.complianceResponsibilitySetBy,
     compliance_responsibility_audit: supplier.complianceResponsibilityAudit ?? [],
+    ppwr_documents: supplier.ppwrDocuments ?? [],
   };
 }
 
@@ -1133,6 +1136,10 @@ export async function uploadScooterDocument(file: File, scooterFrame: string) {
   });
   if (error) throw error;
   return storagePath;
+}
+
+export async function uploadSupplierDocument(file: File, supplierId: string) {
+  return uploadScooterDocument(file, `suppliers/${supplierId}`);
 }
 
 export async function createScooterDocumentUrl(storagePath: string) {

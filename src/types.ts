@@ -329,6 +329,13 @@ export type Supplier = {
     establishedAt: string;
     changedBy: string;
   }>;
+  ppwrDocuments?: Array<{
+    id: string;
+    fileName: string;
+    storagePath?: string;
+    fileUrl?: string;
+    uploadedAt: string;
+  }>;
 };
 
 export type Importer = {
