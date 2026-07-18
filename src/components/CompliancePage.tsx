@@ -66,6 +66,7 @@ type CompliancePageProps = {
     links: ComplianceProductLink[];
   }) => Promise<void>;
   onAutoLinkProducts: (links: ComplianceProductLink[]) => Promise<void>;
+  onDeactivateProductLink: (link: ComplianceProductLink, revision: ComplianceFamilyRevision) => Promise<void>;
   onSavePackagingSupplier: (supplier: Supplier) => Promise<void>;
   onUploadSupplierDocument: (file: File, supplierId: string) => Promise<string>;
   onSelectProduct: (product: Product, tab?: 'basic' | 'gpsr') => void;
@@ -220,6 +221,7 @@ export function CompliancePage({
   onSeedTemplates,
   onSaveFamilyBundle,
   onAutoLinkProducts,
+  onDeactivateProductLink,
   onSavePackagingSupplier,
   onUploadSupplierDocument,
   onSelectProduct,
@@ -254,6 +256,8 @@ export function CompliancePage({
   const [draftTests, setDraftTests] = useState<ComplianceProductTest[]>([]);
   const [draftRevisions, setDraftRevisions] = useState<ComplianceFamilyRevision[]>([]);
   const [draftLinks, setDraftLinks] = useState<ComplianceProductLink[]>([]);
+  const [unlinkingLinkId, setUnlinkingLinkId] = useState('');
+  const [linkActionMessage, setLinkActionMessage] = useState('');
   const familyDetailRef = useRef<HTMLElement | null>(null);
   const packagingDetailRef = useRef<HTMLElement | null>(null);
   const previousSelectedFamilyIdRef = useRef<string>('');
@@ -755,29 +759,34 @@ export function CompliancePage({
     if (!draftFamily) return;
 
     const removedLink = draftLinks.find((link) => link.id === linkId);
+    if (!removedLink || unlinkingLinkId) return;
     const timestamp = new Date().toISOString();
-    const nextLinks = draftLinks.map((link) => (
-      link.id === linkId
-        ? {
-          ...link,
-          status: 'inactive' as const,
-          updatedAt: timestamp,
-        }
-        : link
-    ));
-    const nextRevisions = [{
+    const updatedLink: ComplianceProductLink = {
+      ...removedLink,
+      status: 'inactive',
+      updatedAt: timestamp,
+    };
+    const revision: ComplianceFamilyRevision = {
       id: createComplianceEntityId('compliance-revision'),
       familyId: draftFamily.id,
       changeNote: removedLink?.productId ? `Product ontkoppeld (${removedLink.productId})` : 'Product ontkoppeld',
       createdAt: timestamp,
-    }, ...draftRevisions];
+    };
 
-    setDraftLinks(nextLinks);
-    setDraftRevisions(nextRevisions);
-    await saveFamilyBundle({
-      links: nextLinks,
-      revisions: nextRevisions,
-    });
+    setUnlinkingLinkId(linkId);
+    setLinkActionMessage('');
+    setDraftLinks((current) => current.map((link) => link.id === linkId ? updatedLink : link));
+    setDraftRevisions((current) => [revision, ...current]);
+    try {
+      await onDeactivateProductLink(updatedLink, revision);
+      setLinkActionMessage('Product is ontkoppeld.');
+    } catch (error) {
+      setDraftLinks((current) => current.map((link) => link.id === linkId ? removedLink : link));
+      setDraftRevisions((current) => current.filter((item) => item.id !== revision.id));
+      setLinkActionMessage(`Ontkoppelen mislukt: ${error instanceof Error ? error.message : 'onbekende fout'}`);
+    } finally {
+      setUnlinkingLinkId('');
+    }
   }
 
   function openDossierPreview() {
@@ -1415,7 +1424,9 @@ export function CompliancePage({
                             <span>{product?.articleGroup || link.variantDescription || '-'}</span>
                             <div className="compliance-linked-product-actions">
                               {product ? <button type="button" className="secondary-button compliance-row-action-button" onClick={() => onSelectProduct(product, 'gpsr')}>Open product</button> : null}
-                              <button type="button" className="danger-button compliance-row-action-button" onClick={() => void deactivateLink(link.id)} disabled={saving}>Ontkoppel</button>
+                              <button type="button" className="danger-button compliance-row-action-button" onClick={() => void deactivateLink(link.id)} disabled={saving || Boolean(unlinkingLinkId)}>
+                                {unlinkingLinkId === link.id ? 'Ontkoppelen…' : 'Ontkoppel'}
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -1429,6 +1440,7 @@ export function CompliancePage({
                           <button type="button" className="secondary-button" disabled={linkPage === linkedProductsPageCount} onClick={() => setLinkPage((current) => Math.min(linkedProductsPageCount, current + 1))}>Volgende</button>
                         </div>
                       ) : null}
+                      {linkActionMessage ? <p className="drawer-note">{linkActionMessage}</p> : null}
                     </div>
                   </section>
                 )}

@@ -4169,6 +4169,19 @@ export function App() {
     setComplianceMessage(`${linksToSave.length} producten automatisch gekoppeld aan compliance families.`);
   }
 
+  async function deactivateComplianceProductLink(link: ComplianceProductLink, revision: ComplianceFamilyRevision) {
+    await Promise.all([
+      upsertComplianceProductLinks([link]),
+      upsertComplianceFamilyRevisions([revision]),
+    ]);
+    setData((current) => ({
+      ...current,
+      complianceProductLinks: current.complianceProductLinks.map((item) => item.id === link.id ? link : item),
+      complianceFamilyRevisions: [revision, ...current.complianceFamilyRevisions.filter((item) => item.id !== revision.id)],
+    }));
+    setComplianceMessage('Product is ontkoppeld van de productfamilie.');
+  }
+
   async function saveContainerCostBatch(batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) {
     try {
       const uniqueLines = dedupeContainerCostLines(lines);
@@ -5169,6 +5182,7 @@ export function App() {
               onSeedTemplates={seedComplianceTemplates}
               onSaveFamilyBundle={saveComplianceFamilyBundle}
               onAutoLinkProducts={autoLinkComplianceProducts}
+              onDeactivateProductLink={deactivateComplianceProductLink}
               onSavePackagingSupplier={upsertSupplierRecord}
               onUploadSupplierDocument={uploadSupplierDocument}
               onSelectProduct={openProduct}
