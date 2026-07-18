@@ -6623,8 +6623,9 @@ dd {
   overflow-x: auto;
   scrollbar-width: thin;
   gap: 8px;
-  padding: 0 16px 16px;
+  padding: 12px 16px;
   border-bottom: 1px solid #e4e9ee;
+  background: #fff;
 }
 
 .compliance-tabs button {
@@ -6636,6 +6637,12 @@ dd {
   background: #fff;
   color: #5d6b79;
   font-weight: 700;
+}
+
+.compliance-detail-dialog .compliance-tabs button {
+  flex: 1 0 auto;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .compliance-tabs button.active {
@@ -6675,6 +6682,7 @@ dd {
 
 .compliance-form-grid input,
 .compliance-form-grid select,
+.compliance-text-grid input,
 .compliance-text-grid textarea,
 .compliance-grid-table input,
 .compliance-grid-table select {
@@ -6687,8 +6695,33 @@ dd {
 }
 
 .compliance-text-grid textarea {
-  min-height: 120px;
+  min-height: 104px;
   resize: vertical;
+}
+
+.compliance-family-settings-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 12px 14px;
+  border: 1px solid #dbe4ec;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.compliance-family-settings-label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+  margin-right: auto;
+}
+
+.compliance-family-settings-row .checkbox-label {
+  min-height: 24px;
+  color: #435160;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .checkbox-label {
@@ -6900,6 +6933,24 @@ dd {
   top: 0;
   z-index: 3;
   background: #fff;
+  padding: 14px 18px;
+}
+
+.compliance-detail-dialog .compliance-family-detail-header h2 {
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.compliance-detail-dialog .compliance-progress-panel {
+  padding: 12px 16px;
+}
+
+.compliance-detail-dialog .compliance-detail-body {
+  padding: 14px 16px 18px;
+}
+
+.compliance-detail-dialog .compliance-panel-body {
+  padding: 16px;
 }
 
 .compliance-detail-dialog .compliance-form-grid {

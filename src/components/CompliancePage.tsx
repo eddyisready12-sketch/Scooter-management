@@ -89,7 +89,6 @@ const detailTabs: Array<{ id: ComplianceDetailTab; label: string }> = [
   { id: 'documents', label: 'Documenten' },
   { id: 'links', label: 'Gekoppelde producten' },
   { id: 'revisions', label: 'Revisies' },
-  { id: 'dossier', label: 'Dossier genereren' },
 ];
 
 const dashboardTabs: Array<{ id: ComplianceDashboardTab; label: string }> = [
@@ -1132,7 +1131,7 @@ export function CompliancePage({
                     <section className="panel">
                       <div className="panel-title">Basisinformatie</div>
                       <div className="compliance-panel-body compliance-form-stack">
-                        <div className="compliance-form-grid">
+                        <div className="compliance-form-grid compliance-family-basic-grid">
                           <label>
                             <span>Code</span>
                             <input value={draftFamily.code || ''} onChange={(event) => setDraftFamily((current) => current ? { ...current, code: event.target.value } : current)} />
@@ -1163,6 +1162,9 @@ export function CompliancePage({
                               <option value="archived">Archief</option>
                             </select>
                           </label>
+                        </div>
+                        <div className="compliance-family-settings-row">
+                          <span className="compliance-family-settings-label">Dossierinstellingen</span>
                           <label className="checkbox-label">
                             <input type="checkbox" checked={draftFamily.gpsrRequired ?? true} onChange={(event) => setDraftFamily((current) => current ? { ...current, gpsrRequired: event.target.checked } : current)} />
                             <span>GPSR verplicht</span>
