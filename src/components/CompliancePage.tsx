@@ -287,6 +287,10 @@ export function CompliancePage({
     setModuleView('families');
     setSelectedFamilyId(familyId);
     setDetailTab(tab);
+    if (tab === 'links') {
+      setLinkSearch('');
+      setLinkPage(1);
+    }
     setFamilyDialogOpen(true);
   }
 
@@ -1054,7 +1058,17 @@ export function CompliancePage({
                         {riskLabel(family.riskLevel)}
                       </span>
                     </td>
-                    <td>{stats.activeLinks}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="compliance-product-count-button"
+                        onClick={() => openFamilyDetail(family.id, 'links')}
+                        aria-label={`Bekijk ${stats.activeLinks} gekoppelde producten van ${family.name}`}
+                        title="Gekoppelde producten bekijken en ontkoppelen"
+                      >
+                        {stats.activeLinks}
+                      </button>
+                    </td>
                     <td>
                       <span className={`compliance-status-pill ${stats.calculatedStatus}`}>
                         {familyDocumentationLabel(stats.calculatedStatus)}

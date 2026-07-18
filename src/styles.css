@@ -6439,6 +6439,26 @@ dd {
   text-decoration: underline;
 }
 
+.compliance-product-count-button {
+  min-width: 34px;
+  min-height: 30px;
+  padding: 3px 10px;
+  border: 1px solid #b9d2f3;
+  border-radius: 999px;
+  background: #edf5ff;
+  color: #1559a6;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.compliance-product-count-button:hover,
+.compliance-product-count-button:focus-visible {
+  border-color: #2c74d8;
+  background: #dcecff;
+  box-shadow: 0 0 0 3px rgba(44, 116, 216, 0.14);
+  outline: none;
+}
+
 .compliance-family-table-actions {
   display: flex;
   align-items: center;
