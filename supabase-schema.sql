@@ -548,6 +548,9 @@ create table if not exists scooters (
   "batteryNumber" text,
   "invoiceNumber" text,
   "isUnpacked" boolean default false,
+  "injectorCapModificationDone" boolean default false,
+  "injectorCapModificationDate" date,
+  "injectorCapModificationNotes" text,
   "arrivedAt" timestamptz,
   "deliveredAt" timestamptz,
   "soldAt" timestamptz
@@ -558,6 +561,15 @@ add column if not exists "isUnpacked" boolean default false;
 
 alter table scooters
 add column if not exists "colorNumber" text;
+
+alter table scooters
+add column if not exists "injectorCapModificationDone" boolean default false;
+
+alter table scooters
+add column if not exists "injectorCapModificationDate" date;
+
+alter table scooters
+add column if not exists "injectorCapModificationNotes" text;
 
 create table if not exists batteries (
   id text primary key,

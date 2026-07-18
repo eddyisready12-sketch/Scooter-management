@@ -32,6 +32,9 @@ export type Scooter = {
   batteryNumber?: string;
   invoiceNumber?: string;
   isUnpacked?: boolean;
+  injectorCapModificationDone?: boolean;
+  injectorCapModificationDate?: string;
+  injectorCapModificationNotes?: string;
   arrivedAt?: string;
   deliveredAt?: string;
   soldAt?: string;

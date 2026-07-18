@@ -5543,10 +5543,16 @@ dd {
 }
 
 .drawer-form input,
-.drawer-form select {
+.drawer-form select,
+.drawer-form textarea {
   width: 100%;
   min-height: 38px;
   font-weight: 600;
+}
+
+.drawer-form textarea {
+  min-height: 78px;
+  resize: vertical;
 }
 
 .drawer-form .checkbox-field {
@@ -5559,6 +5565,46 @@ dd {
 .drawer-form .checkbox-field input {
   min-height: auto;
   width: auto;
+}
+
+.injector-cap-check {
+  border: 1px solid;
+  border-radius: 10px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.injector-cap-check.is-open {
+  background: #fff7ed;
+  border-color: #fdba74;
+}
+
+.injector-cap-check.is-complete {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.injector-cap-check__status {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.injector-cap-check__status span {
+  background: #ffffffb8;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.injector-cap-check p {
+  color: #5b4632;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
 }
 
 .drawer-actions {

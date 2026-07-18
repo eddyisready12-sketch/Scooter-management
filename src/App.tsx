@@ -13048,6 +13048,7 @@ function ScooterDrawer({
   const [documentMessage, setDocumentMessage] = useState('');
   const [documentUploading, setDocumentUploading] = useState(false);
   const registrationComplete = isRegistrationComplete(scooter);
+  const injectorCapModificationRelevant = /(^|\W)(s9|speedy)(\W|$)/i.test(scooter.model);
   const selectableDealers = dealers
     .filter((dealer) => dealer.active !== false || dealer.id === draft.dealerId)
     .sort((a, b) => (a.company || a.name).localeCompare(b.company || b.name, 'nl', { sensitivity: 'base' }));
@@ -13178,6 +13179,43 @@ function ScooterDrawer({
                 <input type="checkbox" checked={Boolean(draft.isUnpacked)} onChange={(e) => setDraft({ ...draft, isUnpacked: e.target.checked })} />
                 Uitgepakt
               </label>
+              {injectorCapModificationRelevant ? (
+                <div className={`injector-cap-check ${draft.injectorCapModificationDone ? 'is-complete' : 'is-open'}`}>
+                  <div className="injector-cap-check__status">
+                    <strong>Veiligheidsaanpassing injector-kap</strong>
+                    <span>{draft.injectorCapModificationDone ? 'Uitgevoerd' : 'Nog uitvoeren'}</span>
+                  </div>
+                  <p>Voor S9/Speedy: borg de injector-kap, zodat deze niet kan losschieten bij een heuvel of drempel.</p>
+                  <label className="checkbox-field">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(draft.injectorCapModificationDone)}
+                      onChange={(e) => setDraft({
+                        ...draft,
+                        injectorCapModificationDone: e.target.checked,
+                        injectorCapModificationDate: e.target.checked
+                          ? (draft.injectorCapModificationDate || new Date().toISOString().slice(0, 10))
+                          : draft.injectorCapModificationDate,
+                      })}
+                    />
+                    Injector-kapaanpassing uitgevoerd
+                  </label>
+                  <label>Uitgevoerd op
+                    <input
+                      type="date"
+                      value={draft.injectorCapModificationDate ?? ''}
+                      onChange={(e) => setDraft({ ...draft, injectorCapModificationDate: e.target.value })}
+                    />
+                  </label>
+                  <label>Notitie
+                    <textarea
+                      value={draft.injectorCapModificationNotes ?? ''}
+                      onChange={(e) => setDraft({ ...draft, injectorCapModificationNotes: e.target.value })}
+                      placeholder="Bijvoorbeeld: kap geborgd en gecontroleerd"
+                    />
+                  </label>
+                </div>
+              ) : null}
             </div>
             <div className="drawer-actions">
               <button className="primary-button" onClick={() => onUpdate(draft)}>Verander gegevens</button>
