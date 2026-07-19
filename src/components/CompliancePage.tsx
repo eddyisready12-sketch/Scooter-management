@@ -5,6 +5,7 @@ import {
   DatabaseZap,
   FileText,
   FolderKanban,
+  CircleHelp,
   LayoutDashboard,
   Link2,
   PackageSearch,
@@ -1103,7 +1104,7 @@ export function CompliancePage({
 
         {familyDialogOpen && draftFamily ? (
         <div className="modal-backdrop compliance-detail-dialog-backdrop" onMouseDown={() => setFamilyDialogOpen(false)}>
-        <section className="panel compliance-family-detail compliance-detail-dialog" ref={familyDetailRef} onMouseDown={(event) => event.stopPropagation()}>
+        <section className="panel compliance-family-detail compliance-detail-dialog product-family-dialog" ref={familyDetailRef} onMouseDown={(event) => event.stopPropagation()}>
           {!draftFamily ? (
             <p className="empty compliance-empty">Kies een productfamilie links of maak een nieuwe aan.</p>
           ) : (
@@ -1239,7 +1240,20 @@ export function CompliancePage({
                       <button type="button" className="secondary-button" onClick={addRisk}><Plus size={14} /> Risico</button>
                     </div>
                     <div className="compliance-panel-body">
-                      <p className="compliance-risk-help">Score = ernst x kans. Gebruik voor ernst en kans een waarde van 1 (laag) tot en met 5 (hoog).</p>
+                      <div className="compliance-risk-help">
+                        <span>Score = ernst x kans. Beide waarden lopen van 1 (laag) tot en met 5 (hoog).</span>
+                        <span className="compliance-score-help">
+                          <button type="button" aria-label="Uitleg scoreclassificatie"><CircleHelp size={17} /></button>
+                          <span className="compliance-score-tooltip" role="tooltip">
+                            <strong>Scoreclassificatie</strong>
+                            <span><i className="low" /> 1-4: Laag</span>
+                            <span><i className="medium" /> 5-8: Middel</span>
+                            <span><i className="high" /> 9-15: Hoog</span>
+                            <span><i className="critical" /> 16-25: Kritiek</span>
+                            <small>Voorbeeld: ernst 5 x kans 2 = score 10, dus Hoog.</small>
+                          </span>
+                        </span>
+                      </div>
                       <div className="compliance-risk-table-scroll">
                       <div className="compliance-grid-table compliance-risk-table">
                         <div className="compliance-card-row compliance-risk-table-header" aria-hidden="true">
@@ -1262,8 +1276,9 @@ export function CompliancePage({
                             <input value={risk.residualRisk || ''} onChange={(event) => setDraftRisks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, residualRisk: event.target.value } : item))} placeholder="Rest" />
                             {(() => {
                               const score = asNumber(risk.severity) * asNumber(risk.probability);
-                              const level = score >= 15 ? 'high' : score >= 8 ? 'medium' : 'low';
-                              return <div className={`compliance-score-cell ${level}`}><strong>{score}</strong><span>{level === 'high' ? 'Hoog' : level === 'medium' ? 'Middel' : 'Laag'}</span></div>;
+                              const level = score >= 16 ? 'critical' : score >= 9 ? 'high' : score >= 5 ? 'medium' : score > 0 ? 'low' : 'none';
+                              const label = level === 'critical' ? 'Kritiek' : level === 'high' ? 'Hoog' : level === 'medium' ? 'Middel' : level === 'low' ? 'Laag' : 'Niet berekend';
+                              return <div className={`compliance-score-cell ${level}`} title={`Ernst ${risk.severity || '-'} x kans ${risk.probability || '-'} = ${score || 'niet berekend'}`}><strong>{score || '-'}</strong><span>{label}</span></div>;
                             })()}
                             <button type="button" className="icon-button danger" onClick={() => setDraftRisks((current) => current.filter((item) => item.id !== risk.id))}><Trash2 size={14} /></button>
                           </div>
