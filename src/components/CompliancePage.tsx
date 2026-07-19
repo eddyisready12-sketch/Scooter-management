@@ -935,6 +935,7 @@ export function CompliancePage({
       const score = asNumber(risk.severity) * asNumber(risk.probability);
       return `<tr>
         <td>${escapeHtml(risk.hazard)}</td>
+        <td>${escapeHtml(risk.riskDescription || '-')}</td>
         <td>${escapeHtml(risk.severity)}</td>
         <td>${escapeHtml(risk.probability)}</td>
         <td>${score}</td>
@@ -949,13 +950,6 @@ export function CompliancePage({
         ${warning.warningTextEn ? `<strong>EN:</strong> ${escapeHtml(warning.warningTextEn)}` : ''}
       </div>
     `).join('');
-    const linkedRows = [selectedDossierEntry].map(({ product }) => `
-      <tr>
-        <td>${escapeHtml(product?.code || '-')}</td>
-        <td>${escapeHtml(product?.description || '-')}</td>
-        <td>${escapeHtml(product?.articleGroup || '-')}</td>
-      </tr>
-    `).join('');
     const documentRows = draftDocuments.map((document) => `
       <tr>
         <td>${escapeHtml(document.documentType || '-')}</td>
@@ -963,6 +957,44 @@ export function CompliancePage({
         <td>${escapeHtml(formatDate(document.validUntil))}</td>
       </tr>
     `).join('');
+    const productIdentificationRows = [
+      ['Artikelnummer', selectedDossierProduct?.code || selectedDossierEntry.link.productId],
+      ['Productnaam / omschrijving', selectedDossierProduct?.labelTitle || selectedDossierProduct?.description],
+      ['Merk', selectedDossierProduct?.brand],
+      ['Leveranciersartikelnummer', selectedDossierProduct?.supplierItemNo],
+      ['EAN / barcode', selectedDossierProduct?.barcode],
+      ['Batch- of lotnummer', selectedDossierProduct?.batchNumber || selectedDossierProduct?.batch],
+      ['Serienummer', selectedDossierProduct?.serialNumber],
+      ['Traceerbaarheidscode', selectedDossierProduct?.traceabilityCode],
+      ['Land van oorsprong', selectedDossierProduct?.countryOfOrigin],
+      ['Productcategorie', selectedDossierProduct?.articleGroup || draftFamily.category],
+    ].map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value || 'Niet vastgelegd')}</td></tr>`).join('');
+    const characteristicRows = [
+      ['Essentiële veiligheidskenmerken', selectedDossierProduct?.safetyInfo],
+      ['Productwaarschuwing', selectedDossierProduct?.warning],
+      ['Verpakkings-/verkoopeenheid', selectedDossierProduct?.packagingUnit],
+      ['Primaire verpakkingsmateriaal', selectedDossierProduct?.packagingMaterialPrimary],
+      ['Secundaire verpakkingsmateriaal', selectedDossierProduct?.packagingMaterialSecondary],
+      ['Materiaal / samenstelling van het product', undefined],
+    ].map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value || 'Niet vastgelegd')}</td></tr>`).join('');
+    const requirementRows = draftRequirements.map((requirement) => `
+      <tr><td>${escapeHtml(requirement.name)}</td><td>${escapeHtml(requirement.regulation || '-')}</td><td>${requirement.mandatory ?? true ? 'Verplicht' : 'Aanvullend'}</td><td>${requirementFulfilled(requirement, draftDocuments) ? 'Aangetoond' : 'Openstaand'}</td><td>${escapeHtml(requirement.notes || '-')}</td></tr>
+    `).join('');
+    const testRows = draftTests.map((test) => {
+      const plan = draftTestPlans.find((item) => item.id === test.planId);
+      return `<tr><td>${escapeHtml(test.testName || plan?.name || '-')}</td><td>${escapeHtml(formatDate(test.testDate))}</td><td>${escapeHtml(test.batchRef || '-')}</td><td>${escapeHtml(test.result || '-')}</td><td>${escapeHtml(test.testedBy || '-')}</td><td>${escapeHtml(test.findings || '-')}</td></tr>`;
+    }).join('');
+    const revisionRows = draftRevisions.map((revision) => `<tr><td>${escapeHtml(formatDate(revision.createdAt))}</td><td>${escapeHtml(revision.changedBy || '-')}</td><td>${escapeHtml(revision.changeNote)}</td></tr>`).join('');
+    const dossierGaps = [
+      !selectedDossierProduct?.brand && 'merk',
+      !(selectedDossierProduct?.barcode || selectedDossierProduct?.batchNumber || selectedDossierProduct?.batch || selectedDossierProduct?.serialNumber || selectedDossierProduct?.traceabilityCode) && 'traceerbaar productkenmerk',
+      !economicOperatorRows[0].name && 'fabrikant',
+      !selectedDossierProduct?.safetyInfo && 'essentiële veiligheidskenmerken',
+      !selectedDossierProduct?.imageUrl && 'productafbeelding (aanbevolen modelveld)',
+      draftRisks.length === 0 && 'risicoanalyse',
+      draftRequirements.length === 0 && 'toepasselijke wetgeving/normen',
+      draftTests.length === 0 && 'test- of keuringsbewijs',
+    ].filter(Boolean) as string[];
 
     const previewWindow = window.open('', '_blank', 'width=1200,height=900');
     if (!previewWindow) return;
@@ -984,6 +1016,8 @@ export function CompliancePage({
             th { background: #103f77; color: white; }
             .warning-card { border: 1px solid #f5c451; background: #fff7da; padding: 12px; margin-bottom: 10px; }
             .legal-note { border-left: 4px solid #1d4f91; background: #eef4ff; padding: 12px 14px; line-height: 1.45; }
+            .gap-note { border-left: 4px solid #d97706; background: #fff7ed; padding: 12px 14px; line-height: 1.55; }
+            .product-image { max-width: 320px; max-height: 240px; object-fit: contain; border: 1px solid #d6dce2; padding: 8px; }
             .print-button { float: right; background: #0b4a8f; color: white; border: 0; border-radius: 6px; padding: 10px 14px; cursor: pointer; }
           </style>
         </head>
@@ -997,19 +1031,23 @@ export function CompliancePage({
               <tr><td><strong>Datum gegenereerd</strong></td><td>${escapeHtml(formatDate(new Date().toISOString()))}</td><td><strong>Artikelnummer</strong></td><td>${escapeHtml(selectedDossierProduct?.code || selectedDossierEntry.link.productId)}</td></tr>
             </table>
           </div>
-          <div class="section"><h2>1. Productomschrijving</h2><p>${escapeHtml(draftFamily.description || '-')}</p></div>
-          <div class="section"><h2>2. Bedoeld gebruik</h2><p>${escapeHtml(draftFamily.intendedUse || '-')}</p></div>
-          <div class="section"><h2>3. Voorzienbaar verkeerd gebruik</h2><p>${escapeHtml(draftFamily.foreseeableMisuse || '-')}</p></div>
-          <div class="section"><h2>4. Risicoanalyse</h2><table><thead><tr><th>Gevaar</th><th>Ernst</th><th>Kans</th><th>Score</th><th>Mitigatie</th><th>Resterend risico</th></tr></thead><tbody>${riskRows || '<tr><td colspan="6">Geen risicoanalyse vastgelegd.</td></tr>'}</tbody></table></div>
-          <div class="section"><h2>5. Waarschuwingen</h2>${warningCards || '<p>Geen waarschuwingen vastgelegd.</p>'}</div>
-          <div class="section"><h2>6. Productidentificatie</h2><table><thead><tr><th>Artikelnummer</th><th>Omschrijving</th><th>Categorie</th></tr></thead><tbody>${linkedRows}</tbody></table></div>
-          <div class="section"><h2>7. Marktdeelnemers</h2><table><thead><tr><th>Rol</th><th>Bedrijfsnaam</th><th>Adres</th><th>E-mail</th><th>Website</th></tr></thead><tbody>${economicOperatorHtml}</tbody></table></div>
+          <div class="section"><h2>1. Dossiercontrole</h2><div class="gap-note">${dossierGaps.length ? `<strong>Nog aan te vullen:</strong> ${escapeHtml(dossierGaps.join(', '))}.` : '<strong>Geen inhoudelijke leemtes gevonden in de gecontroleerde kernvelden.</strong>'}<br /><small>De aanwezigheid van een veld is gecontroleerd; dit is geen inhoudelijke conformiteitsbeoordeling.</small></div></div>
+          <div class="section"><h2>2. Productomschrijving</h2><p>${escapeHtml(draftFamily.description || selectedDossierProduct?.shortDescription || '-')}</p>${selectedDossierProduct?.imageUrl ? `<img class="product-image" src="${escapeHtml(selectedDossierProduct.imageUrl)}" alt="Productafbeelding" />` : ''}</div>
+          <div class="section"><h2>3. Productidentificatie en traceerbaarheid</h2><table><tbody>${productIdentificationRows}</tbody></table></div>
+          <div class="section"><h2>4. Bedoeld gebruik</h2><p>${escapeHtml(draftFamily.intendedUse || '-')}</p><h3>Voorzienbaar verkeerd gebruik</h3><p>${escapeHtml(draftFamily.foreseeableMisuse || '-')}</p></div>
+          <div class="section"><h2>5. Essentiële kenmerken en samenstelling</h2><table><tbody>${characteristicRows}</tbody></table></div>
+          <div class="section"><h2>6. Risicoanalyse</h2><table><thead><tr><th>Gevaar</th><th>Risicobeschrijving</th><th>Ernst</th><th>Kans</th><th>Score</th><th>Mitigatie</th><th>Resterend risico</th></tr></thead><tbody>${riskRows || '<tr><td colspan="7">Geen risicoanalyse vastgelegd.</td></tr>'}</tbody></table></div>
+          <div class="section"><h2>7. Waarschuwingen en instructies</h2>${warningCards || '<p>Geen waarschuwingen vastgelegd.</p>'}<h3>Handleidingstekst</h3><p>${escapeHtml(draftFamily.manualText || 'Niet vastgelegd')}</p></div>
+          <div class="section"><h2>8. Marktdeelnemers</h2><table><thead><tr><th>Rol</th><th>Bedrijfsnaam</th><th>Adres</th><th>E-mail</th><th>Website</th></tr></thead><tbody>${economicOperatorHtml}</tbody></table></div>
           <div class="section">
-            <h2>8. Voertuigtype en EU-typegoedkeuring</h2>
+            <h2>9. Voertuigtype en EU-typegoedkeuring</h2>
             <p class="legal-note">Dit product is een OEM-onderdeel voor voertuigen met de onderstaande EU-typegoedkeuring(en). Het is bestemd als vervangingsonderdeel binnen de goedgekeurde voertuigconfiguratie.</p>
             <table><thead><tr><th>Voertuigmodel</th><th>EU-typegoedkeuringsnummer</th><th>RDW type</th><th>Variant</th><th>Uitvoering</th></tr></thead><tbody>${vehicleApprovalHtml}</tbody></table>
           </div>
-          <div class="section"><h2>9. Documenten</h2><table><thead><tr><th>Type</th><th>Naam</th><th>Geldig t/m</th></tr></thead><tbody>${documentRows || '<tr><td colspan="3">Geen documenten geregistreerd.</td></tr>'}</tbody></table></div>
+          <div class="section"><h2>10. Toepasselijke wetgeving, normen en keuringseisen</h2><table><thead><tr><th>Eis</th><th>Regeling / norm</th><th>Type</th><th>Status</th><th>Toelichting</th></tr></thead><tbody>${requirementRows || '<tr><td colspan="5">Geen eisen of normen geregistreerd.</td></tr>'}</tbody></table></div>
+          <div class="section"><h2>11. Tests en conformiteitsbewijs</h2><table><thead><tr><th>Test</th><th>Datum</th><th>Batch</th><th>Resultaat</th><th>Getest door</th><th>Bevindingen</th></tr></thead><tbody>${testRows || '<tr><td colspan="6">Geen testresultaten geregistreerd.</td></tr>'}</tbody></table></div>
+          <div class="section"><h2>12. Documenten</h2><table><thead><tr><th>Type</th><th>Naam</th><th>Geldig t/m</th></tr></thead><tbody>${documentRows || '<tr><td colspan="3">Geen documenten geregistreerd.</td></tr>'}</tbody></table></div>
+          <div class="section"><h2>13. Revisiegeschiedenis</h2><table><thead><tr><th>Datum</th><th>Gewijzigd door</th><th>Wijziging</th></tr></thead><tbody>${revisionRows || '<tr><td colspan="3">Geen revisies geregistreerd.</td></tr>'}</tbody></table><p class="legal-note">Houd dit technisch dossier actueel en bewaar het ten minste tien jaar nadat het product in de handel is gebracht.</p></div>
         </body>
       </html>
     `);
