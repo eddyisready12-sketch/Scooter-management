@@ -1009,25 +1009,25 @@ export function CompliancePage({
           <style>
             @page { size: A4 portrait; margin: 12mm 11mm 14mm; }
             * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            body { font-family: Arial, sans-serif; margin: 0; padding: 12px; color: #0f172a; font-size: 10.5px; line-height: 1.35; }
+            body { font-family: Arial, sans-serif; margin: 0; padding: 10px; color: #0f172a; font-size: 9px; line-height: 1.3; }
             h1, h2, h3 { color: #0b4a8f; break-after: avoid; page-break-after: avoid; }
-            h1 { font-size: 21px; margin: 0 0 7px; }
-            h2 { font-size: 14px; margin: 0 0 6px; }
-            h3 { font-size: 11.5px; margin: 9px 0 4px; }
-            p { margin: 4px 0 7px; }
-            .hero { border: 1px solid #1d4f91; background: #eef4ff; padding: 11px; margin-bottom: 13px; break-inside: avoid; page-break-inside: avoid; }
-            .hero-grid { width: 100%; border-collapse: collapse; margin-top: 7px; }
-            .hero-grid td { padding: 5px 7px; border-bottom: 1px solid #dbe6f5; }
-            .section { margin-top: 13px; }
+            h1 { font-size: 18px; margin: 0 0 6px; }
+            h2 { font-size: 11.5px; margin: 0 0 4px; }
+            h3 { font-size: 9.5px; margin: 7px 0 3px; }
+            p { margin: 3px 0 5px; }
+            .hero { border: 1px solid #1d4f91; background: #eef4ff; padding: 8px; margin-bottom: 10px; break-inside: avoid; page-break-inside: avoid; }
+            .hero-grid { width: 100%; border-collapse: collapse; margin-top: 5px; }
+            .hero-grid td { padding: 3px 5px; border-bottom: 1px solid #dbe6f5; }
+            .section { margin-top: 9px; }
             .keep-together { break-inside: avoid; page-break-inside: avoid; }
             table { width: 100%; border-collapse: collapse; }
             thead { display: table-header-group; }
             tr { break-inside: avoid; page-break-inside: avoid; }
-            th, td { border: 1px solid #d6dce2; padding: 4px 5px; text-align: left; vertical-align: top; }
+            th, td { border: 1px solid #d6dce2; padding: 3px 4px; text-align: left; vertical-align: top; font-size: 8.5px; line-height: 1.22; }
             th { background: #103f77; color: white; }
-            .warning-card { border: 1px solid #f5c451; background: #fff7da; padding: 7px; margin-bottom: 6px; break-inside: avoid; }
-            .legal-note { border-left: 3px solid #1d4f91; background: #eef4ff; padding: 7px 9px; line-height: 1.35; }
-            .gap-note { border-left: 3px solid #d97706; background: #fff7ed; padding: 7px 9px; line-height: 1.4; }
+            .warning-card { border: 1px solid #f5c451; background: #fff7da; padding: 5px; margin-bottom: 4px; break-inside: avoid; }
+            .legal-note { border-left: 3px solid #1d4f91; background: #eef4ff; padding: 5px 7px; line-height: 1.3; }
+            .gap-note { border-left: 3px solid #d97706; background: #fff7ed; padding: 5px 7px; line-height: 1.3; }
             .product-image { max-width: 220px; max-height: 150px; object-fit: contain; border: 1px solid #d6dce2; padding: 5px; }
             .print-button { float: right; background: #0b4a8f; color: white; border: 0; border-radius: 6px; padding: 10px 14px; cursor: pointer; }
             @media print {
