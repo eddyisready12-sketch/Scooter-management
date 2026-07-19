@@ -1004,21 +1004,32 @@ export function CompliancePage({
         <head>
           <title>GPSR Technisch Dossier</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
-            h1, h2 { color: #0b4a8f; }
-            h1 { font-size: 28px; margin-bottom: 12px; }
-            .hero { border: 1px solid #1d4f91; background: #eef4ff; padding: 18px; margin-bottom: 24px; }
-            .hero-grid { width: 100%; border-collapse: collapse; margin-top: 12px; }
-            .hero-grid td { padding: 8px 10px; border-bottom: 1px solid #dbe6f5; }
-            .section { margin-top: 28px; }
+            @page { size: A4 portrait; margin: 12mm 11mm 14mm; }
+            * { box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; margin: 0; padding: 12px; color: #0f172a; font-size: 10.5px; line-height: 1.35; }
+            h1, h2, h3 { color: #0b4a8f; break-after: avoid; page-break-after: avoid; }
+            h1 { font-size: 21px; margin: 0 0 7px; }
+            h2 { font-size: 14px; margin: 0 0 6px; }
+            h3 { font-size: 11.5px; margin: 9px 0 4px; }
+            p { margin: 4px 0 7px; }
+            .hero { border: 1px solid #1d4f91; background: #eef4ff; padding: 11px; margin-bottom: 13px; break-inside: avoid; page-break-inside: avoid; }
+            .hero-grid { width: 100%; border-collapse: collapse; margin-top: 7px; }
+            .hero-grid td { padding: 5px 7px; border-bottom: 1px solid #dbe6f5; }
+            .section { margin-top: 13px; }
             table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #d6dce2; padding: 8px; text-align: left; vertical-align: top; }
+            thead { display: table-header-group; }
+            tr { break-inside: avoid; page-break-inside: avoid; }
+            th, td { border: 1px solid #d6dce2; padding: 4px 5px; text-align: left; vertical-align: top; }
             th { background: #103f77; color: white; }
-            .warning-card { border: 1px solid #f5c451; background: #fff7da; padding: 12px; margin-bottom: 10px; }
-            .legal-note { border-left: 4px solid #1d4f91; background: #eef4ff; padding: 12px 14px; line-height: 1.45; }
-            .gap-note { border-left: 4px solid #d97706; background: #fff7ed; padding: 12px 14px; line-height: 1.55; }
-            .product-image { max-width: 320px; max-height: 240px; object-fit: contain; border: 1px solid #d6dce2; padding: 8px; }
+            .warning-card { border: 1px solid #f5c451; background: #fff7da; padding: 7px; margin-bottom: 6px; break-inside: avoid; }
+            .legal-note { border-left: 3px solid #1d4f91; background: #eef4ff; padding: 7px 9px; line-height: 1.35; }
+            .gap-note { border-left: 3px solid #d97706; background: #fff7ed; padding: 7px 9px; line-height: 1.4; }
+            .product-image { max-width: 220px; max-height: 150px; object-fit: contain; border: 1px solid #d6dce2; padding: 5px; }
             .print-button { float: right; background: #0b4a8f; color: white; border: 0; border-radius: 6px; padding: 10px 14px; cursor: pointer; }
+            @media print {
+              body { padding: 0; }
+              .print-button { display: none; }
+            }
           </style>
         </head>
         <body>
@@ -1032,13 +1043,13 @@ export function CompliancePage({
             </table>
           </div>
           <div class="section"><h2>1. Dossiercontrole</h2><div class="gap-note">${dossierGaps.length ? `<strong>Nog aan te vullen:</strong> ${escapeHtml(dossierGaps.join(', '))}.` : '<strong>Geen inhoudelijke leemtes gevonden in de gecontroleerde kernvelden.</strong>'}<br /><small>De aanwezigheid van een veld is gecontroleerd; dit is geen inhoudelijke conformiteitsbeoordeling.</small></div></div>
-          <div class="section"><h2>2. Productomschrijving</h2><p>${escapeHtml(draftFamily.description || selectedDossierProduct?.shortDescription || '-')}</p>${selectedDossierProduct?.imageUrl ? `<img class="product-image" src="${escapeHtml(selectedDossierProduct.imageUrl)}" alt="Productafbeelding" />` : ''}</div>
-          <div class="section"><h2>3. Productidentificatie en traceerbaarheid</h2><table><tbody>${productIdentificationRows}</tbody></table></div>
-          <div class="section"><h2>4. Bedoeld gebruik</h2><p>${escapeHtml(draftFamily.intendedUse || '-')}</p><h3>Voorzienbaar verkeerd gebruik</h3><p>${escapeHtml(draftFamily.foreseeableMisuse || '-')}</p></div>
-          <div class="section"><h2>5. Essentiële kenmerken en samenstelling</h2><table><tbody>${characteristicRows}</tbody></table></div>
-          <div class="section"><h2>6. Risicoanalyse</h2><table><thead><tr><th>Gevaar</th><th>Risicobeschrijving</th><th>Ernst</th><th>Kans</th><th>Score</th><th>Mitigatie</th><th>Resterend risico</th></tr></thead><tbody>${riskRows || '<tr><td colspan="7">Geen risicoanalyse vastgelegd.</td></tr>'}</tbody></table></div>
-          <div class="section"><h2>7. Waarschuwingen en instructies</h2>${warningCards || '<p>Geen waarschuwingen vastgelegd.</p>'}<h3>Handleidingstekst</h3><p>${escapeHtml(draftFamily.manualText || 'Niet vastgelegd')}</p></div>
-          <div class="section"><h2>8. Marktdeelnemers</h2><table><thead><tr><th>Rol</th><th>Bedrijfsnaam</th><th>Adres</th><th>E-mail</th><th>Website</th></tr></thead><tbody>${economicOperatorHtml}</tbody></table></div>
+          <div class="section"><h2>2. Marktdeelnemers</h2><table><thead><tr><th>Rol</th><th>Bedrijfsnaam</th><th>Adres</th><th>E-mail</th><th>Website</th></tr></thead><tbody>${economicOperatorHtml}</tbody></table></div>
+          <div class="section"><h2>3. Productomschrijving</h2><p>${escapeHtml(draftFamily.description || selectedDossierProduct?.shortDescription || '-')}</p>${selectedDossierProduct?.imageUrl ? `<img class="product-image" src="${escapeHtml(selectedDossierProduct.imageUrl)}" alt="Productafbeelding" />` : ''}</div>
+          <div class="section"><h2>4. Productidentificatie en traceerbaarheid</h2><table><tbody>${productIdentificationRows}</tbody></table></div>
+          <div class="section"><h2>5. Bedoeld gebruik</h2><p>${escapeHtml(draftFamily.intendedUse || '-')}</p><h3>Voorzienbaar verkeerd gebruik</h3><p>${escapeHtml(draftFamily.foreseeableMisuse || '-')}</p></div>
+          <div class="section"><h2>6. Essentiële kenmerken en samenstelling</h2><table><tbody>${characteristicRows}</tbody></table></div>
+          <div class="section"><h2>7. Risicoanalyse</h2><table><thead><tr><th>Gevaar</th><th>Risicobeschrijving</th><th>Ernst</th><th>Kans</th><th>Score</th><th>Mitigatie</th><th>Resterend risico</th></tr></thead><tbody>${riskRows || '<tr><td colspan="7">Geen risicoanalyse vastgelegd.</td></tr>'}</tbody></table></div>
+          <div class="section"><h2>8. Waarschuwingen en instructies</h2>${warningCards || '<p>Geen waarschuwingen vastgelegd.</p>'}<h3>Handleidingstekst</h3><p>${escapeHtml(draftFamily.manualText || 'Niet vastgelegd')}</p></div>
           <div class="section">
             <h2>9. Voertuigtype en EU-typegoedkeuring</h2>
             <p class="legal-note">Dit product is een OEM-onderdeel voor voertuigen met de onderstaande EU-typegoedkeuring(en). Het is bestemd als vervangingsonderdeel binnen de goedgekeurde voertuigconfiguratie.</p>
