@@ -962,7 +962,7 @@ export function CompliancePage({
           <div class="section"><h2>6. Productidentificatie</h2><table><thead><tr><th>Artikelnummer</th><th>Omschrijving</th><th>Categorie</th></tr></thead><tbody>${linkedRows}</tbody></table></div>
           <div class="section">
             <h2>7. Voertuigtype en EU-typegoedkeuring</h2>
-            <p class="legal-note">De EU-typegoedkeuring geldt voor het complete voertuigtype. De gekoppelde onderdelen moeten geschikt zijn voor dit type en mogen de goedgekeurde voertuigconfiguratie en veiligheidskenmerken niet nadelig wijzigen.</p>
+            <p class="legal-note">Dit product is een OEM-onderdeel voor voertuigen met de onderstaande EU-typegoedkeuring(en). Het is bestemd als vervangingsonderdeel binnen de goedgekeurde voertuigconfiguratie.</p>
             <table><thead><tr><th>Voertuigmodel</th><th>EU-typegoedkeuringsnummer</th><th>RDW type</th><th>Variant</th><th>Uitvoering</th></tr></thead><tbody>${vehicleApprovalHtml}</tbody></table>
           </div>
           <div class="section"><h2>8. Documenten</h2><table><thead><tr><th>Type</th><th>Naam</th><th>Geldig t/m</th></tr></thead><tbody>${documentRows || '<tr><td colspan="3">Geen documenten geregistreerd.</td></tr>'}</tbody></table></div>
