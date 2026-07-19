@@ -5186,6 +5186,7 @@ export function App() {
           {view === 'compliance' && (
             <CompliancePage
               products={data.products}
+              scooters={data.scooters}
               families={data.complianceFamilies}
               risks={data.complianceFamilyRisks}
               warnings={data.complianceFamilyWarnings}

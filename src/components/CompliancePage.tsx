@@ -35,6 +35,7 @@ import type {
   ComplianceProductTest,
   Importer,
   Product,
+  Scooter,
   Supplier,
 } from '../types';
 
@@ -44,6 +45,7 @@ type ComplianceDashboardTab = 'incomplete' | 'outsourced' | 'highRisk' | 'requir
 
 type CompliancePageProps = {
   products: Product[];
+  scooters: Scooter[];
   families: ComplianceProductFamily[];
   risks: ComplianceFamilyRisk[];
   warnings: ComplianceFamilyWarning[];
@@ -211,6 +213,7 @@ function supplierStatusLabel(supplier?: Supplier) {
 
 export function CompliancePage({
   products,
+  scooters,
   families,
   risks,
   warnings,
@@ -834,6 +837,40 @@ export function CompliancePage({
 
   function openDossierPreview() {
     if (!draftFamily) return;
+    const normalizeVehicleModel = (value?: string) => {
+      const normalized = (value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (normalized === 'S9' || normalized.includes('SPEEDY')) return 'SPEEDY';
+      return normalized;
+    };
+    const linkedProductModelText = selectedFamilyProducts
+      .map(({ product, link }) => [product?.description, product?.shortDescription, product?.labelTitle, product?.articleGroup, link.variantDescription].filter(Boolean).join(' '))
+      .join(' ');
+    const normalizedLinkedProductText = normalizeVehicleModel(linkedProductModelText);
+    const mentionedVehicleModels = Array.from(new Set(scooters
+      .map((scooter) => normalizeVehicleModel(scooter.model))
+      .filter((model) => model && normalizedLinkedProductText.includes(model))));
+    if ((normalizedLinkedProductText.includes('S9') || normalizedLinkedProductText.includes('SPEEDY')) && !mentionedVehicleModels.includes('SPEEDY')) {
+      mentionedVehicleModels.push('SPEEDY');
+    }
+    const vehicleApprovalRows = mentionedVehicleModels.flatMap((model) => {
+      const matchingScooters = scooters.filter((scooter) => normalizeVehicleModel(scooter.model) === model);
+      const approvals = new Map<string, Scooter>();
+      matchingScooters.forEach((scooter) => {
+        const key = [scooter.rdwTypeApprovalNumber || 'ONTBREEKT', scooter.rdwType || '', scooter.rdwVariant || '', scooter.rdwExecution || ''].join('|');
+        if (!approvals.has(key)) approvals.set(key, scooter);
+      });
+      if (approvals.size === 0) return [{ model, scooter: undefined as Scooter | undefined }];
+      return Array.from(approvals.values()).map((scooter) => ({ model, scooter }));
+    });
+    const vehicleApprovalHtml = vehicleApprovalRows.map(({ model, scooter }) => `
+      <tr class="${scooter?.rdwTypeApprovalNumber ? '' : 'missing-row'}">
+        <td>RSO ${escapeHtml(model === 'SPEEDY' ? 'Speedy / S9' : model)}</td>
+        <td>${escapeHtml(scooter?.rdwTypeApprovalNumber || 'Ontbreekt - aanvullen via RDW voertuiggegevens')}</td>
+        <td>${escapeHtml(scooter?.rdwType || '-')}</td>
+        <td>${escapeHtml(scooter?.rdwVariant || '-')}</td>
+        <td>${escapeHtml(scooter?.rdwExecution || '-')}</td>
+      </tr>
+    `).join('');
     const riskRows = draftRisks.map((risk) => {
       const score = asNumber(risk.severity) * asNumber(risk.probability);
       return `<tr>
@@ -886,6 +923,8 @@ export function CompliancePage({
             th, td { border: 1px solid #d6dce2; padding: 8px; text-align: left; vertical-align: top; }
             th { background: #103f77; color: white; }
             .warning-card { border: 1px solid #f5c451; background: #fff7da; padding: 12px; margin-bottom: 10px; }
+            .legal-note { border-left: 4px solid #1d4f91; background: #eef4ff; padding: 12px 14px; line-height: 1.45; }
+            .missing-row td { background: #fff4e5; color: #8a4b00; }
             .print-button { float: right; background: #0b4a8f; color: white; border: 0; border-radius: 6px; padding: 10px 14px; cursor: pointer; }
           </style>
         </head>
@@ -905,7 +944,12 @@ export function CompliancePage({
           <div class="section"><h2>4. Risicoanalyse</h2><table><thead><tr><th>Gevaar</th><th>Ernst</th><th>Kans</th><th>Score</th><th>Mitigatie</th><th>Resterend risico</th></tr></thead><tbody>${riskRows || '<tr><td colspan="6">Geen risicoanalyse vastgelegd.</td></tr>'}</tbody></table></div>
           <div class="section"><h2>5. Waarschuwingen</h2>${warningCards || '<p>Geen waarschuwingen vastgelegd.</p>'}</div>
           <div class="section"><h2>6. Gekoppelde producten (${selectedFamilyProducts.length})</h2><table><thead><tr><th>Artikelnummer</th><th>Omschrijving</th><th>Categorie</th></tr></thead><tbody>${linkedRows || '<tr><td colspan="3">Geen producten gekoppeld.</td></tr>'}</tbody></table></div>
-          <div class="section"><h2>7. Documenten</h2><table><thead><tr><th>Type</th><th>Naam</th><th>Geldig t/m</th></tr></thead><tbody>${documentRows || '<tr><td colspan="3">Geen documenten geregistreerd.</td></tr>'}</tbody></table></div>
+          <div class="section">
+            <h2>7. Voertuigtype en EU-typegoedkeuring</h2>
+            <p class="legal-note">De EU-typegoedkeuring geldt voor het complete voertuigtype. De gekoppelde onderdelen moeten geschikt zijn voor dit type en mogen de goedgekeurde voertuigconfiguratie en veiligheidskenmerken niet nadelig wijzigen.</p>
+            <table><thead><tr><th>Voertuigmodel</th><th>EU-typegoedkeuringsnummer</th><th>RDW type</th><th>Variant</th><th>Uitvoering</th></tr></thead><tbody>${vehicleApprovalHtml || '<tr class="missing-row"><td colspan="5">Geen voertuigmodel herkend in de gekoppelde productomschrijvingen. Voeg het toepasselijke model, bijvoorbeeld RSO Speedy/S9, toe aan de productomschrijving.</td></tr>'}</tbody></table>
+          </div>
+          <div class="section"><h2>8. Documenten</h2><table><thead><tr><th>Type</th><th>Naam</th><th>Geldig t/m</th></tr></thead><tbody>${documentRows || '<tr><td colspan="3">Geen documenten geregistreerd.</td></tr>'}</tbody></table></div>
         </body>
       </html>
     `);
