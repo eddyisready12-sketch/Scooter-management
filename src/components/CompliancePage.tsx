@@ -854,6 +854,49 @@ export function CompliancePage({
     const selectedDossierEntry = selectedFamilyProducts.find(({ product, link }) => (product?.id || link.productId) === selectedProductId);
     if (!selectedDossierEntry) return;
     const selectedDossierProduct = selectedDossierEntry.product;
+    const selectedSupplier = selectedDossierProduct?.supplier
+      ? suppliers.find((supplier) => normalizeSupplierName(supplier.name) === normalizeSupplierName(selectedDossierProduct.supplier))
+      : undefined;
+    const selectedImporter = selectedSupplier?.importerId ? importers.find((importer) => importer.id === selectedSupplier.importerId) : undefined;
+    const selectedEuResponsiblePerson = selectedSupplier?.euResponsiblePersonId ? importers.find((importer) => importer.id === selectedSupplier.euResponsiblePersonId) : undefined;
+    const economicOperatorRows = [
+      {
+        role: 'Fabrikant / leverancier',
+        name: selectedSupplier?.name || selectedDossierProduct?.manufacturerName || selectedDossierProduct?.supplier,
+        address: selectedSupplier
+          ? [selectedSupplier.address, selectedSupplier.postalCode, selectedSupplier.city, selectedSupplier.country].filter(Boolean).join(', ')
+          : [selectedDossierProduct?.manufacturerAddress, selectedDossierProduct?.manufacturerPostalCode, selectedDossierProduct?.manufacturerCity, selectedDossierProduct?.manufacturerCountry].filter(Boolean).join(', '),
+        email: selectedSupplier?.email || selectedDossierProduct?.manufacturerEmail,
+        website: selectedSupplier?.website || selectedDossierProduct?.manufacturerWebsite,
+      },
+      {
+        role: 'Importeur',
+        name: selectedImporter?.name || selectedDossierProduct?.importerName,
+        address: selectedImporter
+          ? [selectedImporter.address, selectedImporter.postalCode, selectedImporter.city, selectedImporter.country].filter(Boolean).join(', ')
+          : [selectedDossierProduct?.importerAddress, selectedDossierProduct?.importerPostalCode, selectedDossierProduct?.importerCity, selectedDossierProduct?.importerCountry].filter(Boolean).join(', '),
+        email: selectedImporter?.email || selectedDossierProduct?.importerEmail,
+        website: selectedImporter?.website || selectedDossierProduct?.importerWebsite,
+      },
+      {
+        role: 'EU-verantwoordelijke persoon',
+        name: selectedEuResponsiblePerson?.name || selectedDossierProduct?.euResponsiblePersonName,
+        address: selectedEuResponsiblePerson
+          ? [selectedEuResponsiblePerson.address, selectedEuResponsiblePerson.postalCode, selectedEuResponsiblePerson.city, selectedEuResponsiblePerson.country].filter(Boolean).join(', ')
+          : [selectedDossierProduct?.euResponsiblePersonAddress, selectedDossierProduct?.euResponsiblePersonPostalCode, selectedDossierProduct?.euResponsiblePersonCity, selectedDossierProduct?.euResponsiblePersonCountry].filter(Boolean).join(', '),
+        email: selectedEuResponsiblePerson?.email || selectedDossierProduct?.euResponsiblePersonEmail,
+        website: selectedEuResponsiblePerson?.website || selectedDossierProduct?.euResponsiblePersonWebsite,
+      },
+    ];
+    const economicOperatorHtml = economicOperatorRows.map((operator) => `
+      <tr>
+        <td><strong>${escapeHtml(operator.role)}</strong></td>
+        <td>${escapeHtml(operator.name || '-')}</td>
+        <td>${escapeHtml(operator.address || '-')}</td>
+        <td>${escapeHtml(operator.email || '-')}</td>
+        <td>${escapeHtml(operator.website || '-')}</td>
+      </tr>
+    `).join('');
     const normalizeVehicleModel = (value?: string) => {
       const normalized = (value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (normalized === 'S9' || normalized.includes('SPEEDY')) return 'SPEEDY';
@@ -960,12 +1003,13 @@ export function CompliancePage({
           <div class="section"><h2>4. Risicoanalyse</h2><table><thead><tr><th>Gevaar</th><th>Ernst</th><th>Kans</th><th>Score</th><th>Mitigatie</th><th>Resterend risico</th></tr></thead><tbody>${riskRows || '<tr><td colspan="6">Geen risicoanalyse vastgelegd.</td></tr>'}</tbody></table></div>
           <div class="section"><h2>5. Waarschuwingen</h2>${warningCards || '<p>Geen waarschuwingen vastgelegd.</p>'}</div>
           <div class="section"><h2>6. Productidentificatie</h2><table><thead><tr><th>Artikelnummer</th><th>Omschrijving</th><th>Categorie</th></tr></thead><tbody>${linkedRows}</tbody></table></div>
+          <div class="section"><h2>7. Marktdeelnemers</h2><table><thead><tr><th>Rol</th><th>Bedrijfsnaam</th><th>Adres</th><th>E-mail</th><th>Website</th></tr></thead><tbody>${economicOperatorHtml}</tbody></table></div>
           <div class="section">
-            <h2>7. Voertuigtype en EU-typegoedkeuring</h2>
+            <h2>8. Voertuigtype en EU-typegoedkeuring</h2>
             <p class="legal-note">Dit product is een OEM-onderdeel voor voertuigen met de onderstaande EU-typegoedkeuring(en). Het is bestemd als vervangingsonderdeel binnen de goedgekeurde voertuigconfiguratie.</p>
             <table><thead><tr><th>Voertuigmodel</th><th>EU-typegoedkeuringsnummer</th><th>RDW type</th><th>Variant</th><th>Uitvoering</th></tr></thead><tbody>${vehicleApprovalHtml}</tbody></table>
           </div>
-          <div class="section"><h2>8. Documenten</h2><table><thead><tr><th>Type</th><th>Naam</th><th>Geldig t/m</th></tr></thead><tbody>${documentRows || '<tr><td colspan="3">Geen documenten geregistreerd.</td></tr>'}</tbody></table></div>
+          <div class="section"><h2>9. Documenten</h2><table><thead><tr><th>Type</th><th>Naam</th><th>Geldig t/m</th></tr></thead><tbody>${documentRows || '<tr><td colspan="3">Geen documenten geregistreerd.</td></tr>'}</tbody></table></div>
         </body>
       </html>
     `);
