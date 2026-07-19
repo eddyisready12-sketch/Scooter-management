@@ -7825,6 +7825,78 @@ dd {
   padding: 12px 0;
 }
 
+.compliance-dossier-picker-backdrop {
+  z-index: 70;
+  padding: 24px;
+}
+
+.compliance-dossier-picker {
+  width: min(980px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+  border-radius: 14px;
+  background: #f8fafc;
+  box-shadow: 0 24px 70px rgba(18, 35, 52, 0.3);
+}
+
+.compliance-dossier-picker-title {
+  display: grid;
+  gap: 3px;
+}
+
+.compliance-dossier-picker-title small {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.compliance-dossier-picker-body {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.compliance-dossier-product-list {
+  max-height: min(560px, calc(100vh - 260px));
+  overflow-y: auto;
+  border: 1px solid #dce4ec;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.compliance-dossier-product-row {
+  display: grid;
+  grid-template-columns: 24px 140px minmax(260px, 1fr) 180px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e6ebf0;
+  cursor: pointer;
+}
+
+.compliance-dossier-product-row:last-child { border-bottom: 0; }
+.compliance-dossier-product-row:hover { background: #f5f9ff; }
+.compliance-dossier-product-row.selected { background: #eaf3ff; box-shadow: inset 3px 0 #2c74d8; }
+.compliance-dossier-product-row small { color: #64748b; }
+
+.compliance-dossier-picker-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-top: 1px solid #dce4ec;
+  background: #fff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .compliance-dossier-product-row { grid-template-columns: 24px 1fr; }
+  .compliance-dossier-product-row span,
+  .compliance-dossier-product-row small { grid-column: 2; }
+}
+
 @media (max-width: 1180px) {
   .compliance-dashboard-grid,
   .compliance-layout,

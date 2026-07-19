@@ -249,6 +249,9 @@ export function CompliancePage({
   const [productSearch, setProductSearch] = useState('');
   const [linkSearch, setLinkSearch] = useState('');
   const [linkPage, setLinkPage] = useState(1);
+  const [dossierPickerOpen, setDossierPickerOpen] = useState(false);
+  const [dossierProductId, setDossierProductId] = useState('');
+  const [dossierProductQuery, setDossierProductQuery] = useState('');
   const [documentQuery, setDocumentQuery] = useState('');
   const [unlinkedQuery, setUnlinkedQuery] = useState('');
   const [supplierQuery, setSupplierQuery] = useState('');
@@ -835,14 +838,28 @@ export function CompliancePage({
     }
   }
 
-  function openDossierPreview() {
+  function requestDossierPreview() {
+    if (selectedFamilyProducts.length === 0) {
+      setDetailTab('links');
+      setLinkActionMessage('Koppel eerst minimaal één product voordat je een dossier genereert.');
+      return;
+    }
+    setDossierProductId('');
+    setDossierProductQuery('');
+    setDossierPickerOpen(true);
+  }
+
+  function openDossierPreview(selectedProductId: string) {
     if (!draftFamily) return;
+    const selectedDossierEntry = selectedFamilyProducts.find(({ product, link }) => (product?.id || link.productId) === selectedProductId);
+    if (!selectedDossierEntry) return;
+    const selectedDossierProduct = selectedDossierEntry.product;
     const normalizeVehicleModel = (value?: string) => {
       const normalized = (value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (normalized === 'S9' || normalized.includes('SPEEDY')) return 'SPEEDY';
       return normalized;
     };
-    const linkedProductModelText = selectedFamilyProducts
+    const linkedProductModelText = [selectedDossierEntry]
       .map(({ product, link }) => [product?.description, product?.shortDescription, product?.labelTitle, product?.articleGroup, link.variantDescription].filter(Boolean).join(' '))
       .join(' ');
     const normalizedLinkedProductText = normalizeVehicleModel(linkedProductModelText);
@@ -853,19 +870,19 @@ export function CompliancePage({
       mentionedVehicleModels.push('SPEEDY');
     }
     const vehicleApprovalRows = mentionedVehicleModels.flatMap((model) => {
-      const matchingScooters = scooters.filter((scooter) => normalizeVehicleModel(scooter.model) === model);
+      const matchingScooters = scooters.filter((scooter) => normalizeVehicleModel(scooter.model) === model && Boolean(scooter.rdwTypeApprovalNumber?.trim()));
       const approvals = new Map<string, Scooter>();
       matchingScooters.forEach((scooter) => {
         const key = [scooter.rdwTypeApprovalNumber || 'ONTBREEKT', scooter.rdwType || '', scooter.rdwVariant || '', scooter.rdwExecution || ''].join('|');
         if (!approvals.has(key)) approvals.set(key, scooter);
       });
-      if (approvals.size === 0) return [{ model, scooter: undefined as Scooter | undefined }];
+      if (approvals.size === 0) return [];
       return Array.from(approvals.values()).map((scooter) => ({ model, scooter }));
     });
     const vehicleApprovalHtml = vehicleApprovalRows.map(({ model, scooter }) => `
-      <tr class="${scooter?.rdwTypeApprovalNumber ? '' : 'missing-row'}">
+      <tr>
         <td>RSO ${escapeHtml(model === 'SPEEDY' ? 'Speedy / S9' : model)}</td>
-        <td>${escapeHtml(scooter?.rdwTypeApprovalNumber || 'Ontbreekt - aanvullen via RDW voertuiggegevens')}</td>
+        <td>${escapeHtml(scooter?.rdwTypeApprovalNumber || '')}</td>
         <td>${escapeHtml(scooter?.rdwType || '-')}</td>
         <td>${escapeHtml(scooter?.rdwVariant || '-')}</td>
         <td>${escapeHtml(scooter?.rdwExecution || '-')}</td>
@@ -889,7 +906,7 @@ export function CompliancePage({
         ${warning.warningTextEn ? `<strong>EN:</strong> ${escapeHtml(warning.warningTextEn)}` : ''}
       </div>
     `).join('');
-    const linkedRows = selectedFamilyProducts.map(({ product }) => `
+    const linkedRows = [selectedDossierEntry].map(({ product }) => `
       <tr>
         <td>${escapeHtml(product?.code || '-')}</td>
         <td>${escapeHtml(product?.description || '-')}</td>
@@ -924,7 +941,6 @@ export function CompliancePage({
             th { background: #103f77; color: white; }
             .warning-card { border: 1px solid #f5c451; background: #fff7da; padding: 12px; margin-bottom: 10px; }
             .legal-note { border-left: 4px solid #1d4f91; background: #eef4ff; padding: 12px 14px; line-height: 1.45; }
-            .missing-row td { background: #fff4e5; color: #8a4b00; }
             .print-button { float: right; background: #0b4a8f; color: white; border: 0; border-radius: 6px; padding: 10px 14px; cursor: pointer; }
           </style>
         </head>
@@ -935,7 +951,7 @@ export function CompliancePage({
             <table class="hero-grid">
               <tr><td><strong>Productfamilie</strong></td><td>${escapeHtml(draftFamily.name)}</td><td><strong>Code</strong></td><td>${escapeHtml(draftFamily.code)}</td></tr>
               <tr><td><strong>Categorie</strong></td><td>${escapeHtml(draftFamily.category || '-')}</td><td><strong>Risiconiveau</strong></td><td>${escapeHtml(riskLabel(draftFamily.riskLevel))}</td></tr>
-              <tr><td><strong>Datum gegenereerd</strong></td><td>${escapeHtml(formatDate(new Date().toISOString()))}</td><td><strong>Aantal producten</strong></td><td>${selectedFamilyProducts.length}</td></tr>
+              <tr><td><strong>Datum gegenereerd</strong></td><td>${escapeHtml(formatDate(new Date().toISOString()))}</td><td><strong>Artikelnummer</strong></td><td>${escapeHtml(selectedDossierProduct?.code || selectedDossierEntry.link.productId)}</td></tr>
             </table>
           </div>
           <div class="section"><h2>1. Productomschrijving</h2><p>${escapeHtml(draftFamily.description || '-')}</p></div>
@@ -943,17 +959,18 @@ export function CompliancePage({
           <div class="section"><h2>3. Voorzienbaar verkeerd gebruik</h2><p>${escapeHtml(draftFamily.foreseeableMisuse || '-')}</p></div>
           <div class="section"><h2>4. Risicoanalyse</h2><table><thead><tr><th>Gevaar</th><th>Ernst</th><th>Kans</th><th>Score</th><th>Mitigatie</th><th>Resterend risico</th></tr></thead><tbody>${riskRows || '<tr><td colspan="6">Geen risicoanalyse vastgelegd.</td></tr>'}</tbody></table></div>
           <div class="section"><h2>5. Waarschuwingen</h2>${warningCards || '<p>Geen waarschuwingen vastgelegd.</p>'}</div>
-          <div class="section"><h2>6. Gekoppelde producten (${selectedFamilyProducts.length})</h2><table><thead><tr><th>Artikelnummer</th><th>Omschrijving</th><th>Categorie</th></tr></thead><tbody>${linkedRows || '<tr><td colspan="3">Geen producten gekoppeld.</td></tr>'}</tbody></table></div>
+          <div class="section"><h2>6. Productidentificatie</h2><table><thead><tr><th>Artikelnummer</th><th>Omschrijving</th><th>Categorie</th></tr></thead><tbody>${linkedRows}</tbody></table></div>
           <div class="section">
             <h2>7. Voertuigtype en EU-typegoedkeuring</h2>
             <p class="legal-note">De EU-typegoedkeuring geldt voor het complete voertuigtype. De gekoppelde onderdelen moeten geschikt zijn voor dit type en mogen de goedgekeurde voertuigconfiguratie en veiligheidskenmerken niet nadelig wijzigen.</p>
-            <table><thead><tr><th>Voertuigmodel</th><th>EU-typegoedkeuringsnummer</th><th>RDW type</th><th>Variant</th><th>Uitvoering</th></tr></thead><tbody>${vehicleApprovalHtml || '<tr class="missing-row"><td colspan="5">Geen voertuigmodel herkend in de gekoppelde productomschrijvingen. Voeg het toepasselijke model, bijvoorbeeld RSO Speedy/S9, toe aan de productomschrijving.</td></tr>'}</tbody></table>
+            <table><thead><tr><th>Voertuigmodel</th><th>EU-typegoedkeuringsnummer</th><th>RDW type</th><th>Variant</th><th>Uitvoering</th></tr></thead><tbody>${vehicleApprovalHtml}</tbody></table>
           </div>
           <div class="section"><h2>8. Documenten</h2><table><thead><tr><th>Type</th><th>Naam</th><th>Geldig t/m</th></tr></thead><tbody>${documentRows || '<tr><td colspan="3">Geen documenten geregistreerd.</td></tr>'}</tbody></table></div>
         </body>
       </html>
     `);
     previewWindow.document.close();
+    setDossierPickerOpen(false);
   }
 
   function renderDashboard() {
@@ -1203,7 +1220,7 @@ export function CompliancePage({
                 <div className="page-title-actions">
                   <button type="button" className="secondary-button" onClick={() => setFamilyDialogOpen(false)}>Sluiten</button>
                   <button type="button" className="secondary-button" onClick={() => void saveFamilyBundle()} disabled={saving}>Opslaan</button>
-                  <button type="button" className="primary-button" onClick={openDossierPreview}>Dossier genereren</button>
+                  <button type="button" className="primary-button" onClick={requestDossierPreview}>Dossier genereren</button>
                 </div>
               </div>
 
@@ -1607,7 +1624,7 @@ export function CompliancePage({
                       </div>
                       <p>Open een nette print-/PDF-preview van het GPSR technisch dossier met dezelfde data uit deze app.</p>
                       <div>
-                        <button type="button" className="primary-button" onClick={openDossierPreview}>Afdrukken / PDF</button>
+                        <button type="button" className="primary-button" onClick={requestDossierPreview}>Afdrukken / PDF</button>
                       </div>
                     </div>
                   </section>
@@ -1637,6 +1654,41 @@ export function CompliancePage({
           )}
         </section>
         </div>
+        ) : null}
+        {dossierPickerOpen ? (
+          <div className="modal-backdrop compliance-dossier-picker-backdrop" onMouseDown={() => setDossierPickerOpen(false)}>
+            <section className="panel compliance-dossier-picker" onMouseDown={(event) => event.stopPropagation()}>
+              <div className="panel-title">
+                <div className="compliance-dossier-picker-title"><strong>Kies één product voor het GPSR-dossier</strong><small>Het dossier wordt productgericht gegenereerd; de familiegegevens worden als gedeelde basis gebruikt.</small></div>
+                <button type="button" className="secondary-button" onClick={() => setDossierPickerOpen(false)}>Sluiten</button>
+              </div>
+              <div className="compliance-dossier-picker-body">
+                <div className="search-field">
+                  <Search size={16} />
+                  <input value={dossierProductQuery} onChange={(event) => setDossierProductQuery(event.target.value)} placeholder="Zoek op artikelnummer, omschrijving of categorie" autoFocus />
+                </div>
+                <div className="compliance-dossier-product-list">
+                  {selectedFamilyProducts
+                    .filter(({ product, link }) => `${product?.code || ''} ${product?.description || ''} ${product?.articleGroup || ''} ${link.variantDescription || ''}`.toLocaleLowerCase('nl').includes(dossierProductQuery.trim().toLocaleLowerCase('nl')))
+                    .map(({ product, link }) => {
+                      const productId = product?.id || link.productId;
+                      return (
+                        <label className={`compliance-dossier-product-row ${dossierProductId === productId ? 'selected' : ''}`} key={link.id}>
+                          <input type="radio" name="dossierProduct" checked={dossierProductId === productId} onChange={() => setDossierProductId(productId)} />
+                          <strong>{product?.code || link.productId}</strong>
+                          <span>{product?.description || link.variantDescription || '-'}</span>
+                          <small>{product?.articleGroup || link.variantDescription || '-'}</small>
+                        </label>
+                      );
+                    })}
+                </div>
+              </div>
+              <div className="compliance-dossier-picker-actions">
+                <span>{dossierProductId ? '1 product geselecteerd' : 'Selecteer verplicht één product'}</span>
+                <button type="button" className="primary-button" disabled={!dossierProductId} onClick={() => openDossierPreview(dossierProductId)}>Dossier genereren</button>
+              </div>
+            </section>
+          </div>
         ) : null}
       </div>
     );
