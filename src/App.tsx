@@ -11654,6 +11654,7 @@ function SuppliersPage({
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [showAddImporter, setShowAddImporter] = useState(false);
   const [selectedImporter, setSelectedImporter] = useState<Importer | null>(null);
+  const [gpsrSupplierFilter, setGpsrSupplierFilter] = useState<'all' | 'ready' | 'attention' | 'blocked' | 'outsourced'>('all');
   const sortedSuppliers = [...suppliers].sort((a, b) => {
     const activeRank = Number(b.active !== false) - Number(a.active !== false);
     if (activeRank !== 0) return activeRank;
@@ -11670,6 +11671,42 @@ function SuppliersPage({
   }
 
   const productSupplierCount = new Set(products.map((product) => product.supplier?.trim()).filter(Boolean)).size;
+  const euCountries = new Set([
+    'belgie', 'bulgarije', 'cyprus', 'denemarken', 'duitsland', 'estland', 'finland', 'frankrijk', 'griekenland',
+    'hongarije', 'ierland', 'italie', 'kroatie', 'letland', 'litouwen', 'luxemburg', 'malta', 'nederland',
+    'oostenrijk', 'polen', 'portugal', 'roemenie', 'slovenie', 'slowakije', 'spanje', 'tsjechie', 'zweden',
+  ]);
+  const normalizeCountry = (value?: string) => (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const gpsrSupplierRows = sortedSuppliers.map((supplier) => {
+    const linkedProducts = productsForSupplier(supplier);
+    const importer = supplier.importerId ? importers.find((item) => item.id === supplier.importerId) : undefined;
+    const euResponsiblePerson = supplier.euResponsiblePersonId ? importers.find((item) => item.id === supplier.euResponsiblePersonId) : undefined;
+    const outsourced = supplier.complianceResponsibility === 'outsourced';
+    const issues: string[] = [];
+    const country = normalizeCountry(supplier.country);
+    const isEuSupplier = euCountries.has(country);
+    if (!supplier.country?.trim()) issues.push('land ontbreekt');
+    if (!supplier.address?.trim() || !supplier.city?.trim()) issues.push('adres onvolledig');
+    if (!supplier.email?.trim()) issues.push('e-mail ontbreekt');
+    if (outsourced && !supplier.complianceResponsibilityReference?.trim()) issues.push('onderbouwing ontbreekt');
+    if (!outsourced && country && !isEuSupplier) {
+      if (!importer) issues.push('importeur ontbreekt');
+      if (!euResponsiblePerson) issues.push('EU-verantwoordelijke ontbreekt');
+    }
+    let status: 'ready' | 'attention' | 'blocked' | 'outsourced' = 'ready';
+    if (outsourced && supplier.complianceResponsibilityReference?.trim()) status = 'outsourced';
+    else if (issues.some((issue) => issue.includes('onderbouwing') || issue.includes('importeur') || issue.includes('EU-verantwoordelijke'))) status = 'blocked';
+    else if (issues.length > 0 || linkedProducts.length === 0) status = 'attention';
+    return { supplier, linkedProducts, importer, euResponsiblePerson, issues, status };
+  });
+  const filteredGpsrSupplierRows = gpsrSupplierRows.filter((row) => gpsrSupplierFilter === 'all' || row.status === gpsrSupplierFilter);
+  const gpsrSupplierTotals = {
+    all: gpsrSupplierRows.length,
+    ready: gpsrSupplierRows.filter((row) => row.status === 'ready').length,
+    attention: gpsrSupplierRows.filter((row) => row.status === 'attention').length,
+    blocked: gpsrSupplierRows.filter((row) => row.status === 'blocked').length,
+    outsourced: gpsrSupplierRows.filter((row) => row.status === 'outsourced').length,
+  };
 
   return (
     <>
@@ -11715,6 +11752,45 @@ function SuppliersPage({
             ))}
           </div>
         )}
+      </section>
+      <section className="panel table-panel supplier-gpsr-panel">
+        <div className="panel-title">
+          <span><ShieldCheck size={16} /> GPSR compliance leveranciers</span>
+          <small>Automatisch afgeleid uit leveranciers-, rol- en productgegevens</small>
+        </div>
+        <div className="supplier-gpsr-filter-grid">
+          {([
+            ['all', 'Alle leveranciers', gpsrSupplierTotals.all],
+            ['ready', 'GPSR gereed', gpsrSupplierTotals.ready],
+            ['attention', 'Aanvullen', gpsrSupplierTotals.attention],
+            ['blocked', 'Geblokkeerd', gpsrSupplierTotals.blocked],
+            ['outsourced', 'Uitbesteed', gpsrSupplierTotals.outsourced],
+          ] as const).map(([filter, label, count]) => (
+            <button type="button" key={filter} className={`supplier-gpsr-filter ${filter} ${gpsrSupplierFilter === filter ? 'active' : ''}`} onClick={() => setGpsrSupplierFilter(filter)}>
+              <span>{label}</span><strong>{count}</strong>
+            </button>
+          ))}
+        </div>
+        <div className="supplier-gpsr-table-scroll">
+          <table className="supplier-gpsr-table">
+            <thead><tr><th>Leverancier / fabrikant</th><th>Verantwoordelijkheid</th><th>Producten</th><th>Importeur</th><th>EU-verantwoordelijke</th><th>Onderbouwing</th><th>GPSR-status</th><th>Actie</th></tr></thead>
+            <tbody>
+              {filteredGpsrSupplierRows.map(({ supplier, linkedProducts, importer, euResponsiblePerson, issues, status }) => (
+                <tr key={supplier.id}>
+                  <td><strong>{supplier.name}</strong><small>{supplier.country || 'Land ontbreekt'}</small></td>
+                  <td><span className={`supplier-responsibility-badge ${supplier.complianceResponsibility === 'outsourced' ? 'outsourced' : 'own'}`}>{supplier.complianceResponsibility === 'outsourced' ? 'Overgedragen' : 'Eigen dossier'}</span></td>
+                  <td><strong>{linkedProducts.length}</strong></td>
+                  <td>{importer?.name || '-'}</td>
+                  <td>{euResponsiblePerson?.name || '-'}</td>
+                  <td className="supplier-gpsr-reference" title={supplier.complianceResponsibilityReference || ''}>{supplier.complianceResponsibilityReference || '-'}</td>
+                  <td><span className={`supplier-gpsr-status ${status}`} title={issues.join(', ')}>{status === 'ready' ? 'GPSR gereed' : status === 'attention' ? 'Aanvullen' : status === 'blocked' ? 'Geblokkeerd' : 'Uitbesteed'}</span>{issues.length ? <small>{issues.join(', ')}</small> : null}</td>
+                  <td><button type="button" className="secondary-button" onClick={() => setSelectedSupplier(supplier)}>Openen</button></td>
+                </tr>
+              ))}
+              {filteredGpsrSupplierRows.length === 0 ? <tr><td colSpan={8}><p className="empty">Geen leveranciers binnen dit GPSR-filter.</p></td></tr> : null}
+            </tbody>
+          </table>
+        </div>
       </section>
       <section className="panel table-panel">
         <div className="panel-title"><ShieldCheck size={16} /> EU-contactpartijen</div>
