@@ -984,7 +984,10 @@ export function CompliancePage({
       const plan = draftTestPlans.find((item) => item.id === test.planId);
       return `<tr><td>${escapeHtml(test.testName || plan?.name || '-')}</td><td>${escapeHtml(formatDate(test.testDate))}</td><td>${escapeHtml(test.batchRef || '-')}</td><td>${escapeHtml(test.result || '-')}</td><td>${escapeHtml(test.testedBy || '-')}</td><td>${escapeHtml(test.findings || '-')}</td></tr>`;
     }).join('');
-    const revisionRows = draftRevisions.map((revision) => `<tr><td>${escapeHtml(formatDate(revision.createdAt))}</td><td>${escapeHtml(revision.changedBy || '-')}</td><td>${escapeHtml(revision.changeNote)}</td></tr>`).join('');
+    const dossierRevisions = draftRevisions
+      .filter((revision) => !/^Product (?:ge|ont)koppeld\b/i.test(revision.changeNote.trim()))
+      .slice(0, 5);
+    const revisionRows = dossierRevisions.map((revision) => `<tr><td>${escapeHtml(formatDate(revision.createdAt))}</td><td>${escapeHtml(revision.changedBy || '-')}</td><td>${escapeHtml(revision.changeNote)}</td></tr>`).join('');
     const dossierGaps = [
       !selectedDossierProduct?.brand && 'merk',
       !(selectedDossierProduct?.barcode || selectedDossierProduct?.batchNumber || selectedDossierProduct?.batch || selectedDossierProduct?.serialNumber || selectedDossierProduct?.traceabilityCode) && 'traceerbaar productkenmerk',
@@ -1005,7 +1008,7 @@ export function CompliancePage({
           <title>GPSR Technisch Dossier</title>
           <style>
             @page { size: A4 portrait; margin: 12mm 11mm 14mm; }
-            * { box-sizing: border-box; }
+            * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             body { font-family: Arial, sans-serif; margin: 0; padding: 12px; color: #0f172a; font-size: 10.5px; line-height: 1.35; }
             h1, h2, h3 { color: #0b4a8f; break-after: avoid; page-break-after: avoid; }
             h1 { font-size: 21px; margin: 0 0 7px; }
@@ -1016,6 +1019,7 @@ export function CompliancePage({
             .hero-grid { width: 100%; border-collapse: collapse; margin-top: 7px; }
             .hero-grid td { padding: 5px 7px; border-bottom: 1px solid #dbe6f5; }
             .section { margin-top: 13px; }
+            .keep-together { break-inside: avoid; page-break-inside: avoid; }
             table { width: 100%; border-collapse: collapse; }
             thead { display: table-header-group; }
             tr { break-inside: avoid; page-break-inside: avoid; }
@@ -1047,7 +1051,7 @@ export function CompliancePage({
           <div class="section"><h2>3. Productomschrijving</h2><p>${escapeHtml(draftFamily.description || selectedDossierProduct?.shortDescription || '-')}</p>${selectedDossierProduct?.imageUrl ? `<img class="product-image" src="${escapeHtml(selectedDossierProduct.imageUrl)}" alt="Productafbeelding" />` : ''}</div>
           <div class="section"><h2>4. Productidentificatie en traceerbaarheid</h2><table><tbody>${productIdentificationRows}</tbody></table></div>
           <div class="section"><h2>5. Bedoeld gebruik</h2><p>${escapeHtml(draftFamily.intendedUse || '-')}</p><h3>Voorzienbaar verkeerd gebruik</h3><p>${escapeHtml(draftFamily.foreseeableMisuse || '-')}</p></div>
-          <div class="section"><h2>6. Essentiële kenmerken en samenstelling</h2><table><tbody>${characteristicRows}</tbody></table></div>
+          <div class="section keep-together"><h2>6. Essentiële kenmerken en samenstelling</h2><table><tbody>${characteristicRows}</tbody></table></div>
           <div class="section"><h2>7. Risicoanalyse</h2><table><thead><tr><th>Gevaar</th><th>Risicobeschrijving</th><th>Ernst</th><th>Kans</th><th>Score</th><th>Mitigatie</th><th>Resterend risico</th></tr></thead><tbody>${riskRows || '<tr><td colspan="7">Geen risicoanalyse vastgelegd.</td></tr>'}</tbody></table></div>
           <div class="section"><h2>8. Waarschuwingen en instructies</h2>${warningCards || '<p>Geen waarschuwingen vastgelegd.</p>'}<h3>Handleidingstekst</h3><p>${escapeHtml(draftFamily.manualText || 'Niet vastgelegd')}</p></div>
           <div class="section">
@@ -1058,11 +1062,16 @@ export function CompliancePage({
           <div class="section"><h2>10. Toepasselijke wetgeving, normen en keuringseisen</h2><table><thead><tr><th>Eis</th><th>Regeling / norm</th><th>Type</th><th>Status</th><th>Toelichting</th></tr></thead><tbody>${requirementRows || '<tr><td colspan="5">Geen eisen of normen geregistreerd.</td></tr>'}</tbody></table></div>
           <div class="section"><h2>11. Tests en conformiteitsbewijs</h2><table><thead><tr><th>Test</th><th>Datum</th><th>Batch</th><th>Resultaat</th><th>Getest door</th><th>Bevindingen</th></tr></thead><tbody>${testRows || '<tr><td colspan="6">Geen testresultaten geregistreerd.</td></tr>'}</tbody></table></div>
           <div class="section"><h2>12. Documenten</h2><table><thead><tr><th>Type</th><th>Naam</th><th>Geldig t/m</th></tr></thead><tbody>${documentRows || '<tr><td colspan="3">Geen documenten geregistreerd.</td></tr>'}</tbody></table></div>
-          <div class="section"><h2>13. Revisiegeschiedenis</h2><table><thead><tr><th>Datum</th><th>Gewijzigd door</th><th>Wijziging</th></tr></thead><tbody>${revisionRows || '<tr><td colspan="3">Geen revisies geregistreerd.</td></tr>'}</tbody></table><p class="legal-note">Houd dit technisch dossier actueel en bewaar het ten minste tien jaar nadat het product in de handel is gebracht.</p></div>
+          <div class="section"><h2>13. Revisiegeschiedenis</h2><table><thead><tr><th>Datum</th><th>Gewijzigd door</th><th>Wijziging</th></tr></thead><tbody>${revisionRows || '<tr><td colspan="3">Geen inhoudelijke dossierrevisies geregistreerd.</td></tr>'}</tbody></table><p class="legal-note">Houd dit technisch dossier actueel en bewaar het ten minste tien jaar nadat het product in de handel is gebracht.</p></div>
         </body>
       </html>
     `);
     previewWindow.document.close();
+    try {
+      previewWindow.history.replaceState({}, 'GPSR Technisch Dossier', '/gpsr-technisch-dossier');
+    } catch {
+      // De dossierweergave blijft bruikbaar wanneer de browser URL-wijzigingen blokkeert.
+    }
     setDossierPickerOpen(false);
   }
 
