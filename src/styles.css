@@ -6918,6 +6918,72 @@ dd {
   list-style-position: inside;
 }
 
+.packaging-supplier-dialog {
+  width: min(1280px, calc(100vw - 44px));
+}
+
+.packaging-dialog-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.packaging-dialog-title-row h2 {
+  margin-right: 2px;
+}
+
+.packaging-dialog-content {
+  gap: 12px;
+  padding: 14px !important;
+}
+
+.packaging-dialog-content > .compliance-progress-panel {
+  border: 1px solid #dde5ed;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.packaging-dialog-content > .compliance-tabs {
+  border: 1px solid #dde5ed;
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.packaging-dialog-content > .compliance-tabs button {
+  min-height: 38px;
+}
+
+.packaging-dialog-content .packaging-contact-details {
+  overflow: hidden;
+  border-color: #d9e2eb;
+  box-shadow: 0 4px 14px rgba(30, 51, 72, 0.05);
+}
+
+.packaging-dialog-content .packaging-contact-details > summary {
+  min-height: 46px;
+  padding: 0 14px;
+  background: #f8fafc;
+}
+
+.packaging-dialog-content .packaging-contact-details[open] > summary {
+  border-bottom: 1px solid #e4eaf0;
+}
+
+.packaging-dialog-content .packaging-contact-details .compliance-form-grid {
+  padding: 14px;
+}
+
+@media (min-width: 1040px) {
+  .packaging-supplier-dialog .packaging-contact-details .compliance-form-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .packaging-supplier-dialog .packaging-contact-details .packaging-country-field {
+    grid-column: span 2;
+  }
+}
+
 .packaging-contact-details > summary small {
   margin-left: auto;
   color: #64748b;
@@ -6983,9 +7049,14 @@ dd {
 }
 
 .compact-ppwr-settings .compliance-checkbox-label {
-  padding-top: 25px;
+  margin-top: 25px;
+  min-height: 40px;
+  padding: 0 14px;
   align-self: stretch;
   align-content: center;
+  border: 1px solid #dbe4ec;
+  border-radius: 8px;
+  background: #f8fafc;
 }
 
 .supplier-document-upload {

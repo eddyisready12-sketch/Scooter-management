@@ -1748,7 +1748,7 @@ export function CompliancePage({
 
         {packagingDialogOpen && draftPackagingSupplier ? (
         <div className="modal-backdrop compliance-detail-dialog-backdrop" onMouseDown={() => setPackagingDialogOpen(false)}>
-        <section className="panel compliance-family-detail compliance-detail-dialog" ref={packagingDetailRef} onMouseDown={(event) => event.stopPropagation()}>
+        <section className="panel compliance-family-detail compliance-detail-dialog packaging-supplier-dialog" ref={packagingDetailRef} onMouseDown={(event) => event.stopPropagation()}>
           {!draftPackagingSupplier ? (
             <p className="empty compliance-empty">Kies links een verpakkingsleverancier of maak een nieuwe kaart aan.</p>
           ) : (
@@ -1756,7 +1756,12 @@ export function CompliancePage({
               <div className="panel-title compliance-family-detail-header">
                 <div>
                   <span className="compliance-breadcrumb">PPWR leveranciers</span>
-                  <h2>{draftPackagingSupplier.name || 'Nieuwe verpakkingsleverancier'}</h2>
+                  <div className="packaging-dialog-title-row">
+                    <h2>{draftPackagingSupplier.name || 'Nieuwe verpakkingsleverancier'}</h2>
+                    <span className={`compliance-status-pill ${draftPackagingSupplier.active === false ? 'concept' : 'complete'}`}>
+                      {draftPackagingSupplier.active === false ? 'Niet actief' : 'Actief'}
+                    </span>
+                  </div>
                 </div>
                 <div className="page-title-actions">
                   <button type="button" className="secondary-button" onClick={() => setPackagingDialogOpen(false)}>Sluiten</button>
@@ -1769,7 +1774,7 @@ export function CompliancePage({
                 </div>
               </div>
 
-              <div className="compliance-panel-body compliance-view-stack">
+              <div className="compliance-panel-body compliance-view-stack packaging-dialog-content">
                 <div className="compliance-progress-panel">
                   <div className="compliance-progress-header"><strong>PPWR-dossier volledigheid</strong><span>{ppwrProgress}%</span></div>
                   <div className="compliance-progress-track"><div className="compliance-progress-fill" style={{ width: `${ppwrProgress}%` }} /></div>
@@ -1826,7 +1831,7 @@ export function CompliancePage({
                       <span>Plaats</span>
                       <input value={draftPackagingSupplier.city || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, city: event.target.value } : current)} />
                     </label>
-                    <label>
+                    <label className="packaging-country-field">
                       <span>Land</span>
                       <input value={draftPackagingSupplier.country || ''} onChange={(event) => setDraftPackagingSupplier((current) => current ? { ...current, country: event.target.value } : current)} />
                     </label>
