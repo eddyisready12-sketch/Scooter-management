@@ -238,6 +238,8 @@ export function CompliancePage({
   const [familyQuery, setFamilyQuery] = useState('');
   const [familyCategoryFilter, setFamilyCategoryFilter] = useState('all');
   const [familyStatusFilter, setFamilyStatusFilter] = useState('all');
+  const [templateQuery, setTemplateQuery] = useState('');
+  const [templateRiskFilter, setTemplateRiskFilter] = useState<'all' | ComplianceProductFamily['riskLevel']>('all');
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('');
   const [familyDialogOpen, setFamilyDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1672,27 +1674,50 @@ export function CompliancePage({
   }
 
   function renderTemplatesView() {
+    const sortedTemplateFamilies = [...templateSummary.families]
+      .sort((left, right) => left.name.localeCompare(right.name, 'nl', { sensitivity: 'base' }));
+    const filteredTemplateFamilies = sortedTemplateFamilies.filter((family) => {
+      const query = templateQuery.trim().toLocaleLowerCase('nl');
+      const matchesQuery = !query || `${family.name} ${family.code} ${family.category || ''} ${family.description || ''}`.toLocaleLowerCase('nl').includes(query);
+      const matchesRisk = templateRiskFilter === 'all' || family.riskLevel === templateRiskFilter;
+      return matchesQuery && matchesRisk;
+    });
     return (
       <div className="compliance-view-stack">
-        <section className="panel">
+        <section className="panel compliance-templates-panel">
           <div className="panel-title">
-            <span>Templates</span>
+            <div className="compliance-template-title-copy"><span>GPSR-templates</span><small>Alfabetisch gesorteerd op naam</small></div>
             <button type="button" className="primary-button" onClick={() => void handleSeedTemplates()} disabled={saving}>
               <DatabaseZap size={14} /> Templates laden
             </button>
           </div>
           <div className="compliance-panel-body">
+            <div className="compliance-template-toolbar">
+              <div className="search-field">
+                <Search size={16} />
+                <input value={templateQuery} onChange={(event) => setTemplateQuery(event.target.value)} placeholder="Zoek op naam, code, categorie of omschrijving" />
+              </div>
+              <select value={templateRiskFilter || 'all'} onChange={(event) => setTemplateRiskFilter(event.target.value as typeof templateRiskFilter)}>
+                <option value="all">Alle risiconiveaus</option>
+                <option value="low">Laag</option>
+                <option value="medium">Matig</option>
+                <option value="high">Hoog</option>
+                <option value="critical">Kritiek</option>
+              </select>
+              <span className="compliance-template-result-count"><strong>{filteredTemplateFamilies.length}</strong> van {sortedTemplateFamilies.length}</span>
+            </div>
             <div className="compliance-template-grid">
-              {templateSummary.families.map((family) => {
+              {filteredTemplateFamilies.map((family) => {
                 const templateRiskCount = templateSummary.risks.filter((item) => item.familyId === family.id).length;
                 const templateWarningCount = templateSummary.warnings.filter((item) => item.familyId === family.id).length;
                 return (
                   <article key={family.id} className="compliance-template-card">
                     <div className="compliance-template-card-header">
-                      <strong>{family.code}</strong>
+                      <span className="compliance-template-code">{family.code}</span>
                       <span className={`compliance-badge ${family.riskLevel === 'high' || family.riskLevel === 'critical' ? 'danger' : family.riskLevel === 'medium' ? 'warning' : 'success'}`}>{riskLabel(family.riskLevel)}</span>
                     </div>
                     <h3>{family.name}</h3>
+                    <span className="compliance-template-category">{family.category || 'Geen categorie'}</span>
                     <p>{family.description || 'Geen omschrijving'}</p>
                     <div className="compliance-template-stats">
                       <span>{templateRiskCount} risico's</span>
@@ -1702,6 +1727,7 @@ export function CompliancePage({
                 );
               })}
             </div>
+            {filteredTemplateFamilies.length === 0 ? <div className="empty-state inline"><Search size={22} /><strong>Geen templates gevonden</strong><span>Pas de zoekterm of het risicofilter aan.</span></div> : null}
           </div>
         </section>
       </div>

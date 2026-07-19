@@ -7687,8 +7687,49 @@ dd {
 
 .compliance-template-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.compliance-template-title-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.compliance-template-title-copy small {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.compliance-template-toolbar {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 210px auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #dfe7ef;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.compliance-template-toolbar select {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #cfd8e1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.compliance-template-result-count {
+  color: #64748b;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.compliance-template-result-count strong {
+  color: #243447;
+  font-size: 16px;
 }
 
 .compliance-template-card {
@@ -7697,7 +7738,17 @@ dd {
   background: #fff;
   padding: 16px;
   display: grid;
+  grid-template-rows: auto auto auto 1fr auto;
   gap: 10px;
+  min-height: 245px;
+  box-shadow: 0 3px 10px rgba(30, 51, 72, 0.04);
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.compliance-template-card:hover {
+  border-color: #b8cce0;
+  box-shadow: 0 8px 22px rgba(30, 51, 72, 0.1);
+  transform: translateY(-1px);
 }
 
 .compliance-template-card h3 {
@@ -7705,10 +7756,40 @@ dd {
   font-size: 20px;
 }
 
+.compliance-template-code {
+  color: #245d91;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.compliance-template-category {
+  justify-self: start;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f0f3f6;
+  color: #5b6876;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .compliance-template-card p {
   margin: 0;
   color: #5f6f7f;
   line-height: 1.45;
+}
+
+@media (max-width: 1400px) {
+  .compliance-template-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 980px) {
+  .compliance-template-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .compliance-template-toolbar { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .compliance-template-grid { grid-template-columns: 1fr; }
 }
 
 .compliance-template-card-header,
