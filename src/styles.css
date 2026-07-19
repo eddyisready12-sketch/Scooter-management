@@ -4415,7 +4415,7 @@ tbody tr:hover {
 
 .supplier-gpsr-table {
   width: 100%;
-  min-width: 1380px;
+  min-width: 1660px;
   border-collapse: collapse;
 }
 
@@ -4460,6 +4460,21 @@ tbody tr:hover {
   max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.supplier-gpsr-action-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.supplier-gpsr-action-cell .active-status,
+.supplier-gpsr-table td > .active-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   white-space: nowrap;
 }
 

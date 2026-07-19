@@ -11722,41 +11722,10 @@ function SuppliersPage({
         </div>
       </div>
       {message && <div className="notice">{message}</div>}
-      <section className="panel table-panel">
-        <div className="panel-title"><Factory size={16} /> Leveranciers / fabrikanten</div>
-        {sortedSuppliers.length === 0 ? (
-          <div className="empty-state inline"><Factory size={22} /><strong>Geen leveranciers aangemaakt</strong><span>Maak leveranciers aan zodat producten fabrikantgegevens kunnen overnemen.</span></div>
-        ) : (
-          <div className="dealer-table supplier-table ppwr-supplier-table">
-            <div className="dealer-table-header supplier-table-header">
-              <span>Leverancier</span>
-              <span>Plaats</span>
-              <span>Land</span>
-              <span>Gekoppelde producten</span>
-              <span>Verpakking</span>
-              <span>Actief</span>
-            </div>
-            {sortedSuppliers.map((supplier) => (
-              <button className="dealer-table-row supplier-table-row" key={supplier.id} onClick={() => setSelectedSupplier(supplier)}>
-                <span>{supplier.name}</span>
-                <span>{supplier.city || '-'}</span>
-                <span>{supplier.country || '-'}</span>
-                <span>{productsForSupplier(supplier).length}</span>
-                <span className={supplier.isPackagingSupplier ? 'active-status' : 'inactive-status'}>
-                  {supplier.isPackagingSupplier ? <CheckCircle2 size={18} aria-label="Verpakkingsleverancier" /> : '-'}
-                </span>
-                <span className={supplier.active === false ? 'inactive-status' : 'active-status'}>
-                  {supplier.active === false ? '-' : <CheckCircle2 size={18} aria-label="Actief" />}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
       <section className="panel table-panel supplier-gpsr-panel">
         <div className="panel-title">
-          <span><ShieldCheck size={16} /> GPSR compliance leveranciers</span>
-          <small>Automatisch afgeleid uit leveranciers-, rol- en productgegevens</small>
+          <span><Factory size={16} /> Leveranciers / fabrikanten en GPSR compliance</span>
+          <small>Eén overzicht, automatisch afgeleid uit leveranciers-, rol- en productgegevens</small>
         </div>
         <div className="supplier-gpsr-filter-grid">
           {([
@@ -11773,21 +11742,23 @@ function SuppliersPage({
         </div>
         <div className="supplier-gpsr-table-scroll">
           <table className="supplier-gpsr-table">
-            <thead><tr><th>Leverancier / fabrikant</th><th>Verantwoordelijkheid</th><th>Producten</th><th>Importeur</th><th>EU-verantwoordelijke</th><th>Onderbouwing</th><th>GPSR-status</th><th>Actie</th></tr></thead>
+            <thead><tr><th>Leverancier / fabrikant</th><th>Vestiging</th><th>Producten</th><th>Verpakking</th><th>Verantwoordelijkheid</th><th>Importeur</th><th>EU-verantwoordelijke</th><th>Onderbouwing</th><th>GPSR-status</th><th>Actief / actie</th></tr></thead>
             <tbody>
               {filteredGpsrSupplierRows.map(({ supplier, linkedProducts, importer, euResponsiblePerson, issues, status }) => (
                 <tr key={supplier.id}>
-                  <td><strong>{supplier.name}</strong><small>{supplier.country || 'Land ontbreekt'}</small></td>
-                  <td><span className={`supplier-responsibility-badge ${supplier.complianceResponsibility === 'outsourced' ? 'outsourced' : 'own'}`}>{supplier.complianceResponsibility === 'outsourced' ? 'Overgedragen' : 'Eigen dossier'}</span></td>
+                  <td><strong>{supplier.name}</strong><small>{supplier.contactName || supplier.email || 'Geen contactpersoon'}</small></td>
+                  <td><strong>{supplier.city || '-'}</strong><small>{supplier.country || 'Land ontbreekt'}</small></td>
                   <td><strong>{linkedProducts.length}</strong></td>
+                  <td><span className={supplier.isPackagingSupplier ? 'active-status' : 'inactive-status'}>{supplier.isPackagingSupplier ? <><CheckCircle2 size={16} /> Ja</> : '-'}</span></td>
+                  <td><span className={`supplier-responsibility-badge ${supplier.complianceResponsibility === 'outsourced' ? 'outsourced' : 'own'}`}>{supplier.complianceResponsibility === 'outsourced' ? 'Overgedragen' : 'Eigen dossier'}</span></td>
                   <td>{importer?.name || '-'}</td>
                   <td>{euResponsiblePerson?.name || '-'}</td>
                   <td className="supplier-gpsr-reference" title={supplier.complianceResponsibilityReference || ''}>{supplier.complianceResponsibilityReference || '-'}</td>
                   <td><span className={`supplier-gpsr-status ${status}`} title={issues.join(', ')}>{status === 'ready' ? 'GPSR gereed' : status === 'attention' ? 'Aanvullen' : status === 'blocked' ? 'Geblokkeerd' : 'Uitbesteed'}</span>{issues.length ? <small>{issues.join(', ')}</small> : null}</td>
-                  <td><button type="button" className="secondary-button" onClick={() => setSelectedSupplier(supplier)}>Openen</button></td>
+                  <td><div className="supplier-gpsr-action-cell"><span className={supplier.active === false ? 'inactive-status' : 'active-status'}>{supplier.active === false ? 'Niet actief' : <><CheckCircle2 size={16} /> Actief</>}</span><button type="button" className="secondary-button" onClick={() => setSelectedSupplier(supplier)}>Openen</button></div></td>
                 </tr>
               ))}
-              {filteredGpsrSupplierRows.length === 0 ? <tr><td colSpan={8}><p className="empty">Geen leveranciers binnen dit GPSR-filter.</p></td></tr> : null}
+              {filteredGpsrSupplierRows.length === 0 ? <tr><td colSpan={10}><p className="empty">Geen leveranciers binnen dit GPSR-filter.</p></td></tr> : null}
             </tbody>
           </table>
         </div>
