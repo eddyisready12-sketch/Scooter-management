@@ -7016,11 +7016,12 @@ function SalesPage({ scooters, dealers, onSelect }: { scooters: Scooter[]; deale
 }
 
 function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; dealers: Dealer[]; onSelect: (scooter: Scooter) => void }) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'colors'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'colors' | 'dealers'>('overview');
   const [dealerFilter, setDealerFilter] = useState('all');
   const [selectedYears, setSelectedYears] = useState<string[]>([]);
   const [showYearFilter, setShowYearFilter] = useState(false);
   const [colorModelFilter, setColorModelFilter] = useState('all');
+  const [dealerModelFilter, setDealerModelFilter] = useState('all');
   const [selectedBucket, setSelectedBucket] = useState<{ year: string; model: string } | null>(null);
   const yearFilterRef = useRef<HTMLDivElement | null>(null);
 
@@ -7107,6 +7108,30 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
     return map;
   }, new Map<string, { model: string; color: string; snorCount: number; bromCount: number; totalCount: number }>()).values())
     .sort((a, b) => b.totalCount - a.totalCount || a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' }) || a.color.localeCompare(b.color, 'nl', { sensitivity: 'base' }));
+  const dealerTabScooters = soldScooters.filter((scooter) =>
+    dealerModelFilter === 'all' || normalizeSalesModel(scooter.model) === dealerModelFilter,
+  );
+  const dealerRows = Array.from(dealerTabScooters.reduce((map, scooter) => {
+    const dealer = dealers.find((item) => item.id === scooter.dealerId);
+    const key = scooter.dealerId || 'unknown';
+    const current = map.get(key) ?? {
+      id: key,
+      name: dealer?.company || dealer?.name || 'Geen dealer gekoppeld',
+      city: dealer?.city || '-',
+      snorCount: 0,
+      bromCount: 0,
+      otherCount: 0,
+      totalCount: 0,
+    };
+    const speed = normalizeSpeedValue(scooter.speed);
+    current.snorCount += speed === '25' ? 1 : 0;
+    current.bromCount += speed === '45' ? 1 : 0;
+    current.otherCount += speed !== '25' && speed !== '45' ? 1 : 0;
+    current.totalCount += 1;
+    map.set(key, current);
+    return map;
+  }, new Map<string, { id: string; name: string; city: string; snorCount: number; bromCount: number; otherCount: number; totalCount: number }>()).values())
+    .sort((a, b) => b.totalCount - a.totalCount || a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' }));
   const totalSnorCount = soldScooters.reduce((sum, scooter) => sum + (normalizeSpeedValue(scooter.speed) === '25' ? 1 : 0), 0);
   const totalBromCount = soldScooters.reduce((sum, scooter) => sum + (normalizeSpeedValue(scooter.speed) === '45' ? 1 : 0), 0);
 
@@ -7125,6 +7150,12 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
       setColorModelFilter('all');
     }
   }, [colorModelFilter, colorModelOptions]);
+
+  useEffect(() => {
+    if (dealerModelFilter !== 'all' && !colorModelOptions.includes(dealerModelFilter)) {
+      setDealerModelFilter('all');
+    }
+  }, [dealerModelFilter, colorModelOptions]);
 
   useEffect(() => {
     if (!showYearFilter) return;
@@ -7191,12 +7222,19 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
           Kleuren
           <span className="product-section-meta">Verkoopverdeling per kleur</span>
         </button>
+        <button type="button" className={`product-tab-button sales-tab-button${activeTab === 'dealers' ? ' active' : ''}`} onClick={() => setActiveTab('dealers')}>
+          Dealers
+          <span className="product-section-meta">Verkochte scooters per dealer</span>
+        </button>
       </div>
-      {activeTab === 'colors' ? (
+      {activeTab === 'colors' || activeTab === 'dealers' ? (
         <div className="sales-subfilters">
           <label className="sales-subfilter">
             Model
-            <select value={colorModelFilter} onChange={(event) => setColorModelFilter(event.target.value)}>
+            <select
+              value={activeTab === 'colors' ? colorModelFilter : dealerModelFilter}
+              onChange={(event) => activeTab === 'colors' ? setColorModelFilter(event.target.value) : setDealerModelFilter(event.target.value)}
+            >
               <option value="all">Alle modellen</option>
               {colorModelOptions.map((model) => <option key={model} value={model}>{model}</option>)}
             </select>
@@ -7283,7 +7321,7 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
             </div>
           )}
         </>
-      ) : (
+      ) : activeTab === 'colors' ? (
         <div className="table-wrap sales-table-wrap">
           <table className="sales-table sales-color-table">
             <thead>
@@ -7311,6 +7349,29 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
                 </tr>
               )) : (
                 <tr><td colSpan={6}>Geen kleurdata gevonden.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="table-wrap sales-table-wrap">
+          <table className="sales-table sales-dealer-table">
+            <thead>
+              <tr><th>Dealer</th><th>Plaats</th><th>Snorscooter (25)</th><th>Bromscooter (45)</th><th>Overig</th><th>Totaal verkocht</th><th>Aandeel</th></tr>
+            </thead>
+            <tbody>
+              {dealerRows.length ? dealerRows.map((row) => (
+                <tr key={row.id}>
+                  <td><strong>{row.name}</strong></td>
+                  <td>{row.city}</td>
+                  <td className="sales-metric-cell"><span className="sales-metric-value">{row.snorCount}</span></td>
+                  <td className="sales-metric-cell"><span className="sales-metric-value">{row.bromCount}</span></td>
+                  <td className="sales-metric-cell"><span className="sales-metric-value">{row.otherCount}</span></td>
+                  <td className="sales-total-cell"><strong>{row.totalCount}</strong></td>
+                  <td className="sales-share-cell">{formatPercentage(row.totalCount, dealerTabScooters.length)}</td>
+                </tr>
+              )) : (
+                <tr><td colSpan={7}>Geen verkoopdata per dealer gevonden.</td></tr>
               )}
             </tbody>
           </table>
