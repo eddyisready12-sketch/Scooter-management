@@ -33,6 +33,7 @@ import type {
   ComplianceProductFamily,
   ComplianceProductLink,
   ComplianceProductTest,
+  Importer,
   Product,
   Supplier,
 } from '../types';
@@ -53,6 +54,7 @@ type CompliancePageProps = {
   revisions: ComplianceFamilyRevision[];
   links: ComplianceProductLink[];
   suppliers: Supplier[];
+  importers: Importer[];
   message?: string;
   onSeedTemplates: (seed: ReturnType<typeof buildComplianceTemplateSeed>) => Promise<void>;
   onSaveFamilyBundle: (payload: {
@@ -68,6 +70,7 @@ type CompliancePageProps = {
   }) => Promise<void>;
   onAutoLinkProducts: (links: ComplianceProductLink[]) => Promise<void>;
   onDeactivateProductLink: (link: ComplianceProductLink, revision: ComplianceFamilyRevision) => Promise<void>;
+  onActivateProductLink: (link: ComplianceProductLink, revision: ComplianceFamilyRevision) => Promise<void>;
   onSavePackagingSupplier: (supplier: Supplier) => Promise<void>;
   onUploadSupplierDocument: (file: File, supplierId: string) => Promise<string>;
   onSelectProduct: (product: Product, tab?: 'basic' | 'gpsr') => void;
@@ -218,11 +221,13 @@ export function CompliancePage({
   revisions,
   links,
   suppliers,
+  importers,
   message,
   onSeedTemplates,
   onSaveFamilyBundle,
   onAutoLinkProducts,
   onDeactivateProductLink,
+  onActivateProductLink,
   onSavePackagingSupplier,
   onUploadSupplierDocument,
   onSelectProduct,
@@ -304,8 +309,8 @@ export function CompliancePage({
   const dossierLinks = useMemo(() => links.filter((link) => !outsourcedProductIds.has(link.productId)), [links, outsourcedProductIds]);
   const familyRows = useMemo(() => families.map((family) => ({
     family,
-    stats: getComplianceFamilyStats(family, risks, warnings, documents, requirements, testPlans, tests, dossierLinks),
-  })), [documents, families, dossierLinks, requirements, risks, testPlans, tests, warnings]);
+    stats: getComplianceFamilyStats(family, risks, warnings, documents, requirements, testPlans, tests, dossierLinks, products),
+  })), [documents, families, dossierLinks, products, requirements, risks, testPlans, tests, warnings]);
 
   const filteredFamilies = useMemo(() => familyRows.filter(({ family, stats }) => {
     const haystack = `${family.code} ${family.name} ${family.category ?? ''}`.toLowerCase();
@@ -523,6 +528,28 @@ export function CompliancePage({
     }));
   }, [draftLinks, products]);
 
+  const linkedSupplierDetails = useMemo(() => {
+    const byName = new Map<string, { name: string; supplier?: Supplier; products: Product[] }>();
+    selectedFamilyProducts.forEach(({ product }) => {
+      if (!product) return;
+      const name = product.supplier?.trim() || product.manufacturerName?.trim();
+      if (!name) return;
+      const key = name.toLocaleLowerCase('nl');
+      const current = byName.get(key) ?? {
+        name,
+        supplier: suppliers.find((item) => item.name.trim().toLocaleLowerCase('nl') === key),
+        products: [],
+      };
+      current.products.push(product);
+      byName.set(key, current);
+    });
+    return Array.from(byName.values()).map((entry) => ({
+      ...entry,
+      importer: entry.supplier?.importerId ? importers.find((item) => item.id === entry.supplier?.importerId) : undefined,
+      euResponsiblePerson: entry.supplier?.euResponsiblePersonId ? importers.find((item) => item.id === entry.supplier?.euResponsiblePersonId) : undefined,
+    }));
+  }, [importers, selectedFamilyProducts, suppliers]);
+
   const filteredFamilyProducts = useMemo(() => selectedFamilyProducts.filter(({ product, link }) => {
     const haystack = `${product?.code ?? ''} ${product?.description ?? ''} ${product?.articleGroup ?? ''} ${link.variantDescription ?? ''}`.toLowerCase();
     return haystack.includes(linkSearch.toLowerCase());
@@ -705,27 +732,40 @@ export function CompliancePage({
     if (draftLinks.some((link) => link.productId === product.id && (link.status ?? 'active') === 'active')) return;
 
     const timestamp = new Date().toISOString();
-    const nextLinks = [...draftLinks, {
-      id: createComplianceEntityId('compliance-link'),
+    const existingLink = draftLinks.find((link) => link.productId === product.id);
+    const activatedLink: ComplianceProductLink = {
+      ...existingLink,
+      id: existingLink?.id || createComplianceEntityId('compliance-link'),
       familyId: draftFamily.id,
       productId: product.id,
       variantDescription: product.articleGroup || '',
-      status: 'active' as const,
+      status: 'active',
       linkedBy: 'handmatig',
-      createdAt: timestamp,
+      createdAt: existingLink?.createdAt || timestamp,
       updatedAt: timestamp,
-    }];
-    const nextRevisions = [{
+    };
+    const revision: ComplianceFamilyRevision = {
       id: createComplianceEntityId('compliance-revision'),
       familyId: draftFamily.id,
       changeNote: `Product gekoppeld (${product.code || product.id})`,
       createdAt: timestamp,
-    }, ...draftRevisions];
+    };
+    const nextLinks = existingLink
+      ? draftLinks.map((link) => link.id === existingLink.id ? activatedLink : link)
+      : [...draftLinks, activatedLink];
 
     setDraftLinks(nextLinks);
-    setDraftRevisions(nextRevisions);
+    setDraftRevisions((current) => [revision, ...current]);
     setProductSearch('');
-    await saveFamilyBundle({ links: nextLinks, revisions: nextRevisions });
+    setLinkActionMessage('');
+    try {
+      await onActivateProductLink(activatedLink, revision);
+      setLinkActionMessage('Product is gekoppeld en opgeslagen.');
+    } catch (error) {
+      setDraftLinks(draftLinks);
+      setDraftRevisions((current) => current.filter((item) => item.id !== revision.id));
+      setLinkActionMessage(`Koppelen mislukt: ${error instanceof Error ? error.message : 'onbekende fout'}`);
+    }
   }
 
   async function saveFamilyBundle(overrides?: {
@@ -1016,7 +1056,7 @@ export function CompliancePage({
   }
 
   function renderFamiliesView() {
-    const selectedStats = draftFamily ? getComplianceFamilyStats(draftFamily, draftRisks, draftWarnings, draftDocuments, draftRequirements, draftTestPlans, draftTests, draftLinks) : null;
+    const selectedStats = draftFamily ? getComplianceFamilyStats(draftFamily, draftRisks, draftWarnings, draftDocuments, draftRequirements, draftTestPlans, draftTests, draftLinks, products) : null;
 
     return (
       <div className="compliance-view-stack">
@@ -1219,15 +1259,45 @@ export function CompliancePage({
                             <span>Handleidingstekst</span>
                             <textarea value={draftFamily.manualText || ''} onChange={(event) => setDraftFamily((current) => current ? { ...current, manualText: event.target.value } : current)} rows={4} />
                           </label>
-                          <label>
-                            <span>Fabrikant / verantwoordelijke</span>
-                            <input value={draftFamily.manufacturerName || ''} onChange={(event) => setDraftFamily((current) => current ? { ...current, manufacturerName: event.target.value } : current)} />
-                          </label>
-                          <label>
-                            <span>Contact fabrikant / EU verantwoordelijke</span>
-                            <textarea value={draftFamily.manufacturerContact || ''} onChange={(event) => setDraftFamily((current) => current ? { ...current, manufacturerContact: event.target.value } : current)} rows={3} />
-                          </label>
                         </div>
+                        <section className="compliance-supplier-source-section">
+                          <div className="compliance-supplier-source-heading">
+                            <div>
+                              <strong>Fabrikant, importeur en EU-verantwoordelijke</strong>
+                              <span>Automatisch opgehaald uit de leveranciersgegevens van de gekoppelde producten.</span>
+                            </div>
+                            <span className="compliance-status-pill complete">Centrale bron</span>
+                          </div>
+                          {linkedSupplierDetails.length ? (
+                            <div className="compliance-supplier-source-grid">
+                              {linkedSupplierDetails.map(({ name, supplier, products: supplierProducts, importer, euResponsiblePerson }) => {
+                                const exampleProduct = supplierProducts[0];
+                                const manufacturerAddress = supplier
+                                  ? [supplier.address, supplier.postalCode, supplier.city, supplier.country].filter(Boolean).join(', ')
+                                  : [exampleProduct.manufacturerAddress, exampleProduct.manufacturerPostalCode, exampleProduct.manufacturerCity, exampleProduct.manufacturerCountry].filter(Boolean).join(', ');
+                                const importerName = importer?.name || exampleProduct.importerName;
+                                const euResponsibleName = euResponsiblePerson?.name || exampleProduct.euResponsiblePersonName;
+                                return (
+                                  <article className="compliance-supplier-source-card" key={name.toLocaleLowerCase('nl')}>
+                                    <div className="compliance-supplier-source-card-title">
+                                      <div><small>Leverancier / fabrikant</small><strong>{supplier?.name || exampleProduct.manufacturerName || name}</strong></div>
+                                      <span>{supplierProducts.length} product{supplierProducts.length === 1 ? '' : 'en'}</span>
+                                    </div>
+                                    <dl>
+                                      <dt>Contact</dt><dd>{supplier?.contactName || '-'}</dd>
+                                      <dt>Adres</dt><dd>{manufacturerAddress || '-'}</dd>
+                                      <dt>E-mail</dt><dd>{supplier?.email || exampleProduct.manufacturerEmail || '-'}</dd>
+                                      <dt>Importeur</dt><dd>{importerName || 'Niet gekoppeld'}</dd>
+                                      <dt>EU-verantwoordelijke</dt><dd>{euResponsibleName || 'Niet gekoppeld'}</dd>
+                                    </dl>
+                                  </article>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="empty">Koppel eerst producten aan deze familie; daarna verschijnen de leveranciersgegevens hier automatisch.</p>
+                          )}
+                        </section>
                       </div>
                     </section>
                   </div>

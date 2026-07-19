@@ -6744,6 +6744,93 @@ dd {
   font-weight: 700;
 }
 
+.compliance-supplier-source-section {
+  overflow: hidden;
+  border: 1px solid #d8e2ec;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.compliance-supplier-source-heading,
+.compliance-supplier-source-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.compliance-supplier-source-heading {
+  padding: 14px 16px;
+  border-bottom: 1px solid #dfe7ef;
+  background: #f1f6fb;
+}
+
+.compliance-supplier-source-heading > div,
+.compliance-supplier-source-card-title > div {
+  display: grid;
+  gap: 3px;
+}
+
+.compliance-supplier-source-heading span:not(.compliance-status-pill),
+.compliance-supplier-source-card-title small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.compliance-supplier-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.compliance-supplier-source-card {
+  padding: 14px;
+  border: 1px solid #dce5ed;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.compliance-supplier-source-card-title > span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #edf4ff;
+  color: #245d91;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.compliance-supplier-source-card dl {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 7px 12px;
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid #edf1f5;
+  font-size: 12px;
+}
+
+.compliance-supplier-source-card dt {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.compliance-supplier-source-card dd {
+  margin: 0;
+  color: #253445;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .compliance-supplier-source-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .compliance-supplier-source-heading {
+    align-items: flex-start;
+  }
+}
+
 .checkbox-label {
   display: inline-flex !important;
   align-items: center;

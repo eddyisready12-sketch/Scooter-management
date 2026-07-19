@@ -1241,6 +1241,7 @@ export function getComplianceFamilyStats(
   testPlans: ComplianceFamilyTestPlan[],
   tests: ComplianceProductTest[],
   links: ComplianceProductLink[],
+  products: Product[] = [],
 ) {
   const familyRisks = risks.filter((item) => item.familyId === family.id);
   const familyWarnings = warnings.filter((item) => item.familyId === family.id);
@@ -1254,6 +1255,10 @@ export function getComplianceFamilyStats(
   const openTestPlans = mandatoryTestPlans.filter((item) => !testPlanFulfilled(item, tests));
   const familyTests = tests.filter((item) => item.familyId === family.id);
   const activeLinks = links.filter((item) => item.familyId === family.id && (item.status ?? 'active') === 'active');
+  const hasLinkedSupplierSource = activeLinks.some((link) => {
+    const product = products.find((item) => item.id === link.productId);
+    return Boolean(product?.supplier?.trim() || product?.manufacturerName?.trim());
+  });
 
   const checks = [
     { ok: Boolean(family.description?.trim()), label: 'Omschrijving' },
@@ -1262,7 +1267,7 @@ export function getComplianceFamilyStats(
     { ok: familyRisks.length > 0, label: 'Minimaal 1 risicoanalyse' },
     { ok: familyWarnings.length > 0 || family.noWarningsNeeded === true, label: 'Waarschuwingen of expliciet niet nodig' },
     { ok: activeLinks.length > 0, label: 'Gekoppelde producten' },
-    { ok: Boolean(family.manufacturerName?.trim()) || activeDocuments.length > 0, label: 'Fabrikant/leverancier of documentverwijzing' },
+    { ok: hasLinkedSupplierSource || activeDocuments.length > 0, label: 'Fabrikant/leverancier uit gekoppelde producten of documentverwijzing' },
   ];
   if (mandatoryRequirements.length > 0) {
     checks.push({ ok: openRequirements.length === 0, label: `Verplichte keuringen (${openRequirements.length} open)` });

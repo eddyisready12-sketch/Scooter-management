@@ -42,7 +42,7 @@ import { CompliancePage } from './components/CompliancePage';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseExactBatchTransactionsImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
 import { migratePpwrLocalStorage, migrateSupplierPpwr, ppwrSupplierStatus } from './lib/ppwr-suppliers';
-import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceComplianceFamilyDocuments, replaceComplianceFamilyRequirements, replaceComplianceFamilyRevisions, replaceComplianceFamilyRisks, replaceComplianceFamilyTestPlans, replaceComplianceFamilyWarnings, replaceComplianceProductLinks, replaceComplianceProductTests, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, uploadSupplierDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRequirements, upsertComplianceFamilyRevisions, upsertComplianceFamilyRisks, upsertComplianceFamilyTestPlans, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertComplianceProductTests, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceComplianceFamilyDocuments, replaceComplianceFamilyRequirements, replaceComplianceFamilyRevisions, replaceComplianceFamilyRisks, replaceComplianceFamilyTestPlans, replaceComplianceFamilyWarnings, replaceComplianceProductTests, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, uploadSupplierDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRequirements, upsertComplianceFamilyRevisions, upsertComplianceFamilyRisks, upsertComplianceFamilyTestPlans, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertComplianceProductTests, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'compliance' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance';
@@ -4139,7 +4139,7 @@ export function App() {
     await replaceComplianceFamilyTestPlans(nextFamily.id, nextTestPlans);
     await replaceComplianceProductTests(nextFamily.id, nextTests);
     await replaceComplianceFamilyRevisions(nextFamily.id, nextRevisions);
-    await replaceComplianceProductLinks(nextFamily.id, nextLinks);
+    await upsertComplianceProductLinks(nextLinks);
     setComplianceMessage(`${nextFamily.name || nextFamily.code || 'Compliance familie'} opgeslagen.`);
   }
 
@@ -4180,6 +4180,24 @@ export function App() {
       complianceFamilyRevisions: [revision, ...current.complianceFamilyRevisions.filter((item) => item.id !== revision.id)],
     }));
     setComplianceMessage('Product is ontkoppeld van de productfamilie.');
+  }
+
+  async function activateComplianceProductLink(link: ComplianceProductLink, revision: ComplianceFamilyRevision) {
+    await Promise.all([
+      upsertComplianceProductLinks([link]),
+      upsertComplianceFamilyRevisions([revision]),
+    ]);
+    setData((current) => {
+      const existingLink = current.complianceProductLinks.some((item) => item.id === link.id);
+      return {
+        ...current,
+        complianceProductLinks: existingLink
+          ? current.complianceProductLinks.map((item) => item.id === link.id ? link : item)
+          : [...current.complianceProductLinks, link],
+        complianceFamilyRevisions: [revision, ...current.complianceFamilyRevisions.filter((item) => item.id !== revision.id)],
+      };
+    });
+    setComplianceMessage('Product is gekoppeld aan de productfamilie.');
   }
 
   async function saveContainerCostBatch(batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) {
@@ -5178,11 +5196,13 @@ export function App() {
               revisions={data.complianceFamilyRevisions}
               links={data.complianceProductLinks}
               suppliers={data.suppliers}
+              importers={data.importers}
               message={complianceMessage}
               onSeedTemplates={seedComplianceTemplates}
               onSaveFamilyBundle={saveComplianceFamilyBundle}
               onAutoLinkProducts={autoLinkComplianceProducts}
               onDeactivateProductLink={deactivateComplianceProductLink}
+              onActivateProductLink={activateComplianceProductLink}
               onSavePackagingSupplier={upsertSupplierRecord}
               onUploadSupplierDocument={uploadSupplierDocument}
               onSelectProduct={openProduct}
