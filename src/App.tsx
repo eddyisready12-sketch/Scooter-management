@@ -7244,7 +7244,11 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
       <div className="sales-summary">
         <div><span>Verkocht totaal</span><strong>{soldScooters.length}</strong></div>
         <div><span>Modellen</span><strong>{new Set(soldScooters.map((scooter) => normalizeSalesModel(scooter.model))).size}</strong></div>
-        <div><span>Kleuren</span><strong>{colorRows.length}</strong><small>{activeTab === 'colors' ? `${colorTabScooters.length} scooters in selectie` : 'Beschikbare kleurverdeling'}</small></div>
+        {activeTab === 'dealers' ? (
+          <div><span>Dealers</span><strong>{dealerRows.length}</strong><small>{dealerTabScooters.length} scooters in selectie</small></div>
+        ) : (
+          <div><span>Kleuren</span><strong>{colorRows.length}</strong><small>{activeTab === 'colors' ? `${colorTabScooters.length} scooters in selectie` : 'Beschikbare kleurverdeling'}</small></div>
+        )}
         <div><span>Snorscooter (25)</span><strong>{totalSnorCount}</strong><small>{formatPercentage(totalSnorCount, soldScooters.length)} van {soldScooters.length}</small></div>
         <div><span>Bromscooter (45)</span><strong>{totalBromCount}</strong><small>{formatPercentage(totalBromCount, soldScooters.length)} van {soldScooters.length}</small></div>
         <div><span>Filters</span><strong>{yearFilterLabel} / {dealerFilter === 'all' ? 'Alle dealers' : dealerName(dealers, dealerFilter)}</strong></div>
