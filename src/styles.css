@@ -6769,7 +6769,68 @@ dd {
 }
 
 .compliance-card-row {
-  grid-template-columns: 1.1fr 1.3fr 1.2fr 82px 82px 82px 60px 42px;
+  grid-template-columns: minmax(190px, 1.05fr) minmax(230px, 1.25fr) minmax(230px, 1.25fr) 72px 72px 92px 86px 44px;
+}
+
+.compliance-risk-table-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.compliance-risk-table {
+  min-width: 1120px;
+}
+
+.compliance-risk-table-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 9px 8px;
+  border: 1px solid #d9e2eb;
+  border-radius: 9px;
+  background: #edf3f8;
+  color: #425466;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.compliance-risk-table-header span {
+  line-height: 1.25;
+}
+
+.compliance-risk-table-header small {
+  color: #718096;
+  font-size: 10px;
+}
+
+.compliance-risk-table .compliance-card-row:not(.compliance-risk-table-header) {
+  align-items: stretch;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e7edf3;
+}
+
+.compliance-grid-table textarea {
+  width: 100%;
+  min-height: 58px;
+  padding: 9px 10px;
+  border: 1px solid #cfd7df;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  line-height: 1.35;
+  resize: vertical;
+}
+
+.compliance-risk-help {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-left: 3px solid #2c74d8;
+  border-radius: 0 8px 8px 0;
+  background: #f4f8fd;
+  color: #526170;
+  font-size: 12px;
 }
 
 .compliance-warning-row {
@@ -6789,6 +6850,26 @@ dd {
   place-items: center;
   background: #f8fafc;
 }
+
+.compliance-score-cell {
+  align-content: center;
+  gap: 1px;
+  line-height: 1.1;
+}
+
+.compliance-score-cell strong {
+  font-size: 16px;
+}
+
+.compliance-score-cell span {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.compliance-score-cell.low { background: #effaf2; border-color: #b9e3c5; color: #176b35; }
+.compliance-score-cell.medium { background: #fff8e8; border-color: #f2d18d; color: #8a5200; }
+.compliance-score-cell.high { background: #fff1f1; border-color: #efb4b4; color: #a82020; }
 
 .icon-button.danger {
   color: #b42318;

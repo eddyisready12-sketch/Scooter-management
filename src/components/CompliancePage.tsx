@@ -1239,20 +1239,37 @@ export function CompliancePage({
                       <button type="button" className="secondary-button" onClick={addRisk}><Plus size={14} /> Risico</button>
                     </div>
                     <div className="compliance-panel-body">
-                      <div className="compliance-grid-table">
+                      <p className="compliance-risk-help">Score = ernst x kans. Gebruik voor ernst en kans een waarde van 1 (laag) tot en met 5 (hoog).</p>
+                      <div className="compliance-risk-table-scroll">
+                      <div className="compliance-grid-table compliance-risk-table">
+                        <div className="compliance-card-row compliance-risk-table-header" aria-hidden="true">
+                          <span>Gevaar</span>
+                          <span>Risicobeschrijving</span>
+                          <span>Beheersmaatregel</span>
+                          <span>Ernst<br /><small>1-5</small></span>
+                          <span>Kans<br /><small>1-5</small></span>
+                          <span>Restrisico</span>
+                          <span>Score</span>
+                          <span>Actie</span>
+                        </div>
                         {draftRisks.map((risk, index) => (
                           <div className="compliance-card-row" key={risk.id}>
-                            <input value={risk.hazard} onChange={(event) => setDraftRisks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, hazard: event.target.value } : item))} placeholder="Gevaar" />
-                            <input value={risk.riskDescription || ''} onChange={(event) => setDraftRisks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, riskDescription: event.target.value } : item))} placeholder="Beschrijving" />
-                            <input value={risk.mitigation || ''} onChange={(event) => setDraftRisks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, mitigation: event.target.value } : item))} placeholder="Mitigatie" />
-                            <input value={risk.severity || ''} onChange={(event) => setDraftRisks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, severity: event.target.value } : item))} placeholder="Ernst" />
-                            <input value={risk.probability || ''} onChange={(event) => setDraftRisks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, probability: event.target.value } : item))} placeholder="Kans" />
+                            <textarea rows={2} value={risk.hazard} onChange={(event) => setDraftRisks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, hazard: event.target.value } : item))} placeholder="Omschrijf het gevaar" />
+                            <textarea rows={2} value={risk.riskDescription || ''} onChange={(event) => setDraftRisks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, riskDescription: event.target.value } : item))} placeholder="Wat kan er gebeuren?" />
+                            <textarea rows={2} value={risk.mitigation || ''} onChange={(event) => setDraftRisks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, mitigation: event.target.value } : item))} placeholder="Welke maatregel beperkt het risico?" />
+                            <input type="number" min="1" max="5" value={risk.severity || ''} onChange={(event) => setDraftRisks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, severity: event.target.value } : item))} aria-label="Ernst, 1 tot 5" />
+                            <input type="number" min="1" max="5" value={risk.probability || ''} onChange={(event) => setDraftRisks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, probability: event.target.value } : item))} aria-label="Kans, 1 tot 5" />
                             <input value={risk.residualRisk || ''} onChange={(event) => setDraftRisks((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, residualRisk: event.target.value } : item))} placeholder="Rest" />
-                            <div className="compliance-score-cell">{asNumber(risk.severity) * asNumber(risk.probability)}</div>
+                            {(() => {
+                              const score = asNumber(risk.severity) * asNumber(risk.probability);
+                              const level = score >= 15 ? 'high' : score >= 8 ? 'medium' : 'low';
+                              return <div className={`compliance-score-cell ${level}`}><strong>{score}</strong><span>{level === 'high' ? 'Hoog' : level === 'medium' ? 'Middel' : 'Laag'}</span></div>;
+                            })()}
                             <button type="button" className="icon-button danger" onClick={() => setDraftRisks((current) => current.filter((item) => item.id !== risk.id))}><Trash2 size={14} /></button>
                           </div>
                         ))}
                         {draftRisks.length === 0 ? <p className="empty">Nog geen risico's toegevoegd.</p> : null}
+                      </div>
                       </div>
                     </div>
                   </section>
