@@ -7263,6 +7263,24 @@ dd {
   min-width: 0;
 }
 
+.compliance-unlinked-products-header,
+.compliance-unlinked-products-row {
+  grid-template-columns: 160px minmax(260px, 1.4fr) minmax(180px, 0.8fr) minmax(180px, 0.8fr) minmax(330px, 1fr);
+}
+
+.compliance-unlinked-link-action {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.compliance-unlinked-link-action select {
+  min-width: 0;
+  width: 100%;
+}
+
 .compliance-linked-products-button {
   width: 100%;
   border: 0;

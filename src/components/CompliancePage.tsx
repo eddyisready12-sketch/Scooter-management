@@ -254,6 +254,9 @@ export function CompliancePage({
   const [dossierProductQuery, setDossierProductQuery] = useState('');
   const [documentQuery, setDocumentQuery] = useState('');
   const [unlinkedQuery, setUnlinkedQuery] = useState('');
+  const [manualFamilyByProduct, setManualFamilyByProduct] = useState<Record<string, string>>({});
+  const [manualLinkingProductId, setManualLinkingProductId] = useState('');
+  const [unlinkedActionMessage, setUnlinkedActionMessage] = useState('');
   const [supplierQuery, setSupplierQuery] = useState('');
   const [supplierStatusFilter, setSupplierStatusFilter] = useState<'all' | 'complete' | 'blocked' | 'attention'>('all');
   const [selectedPackagingSupplierKey, setSelectedPackagingSupplierKey] = useState('');
@@ -609,6 +612,49 @@ export function CompliancePage({
       setModuleView('unlinked');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleManualProductLink(product: Product) {
+    const familyId = manualFamilyByProduct[product.id];
+    const family = families.find((item) => item.id === familyId);
+    if (!product.id || !family) return;
+
+    const timestamp = new Date().toISOString();
+    const existingLink = links.find((link) => link.productId === product.id && (link.status ?? 'active') !== 'active');
+    const activatedLink: ComplianceProductLink = {
+      ...existingLink,
+      id: existingLink?.id || createComplianceEntityId('compliance-link'),
+      familyId: family.id,
+      productId: product.id,
+      variantDescription: product.articleGroup || '',
+      status: 'active',
+      linkedBy: 'handmatig vanuit producten zonder familie',
+      createdAt: existingLink?.createdAt || timestamp,
+      updatedAt: timestamp,
+    };
+    const revision: ComplianceFamilyRevision = {
+      id: createComplianceEntityId('compliance-revision'),
+      familyId: family.id,
+      changeNote: `Product gekoppeld (${product.code || product.id})`,
+      changedBy: 'handmatig',
+      createdAt: timestamp,
+    };
+
+    setManualLinkingProductId(product.id);
+    setUnlinkedActionMessage('');
+    try {
+      await onActivateProductLink(activatedLink, revision);
+      setManualFamilyByProduct((current) => {
+        const next = { ...current };
+        delete next[product.id];
+        return next;
+      });
+      setUnlinkedActionMessage(`${product.code || 'Product'} is gekoppeld aan ${family.code} - ${family.name}.`);
+    } catch (error) {
+      setUnlinkedActionMessage(`Koppelen mislukt: ${error instanceof Error ? error.message : 'onbekende fout'}`);
+    } finally {
+      setManualLinkingProductId('');
     }
   }
 
@@ -1807,26 +1853,48 @@ export function CompliancePage({
             </button>
           </div>
           <div className="compliance-panel-body compliance-view-stack">
+            {unlinkedActionMessage ? <div className={`inline-notice ${unlinkedActionMessage.startsWith('Koppelen mislukt') ? 'warning-notice' : 'success-notice'}`}>{unlinkedActionMessage}</div> : null}
             <div className="search-field">
               <Search size={16} />
               <input value={unlinkedQuery} onChange={(event) => setUnlinkedQuery(event.target.value)} placeholder="Zoeken op artikelnummer, omschrijving of categorie" />
             </div>
             <div className="compliance-linked-products-table">
-              <div className="compliance-linked-products-header">
+              <div className="compliance-linked-products-header compliance-unlinked-products-header">
                 <span>Artikelnummer</span>
                 <span>Naam</span>
                 <span>Categorie</span>
                 <span>Suggestie</span>
+                <span>Handmatig koppelen</span>
               </div>
               {productsWithoutFamily.map((product) => {
                 const suggestion = unlinkedSuggestions.find((item) => item.productId === product.id);
                 const family = suggestion ? families.find((item) => item.id === suggestion.familyId) : null;
                 return (
-                  <div className="compliance-linked-products-row" key={product.id}>
+                  <div className="compliance-linked-products-row compliance-unlinked-products-row" key={product.id}>
                     <strong>{product.code || '-'}</strong>
                     <span>{product.description || '-'}</span>
                     <span>{product.articleGroup || '-'}</span>
                     <span>{family ? `${family.code} - ${family.name}` : 'Geen suggestie'}</span>
+                    <div className="compliance-unlinked-link-action">
+                      <select
+                        aria-label={`Productfamilie voor ${product.code}`}
+                        value={manualFamilyByProduct[product.id] || ''}
+                        onChange={(event) => setManualFamilyByProduct((current) => ({ ...current, [product.id]: event.target.value }))}
+                      >
+                        <option value="">Kies productfamilie...</option>
+                        {[...families]
+                          .sort((left, right) => left.name.localeCompare(right.name, 'nl', { sensitivity: 'base' }))
+                          .map((option) => <option key={option.id} value={option.id}>{option.code} - {option.name}</option>)}
+                      </select>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled={!manualFamilyByProduct[product.id] || Boolean(manualLinkingProductId)}
+                        onClick={() => void handleManualProductLink(product)}
+                      >
+                        <Link2 size={14} /> {manualLinkingProductId === product.id ? 'Koppelen...' : 'Koppelen'}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
