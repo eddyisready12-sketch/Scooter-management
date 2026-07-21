@@ -1039,10 +1039,12 @@ export function CompliancePage({
       !(selectedDossierProduct?.barcode || selectedDossierProduct?.batchNumber || selectedDossierProduct?.batch || selectedDossierProduct?.serialNumber || selectedDossierProduct?.traceabilityCode) && 'traceerbaar productkenmerk',
       !economicOperatorRows[0].name && 'fabrikant',
       !selectedDossierProduct?.safetyInfo && 'essentiële veiligheidskenmerken',
-      !selectedDossierProduct?.imageUrl && 'productafbeelding (aanbevolen modelveld)',
       draftRisks.length === 0 && 'risicoanalyse',
       draftRequirements.length === 0 && 'toepasselijke wetgeving/normen',
       draftTests.length === 0 && 'test- of keuringsbewijs',
+    ].filter(Boolean) as string[];
+    const dossierRecommendations = [
+      !selectedDossierProduct?.imageUrl && 'productafbeelding',
     ].filter(Boolean) as string[];
 
     const previewWindow = window.open('', '_blank', 'width=1200,height=900');
@@ -1092,7 +1094,7 @@ export function CompliancePage({
               <tr><td><strong>Datum gegenereerd</strong></td><td>${escapeHtml(formatDate(new Date().toISOString()))}</td><td><strong>Artikelnummer</strong></td><td>${escapeHtml(selectedDossierProduct?.code || selectedDossierEntry.link.productId)}</td></tr>
             </table>
           </div>
-          <div class="section"><h2>1. Dossiercontrole</h2><div class="gap-note">${dossierGaps.length ? `<strong>Nog aan te vullen:</strong> ${escapeHtml(dossierGaps.join(', '))}.` : '<strong>Geen inhoudelijke leemtes gevonden in de gecontroleerde kernvelden.</strong>'}<br /><small>De aanwezigheid van een veld is gecontroleerd; dit is geen inhoudelijke conformiteitsbeoordeling.</small></div></div>
+          <div class="section"><h2>1. Dossiercontrole</h2><div class="gap-note">${dossierGaps.length ? `<strong>Nog aan te vullen:</strong> ${escapeHtml(dossierGaps.join(', '))}.` : '<strong>Geen inhoudelijke leemtes gevonden in de gecontroleerde kernvelden.</strong>'}${dossierRecommendations.length ? `<br /><strong>Aanbevolen aanvulling:</strong> ${escapeHtml(dossierRecommendations.join(', '))}.` : ''}<br /><small>De aanwezigheid van een veld is gecontroleerd; dit is geen inhoudelijke conformiteitsbeoordeling.</small></div></div>
           <div class="section"><h2>2. Marktdeelnemers</h2><table><thead><tr><th>Rol</th><th>Bedrijfsnaam</th><th>Adres</th><th>E-mail</th><th>Website</th></tr></thead><tbody>${economicOperatorHtml}</tbody></table></div>
           <div class="section"><h2>3. Productomschrijving</h2><p>${escapeHtml(draftFamily.description || selectedDossierProduct?.shortDescription || '-')}</p>${selectedDossierProduct?.imageUrl ? `<img class="product-image" src="${escapeHtml(selectedDossierProduct.imageUrl)}" alt="Productafbeelding" />` : ''}</div>
           <div class="section"><h2>4. Productidentificatie en traceerbaarheid</h2><table><tbody>${productIdentificationRows}</tbody></table></div>

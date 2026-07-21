@@ -1255,6 +1255,9 @@ export function getComplianceFamilyStats(
   const openTestPlans = mandatoryTestPlans.filter((item) => !testPlanFulfilled(item, tests));
   const familyTests = tests.filter((item) => item.familyId === family.id);
   const activeLinks = links.filter((item) => item.familyId === family.id && (item.status ?? 'active') === 'active');
+  const linkedProducts = activeLinks
+    .map((link) => products.find((item) => item.id === link.productId))
+    .filter((product): product is Product => Boolean(product));
   const hasLinkedSupplierSource = activeLinks.some((link) => {
     const product = products.find((item) => item.id === link.productId);
     return Boolean(product?.supplier?.trim() || product?.manufacturerName?.trim());
@@ -1267,7 +1270,12 @@ export function getComplianceFamilyStats(
     { ok: familyRisks.length > 0, label: 'Minimaal 1 risicoanalyse' },
     { ok: familyWarnings.length > 0 || family.noWarningsNeeded === true, label: 'Waarschuwingen of expliciet niet nodig' },
     { ok: activeLinks.length > 0, label: 'Gekoppelde producten' },
-    { ok: hasLinkedSupplierSource || activeDocuments.length > 0, label: 'Fabrikant/leverancier uit gekoppelde producten of documentverwijzing' },
+    { ok: hasLinkedSupplierSource, label: 'Fabrikant/leverancier uit gekoppelde producten' },
+    { ok: activeDocuments.length > 0, label: 'Minimaal 1 actief onderbouwend document' },
+    { ok: linkedProducts.length > 0 && linkedProducts.every((product) => Boolean(product.brand?.trim())), label: 'Merk op alle gekoppelde producten' },
+    { ok: linkedProducts.length > 0 && linkedProducts.every((product) => Boolean(product.safetyInfo?.trim())), label: 'Essentiële veiligheidskenmerken op alle gekoppelde producten' },
+    { ok: familyRequirements.length > 0, label: 'Toepasselijke wetgeving/normen vastgelegd' },
+    { ok: familyTests.length > 0, label: 'Test- of keuringsbewijs vastgelegd' },
   ];
   if (mandatoryRequirements.length > 0) {
     checks.push({ ok: openRequirements.length === 0, label: `Verplichte keuringen (${openRequirements.length} open)` });
