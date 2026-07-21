@@ -539,6 +539,21 @@ export function CompliancePage({
     }));
   }, [draftLinks, products]);
 
+  const familyBatchOptions = useMemo(() => {
+    const batches = new Map<string, Set<string>>();
+    selectedFamilyProducts.forEach(({ product }) => {
+      if (!product) return;
+      const batch = product.batchNumber?.trim() || product.batch?.trim() || product.traceabilityCode?.trim();
+      if (!batch) return;
+      const productCodes = batches.get(batch) ?? new Set<string>();
+      if (product.code?.trim()) productCodes.add(product.code.trim());
+      batches.set(batch, productCodes);
+    });
+    return Array.from(batches.entries())
+      .map(([value, productCodes]) => ({ value, label: Array.from(productCodes).join(', ') }))
+      .sort((left, right) => left.value.localeCompare(right.value, 'nl', { numeric: true, sensitivity: 'base' }));
+  }, [selectedFamilyProducts]);
+
   const linkedSupplierDetails = useMemo(() => {
     const byName = new Map<string, { name: string; supplier?: Supplier; products: Product[] }>();
     selectedFamilyProducts.forEach(({ product }) => {
@@ -768,6 +783,7 @@ export function CompliancePage({
       findings: '',
       correctiveAction: '',
       testedBy: '',
+      batchRef: familyBatchOptions.length === 1 ? familyBatchOptions[0].value : '',
     }, ...current]);
   }
 
@@ -1658,6 +1674,9 @@ export function CompliancePage({
                           <div><strong>Testlogboek</strong><span>Registreer uitgevoerde tests en eventuele corrigerende acties.</span></div>
                           <span className="compliance-count-badge">{draftTests.length}</span>
                         </div>
+                        <datalist id={`family-batches-${draftFamily.id}`}>
+                          {familyBatchOptions.map((batch) => <option key={batch.value} value={batch.value}>{batch.label}</option>)}
+                        </datalist>
                         {draftTests.map((test, index) => (
                           <div className="compliance-test-result-card" key={test.id}>
                             <div className="compliance-test-result-grid">
@@ -1670,7 +1689,7 @@ export function CompliancePage({
                               <option value="pass">Geslaagd</option><option value="fail">Afgekeurd</option><option value="conditional">Voorwaardelijk</option>
                             </select></label>
                             <label className="compliance-labeled-field"><span>Getest door</span><input value={test.testedBy || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, testedBy: event.target.value } : item))} placeholder="Naam of organisatie" /></label>
-                            <label className="compliance-labeled-field"><span>Batch / referentie</span><input value={test.batchRef || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, batchRef: event.target.value } : item))} placeholder="Batch- of ordernummer" /></label>
+                            <label className="compliance-labeled-field"><span>Batch / referentie</span><input list={`family-batches-${draftFamily.id}`} value={test.batchRef || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, batchRef: event.target.value } : item))} placeholder={familyBatchOptions.length ? 'Kies batch van gekoppeld product' : 'Geen batch gevonden - handmatig invullen'} /></label>
                             <button type="button" className="icon-button danger" title="Testresultaat verwijderen" onClick={() => setDraftTests((current) => current.filter((item) => item.id !== test.id))}><Trash2 size={14} /></button>
                             </div>
                             <div className="compliance-test-result-notes">
