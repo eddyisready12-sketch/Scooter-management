@@ -1629,42 +1629,54 @@ export function CompliancePage({
                       </div>
                     </div>
                     <div className="compliance-panel-body compliance-view-stack">
-                      <div className="compliance-grid-table">
+                      <div className="compliance-test-section">
+                        <div className="compliance-test-section-heading">
+                          <div><strong>Testplannen</strong><span>Leg vast wat, hoe vaak en volgens welke methode getest moet worden.</span></div>
+                          <span className="compliance-count-badge">{draftTestPlans.length}</span>
+                        </div>
                         {draftTestPlans.map((plan, index) => {
                           const fulfilled = testPlanFulfilled(plan, draftTests);
                           return (
-                            <div className="compliance-document-row" key={plan.id}>
-                              <input value={plan.name} onChange={(event) => setDraftTestPlans((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} placeholder="Naam testplan" />
-                              <input value={plan.frequency || ''} onChange={(event) => setDraftTestPlans((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, frequency: event.target.value } : item))} placeholder="Frequentie" />
-                              <label className="checkbox-label small"><input type="checkbox" checked={plan.mandatory ?? true} onChange={(event) => setDraftTestPlans((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, mandatory: event.target.checked } : item))} /><span>Verplicht</span></label>
-                              <span className={`compliance-inline-status ${fulfilled ? 'success' : 'warning'}`}>{fulfilled ? 'Geslaagd' : 'Open'}</span>
-                              <button type="button" className="icon-button danger" onClick={() => setDraftTestPlans((current) => current.filter((item) => item.id !== plan.id))}><Trash2 size={14} /></button>
-                              <textarea value={plan.method || ''} onChange={(event) => setDraftTestPlans((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, method: event.target.value } : item))} placeholder="Methode / acceptatiecriteria" rows={2} />
-                              <button type="button" className="secondary-button" onClick={() => addTest(plan.id)}>+ Test op dit plan</button>
+                            <div className="compliance-test-plan-card" key={plan.id}>
+                              <div className="compliance-test-plan-grid">
+                                <label className="compliance-labeled-field"><span>Naam testplan</span><input value={plan.name} onChange={(event) => setDraftTestPlans((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} placeholder="Naam testplan" /></label>
+                                <label className="compliance-labeled-field"><span>Frequentie</span><input value={plan.frequency || ''} onChange={(event) => setDraftTestPlans((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, frequency: event.target.value } : item))} placeholder="Bijv. per batch of jaarlijks" /></label>
+                                <label className="checkbox-label small compliance-test-required"><input type="checkbox" checked={plan.mandatory ?? true} onChange={(event) => setDraftTestPlans((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, mandatory: event.target.checked } : item))} /><span>Verplicht</span></label>
+                                <span className={`compliance-inline-status ${fulfilled ? 'success' : 'warning'}`}>{fulfilled ? 'Geslaagd' : 'Open'}</span>
+                                <button type="button" className="icon-button danger" title="Testplan verwijderen" onClick={() => setDraftTestPlans((current) => current.filter((item) => item.id !== plan.id))}><Trash2 size={14} /></button>
+                              </div>
+                              <label className="compliance-labeled-field"><span>Methode en acceptatiecriteria</span><textarea value={plan.method || ''} onChange={(event) => setDraftTestPlans((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, method: event.target.value } : item))} placeholder="Beschrijf de testmethode en wanneer de test geslaagd is" rows={3} /></label>
+                              <div className="compliance-test-plan-footer"><button type="button" className="secondary-button" onClick={() => addTest(plan.id)}><Plus size={14} /> Testresultaat toevoegen</button></div>
                             </div>
                           );
                         })}
                         {draftTestPlans.length === 0 ? <p className="empty">Nog geen testplannen toegevoegd.</p> : null}
                       </div>
 
-                      <div className="compliance-grid-table">
+                      <div className="compliance-test-section">
+                        <div className="compliance-test-section-heading">
+                          <div><strong>Testlogboek</strong><span>Registreer uitgevoerde tests en eventuele corrigerende acties.</span></div>
+                          <span className="compliance-count-badge">{draftTests.length}</span>
+                        </div>
                         {draftTests.map((test, index) => (
-                          <div className="compliance-document-row" key={test.id}>
-                            <input type="date" value={test.testDate} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, testDate: event.target.value } : item))} />
-                            <select value={test.planId || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, planId: event.target.value || undefined } : item))}>
+                          <div className="compliance-test-result-card" key={test.id}>
+                            <div className="compliance-test-result-grid">
+                            <label className="compliance-labeled-field"><span>Testdatum</span><input type="date" value={test.testDate} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, testDate: event.target.value } : item))} /></label>
+                            <label className="compliance-labeled-field"><span>Testplan</span><select value={test.planId || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, planId: event.target.value || undefined } : item))}>
                               <option value="">Losse test</option>
                               {draftTestPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name || 'Onbenoemd plan'}</option>)}
-                            </select>
-                            <select value={test.result || 'pass'} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, result: event.target.value as ComplianceProductTest['result'] } : item))}>
-                              <option value="pass">Pass</option>
-                              <option value="fail">Fail</option>
-                              <option value="conditional">Conditional</option>
-                            </select>
-                            <input value={test.testedBy || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, testedBy: event.target.value } : item))} placeholder="Getest door" />
-                            <input value={test.batchRef || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, batchRef: event.target.value } : item))} placeholder="Batch / orderref" />
-                            <button type="button" className="icon-button danger" onClick={() => setDraftTests((current) => current.filter((item) => item.id !== test.id))}><Trash2 size={14} /></button>
-                            <textarea value={test.findings || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, findings: event.target.value } : item))} placeholder="Bevindingen" rows={2} />
-                            <textarea value={test.correctiveAction || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, correctiveAction: event.target.value } : item))} placeholder="Corrigerende actie" rows={2} />
+                            </select></label>
+                            <label className="compliance-labeled-field"><span>Resultaat</span><select value={test.result || 'pass'} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, result: event.target.value as ComplianceProductTest['result'] } : item))}>
+                              <option value="pass">Geslaagd</option><option value="fail">Afgekeurd</option><option value="conditional">Voorwaardelijk</option>
+                            </select></label>
+                            <label className="compliance-labeled-field"><span>Getest door</span><input value={test.testedBy || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, testedBy: event.target.value } : item))} placeholder="Naam of organisatie" /></label>
+                            <label className="compliance-labeled-field"><span>Batch / referentie</span><input value={test.batchRef || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, batchRef: event.target.value } : item))} placeholder="Batch- of ordernummer" /></label>
+                            <button type="button" className="icon-button danger" title="Testresultaat verwijderen" onClick={() => setDraftTests((current) => current.filter((item) => item.id !== test.id))}><Trash2 size={14} /></button>
+                            </div>
+                            <div className="compliance-test-result-notes">
+                              <label className="compliance-labeled-field"><span>Bevindingen</span><textarea value={test.findings || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, findings: event.target.value } : item))} placeholder="Bevindingen" rows={3} /></label>
+                              <label className="compliance-labeled-field"><span>Corrigerende actie</span><textarea value={test.correctiveAction || ''} onChange={(event) => setDraftTests((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, correctiveAction: event.target.value } : item))} placeholder="Corrigerende actie" rows={3} /></label>
+                            </div>
                           </div>
                         ))}
                         {draftTests.length === 0 ? <p className="empty">Nog geen testen geregistreerd.</p> : null}
