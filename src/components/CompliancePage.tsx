@@ -323,13 +323,16 @@ export function CompliancePage({
     stats: getComplianceFamilyStats(family, risks, warnings, documents, requirements, testPlans, tests, dossierLinks, products),
   })), [documents, families, dossierLinks, products, requirements, risks, testPlans, tests, warnings]);
 
-  const filteredFamilies = useMemo(() => familyRows.filter(({ family, stats }) => {
-    const haystack = `${family.code} ${family.name} ${family.category ?? ''}`.toLowerCase();
-    const matchesQuery = haystack.includes(familyQuery.toLowerCase());
-    const matchesCategory = familyCategoryFilter === 'all' || (family.category || '') === familyCategoryFilter;
-    const matchesStatus = familyStatusFilter === 'all' || (stats.calculatedStatus || 'concept') === familyStatusFilter;
-    return matchesQuery && matchesCategory && matchesStatus;
-  }), [familyCategoryFilter, familyQuery, familyRows, familyStatusFilter]);
+  const filteredFamilies = useMemo(() => familyRows
+    .filter(({ family, stats }) => {
+      const haystack = `${family.code} ${family.name} ${family.category ?? ''}`.toLowerCase();
+      const matchesQuery = haystack.includes(familyQuery.toLowerCase());
+      const matchesCategory = familyCategoryFilter === 'all' || (family.category || '') === familyCategoryFilter;
+      const matchesStatus = familyStatusFilter === 'all' || (stats.calculatedStatus || 'concept') === familyStatusFilter;
+      return matchesQuery && matchesCategory && matchesStatus;
+    })
+    .sort((left, right) => left.family.name.localeCompare(right.family.name, 'nl', { sensitivity: 'base' })),
+  [familyCategoryFilter, familyQuery, familyRows, familyStatusFilter]);
 
   const familyCategories = useMemo(() => Array.from(new Set(
     familyRows.map(({ family }) => family.category || '').filter(Boolean),
