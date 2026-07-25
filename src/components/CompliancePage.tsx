@@ -1313,7 +1313,6 @@ export function CompliancePage({
             <table className="compliance-family-table">
               <thead>
                 <tr>
-                  <th>Code</th>
                   <th>Naam</th>
                   <th>Categorie</th>
                   <th>Risico</th>
@@ -1325,7 +1324,6 @@ export function CompliancePage({
               <tbody>
                 {filteredFamilies.map(({ family, stats }) => (
                   <tr key={family.id} className={selectedFamilyId === family.id ? 'active' : ''}>
-                    <td><strong>{family.code || '-'}</strong></td>
                     <td>
                       <button type="button" className="compliance-family-link-button" onClick={() => openFamilyDetail(family.id)}>
                         {family.name}
@@ -1363,7 +1361,7 @@ export function CompliancePage({
                 ))}
                 {filteredFamilies.length === 0 ? (
                   <tr>
-                    <td colSpan={7}><p className="empty">Geen productfamilies gevonden voor deze filters.</p></td>
+                    <td colSpan={6}><p className="empty">Geen productfamilies gevonden voor deze filters.</p></td>
                   </tr>
                 ) : null}
               </tbody>
