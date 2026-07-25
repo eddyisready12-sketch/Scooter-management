@@ -7416,6 +7416,19 @@ dd {
   grid-template-columns: 160px minmax(260px, 1.4fr) minmax(180px, 0.8fr) minmax(180px, 0.8fr) minmax(330px, 1fr);
 }
 
+.compliance-unlinked-products-header .column-sort-button {
+  justify-content: flex-start;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.compliance-unlinked-products-header .column-sort-button.active {
+  color: #1769c2;
+}
+
 .compliance-unlinked-link-action {
   display: grid;
   grid-template-columns: minmax(190px, 1fr) auto;

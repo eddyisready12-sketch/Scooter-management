@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   CheckCircle2,
   DatabaseZap,
   FileText,
@@ -254,6 +257,10 @@ export function CompliancePage({
   const [dossierProductQuery, setDossierProductQuery] = useState('');
   const [documentQuery, setDocumentQuery] = useState('');
   const [unlinkedQuery, setUnlinkedQuery] = useState('');
+  const [unlinkedSort, setUnlinkedSort] = useState<{
+    field: 'code' | 'name' | 'category' | 'suggestion';
+    direction: 'asc' | 'desc';
+  }>({ field: 'code', direction: 'asc' });
   const [manualFamilyByProduct, setManualFamilyByProduct] = useState<Record<string, string>>({});
   const [manualLinkingProductId, setManualLinkingProductId] = useState('');
   const [unlinkedActionMessage, setUnlinkedActionMessage] = useState('');
@@ -1877,6 +1884,37 @@ export function CompliancePage({
   }
 
   function renderUnlinkedProductsView() {
+    const suggestionLabel = (product: Product) => {
+      const suggestion = unlinkedSuggestions.find((item) => item.productId === product.id);
+      const family = suggestion ? families.find((item) => item.id === suggestion.familyId) : null;
+      return family ? `${family.code} - ${family.name}` : 'Geen suggestie';
+    };
+    const sortedUnlinkedProducts = [...productsWithoutFamily].sort((left, right) => {
+      const values = {
+        code: [left.code || '', right.code || ''],
+        name: [left.description || '', right.description || ''],
+        category: [left.articleGroup || '', right.articleGroup || ''],
+        suggestion: [suggestionLabel(left), suggestionLabel(right)],
+      };
+      const [leftValue, rightValue] = values[unlinkedSort.field];
+      const result = leftValue.localeCompare(rightValue, 'nl', { numeric: true, sensitivity: 'base' });
+      return unlinkedSort.direction === 'asc' ? result : -result;
+    });
+    const sortHeader = (field: typeof unlinkedSort.field, label: string) => (
+      <button
+        type="button"
+        className={`column-sort-button${unlinkedSort.field === field ? ' active' : ''}`}
+        onClick={() => setUnlinkedSort((current) => ({
+          field,
+          direction: current.field === field && current.direction === 'asc' ? 'desc' : 'asc',
+        }))}
+        title={`Sorteren op ${label.toLowerCase()}`}
+      >
+        <span>{label}</span>
+        {unlinkedSort.field !== field ? <ArrowUpDown size={13} /> : unlinkedSort.direction === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />}
+      </button>
+    );
+
     return (
       <div className="compliance-view-stack">
         <section className="panel">
@@ -1894,13 +1932,13 @@ export function CompliancePage({
             </div>
             <div className="compliance-linked-products-table">
               <div className="compliance-linked-products-header compliance-unlinked-products-header">
-                <span>Artikelnummer</span>
-                <span>Naam</span>
-                <span>Categorie</span>
-                <span>Suggestie</span>
+                {sortHeader('code', 'Artikelnummer')}
+                {sortHeader('name', 'Naam')}
+                {sortHeader('category', 'Categorie')}
+                {sortHeader('suggestion', 'Suggestie')}
                 <span>Handmatig koppelen</span>
               </div>
-              {productsWithoutFamily.map((product) => {
+              {sortedUnlinkedProducts.map((product) => {
                 const suggestion = unlinkedSuggestions.find((item) => item.productId === product.id);
                 const family = suggestion ? families.find((item) => item.id === suggestion.familyId) : null;
                 return (
