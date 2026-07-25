@@ -95,6 +95,9 @@ export function createComplianceEntityId(prefix: string) {
 }
 
 const requirementTemplates: Partial<Record<string, ComplianceRequirementTemplate[]>> = {
+  VOERT: [
+    { name: 'EU-typegoedkeuring compleet voertuig', regulation: 'Verordening (EU) nr. 168/2013', mandatory: true, notes: 'Leg het typegoedkeuringsnummer, type, variant en uitvoering vast.' },
+  ],
   VERL: [
     { name: 'E-keurmerk verlichtingsunit (typegoedkeuring)', regulation: 'ECE R148/R149/R150', mandatory: true, notes: 'Controleer E-markering en certificaat voor gebruik op de openbare weg.' },
     { name: 'EMC-verklaring (bij LED-driver/elektronica)', regulation: 'ECE R10', mandatory: false, notes: 'Relevant voor LED-units met elektronica of driver.' },
@@ -200,6 +203,85 @@ function genericTestPlan(family: ComplianceProductFamily): ComplianceTestPlanTem
     },
   ];
 }
+
+type AdditionalTemplateSpec = {
+  code: string;
+  name: string;
+  category: string;
+  keywords: string[];
+  riskLevel?: ComplianceRiskLevel;
+};
+
+function createAdditionalComponentTemplate(spec: AdditionalTemplateSpec): ComplianceTemplate {
+  const highRisk = spec.riskLevel === 'high' || spec.riskLevel === 'critical';
+  return {
+    ...spec,
+    riskLevel: spec.riskLevel ?? 'medium',
+    description: `${spec.name} voor scooters en bromfietsen.`,
+    intendedUse: `Vervanging of reparatie met een passend ${spec.name.toLocaleLowerCase('nl')} volgens de voertuigspecificatie.`,
+    foreseeableMisuse: 'Montage op een niet-compatibel voertuig, onjuiste montage of gebruik van een beschadigd onderdeel.',
+    risks: [{
+      hazard: highRisk ? 'Uitval van veiligheidsrelevante functie' : 'Onjuiste werking of losraken',
+      riskDescription: `Een defect, verkeerde uitvoering of onjuiste montage van ${spec.name.toLocaleLowerCase('nl')} kan de veilige werking van het voertuig beïnvloeden.`,
+      severity: highRisk ? '5' : '4',
+      probability: '2',
+      mitigation: 'Compatibiliteit controleren, volgens fabrikantvoorschrift monteren en een functiecontrole uitvoeren.',
+      residualRisk: '2',
+    }],
+    warnings: [{
+      warningType: 'installation',
+      warningTextNl: 'Laat dit onderdeel door een vakbekwame monteur installeren en controleer de werking vóór ingebruikname.',
+      requiredInManual: true,
+    }],
+  };
+}
+
+const additionalComplianceTemplates: ComplianceTemplate[] = [
+  {
+    code: 'VOERT', name: 'Complete voertuigen (EU-typegoedkeuring)', category: 'Complete voertuigen', riskLevel: 'high',
+    description: 'Complete scooters en bromfietsen die vallen onder de Europese typegoedkeuring voor L-categorie voertuigen.',
+    intendedUse: 'Gebruik als compleet, typegoedgekeurd voertuig overeenkomstig type, variant en uitvoering.',
+    foreseeableMisuse: 'Wijzigingen waardoor het voertuig afwijkt van de goedgekeurde configuratie of veiligheidskenmerken.',
+    keywords: ['complete scooter', 'compleet voertuig', 'bromfiets', 'typegoedkeuring', '168/2013'],
+    risks: [{ hazard: 'Afwijking van typegoedkeuring', riskDescription: 'Niet-goedgekeurde wijzigingen kunnen veiligheids- en milieuprestaties beïnvloeden.', severity: '5', probability: '2', mitigation: 'Typegoedkeuringsnummer en voertuigconfiguratie controleren; wijzigingen uitsluitend binnen de goedgekeurde uitvoering.', residualRisk: '2' }],
+    warnings: [{ warningType: 'type-approval', warningTextNl: 'Wijzig het voertuig niet buiten de goedgekeurde type-, variant- en uitvoeringsspecificatie.', requiredInManual: true }],
+  },
+  ...([
+    { code: 'UITL', name: 'Uitlaten', category: 'Uitlaatsysteem', keywords: ['uitlaat', 'demper', 'exhaust'], riskLevel: 'high' },
+    { code: 'KOPP', name: 'Koppelingen', category: 'Aandrijving / koppeling', keywords: ['koppeling', 'clutch'] },
+    { code: 'KOPVER', name: 'Koppelingsveren', category: 'Aandrijving / koppeling', keywords: ['koppelingsveer', 'trekveer clutch'] },
+    { code: 'KOPHUIS', name: 'Koppelingshuizen', category: 'Aandrijving / koppeling', keywords: ['koppelingshuis', 'clutch bell'] },
+    { code: 'SLOT', name: 'Slotensets', category: 'Beveiliging', keywords: ['slotenset', 'contactslot', 'zadelslot', 'slot set'], riskLevel: 'low' },
+    { code: 'SPREG', name: 'Spanningsregelaars', category: 'Elektrisch (motormanagement)', keywords: ['spanningsregelaar', 'voltage regulator'] },
+    { code: 'GELI', name: 'Gelijkrichters', category: 'Elektrisch (motormanagement)', keywords: ['gelijkrichter', 'rectifier'] },
+    { code: 'INJ', name: 'Injectoren', category: 'Elektrisch (motormanagement)', keywords: ['injector', 'injectoren'] },
+    { code: 'LAMBDA', name: 'Lambda- / O2-sensoren', category: 'Elektrisch (motormanagement)', keywords: ['lambdasonde', 'lambda sensor', 'o2 sensor'] },
+    { code: 'GASKL', name: 'Gasklephuizen', category: 'Elektrisch (motormanagement)', keywords: ['gasklephuis', 'throttle body'] },
+    { code: 'TEMPS', name: 'Temperatuursensoren', category: 'Elektrisch (motormanagement)', keywords: ['temperatuursensor', 'temperature sensor'] },
+    { code: 'CAN', name: 'Koolstofcanisters', category: 'Brandstof- en emissiesysteem', keywords: ['koolstofcanister', 'carbon canister', 'evap canister'], riskLevel: 'high' },
+    { code: 'OLIEP', name: 'Oliepompen', category: 'Smering', keywords: ['oliepomp', 'oil pump'], riskLevel: 'high' },
+    { code: 'OLIEF', name: 'Oliefilters', category: 'Smering', keywords: ['oliefilter', 'oil filter'] },
+    { code: 'NOK', name: 'Nokkenassen', category: 'Klepmechanisme', keywords: ['nokkenas', 'camshaft'], riskLevel: 'high' },
+    { code: 'KLEP', name: 'Kleppen', category: 'Klepmechanisme', keywords: ['inlaatklep', 'uitlaatklep', 'engine valve'], riskLevel: 'high' },
+    { code: 'TUIM', name: 'Tuimelaars', category: 'Klepmechanisme', keywords: ['tuimelaar', 'rocker arm'], riskLevel: 'high' },
+    { code: 'BRPOMP', name: 'Brandstofpompen', category: 'Brandstofsysteem', keywords: ['brandstofpomp', 'benzinepomp', 'fuel pump'], riskLevel: 'high' },
+    { code: 'BRFILT', name: 'Brandstoffilters', category: 'Brandstofsysteem', keywords: ['brandstoffilter', 'benzinefilter', 'fuel filter'], riskLevel: 'high' },
+    { code: 'BENZKR', name: 'Benzinekranen', category: 'Brandstofsysteem', keywords: ['benzinekraan', 'brandstofkraan', 'fuel tap'], riskLevel: 'high' },
+    { code: 'MOTOROPH', name: 'Motorophanging / silentblokken', category: 'Motorophanging', keywords: ['motorophanging', 'silentblok', 'engine mount'], riskLevel: 'high' },
+    { code: 'VORKBUIT', name: 'Voorvorkpoten (buitenpoten)', category: 'Voorvork', keywords: ['voorvorkpoot', 'buitenpoot', 'fork leg'], riskLevel: 'high' },
+    { code: 'VORKBIN', name: 'Voorvorkbinnenwerk (binnenpoten / stanchions)', category: 'Voorvork', keywords: ['voorvork binnenpoot', 'stanchion', 'vork binnenwerk'], riskLevel: 'high' },
+    { code: 'REMPOMP', name: 'Rempompen / hoofdcilinders', category: 'Remsysteem (hydraulisch)', keywords: ['rempomp', 'hoofdcilinder', 'master cylinder'], riskLevel: 'high' },
+    { code: 'REMLEID', name: 'Remleidingen', category: 'Remsysteem (hydraulisch)', keywords: ['remleiding', 'remslang', 'brake hose'], riskLevel: 'high' },
+    { code: 'REMHEND', name: 'Remhendels', category: 'Remsysteem (hydraulisch)', keywords: ['remhendel', 'brake lever'], riskLevel: 'high' },
+    { code: 'CARTER', name: 'Carterhelften', category: 'Motorblok', keywords: ['carterhelft', 'carter', 'crankcase'], riskLevel: 'high' },
+    { code: 'MOTORINT', name: 'Motorblok interne onderdelen', category: 'Motorblok', keywords: ['motorblok intern', 'krukaslager', 'motorlager'], riskLevel: 'high' },
+    { code: 'EMOTOR', name: 'Elektromotoren (naaf- / middenmotor)', category: 'E-scooter aandrijving', keywords: ['elektromotor', 'naafmotor', 'middenmotor', 'hub motor'], riskLevel: 'high' },
+    { code: 'MCTRL', name: 'Motorcontrollers', category: 'E-scooter aandrijving', keywords: ['motorcontroller', 'controller e-scooter'], riskLevel: 'high' },
+    { code: 'BMS', name: 'BMS (Battery Management Systems)', category: 'E-scooter aandrijving', keywords: ['bms', 'battery management system'], riskLevel: 'high' },
+    { code: 'LADER', name: 'Laders', category: 'E-scooter aandrijving', keywords: ['lader', 'acculader', 'charger'], riskLevel: 'high' },
+    { code: 'DCDC', name: 'DC-DC-omvormers', category: 'E-scooter aandrijving', keywords: ['dc-dc', 'dc dc converter', 'omvormer'], riskLevel: 'high' },
+  ] satisfies AdditionalTemplateSpec[]).map(createAdditionalComponentTemplate),
+];
 
 export const complianceTemplates: ComplianceTemplate[] = [
   {
@@ -1136,6 +1218,7 @@ export const complianceTemplates: ComplianceTemplate[] = [
       },
     ],
   },
+  ...additionalComplianceTemplates,
 ];
 
 export function buildComplianceTemplateSeed() {
@@ -1148,7 +1231,7 @@ export function buildComplianceTemplateSeed() {
     intendedUse: template.intendedUse,
     foreseeableMisuse: template.foreseeableMisuse,
     riskLevel: template.riskLevel,
-    gpsrRequired: true,
+    gpsrRequired: template.code !== 'VOERT',
     noWarningsNeeded: false,
     manualText: '',
     manufacturerName: '',
