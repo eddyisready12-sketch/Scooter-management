@@ -1777,7 +1777,18 @@ export function CompliancePage({
                             <span>{product?.description || link.variantDescription || '-'}</span>
                             <span>{product?.articleGroup || link.variantDescription || '-'}</span>
                             <div className="compliance-linked-product-actions">
-                              {product ? <button type="button" className="secondary-button compliance-row-action-button" onClick={() => onSelectProduct(product, 'gpsr')}>Open product</button> : null}
+                              {product ? (
+                                <button
+                                  type="button"
+                                  className="secondary-button compliance-row-action-button"
+                                  onClick={() => {
+                                    setFamilyDialogOpen(false);
+                                    onSelectProduct(product, 'gpsr');
+                                  }}
+                                >
+                                  Open product
+                                </button>
+                              ) : null}
                               <button type="button" className="danger-button compliance-row-action-button" onClick={() => void deactivateLink(link.id)} disabled={saving || Boolean(unlinkingLinkId)}>
                                 {unlinkingLinkId === link.id ? 'Ontkoppelen…' : 'Ontkoppel'}
                               </button>
