@@ -8635,6 +8635,28 @@ function ContainerCostModal({
       : current.filter((row) => row.id !== id));
   }
 
+  function updateDraftLine(id: string, patch: Partial<ContainerCostImportDraftLine>) {
+    setDraftLines((current) => current.map((line) => line.id === id ? { ...line, ...patch } : line));
+  }
+
+  function replaceDraftLineProduct(id: string, productCode: string) {
+    const normalizedCode = productCode.trim().toLowerCase();
+    const product = products.find((item) => item.code.trim().toLowerCase() === normalizedCode);
+
+    updateDraftLine(id, product ? {
+      referenceCode: product.code,
+      articleNumber: product.code,
+      supplierItemNo: product.supplierItemNo,
+      supplierName: product.supplier,
+      description: product.description,
+    } : {
+      referenceCode: productCode,
+      articleNumber: productCode,
+      supplierItemNo: undefined,
+      supplierName: undefined,
+    });
+  }
+
   function addAirMailRow() {
     setAirMailRows((current) => [
       ...current,
@@ -9327,6 +9349,84 @@ function ContainerCostModal({
               })}
             </div>
           </section>
+
+          {initialBatch && draftLines.length > 0 ? (
+            <section className="product-form-subsection container-cost-card">
+              <div className="section-header-with-actions compact-header">
+                <div>
+                  <h3>Importregels aanpassen</h3>
+                  <p className="section-subtitle">
+                    Kies bij ‘Geleverd artikel’ het artikel dat werkelijk is ontvangen. Aantal, volume en inkoopprijs van de importregel blijven behouden.
+                  </p>
+                </div>
+              </div>
+              <datalist id="import-batch-product-options">
+                {products
+                  .slice()
+                  .sort((left, right) => left.code.localeCompare(right.code, 'nl', { numeric: true, sensitivity: 'base' }))
+                  .map((product) => (
+                    <option key={product.id} value={product.code}>
+                      {product.description}
+                    </option>
+                  ))}
+              </datalist>
+              <div className="table-wrap">
+                <table className="container-cost-table">
+                  <thead>
+                    <tr>
+                      <th>Geleverd artikel</th>
+                      <th>Omschrijving</th>
+                      <th>Aantal</th>
+                      <th>Volume</th>
+                      <th>USD / stuk</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {draftLines.map((line) => (
+                      <tr key={line.id}>
+                        <td>
+                          <input
+                            list="import-batch-product-options"
+                            value={line.referenceCode}
+                            onChange={(event) => replaceDraftLineProduct(line.id, event.target.value)}
+                            placeholder="Zoek op artikelnummer"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            value={line.description}
+                            onChange={(event) => updateDraftLine(line.id, { description: event.target.value })}
+                            placeholder="Omschrijving"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            value={line.quantity}
+                            onChange={(event) => updateDraftLine(line.id, { quantity: event.target.value, amountUsd: undefined })}
+                            inputMode="decimal"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            value={line.volumeCbm}
+                            onChange={(event) => updateDraftLine(line.id, { volumeCbm: event.target.value })}
+                            inputMode="decimal"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            value={line.unitPriceUsd}
+                            onChange={(event) => updateDraftLine(line.id, { unitPriceUsd: event.target.value, amountUsd: undefined })}
+                            inputMode="decimal"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
 
           <section className="product-form-subsection container-cost-card">
             <div className="section-header-with-actions compact-header">
