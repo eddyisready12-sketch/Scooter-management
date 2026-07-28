@@ -1260,6 +1260,24 @@ function findProductForCostLine(products: Product[], line: ContainerCostLine) {
   ));
 }
 
+function packagingRegistrationMatchesCostLine(
+  registration: ProductPackagingRegistration,
+  batch: ContainerCostBatch,
+  line: ContainerCostLine,
+) {
+  if (registration.batchId !== batch.id) return false;
+  if (registration.containerCostLineId) {
+    return registration.containerCostLineId === line.id;
+  }
+
+  const registrationProductCode = registration.productCode?.trim().toLowerCase();
+  const lineProductCode = line.referenceCode.trim().toLowerCase();
+  return Boolean(
+    (line.referenceId && registration.productId === line.referenceId)
+    || (registrationProductCode && registrationProductCode === lineProductCode),
+  );
+}
+
 function productFromCostLine(line: ContainerCostLine, product?: Product): Product {
   return {
     id: product?.id || line.referenceId || stableId('product', line.referenceCode || line.id),
@@ -8091,8 +8109,7 @@ function CostBatchesPage({
                   const filteredLines = lines.filter((line) => {
                     const needle = importBatchSearchQuery.trim().toLowerCase();
                     const isPrinted = data.productPackagingRegistrations.some((registration) =>
-                      registration.batchId === batch.id
-                      && registration.containerCostLineId === line.id
+                      packagingRegistrationMatchesCostLine(registration, batch, line)
                       && Boolean(registration.labelPrintedAt),
                     );
                     if (importBatchLabelFilter === 'printed' && !isPrinted) return false;
@@ -8259,8 +8276,7 @@ function CostBatchesPage({
                                           <span className="import-batch-header-stack">
                                             <span>Label</span>
                                             <span>{filteredLines.filter((line) => data.productPackagingRegistrations.some((registration) =>
-                                              registration.batchId === batch.id
-                                              && registration.containerCostLineId === line.id
+                                              packagingRegistrationMatchesCostLine(registration, batch, line)
                                               && Boolean(registration.labelPrintedAt),
                                             )).length}/{filteredLines.length}</span>
                                           </span>
@@ -8288,8 +8304,7 @@ function CostBatchesPage({
                                         const ctnInfo = componentParts.find((part) => part.startsWith('Ctn'))?.replace(/^Ctn\s*/i, '');
                                         const supplierInfo = componentParts.find((part) => part.includes('Import') || part.includes('Limited') || part.includes('Co., Ltd.'));
                                         const printedRegistrations = data.productPackagingRegistrations.filter((registration) =>
-                                          registration.batchId === batch.id
-                                          && registration.containerCostLineId === line.id
+                                          packagingRegistrationMatchesCostLine(registration, batch, line)
                                           && Boolean(registration.labelPrintedAt),
                                         );
                                         const isPrinted = printedRegistrations.length > 0;
