@@ -730,7 +730,16 @@ export async function replaceContainerCostLines(batchId: string, lines: Containe
       .filter(Boolean);
   }
 
-  const lineIdsToDelete = Array.from(new Set([...existingLineIds, ...currentLineIds]));
+  // Update matching rows in place so dependent records, such as printed-label
+  // registrations, keep their foreign-key link. Only rows that are genuinely
+  // absent from the replacement set may be removed.
+  if (lines.length > 0) {
+    await upsertContainerCostLines(lines);
+  }
+
+  const replacementLineIds = new Set(lines.map((line) => line.id));
+  const lineIdsToDelete = Array.from(new Set([...existingLineIds, ...currentLineIds]))
+    .filter((lineId) => !replacementLineIds.has(lineId));
 
   if (lineIdsToDelete.length > 0) {
     const { error: idDeleteError } = await supabase
@@ -740,21 +749,6 @@ export async function replaceContainerCostLines(batchId: string, lines: Containe
 
     if (idDeleteError) throw idDeleteError;
   }
-
-  const { error: deleteError } = await supabase
-    .from('container_cost_lines')
-    .delete()
-    .eq('batchId', batchId);
-
-  const { error: legacyDeleteError } = await supabase
-    .from('container_cost_lines')
-    .delete()
-    .eq('batch_id', batchId);
-
-  if (deleteError && legacyDeleteError) throw deleteError;
-
-  if (lines.length === 0) return;
-  await upsertContainerCostLines(lines);
 }
 
 export async function upsertDealers(dealers: Dealer[]) {
