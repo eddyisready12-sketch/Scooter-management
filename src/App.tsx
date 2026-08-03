@@ -1765,6 +1765,16 @@ type DymoBrowserPrinter = {
   twinTurbo: boolean;
 };
 
+type ZebraBrowserPrinter = {
+  deviceType?: string;
+  name?: string;
+  uid?: string;
+  connection?: string;
+  provider?: string;
+  manufacturer?: string;
+  version?: number;
+};
+
 const dymo99012Layout = {
   // DYMO 99012 / S0722400 compatible large address labels (89 mm x 36 mm).
   id: 'LargeAddress',
@@ -1775,6 +1785,81 @@ const dymo99012Layout = {
   frameBounds: { x: 180, y: 860, width: 4686, height: 260 },
   detailsBounds: { x: 180, y: 1160, width: 4686, height: 700 },
 };
+
+type ZebraProductLabelSize = '80x42' | '80x36';
+
+const zebraProductLabelLayouts: Record<ZebraProductLabelSize, { width: number; height: number; label: string }> = {
+  // Zebra ZD421 (203 dpi): approximately 8 dots per millimetre.
+  '80x42': { width: 640, height: 336, label: '80 x 42 mm' },
+  '80x36': { width: 640, height: 288, label: '80 x 36 mm' },
+};
+
+function escapeZplField(value: string) {
+  return value
+    .replace(/\\/g, '\\5C')
+    .replace(/\^/g, '\\5E')
+    .replace(/~/g, '\\7E')
+    .replace(/[^\x20-\x7E]/g, (character) => {
+      const bytes = new TextEncoder().encode(character);
+      return Array.from(bytes, (byte) => `\\${byte.toString(16).padStart(2, '0').toUpperCase()}`).join('');
+    });
+}
+
+function truncateLabelText(value: string, maxLength: number) {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  return normalized.length > maxLength ? `${normalized.slice(0, Math.max(0, maxLength - 3))}...` : normalized;
+}
+
+function buildZebraProductLabelZpl(product: Product, size: ZebraProductLabelSize) {
+  const layout = zebraProductLabelLayouts[size];
+  const barcodeSource = product.barcode?.trim() || product.code.trim();
+  if (!barcodeSource) {
+    throw new Error('Product heeft geen barcode of code om te printen.');
+  }
+
+  const batchCode = product.batchNumber?.trim() || product.batch?.trim() || product.traceabilityCode?.trim();
+  if (!batchCode) {
+    throw new Error('Product heeft geen batchcode om als QR-code te printen.');
+  }
+
+  const code = escapeZplField(product.code.trim() || barcodeSource);
+  const description = escapeZplField(truncateLabelText(
+    product.labelTitle?.trim() || product.shortDescription?.trim() || product.description.trim(),
+    52,
+  ));
+  const barcode = escapeZplField(barcodeSource.replace(/\s/g, ''));
+  const batch = escapeZplField(batchCode);
+  const country = product.countryOfOrigin?.trim() || 'China';
+  const madeIn = escapeZplField(country.toLowerCase().startsWith('made in') ? country : `Made in ${country}`);
+  const importer = productImporterLabelValue(product).split('\n').map((line) => line.trim()).filter(Boolean);
+  const importerName = escapeZplField(truncateLabelText(importer[0] || 'Yreb b.v.', 32));
+  const importerAddress = escapeZplField(truncateLabelText(importer.slice(1).join(', '), 54));
+  const recycleCodes = normalizePackagingLayers(product)
+    .filter((layer) => !isStickerPackagingLayer(layer))
+    .map((layer) => layer.recycleCode?.trim() || recycleCodeParts(layer)?.family || '')
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(' / ');
+  const recycleLine = recycleCodes ? `Materiaal: ${escapeZplField(recycleCodes)}` : '';
+
+  return `^XA
+^CI28
+^PW${layout.width}
+^LL${layout.height}
+^LH0,0
+^FO14,12^A0N,28,26^FB330,1,0,L,0^FH\\^FD${code}^FS
+^FO14,46^A0N,19,18^FB365,2,2,L,0^FH\\^FD${description}^FS
+^FO14,96^BY2,2,58^BCN,58,Y,N,N^FH\\^FD${barcode}^FS
+^FO355,12^A0N,25,23^FB270,1,0,R,0^FDRSO PARTS^FS
+^FO414,43^BQN,2,4^FH\\^FDLA,${batch}^FS
+^FO355,146^A0N,15,14^FB270,1,0,R,0^FH\\^FDBatch ${batch}^FS
+^FO355,165^A0N,14,13^FB270,1,0,R,0^FH\\^FD${madeIn}^FS
+^FO355,187^A0N,14,13^FB270,1,0,R,0^FH\\^FD${importerName}^FS
+^FO355,205^A0N,12,11^FB270,2,1,R,0^FH\\^FD${importerAddress}^FS
+${recycleLine ? `^FO14,${size === '80x42' ? 302 : 260}^A0N,13,12^FB340,1,0,L,0^FH\\^FD${recycleLine}^FS` : ''}
+^PQ1,0,1,N
+^XZ`;
+}
 
 function escapeLabelValue(value: string) {
   return value
@@ -2436,6 +2521,146 @@ async function printProductDymoLabel(product: Product, quantity = 1) {
     }
   }
   return printerName;
+}
+
+async function getAvailableZebraPrinter() {
+  const endpoints = ['http://localhost:9100', 'http://127.0.0.1:9100'];
+  const failedEndpoints: string[] = [];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(`${endpoint}/available`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) {
+        failedEndpoints.push(`${endpoint} (${response.status})`);
+        continue;
+      }
+      const result = await response.json() as { printer?: ZebraBrowserPrinter[] };
+      const printers = Array.isArray(result.printer) ? result.printer : [];
+      const printer = printers.find((item) => /ZD421/i.test(item.name || ''))
+        ?? printers.find((item) => /Zebra/i.test(`${item.manufacturer || ''} ${item.name || ''}`))
+        ?? printers[0];
+      if (printer) {
+        return { endpoint, printer };
+      }
+      failedEndpoints.push(`${endpoint} zonder printer`);
+    } catch {
+      failedEndpoints.push(endpoint);
+    }
+  }
+
+  throw new Error(`Geen Zebra ZD421 gevonden. Start Zebra Browser Print en controleer de printerverbinding. Getest: ${failedEndpoints.join(', ')}.`);
+}
+
+async function printProductZebraLabel(product: Product, quantity = 1, size: ZebraProductLabelSize = '80x42') {
+  const barcodeSource = product.barcode?.trim() || product.code.trim();
+  const batchCode = product.batchNumber?.trim() || product.batch?.trim() || product.traceabilityCode?.trim();
+  if (!barcodeSource) throw new Error('Product heeft geen barcode of code om te printen.');
+  if (!batchCode) throw new Error('Product heeft geen batchcode om als QR-code te printen.');
+
+  const barcodeCanvas = document.createElement('canvas');
+  (bwipjs as unknown as { toCanvas: (canvas: HTMLCanvasElement, options: Record<string, unknown>) => HTMLCanvasElement }).toCanvas(barcodeCanvas, {
+    bcid: 'code128',
+    text: barcodeSource.replace(/\s/g, ''),
+    scaleX: 3,
+    scaleY: 3,
+    height: 12,
+    includetext: true,
+    textxalign: 'center',
+    textsize: 9,
+    backgroundcolor: 'FFFFFF',
+    barcolor: '000000',
+    textcolor: '000000',
+  });
+  const qrCanvas = document.createElement('canvas');
+  (bwipjs as unknown as { toCanvas: (canvas: HTMLCanvasElement, options: Record<string, unknown>) => HTMLCanvasElement }).toCanvas(qrCanvas, {
+    bcid: 'qrcode',
+    text: batchCode,
+    scale: 4,
+    padding: 0,
+    backgroundcolor: 'FFFFFF',
+    barcolor: '000000',
+  });
+
+  const description = truncateLabelText(
+    product.labelTitle?.trim() || product.shortDescription?.trim() || product.description.trim(),
+    70,
+  );
+  const country = product.countryOfOrigin?.trim() || 'China';
+  const madeIn = country.toLowerCase().startsWith('made in') ? country : `Made in ${country}`;
+  const importerLines = productImporterLabelValue(product).split('\n').map((line) => line.trim()).filter(Boolean);
+  const recycleCodes = normalizePackagingLayers(product)
+    .filter((layer) => !isStickerPackagingLayer(layer))
+    .map((layer) => layer.recycleCode?.trim() || recycleCodeParts(layer)?.family || '')
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(' / ');
+  const [widthMm, heightMm] = size === '80x42' ? [80, 42] : [80, 36];
+  const labelMarkup = Array.from({ length: quantity }, () => `
+    <section class="label">
+      <div class="left">
+        <strong class="code">${escapeLabelValue(product.code.trim() || barcodeSource)}</strong>
+        <div class="description">${escapeLabelValue(description)}</div>
+        <img class="barcode" src="${barcodeCanvas.toDataURL('image/png')}" alt="">
+        ${recycleCodes ? `<small>Materiaal: ${escapeLabelValue(recycleCodes)}</small>` : ''}
+      </div>
+      <div class="right">
+        <strong class="brand">RSO PARTS</strong>
+        <img class="qr" src="${qrCanvas.toDataURL('image/png')}" alt="">
+        <div class="meta">Batch ${escapeLabelValue(batchCode)}<br>${escapeLabelValue(madeIn)}</div>
+        <div class="importer">${escapeLabelValue(importerLines.join(' · '))}</div>
+      </div>
+    </section>
+  `).join('');
+
+  const printWindow = window.open('', '_blank', 'popup,width=900,height=650');
+  if (!printWindow) {
+    throw new Error('Het printvenster is geblokkeerd. Sta pop-ups voor deze website toe en probeer opnieuw.');
+  }
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <title>Productlabels ${widthMm} x ${heightMm} mm</title>
+  <style>
+    @page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: Arial, sans-serif; color: #000; background: #fff; }
+    .label {
+      width: ${widthMm}mm; height: ${heightMm}mm; padding: 2mm;
+      display: grid; grid-template-columns: 56% 44%; overflow: hidden;
+      page-break-after: always; break-after: page;
+    }
+    .label:last-child { page-break-after: auto; break-after: auto; }
+    .left, .right { min-width: 0; position: relative; }
+    .left { padding-right: 2mm; display: flex; flex-direction: column; }
+    .right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+    .code { font-size: 12pt; line-height: 1.05; }
+    .description { font-size: 7.5pt; line-height: 1.12; min-height: 7mm; margin-top: 1mm; }
+    .barcode { width: 100%; height: 13mm; object-fit: contain; object-position: left center; margin-top: .5mm; }
+    small { font-size: 5.5pt; margin-top: auto; }
+    .brand { font-size: 10pt; line-height: 1; }
+    .qr { width: 16mm; height: 16mm; object-fit: contain; margin-top: 1mm; }
+    .meta { font-size: 6.5pt; line-height: 1.25; margin-top: .5mm; }
+    .importer { font-size: 5.2pt; line-height: 1.15; margin-top: auto; max-height: ${heightMm === 36 ? '7mm' : '11mm'}; overflow: hidden; }
+    @media screen {
+      body { background: #ddd; padding: 10mm; }
+      .label { background: #fff; margin: 0 auto 8mm; box-shadow: 0 2px 12px #888; }
+    }
+    @media print { body { width: ${widthMm}mm; } }
+  </style>
+</head>
+<body>${labelMarkup}
+<script>
+  window.addEventListener('load', () => setTimeout(() => window.print(), 150));
+<\/script>
+</body>
+</html>`);
+  printWindow.document.close();
+
+  return `Windows afdrukvenster (${zebraProductLabelLayouts[size].label})`;
 }
 
 async function printOuterBoxDymoLabel({
@@ -4256,7 +4481,14 @@ export function App() {
     }
   }
 
-  async function printBatchProductLabel(batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, quantity: number) {
+  async function printBatchProductLabel(
+    batch: ContainerCostBatch,
+    line: ContainerCostLine,
+    product: Product | undefined,
+    quantity: number,
+    printer: 'dymo' | 'zebra' = 'dymo',
+    zebraSize: ZebraProductLabelSize = '80x42',
+  ) {
     const batchCode = batch.orderNumber || batch.containerNumber || line.batchId;
     const sourceProduct = productFromCostLine(line, product);
     const labelProduct: Product = {
@@ -4266,7 +4498,9 @@ export function App() {
       traceabilityCode: sourceProduct.traceabilityCode?.trim() || `${batchCode}-${sourceProduct.code || line.referenceCode}`,
     };
 
-    const printerName = await printProductDymoLabel(labelProduct, quantity);
+    const printerName = printer === 'zebra'
+      ? await printProductZebraLabel(labelProduct, quantity, zebraSize)
+      : await printProductDymoLabel(labelProduct, quantity);
     const printedAt = new Date().toISOString();
     const registrations = buildPackagingRegistrationsForBatch(batch, [line], [labelProduct])
       .map((registration) => ({
@@ -5280,12 +5514,14 @@ export function App() {
             setSelectedProduct(nextProduct);
           }}
           applyBatchNumber={selectedProductApplyBatchNumber}
-          onPrintLabel={pendingBatchLabelPrint ? async (product, quantity) => {
+          onPrintLabel={pendingBatchLabelPrint ? async (product, quantity, printer, zebraSize) => {
             return printBatchProductLabel(
               pendingBatchLabelPrint.batch,
               pendingBatchLabelPrint.line,
               product,
               quantity,
+              printer ?? 'dymo',
+              zebraSize ?? '80x42',
             );
           } : undefined}
         />
@@ -10722,7 +10958,12 @@ function ProductDetailModal({
   onSave: (product: Product) => Promise<void>;
   onSaveAndApplyPackaging: (product: Product, batchNumber?: string) => Promise<void>;
   applyBatchNumber?: string;
-  onPrintLabel?: (product: Product, quantity: number) => Promise<string>;
+  onPrintLabel?: (
+    product: Product,
+    quantity: number,
+    printer?: 'dymo' | 'zebra',
+    zebraSize?: ZebraProductLabelSize,
+  ) => Promise<string>;
 }) {
   const [draft, setDraft] = useState<Product>(() => createProductDraft(product));
   const [saving, setSaving] = useState(false);
@@ -11076,6 +11317,34 @@ function ProductDetailModal({
   }
 
   async function handleDymoPrint() {
+    const printerAnswer = window.prompt(
+      'Welke printer wil je gebruiken?\n1 = DYMO LabelWriter\n2 = Zebra ZD421',
+      '2',
+    );
+    if (printerAnswer === null) return;
+    const normalizedPrinter = printerAnswer.trim().toLowerCase();
+    const printer: 'dymo' | 'zebra' = normalizedPrinter === '1' || normalizedPrinter.includes('dymo')
+      ? 'dymo'
+      : normalizedPrinter === '2' || normalizedPrinter.includes('zebra')
+        ? 'zebra'
+        : 'zebra';
+
+    let zebraSize: ZebraProductLabelSize = '80x42';
+    if (printer === 'zebra') {
+      const sizeAnswer = window.prompt(
+        'Welk liggend Zebra-etiket zit in de printer?\n1 = 80 x 42 mm\n2 = 80 x 36 mm',
+        '1',
+      );
+      if (sizeAnswer === null) return;
+      const normalizedSize = sizeAnswer.replace(/\s/g, '').toLowerCase();
+      if (normalizedSize === '2' || normalizedSize.includes('80x36')) {
+        zebraSize = '80x36';
+      } else if (normalizedSize !== '1' && !normalizedSize.includes('80x42')) {
+        setDymoMessage('Kies 1 voor 80 x 42 mm of 2 voor 80 x 36 mm.');
+        return;
+      }
+    }
+
     const quantityAnswer = window.prompt('Hoeveel productlabels wil je printen?', '1');
     if (quantityAnswer === null) return;
     const quantity = Number(quantityAnswer.replace(',', '.'));
@@ -11088,11 +11357,14 @@ function ProductDetailModal({
     setDymoMessage('');
     try {
       const printerName = onPrintLabel
-        ? await onPrintLabel(draft, quantity)
-        : await printProductDymoLabel(draft, quantity);
-      setDymoMessage(`${quantity} productlabel${quantity === 1 ? '' : 's'} verstuurd naar ${printerName}.`);
+        ? await onPrintLabel(draft, quantity, printer, zebraSize)
+        : printer === 'zebra'
+          ? await printProductZebraLabel(draft, quantity, zebraSize)
+          : await printProductDymoLabel(draft, quantity);
+      const format = printer === 'zebra' ? ` op ${zebraProductLabelLayouts[zebraSize].label}` : '';
+      setDymoMessage(`${quantity} productlabel${quantity === 1 ? '' : 's'}${format} verstuurd naar ${printerName}.`);
     } catch (error) {
-      setDymoMessage(`DYMO print mislukt: ${importErrorMessage(error)}`);
+      setDymoMessage(`Label printen mislukt: ${importErrorMessage(error)}`);
     } finally {
       setDymoPrinting(false);
     }
