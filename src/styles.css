@@ -4719,6 +4719,177 @@ tbody tr:hover {
   color: #1c2732;
 }
 
+.product-print-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(18, 27, 36, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.product-print-dialog {
+  width: min(620px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid #d7dee5;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 22px 70px rgba(10, 25, 40, 0.28);
+}
+
+.product-print-dialog-heading,
+.product-print-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.product-print-dialog-heading span,
+.product-print-choice-group legend,
+.product-print-quantity span {
+  color: #6b7785;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.product-print-dialog-heading h3 {
+  margin: 3px 0 0;
+  color: #182430;
+  font-size: 21px;
+}
+
+.product-print-dialog-close {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #d7dee5;
+  border-radius: 50%;
+  background: #fff;
+  color: #52606d;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.product-print-choice-group {
+  margin: 20px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.product-print-choice-group legend {
+  margin-bottom: 8px;
+}
+
+.product-print-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.product-print-option {
+  position: relative;
+  display: flex;
+  min-height: 78px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #d6dee6;
+  border-radius: 9px;
+  background: #fff;
+  color: #263442;
+  text-align: left;
+}
+
+.product-print-option:hover {
+  border-color: #8bbfe0;
+  background: #f7fbfe;
+}
+
+.product-print-option.selected {
+  border-color: #138fd1;
+  background: #eef8fd;
+  box-shadow: 0 0 0 2px rgba(19, 143, 209, 0.12);
+}
+
+.product-print-option > span:last-child {
+  display: grid;
+  gap: 4px;
+}
+
+.product-print-option strong {
+  font-size: 14px;
+}
+
+.product-print-option small {
+  color: #6b7785;
+  font-size: 11px;
+}
+
+.product-print-option-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 19px;
+  height: 19px;
+  color: #138fd1;
+}
+
+.label-size-shape {
+  display: block;
+  width: 50px;
+  border: 2px solid #617180;
+  border-radius: 3px;
+  background: #fff;
+}
+
+.label-size-shape.\38 0x42 {
+  height: 27px;
+}
+
+.label-size-shape.\38 0x36 {
+  height: 23px;
+}
+
+.product-print-quantity {
+  display: grid;
+  grid-template-columns: 1fr 100px;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.product-print-quantity input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #cbd5df;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.product-print-dialog-actions {
+  justify-content: flex-end;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #e4e9ee;
+}
+
+@media (max-width: 680px) {
+  .product-print-options {
+    grid-template-columns: 1fr;
+  }
+
+  .product-print-dialog-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;

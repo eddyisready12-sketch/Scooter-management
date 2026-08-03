@@ -78,6 +78,17 @@ export async function fetchExactProductsImport(itemCode?: string): Promise<Exact
   return (data as ExactProductImportResponse | null) ?? { products: [], count: 0 };
 }
 
+export async function fetchProductById(id: string): Promise<Product | null> {
+  if (!supabase || !id) return null;
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Product | null;
+}
+
 export async function probeExactBatchLookup(payload: {
   goodsDeliveryLineId?: string;
   salesOrderNumber?: string;
@@ -910,16 +921,48 @@ export async function upsertProducts(products: Product[]) {
 
   let payload = products.map((product) => ({ ...product }) as Record<string, unknown>);
   const removedColumns = new Set<string>();
+  const certificationColumns = [
+    'complianceCategory',
+    'eMarkRelevant',
+    'eMarkPresent',
+    'eMarkNumber',
+    'ceRelevant',
+    'cePresent',
+    'certificationNotes',
+    'certificateDocumentId',
+  ] as const;
 
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const { error } = await supabase
+    const { data: savedRows, error } = await supabase
       .from('products')
-      .upsert(payload);
+      .upsert(payload)
+      .select('*');
 
-    if (!error) return;
+    if (!error) {
+      if (savedRows?.length) {
+        for (const expected of payload) {
+          const saved = savedRows.find((row) => String(row.id) === String(expected.id)) as Record<string, unknown> | undefined;
+          if (!saved) continue;
+          for (const column of certificationColumns) {
+            if (expected[column] === undefined) continue;
+            const expectedValue = expected[column] ?? null;
+            const savedValue = saved[column] ?? null;
+            if (String(savedValue ?? '') !== String(expectedValue ?? '')) {
+              throw new Error(`Opslagcontrole mislukt: ${column} is niet blijvend opgeslagen voor product ${String(expected.code ?? expected.id)}.`);
+            }
+          }
+        }
+      }
+      return;
+    }
 
     const missingColumn = error.message.match(/'([^']+)' column/)?.[1];
     if (!missingColumn || removedColumns.has(missingColumn)) throw error;
+
+    const requiredCertificationColumns = new Set<string>(certificationColumns);
+    if (requiredCertificationColumns.has(missingColumn)) {
+      throw new Error(`Certificeringsgegevens kunnen niet worden opgeslagen: databasekolom ${missingColumn} ontbreekt.`);
+    }
 
     removedColumns.add(missingColumn);
     payload = payload.map((record) => {

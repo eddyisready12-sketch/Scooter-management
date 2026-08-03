@@ -42,7 +42,7 @@ import { CompliancePage } from './components/CompliancePage';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseExactBatchTransactionsImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
 import { migratePpwrLocalStorage, migrateSupplierPpwr, ppwrSupplierStatus } from './lib/ppwr-suppliers';
-import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceComplianceFamilyDocuments, replaceComplianceFamilyRequirements, replaceComplianceFamilyRevisions, replaceComplianceFamilyRisks, replaceComplianceFamilyTestPlans, replaceComplianceFamilyWarnings, replaceComplianceProductTests, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, uploadSupplierDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRequirements, upsertComplianceFamilyRevisions, upsertComplianceFamilyRisks, upsertComplianceFamilyTestPlans, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertComplianceProductTests, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, fetchProductById, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceComplianceFamilyDocuments, replaceComplianceFamilyRequirements, replaceComplianceFamilyRevisions, replaceComplianceFamilyRisks, replaceComplianceFamilyTestPlans, replaceComplianceFamilyWarnings, replaceComplianceProductTests, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, uploadSupplierDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRequirements, upsertComplianceFamilyRevisions, upsertComplianceFamilyRisks, upsertComplianceFamilyTestPlans, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertComplianceProductTests, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
 type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'compliance' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance';
@@ -1111,10 +1111,30 @@ function getProductComplianceSummary(
   ));
   const packagingSupplierStates = activePackagingLayers.map((layer) => {
     const supplier = findSupplierByName(supplierRecords, layer.packagingSupplier);
+    const linkedPackagingItem = supplier?.packagingItems?.find((item) => item.id === layer.packagingCatalogItemId);
+    const linkedItemIsComplete = Boolean(
+      linkedPackagingItem
+      && linkedPackagingItem.actief !== false
+      && linkedPackagingItem.materiaalcode.trim()
+      && linkedPackagingItem.gewichtGram > 0
+      && linkedPackagingItem.gewichtBasis
+      && linkedPackagingItem.zorgwekkendeStoffen
+      && linkedPackagingItem.bron,
+    );
+    const layerIsComplete = Boolean(
+      hasText(layer.material)
+      && parseDecimal(layer.weightGrams) > 0
+      && hasText(layer.recycledContentPercent)
+      && hasText(layer.recyclabilityClass)
+      && hasText(layer.packagingRole)
+      && hasText(layer.productStickerMaterial)
+      && hasText(layer.packagingSupplier)
+      && findPackagingMaterialOption(layer.material)?.wasteStream,
+    );
     return {
       layer,
       supplier,
-      hasProfile: hasPpwrSupplierProfile(supplier),
+      hasProfile: layerIsComplete || linkedItemIsComplete || hasPpwrSupplierProfile(supplier),
     };
   });
   const packagingIssues: ProductComplianceIssue[] = [];
@@ -1861,6 +1881,158 @@ ${recycleLine ? `^FO14,${size === '80x42' ? 302 : 260}^A0N,13,12^FB340,1,0,L,0^F
 ^XZ`;
 }
 
+function loadLabelImage(source: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Een afbeelding voor het Zebra-label kon niet worden geladen.'));
+    image.src = source;
+  });
+}
+
+function drawContainedImage(
+  context: CanvasRenderingContext2D,
+  image: CanvasImageSource & { width: number; height: number },
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const scale = Math.min(width / image.width, height / image.height);
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  context.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
+}
+
+function canvasToZplGraphic(canvas: HTMLCanvasElement) {
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Zebra-label kon niet naar printerdata worden omgezet.');
+  const { width, height } = canvas;
+  const pixels = context.getImageData(0, 0, width, height).data;
+  const bytesPerRow = Math.ceil(width / 8);
+  let hex = '';
+
+  for (let y = 0; y < height; y += 1) {
+    for (let byteIndex = 0; byteIndex < bytesPerRow; byteIndex += 1) {
+      let byte = 0;
+      for (let bit = 0; bit < 8; bit += 1) {
+        const x = byteIndex * 8 + bit;
+        if (x >= width) continue;
+        const offset = (y * width + x) * 4;
+        const luminance = pixels[offset] * 0.299 + pixels[offset + 1] * 0.587 + pixels[offset + 2] * 0.114;
+        if (pixels[offset + 3] > 32 && luminance < 170) byte |= 1 << (7 - bit);
+      }
+      hex += byte.toString(16).padStart(2, '0').toUpperCase();
+    }
+  }
+
+  const totalBytes = bytesPerRow * height;
+  return `^GFA,${totalBytes},${totalBytes},${bytesPerRow},${hex}`;
+}
+
+async function buildZebraProductLabelRasterZpl(product: Product, size: ZebraProductLabelSize) {
+  const layout = zebraProductLabelLayouts[size];
+  const barcodeSource = product.barcode?.trim() || product.code.trim();
+  const batchCode = product.batchNumber?.trim() || product.batch?.trim() || product.traceabilityCode?.trim();
+  if (!barcodeSource) throw new Error('Product heeft geen barcode of code om te printen.');
+  if (!batchCode) throw new Error('Product heeft geen batchcode om als QR-code te printen.');
+
+  const canvas = document.createElement('canvas');
+  canvas.width = layout.width;
+  canvas.height = layout.height;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Zebra-label kon niet worden opgebouwd.');
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#000';
+  context.textBaseline = 'top';
+
+  const barcodeCanvas = document.createElement('canvas');
+  (bwipjs as unknown as { toCanvas: (canvas: HTMLCanvasElement, options: Record<string, unknown>) => HTMLCanvasElement }).toCanvas(barcodeCanvas, {
+    bcid: 'code128',
+    text: barcodeSource.replace(/\s/g, ''),
+    scaleX: 3,
+    scaleY: 3,
+    height: 13,
+    includetext: true,
+    textxalign: 'center',
+    textsize: 10,
+    backgroundcolor: 'FFFFFF',
+    barcolor: '000000',
+    textcolor: '000000',
+  });
+  const qrCanvas = document.createElement('canvas');
+  (bwipjs as unknown as { toCanvas: (canvas: HTMLCanvasElement, options: Record<string, unknown>) => HTMLCanvasElement }).toCanvas(qrCanvas, {
+    bcid: 'qrcode',
+    text: batchCode,
+    scale: 5,
+    padding: 0,
+    backgroundcolor: 'FFFFFF',
+    barcolor: '000000',
+  });
+
+  const logo = await loadLabelImage(rsoLogoUrl);
+  const materialIconsBase64 = await buildMaterialIconsBase64(product, 'horizontal');
+  const materialIcons = materialIconsBase64
+    ? await loadLabelImage(`data:image/png;base64,${materialIconsBase64}`)
+    : null;
+  const compact = size === '80x36';
+
+  context.font = '700 36px Arial';
+  context.fillText(product.code.trim() || barcodeSource, 18, 16, 300);
+  const description = truncateLabelText(
+    product.labelTitle?.trim() || product.shortDescription?.trim() || product.description.trim(),
+    90,
+  );
+  let descriptionFontSize = 19;
+  do {
+    context.font = `${descriptionFontSize}px Arial`;
+    if (context.measureText(description).width <= 604 || descriptionFontSize <= 12) break;
+    descriptionFontSize -= 1;
+  } while (descriptionFontSize > 12);
+  context.fillText(description, 18, 82, 604);
+  drawContainedImage(context, barcodeCanvas, 18, 108, 350, compact ? 105 : 112);
+  drawContainedImage(context, logo, 420, 12, 185, 50);
+  drawContainedImage(context, qrCanvas, 498, compact ? 182 : 216, 78, 78);
+
+  const country = product.countryOfOrigin?.trim() || 'China';
+  const madeIn = country.toLowerCase().startsWith('made in') ? country : `Made in ${country}`;
+  context.textAlign = 'center';
+  context.font = '13px Arial';
+  context.fillText(`Batch ${batchCode}`, 537, compact ? 262 : 300, 115);
+  context.save();
+  context.translate(600, compact ? 272 : 320);
+  context.rotate(-Math.PI / 2);
+  context.textAlign = 'left';
+  context.font = '700 19px Arial';
+  context.fillText(madeIn, 0, 0, compact ? 105 : 120);
+  context.restore();
+
+  const importer = productImporterLabelValue(product).split('\n').map((line) => line.trim()).filter(Boolean);
+  context.textAlign = 'left';
+  context.font = compact ? '14px Arial' : '15px Arial';
+  const importerX = 18;
+  const importerY = compact ? 214 : 236;
+  importer.slice(0, compact ? 3 : 4).forEach((line, index) => {
+    context.fillText(truncateLabelText(line, 35), importerX, importerY + index * (compact ? 17 : 18), 255);
+  });
+
+  if (materialIcons) {
+    drawContainedImage(context, materialIcons, 324, compact ? 207 : 224, 170, compact ? 78 : 92);
+  }
+
+  return {
+    dataUrl: canvas.toDataURL('image/png'),
+    zpl: `^XA
+^PW${layout.width}
+^LL${layout.height}
+^LH0,0
+^FO0,0${canvasToZplGraphic(canvas)}^FS
+^PQ1,0,1,N
+^XZ`,
+  };
+}
+
 function escapeLabelValue(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -1931,7 +2103,7 @@ function svgToPngBase64(svg: string, width: number, height: number) {
   });
 }
 
-async function buildMaterialIconsBase64(product: Product) {
+async function buildMaterialIconsBase64(product: Product, direction: 'vertical' | 'horizontal' = 'vertical') {
   const iconParts = normalizePackagingLayers(product)
     .filter((item) => !isStickerPackagingLayer(item))
     .filter((item) => item.recycleCode?.trim() || item.material?.trim())
@@ -1942,11 +2114,17 @@ async function buildMaterialIconsBase64(product: Product) {
   const iconWidth = 112;
   const iconHeight = 126;
   const gap = 14;
-  const width = iconWidth;
-  const height = iconParts.length * iconHeight + Math.max(0, iconParts.length - 1) * gap;
+  const horizontal = direction === 'horizontal';
+  const width = horizontal
+    ? iconParts.length * iconWidth + Math.max(0, iconParts.length - 1) * gap
+    : iconWidth;
+  const height = horizontal
+    ? iconHeight
+    : iconParts.length * iconHeight + Math.max(0, iconParts.length - 1) * gap;
   const icons = iconParts.map((part, index) => {
-    const y = index * (iconHeight + gap);
-    return `<g transform="translate(0 ${y})">
+    const x = horizontal ? index * (iconWidth + gap) : 0;
+    const y = horizontal ? 0 : index * (iconHeight + gap);
+    return `<g transform="translate(${x} ${y})">
       <svg x="0" y="0" width="${iconWidth}" height="${iconHeight}" viewBox="0 0 100 112">
         <g fill="none" stroke="#000" stroke-width="7" stroke-linejoin="round" stroke-linecap="butt">
           <path d="M31.63 31.5 44.78 9.57s5.29-5.12 9.92-.49l12.25 20.78" />
@@ -2555,7 +2733,7 @@ async function getAvailableZebraPrinter() {
 
 async function printProductZebraLabel(product: Product, quantity = 1, size: ZebraProductLabelSize = '80x42') {
   const { endpoint, printer } = await getAvailableZebraPrinter();
-  const zpl = buildZebraProductLabelZpl(product, size);
+  const { zpl } = await buildZebraProductLabelRasterZpl(product, size);
 
   for (let index = 0; index < quantity; index += 1) {
     const response = await fetch(`${endpoint}/write`, {
@@ -2569,6 +2747,48 @@ async function printProductZebraLabel(product: Product, quantity = 1, size: Zebr
   }
 
   return `${printer.name || 'Zebra ZD421'} (${zebraProductLabelLayouts[size].label})`;
+}
+
+async function previewProductZebraLabel(product: Product, size: ZebraProductLabelSize) {
+  const previewWindow = window.open('', '_blank', 'popup,width=920,height=650');
+  if (!previewWindow) {
+    throw new Error('Het voorbeeldvenster is geblokkeerd. Sta pop-ups voor deze website toe en probeer opnieuw.');
+  }
+
+  try {
+    const { dataUrl } = await buildZebraProductLabelRasterZpl(product, size);
+    const layout = zebraProductLabelLayouts[size];
+    previewWindow.document.open();
+    previewWindow.document.write(`<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <title>Voorbeeld Zebra-productlabel ${layout.label}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 32px; background: #202124; color: #fff; font-family: Arial, sans-serif; }
+    header { max-width: 900px; margin: 0 auto 22px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    h1 { margin: 0; font-size: 18px; }
+    p { margin: 5px 0 0; color: #c7c9cc; font-size: 13px; }
+    .sheet { width: min(100%, 900px); margin: 0 auto; padding: 28px; background: #34363a; border-radius: 12px; overflow: auto; }
+    img { display: block; width: ${layout.width}px; max-width: none; height: ${layout.height}px; background: #fff; image-rendering: pixelated; box-shadow: 0 8px 26px rgba(0,0,0,.35); }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Zebra ZD421 — ${layout.label} liggend</h1>
+      <p>Dit is exact de zwart-witafbeelding die naar de printer wordt gestuurd.</p>
+    </div>
+  </header>
+  <div class="sheet"><img src="${dataUrl}" alt="Voorbeeld productlabel"></div>
+</body>
+</html>`);
+    previewWindow.document.close();
+  } catch (error) {
+    previewWindow.close();
+    throw error;
+  }
 }
 
 async function printOuterBoxDymoLabel({
@@ -3707,10 +3927,12 @@ export function App() {
 
   useEffect(() => {
     let mounted = true;
+    let latestHydrationId = 0;
     async function hydrate() {
+      const hydrationId = ++latestHydrationId;
       try {
         const remote = await loadSupabaseData();
-        if (mounted && Object.keys(remote).length > 0) {
+        if (mounted && hydrationId === latestHydrationId && Object.keys(remote).length > 0) {
           setData((current) => ({
             ...current,
             ...remote,
@@ -3718,6 +3940,7 @@ export function App() {
           }));
         }
       } catch {
+        if (hydrationId !== latestHydrationId) return;
         showCsvMessage('Supabase kon niet laden, demo data blijft actief.');
       }
     }
@@ -3969,16 +4192,47 @@ export function App() {
 
   async function updateProduct(updatedProduct: Product) {
     try {
+      const normalizedCode = updatedProduct.code.trim().toLowerCase();
+      const certificationUpdates: Partial<Product> = {
+        complianceCategory: updatedProduct.complianceCategory,
+        eMarkRelevant: updatedProduct.eMarkRelevant,
+        eMarkPresent: updatedProduct.eMarkPresent,
+        eMarkNumber: updatedProduct.eMarkNumber,
+        ceRelevant: updatedProduct.ceRelevant,
+        cePresent: updatedProduct.cePresent,
+        certificationNotes: updatedProduct.certificationNotes,
+        certificateDocumentId: updatedProduct.certificateDocumentId,
+      };
+      const duplicateProducts = data.products.filter((product) => (
+        product.id !== updatedProduct.id
+        && product.code.trim().toLowerCase() === normalizedCode
+      ));
+      const productsToSave = [
+        updatedProduct,
+        ...duplicateProducts.map((product) => ({ ...product, ...certificationUpdates })),
+      ];
+
+      await upsertProducts(productsToSave);
       setData((current) => ({
         ...current,
         products: current.products.some((product) => product.id === updatedProduct.id)
-          ? current.products.map((product) => product.id === updatedProduct.id ? updatedProduct : product)
+          ? current.products.map((product) => {
+            if (product.id === updatedProduct.id) return updatedProduct;
+            if (product.code.trim().toLowerCase() === normalizedCode) {
+              return { ...product, ...certificationUpdates };
+            }
+            return product;
+          })
           : [...current.products, updatedProduct],
       }));
-      await upsertProducts([updatedProduct]);
-      setProductMessage(`Product ${updatedProduct.code} bijgewerkt.`);
+      setProductMessage(
+        duplicateProducts.length > 0
+          ? `Product ${updatedProduct.code} bijgewerkt; certificering is gesynchroniseerd naar ${duplicateProducts.length + 1} records met hetzelfde artikelnummer.`
+          : `Product ${updatedProduct.code} bijgewerkt.`,
+      );
     } catch (error) {
       setProductMessage(`Product opslaan mislukt: ${importErrorMessage(error)}`);
+      throw error;
     }
   }
 
@@ -4089,6 +4343,20 @@ export function App() {
     setSelectedProductTab(tab);
     setSelectedProductApplyBatchNumber(applyBatchNumber);
     setSelectedProduct(product);
+    if (supabase && product.id) {
+      void fetchProductById(product.id)
+        .then((freshProduct) => {
+          if (!freshProduct) return;
+          setSelectedProduct((current) => current?.id === freshProduct.id ? freshProduct : current);
+          setData((current) => ({
+            ...current,
+            products: current.products.map((item) => item.id === freshProduct.id ? freshProduct : item),
+          }));
+        })
+        .catch((error) => {
+          setProductMessage(`Product opnieuw laden mislukt: ${importErrorMessage(error)}`);
+        });
+    }
   }
 
   function openBatchLabelProduct(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
@@ -10628,7 +10896,7 @@ function ProductsPage({
           </select>
           <select value={responsibilityFilter} onChange={(event) => setResponsibilityFilter(event.target.value)}>
             <option value="">Alle verantwoordelijkheden</option>
-            <option value="own">Eigen dossier vereist</option>
+            <option value="own">Wij beheren dit dossier zelf</option>
             <option value="outsourced">Uitbesteed aan leverancier</option>
           </select>
           <label className="product-date-filter">
@@ -10880,6 +11148,10 @@ function ProductDetailModal({
   const [checklistExpanded, setChecklistExpanded] = useState(false);
   const [dymoPrinting, setDymoPrinting] = useState(false);
   const [dymoMessage, setDymoMessage] = useState('');
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [labelPrinter, setLabelPrinter] = useState<'dymo' | 'zebra'>('zebra');
+  const [zebraLabelSize, setZebraLabelSize] = useState<ZebraProductLabelSize>('80x42');
+  const [labelQuantity, setLabelQuantity] = useState('1');
   const [productImageFailed, setProductImageFailed] = useState(false);
 
   useEffect(() => {
@@ -11224,38 +11496,8 @@ function ProductDetailModal({
     }, 80);
   }
 
-  async function handleDymoPrint() {
-    const printerAnswer = window.prompt(
-      'Welke printer wil je gebruiken?\n1 = DYMO LabelWriter\n2 = Zebra ZD421',
-      '2',
-    );
-    if (printerAnswer === null) return;
-    const normalizedPrinter = printerAnswer.trim().toLowerCase();
-    const printer: 'dymo' | 'zebra' = normalizedPrinter === '1' || normalizedPrinter.includes('dymo')
-      ? 'dymo'
-      : normalizedPrinter === '2' || normalizedPrinter.includes('zebra')
-        ? 'zebra'
-        : 'zebra';
-
-    let zebraSize: ZebraProductLabelSize = '80x42';
-    if (printer === 'zebra') {
-      const sizeAnswer = window.prompt(
-        'Welk liggend Zebra-etiket zit in de printer?\n1 = 80 x 42 mm\n2 = 80 x 36 mm',
-        '1',
-      );
-      if (sizeAnswer === null) return;
-      const normalizedSize = sizeAnswer.replace(/\s/g, '').toLowerCase();
-      if (normalizedSize === '2' || normalizedSize.includes('80x36')) {
-        zebraSize = '80x36';
-      } else if (normalizedSize !== '1' && !normalizedSize.includes('80x42')) {
-        setDymoMessage('Kies 1 voor 80 x 42 mm of 2 voor 80 x 36 mm.');
-        return;
-      }
-    }
-
-    const quantityAnswer = window.prompt('Hoeveel productlabels wil je printen?', '1');
-    if (quantityAnswer === null) return;
-    const quantity = Number(quantityAnswer.replace(',', '.'));
+  async function handleProductLabelAction(action: 'print' | 'preview') {
+    const quantity = Number(labelQuantity.replace(',', '.'));
     if (!Number.isInteger(quantity) || quantity < 1) {
       setDymoMessage('Vul een heel aantal labels in vanaf 1.');
       return;
@@ -11264,15 +11506,27 @@ function ProductDetailModal({
     setDymoPrinting(true);
     setDymoMessage('');
     try {
+      if (action === 'preview') {
+        if (labelPrinter !== 'zebra') {
+          setDymoMessage('De grafische preview is beschikbaar voor de Zebra ZD421.');
+          return;
+        }
+        await previewProductZebraLabel(draft, zebraLabelSize);
+        setDymoMessage(`Voorbeeld voor ${zebraProductLabelLayouts[zebraLabelSize].label} geopend; er is niets geprint.`);
+        setPrintDialogOpen(false);
+        return;
+      }
+
       const printerName = onPrintLabel
-        ? await onPrintLabel(draft, quantity, printer, zebraSize)
-        : printer === 'zebra'
-          ? await printProductZebraLabel(draft, quantity, zebraSize)
+        ? await onPrintLabel(draft, quantity, labelPrinter, zebraLabelSize)
+        : labelPrinter === 'zebra'
+          ? await printProductZebraLabel(draft, quantity, zebraLabelSize)
           : await printProductDymoLabel(draft, quantity);
-      const format = printer === 'zebra' ? ` op ${zebraProductLabelLayouts[zebraSize].label}` : '';
+      const format = labelPrinter === 'zebra' ? ` op ${zebraProductLabelLayouts[zebraLabelSize].label}` : '';
       setDymoMessage(`${quantity} productlabel${quantity === 1 ? '' : 's'}${format} verstuurd naar ${printerName}.`);
+      setPrintDialogOpen(false);
     } catch (error) {
-      setDymoMessage(`Label printen mislukt: ${importErrorMessage(error)}`);
+      setDymoMessage(`${action === 'preview' ? 'Voorbeeld openen' : 'Label printen'} mislukt: ${importErrorMessage(error)}`);
     } finally {
       setDymoPrinting(false);
     }
@@ -11287,35 +11541,103 @@ function ProductDetailModal({
             <h2>{draft.description || draft.code}</h2>
           </div>
           <div className="modal-header-actions">
-            <button type="button" className="secondary-button" disabled={dymoPrinting} onClick={handleDymoPrint}>
+            <button type="button" className="secondary-button" disabled={dymoPrinting} onClick={() => setPrintDialogOpen(true)}>
               <Printer size={15} /> {dymoPrinting ? 'Label printen...' : 'Print productlabel'}
             </button>
             <button type="button" onClick={onClose}>Close</button>
           </div>
         </div>
+        {printDialogOpen && (
+          <div className="product-print-dialog-backdrop" onMouseDown={() => !dymoPrinting && setPrintDialogOpen(false)}>
+            <section className="product-print-dialog" onMouseDown={(event) => event.stopPropagation()}>
+              <div className="product-print-dialog-heading">
+                <div>
+                  <span>Productlabel</span>
+                  <h3>Printer en etiket kiezen</h3>
+                </div>
+                <button type="button" className="product-print-dialog-close" disabled={dymoPrinting} onClick={() => setPrintDialogOpen(false)} aria-label="Sluiten">×</button>
+              </div>
+
+              <fieldset className="product-print-choice-group">
+                <legend>Printer</legend>
+                <div className="product-print-options printer-options">
+                  {([
+                    { id: 'dymo', name: 'DYMO LabelWriter', detail: 'Standaard DYMO-productlabel' },
+                    { id: 'zebra', name: 'Zebra ZD421', detail: 'Thermisch Zebra-productlabel' },
+                  ] as const).map((option) => (
+                    <button
+                      type="button"
+                      key={option.id}
+                      className={`product-print-option ${labelPrinter === option.id ? 'selected' : ''}`}
+                      onClick={() => setLabelPrinter(option.id)}
+                    >
+                      <span className="product-print-option-check">{labelPrinter === option.id && <CheckCircle2 size={19} />}</span>
+                      <Printer size={24} />
+                      <span><strong>{option.name}</strong><small>{option.detail}</small></span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              {labelPrinter === 'zebra' && (
+                <fieldset className="product-print-choice-group">
+                  <legend>Etiketformaat — liggend</legend>
+                  <div className="product-print-options size-options">
+                    {(['80x42', '80x36'] as ZebraProductLabelSize[]).map((size) => (
+                      <button
+                        type="button"
+                        key={size}
+                        className={`product-print-option size-option ${zebraLabelSize === size ? 'selected' : ''}`}
+                        onClick={() => setZebraLabelSize(size)}
+                      >
+                        <span className="product-print-option-check">{zebraLabelSize === size && <CheckCircle2 size={19} />}</span>
+                        <span className={`label-size-shape ${size}`} />
+                        <span><strong>{zebraProductLabelLayouts[size].label}</strong><small>Liggend</small></span>
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+
+              <label className="product-print-quantity">
+                <span>Aantal labels</span>
+                <input type="number" min="1" step="1" value={labelQuantity} onChange={(event) => setLabelQuantity(event.target.value)} />
+              </label>
+
+              <div className="product-print-dialog-actions">
+                <button type="button" className="secondary-button" disabled={dymoPrinting || labelPrinter !== 'zebra'} onClick={() => handleProductLabelAction('preview')}>
+                  <Search size={16} /> Voorbeeld bekijken
+                </button>
+                <button type="button" className="primary-button" disabled={dymoPrinting} onClick={() => handleProductLabelAction('print')}>
+                  <Printer size={16} /> {dymoPrinting ? 'Bezig...' : 'Direct printen'}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
         <section className="panel form-panel product-form-shell">
           <div className="product-compliance-shell">
             <div className={`product-responsibility-banner ${complianceResponsibility.responsibility}`}>
               <div>
-                <strong>{complianceResponsibility.responsibility === 'outsourced' ? 'Uitbesteed aan leverancier' : 'Eigen dossier vereist'}</strong>
-                <span>{complianceResponsibility.source === 'supplier' ? 'Geërfd van leverancier' : 'Handmatige productoverride'}</span>
+                <strong>{complianceResponsibility.responsibility === 'outsourced' ? 'Leverancier beheert dit productdossier' : 'Wij beheren dit productdossier'}</strong>
+                <span>{complianceResponsibility.source === 'supplier' ? 'Deze instelling komt nu van de gekoppelde leverancier.' : 'Deze instelling is handmatig op productniveau aangepast.'}</span>
                 {complianceResponsibility.reference && (/^https?:\/\//i.test(complianceResponsibility.reference)
                   ? <a href={complianceResponsibility.reference} target="_blank" rel="noreferrer">Open onderbouwing</a>
                   : <small>Onderbouwing: {complianceResponsibility.reference}</small>)}
               </div>
-              <label>Productoverride
+              <label>Wie beheert het productdossier?
                 <select value={draft.complianceResponsibilityOverride ?? ''} onChange={(event) => setDraft((current) => ({
                   ...current,
                   complianceResponsibilityOverride: (event.target.value || undefined) as Product['complianceResponsibilityOverride'],
                   complianceResponsibilitySetAt: event.target.value ? new Date().toISOString() : undefined,
                 }))}>
-                  <option value="">Erven van leverancier</option>
-                  <option value="own">Eigen dossier vereist</option>
-                  <option value="outsourced">Overgedragen aan leverancier</option>
+                  <option value="">Volg leverancierinstelling</option>
+                  <option value="own">Wij beheren dit dossier zelf</option>
+                  <option value="outsourced">Leverancier beheert dit dossier</option>
                 </select>
               </label>
               {draft.complianceResponsibilityOverride === 'outsourced' && (
-                <label>Onderbouwing / referentie*
+                <label>Bewijs / referentie*
                   <input value={draft.complianceResponsibilityReference ?? ''} required onChange={(event) => setDraft((current) => ({ ...current, complianceResponsibilityReference: event.target.value }))} />
                 </label>
               )}
@@ -11678,12 +12000,28 @@ function ProductDetailModal({
                     </select>
                   </label>
                   <label>E-mark relevant
-                    <select value={draft.eMarkRelevant ?? 'onbekend'} onChange={(event) => setDraft((current) => ({ ...current, eMarkRelevant: event.target.value as Product['eMarkRelevant'] }))}>
+                    <select value={draft.eMarkRelevant ?? 'onbekend'} onChange={(event) => setDraft((current) => {
+                      const relevance = event.target.value as Product['eMarkRelevant'];
+                      return {
+                        ...current,
+                        eMarkRelevant: relevance,
+                        ...(relevance === 'nee' ? { eMarkPresent: 'niet_van_toepassing' as const } : {}),
+                        ...(relevance === 'ja' && current.eMarkPresent === 'niet_van_toepassing' ? { eMarkPresent: 'onbekend' as const } : {}),
+                      };
+                    })}>
                       {relevanceOptions.map((option) => <option key={option} value={option}>{formatCertificationPresence(option as Product['eMarkPresent'])}</option>)}
                     </select>
                   </label>
                   <label>CE relevant
-                    <select value={draft.ceRelevant ?? 'onbekend'} onChange={(event) => setDraft((current) => ({ ...current, ceRelevant: event.target.value as Product['ceRelevant'] }))}>
+                    <select value={draft.ceRelevant ?? 'onbekend'} onChange={(event) => setDraft((current) => {
+                      const relevance = event.target.value as Product['ceRelevant'];
+                      return {
+                        ...current,
+                        ceRelevant: relevance,
+                        ...(relevance === 'nee' ? { cePresent: 'niet_van_toepassing' as const } : {}),
+                        ...(relevance === 'ja' && current.cePresent === 'niet_van_toepassing' ? { cePresent: 'onbekend' as const } : {}),
+                      };
+                    })}>
                       {relevanceOptions.map((option) => <option key={option} value={option}>{formatCertificationPresence(option as Product['eMarkPresent'])}</option>)}
                     </select>
                   </label>
@@ -11696,7 +12034,15 @@ function ProductDetailModal({
                   </div>
                   <div className="form-grid">
                     <label>E-mark aanwezig
-                      <select value={draft.eMarkPresent ?? 'onbekend'} onChange={(event) => setDraft((current) => ({ ...current, eMarkPresent: event.target.value as Product['eMarkPresent'] }))}>
+                      <select value={draft.eMarkPresent ?? 'onbekend'} onChange={(event) => setDraft((current) => {
+                        const presence = event.target.value as Product['eMarkPresent'];
+                        return {
+                          ...current,
+                          eMarkPresent: presence,
+                          ...(presence === 'ja' ? { eMarkRelevant: 'ja' as const } : {}),
+                          ...(presence === 'niet_van_toepassing' ? { eMarkRelevant: 'nee' as const } : {}),
+                        };
+                      })}>
                         {presenceOptions.map((option) => <option key={option} value={option}>{formatCertificationPresence(option)}</option>)}
                       </select>
                     </label>
@@ -11709,7 +12055,15 @@ function ProductDetailModal({
                 <div className="product-form-subsection">
                   <div className="form-grid">
                     <label>E-mark aanwezig
-                      <select value={draft.eMarkPresent ?? 'onbekend'} onChange={(event) => setDraft((current) => ({ ...current, eMarkPresent: event.target.value as Product['eMarkPresent'] }))}>
+                      <select value={draft.eMarkPresent ?? 'onbekend'} onChange={(event) => setDraft((current) => {
+                        const presence = event.target.value as Product['eMarkPresent'];
+                        return {
+                          ...current,
+                          eMarkPresent: presence,
+                          ...(presence === 'ja' ? { eMarkRelevant: 'ja' as const } : {}),
+                          ...(presence === 'niet_van_toepassing' ? { eMarkRelevant: 'nee' as const } : {}),
+                        };
+                      })}>
                         {presenceOptions.map((option) => <option key={option} value={option}>{formatCertificationPresence(option)}</option>)}
                       </select>
                     </label>
@@ -11727,7 +12081,15 @@ function ProductDetailModal({
                 ) : null}
                 <div className="form-grid">
                   <label>CE aanwezig
-                    <select value={draft.cePresent ?? 'onbekend'} onChange={(event) => setDraft((current) => ({ ...current, cePresent: event.target.value as Product['cePresent'] }))}>
+                    <select value={draft.cePresent ?? 'onbekend'} onChange={(event) => setDraft((current) => {
+                      const presence = event.target.value as Product['cePresent'];
+                      return {
+                        ...current,
+                        cePresent: presence,
+                        ...(presence === 'ja' ? { ceRelevant: 'ja' as const } : {}),
+                        ...(presence === 'niet_van_toepassing' ? { ceRelevant: 'nee' as const } : {}),
+                      };
+                    })}>
                       {presenceOptions.map((option) => <option key={option} value={option}>{formatCertificationPresence(option)}</option>)}
                     </select>
                   </label>
@@ -12379,8 +12741,8 @@ function SupplierModal({
           </label>
           <label>Compliance-verantwoordelijkheid
             <select name="complianceResponsibility" value={complianceResponsibility} onChange={(event) => setComplianceResponsibility(event.target.value as 'own' | 'outsourced')}>
-              <option value="own">Eigen dossier vereist</option>
-              <option value="outsourced">Overgedragen aan leverancier</option>
+              <option value="own">Wij beheren dit dossier zelf</option>
+              <option value="outsourced">Leverancier beheert dit dossier</option>
             </select>
           </label>
           <label>Vastgesteld op
@@ -13736,4 +14098,3 @@ function ScooterDrawer({
     </div>
   );
 }
-
