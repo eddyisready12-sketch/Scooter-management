@@ -2554,113 +2554,21 @@ async function getAvailableZebraPrinter() {
 }
 
 async function printProductZebraLabel(product: Product, quantity = 1, size: ZebraProductLabelSize = '80x42') {
-  const barcodeSource = product.barcode?.trim() || product.code.trim();
-  const batchCode = product.batchNumber?.trim() || product.batch?.trim() || product.traceabilityCode?.trim();
-  if (!barcodeSource) throw new Error('Product heeft geen barcode of code om te printen.');
-  if (!batchCode) throw new Error('Product heeft geen batchcode om als QR-code te printen.');
+  const { endpoint, printer } = await getAvailableZebraPrinter();
+  const zpl = buildZebraProductLabelZpl(product, size);
 
-  const barcodeCanvas = document.createElement('canvas');
-  (bwipjs as unknown as { toCanvas: (canvas: HTMLCanvasElement, options: Record<string, unknown>) => HTMLCanvasElement }).toCanvas(barcodeCanvas, {
-    bcid: 'code128',
-    text: barcodeSource.replace(/\s/g, ''),
-    scaleX: 3,
-    scaleY: 3,
-    height: 12,
-    includetext: true,
-    textxalign: 'center',
-    textsize: 9,
-    backgroundcolor: 'FFFFFF',
-    barcolor: '000000',
-    textcolor: '000000',
-  });
-  const qrCanvas = document.createElement('canvas');
-  (bwipjs as unknown as { toCanvas: (canvas: HTMLCanvasElement, options: Record<string, unknown>) => HTMLCanvasElement }).toCanvas(qrCanvas, {
-    bcid: 'qrcode',
-    text: batchCode,
-    scale: 4,
-    padding: 0,
-    backgroundcolor: 'FFFFFF',
-    barcolor: '000000',
-  });
-
-  const description = truncateLabelText(
-    product.labelTitle?.trim() || product.shortDescription?.trim() || product.description.trim(),
-    70,
-  );
-  const country = product.countryOfOrigin?.trim() || 'China';
-  const madeIn = country.toLowerCase().startsWith('made in') ? country : `Made in ${country}`;
-  const importerLines = productImporterLabelValue(product).split('\n').map((line) => line.trim()).filter(Boolean);
-  const recycleCodes = normalizePackagingLayers(product)
-    .filter((layer) => !isStickerPackagingLayer(layer))
-    .map((layer) => layer.recycleCode?.trim() || recycleCodeParts(layer)?.family || '')
-    .filter(Boolean)
-    .slice(0, 2)
-    .join(' / ');
-  const [widthMm, heightMm] = size === '80x42' ? [80, 42] : [80, 36];
-  const labelMarkup = Array.from({ length: quantity }, () => `
-    <section class="label">
-      <div class="left">
-        <strong class="code">${escapeLabelValue(product.code.trim() || barcodeSource)}</strong>
-        <div class="description">${escapeLabelValue(description)}</div>
-        <img class="barcode" src="${barcodeCanvas.toDataURL('image/png')}" alt="">
-        ${recycleCodes ? `<small>Materiaal: ${escapeLabelValue(recycleCodes)}</small>` : ''}
-      </div>
-      <div class="right">
-        <strong class="brand">RSO PARTS</strong>
-        <img class="qr" src="${qrCanvas.toDataURL('image/png')}" alt="">
-        <div class="meta">Batch ${escapeLabelValue(batchCode)}<br>${escapeLabelValue(madeIn)}</div>
-        <div class="importer">${escapeLabelValue(importerLines.join(' · '))}</div>
-      </div>
-    </section>
-  `).join('');
-
-  const printWindow = window.open('', '_blank', 'popup,width=900,height=650');
-  if (!printWindow) {
-    throw new Error('Het printvenster is geblokkeerd. Sta pop-ups voor deze website toe en probeer opnieuw.');
+  for (let index = 0; index < quantity; index += 1) {
+    const response = await fetch(`${endpoint}/write`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device: printer, data: zpl }),
+    });
+    if (!response.ok) {
+      throw new Error(`Zebra Browser Print gaf fout ${response.status} bij label ${index + 1}.`);
+    }
   }
-  printWindow.document.open();
-  printWindow.document.write(`<!doctype html>
-<html lang="nl">
-<head>
-  <meta charset="utf-8">
-  <title>Productlabels ${widthMm} x ${heightMm} mm</title>
-  <style>
-    @page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; font-family: Arial, sans-serif; color: #000; background: #fff; }
-    .label {
-      width: ${widthMm}mm; height: ${heightMm}mm; padding: 2mm;
-      display: grid; grid-template-columns: 56% 44%; overflow: hidden;
-      page-break-after: always; break-after: page;
-    }
-    .label:last-child { page-break-after: auto; break-after: auto; }
-    .left, .right { min-width: 0; position: relative; }
-    .left { padding-right: 2mm; display: flex; flex-direction: column; }
-    .right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
-    .code { font-size: 12pt; line-height: 1.05; }
-    .description { font-size: 7.5pt; line-height: 1.12; min-height: 7mm; margin-top: 1mm; }
-    .barcode { width: 100%; height: 13mm; object-fit: contain; object-position: left center; margin-top: .5mm; }
-    small { font-size: 5.5pt; margin-top: auto; }
-    .brand { font-size: 10pt; line-height: 1; }
-    .qr { width: 16mm; height: 16mm; object-fit: contain; margin-top: 1mm; }
-    .meta { font-size: 6.5pt; line-height: 1.25; margin-top: .5mm; }
-    .importer { font-size: 5.2pt; line-height: 1.15; margin-top: auto; max-height: ${heightMm === 36 ? '7mm' : '11mm'}; overflow: hidden; }
-    @media screen {
-      body { background: #ddd; padding: 10mm; }
-      .label { background: #fff; margin: 0 auto 8mm; box-shadow: 0 2px 12px #888; }
-    }
-    @media print { body { width: ${widthMm}mm; } }
-  </style>
-</head>
-<body>${labelMarkup}
-<script>
-  window.addEventListener('load', () => setTimeout(() => window.print(), 150));
-<\/script>
-</body>
-</html>`);
-  printWindow.document.close();
 
-  return `Windows afdrukvenster (${zebraProductLabelLayouts[size].label})`;
+  return `${printer.name || 'Zebra ZD421'} (${zebraProductLabelLayouts[size].label})`;
 }
 
 async function printOuterBoxDymoLabel({
