@@ -8379,5 +8379,7 @@ dd {
 }
 
 .product-responsibility-banner.outsourced { background: #edf5fc; border-color: #a9c9e7; color: #245d91; }
-.product-responsibility-banner > div { display: grid; gap: 3px; }
+.product-responsibility-banner > div { display: grid; gap: 3px; flex: 1; }
+.product-responsibility-field { min-width: 190px; }
+.product-responsibility-field input[readonly] { background: #fff; color: #334155; }
 .supplier-compliance-audit { display: grid; gap: 5px; padding: 10px; background: #f6f8fb; border-radius: 8px; }

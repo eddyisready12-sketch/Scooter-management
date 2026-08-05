@@ -5667,6 +5667,8 @@ export function App() {
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
+          scooters={data.scooters}
+          batteries={data.batteries}
           suppliers={productModalSuppliers}
           supplierRecords={data.suppliers}
           importers={data.importers}
@@ -11107,6 +11109,8 @@ function ProductsPage({
 
 function ProductDetailModal({
   product,
+  scooters,
+  batteries,
   suppliers,
   supplierRecords,
   importers,
@@ -11122,6 +11126,8 @@ function ProductDetailModal({
   onPrintLabel,
 }: {
   product: Product;
+  scooters: Scooter[];
+  batteries: Battery[];
   suppliers: string[];
   supplierRecords: Supplier[];
   importers: Importer[];
@@ -11153,6 +11159,19 @@ function ProductDetailModal({
   const [zebraLabelSize, setZebraLabelSize] = useState<ZebraProductLabelSize>('80x42');
   const [labelQuantity, setLabelQuantity] = useState('1');
   const [productImageFailed, setProductImageFailed] = useState(false);
+
+  const linkedScooter = useMemo(() => {
+    const productReferences = [draft.code, draft.supplierItemNo, draft.serialNumber, draft.traceabilityCode]
+      .map((value) => value?.trim().toLowerCase())
+      .filter((value): value is string => Boolean(value));
+    return scooters.find((scooter) => productReferences.includes(scooter.frameNumber.trim().toLowerCase()));
+  }, [draft.code, draft.serialNumber, draft.supplierItemNo, draft.traceabilityCode, scooters]);
+  const linkedBatteryNumber = useMemo(() => {
+    if (!linkedScooter) return '';
+    return batteries.find((battery) => battery.scooterFrame?.trim().toLowerCase() === linkedScooter.frameNumber.trim().toLowerCase())?.lotNumber
+      ?? linkedScooter.batteryNumber
+      ?? '';
+  }, [batteries, linkedScooter]);
 
   useEffect(() => {
     const nextDraft = createProductDraft(product);
@@ -11625,6 +11644,9 @@ function ProductDetailModal({
                   ? <a href={complianceResponsibility.reference} target="_blank" rel="noreferrer">Open onderbouwing</a>
                   : <small>Onderbouwing: {complianceResponsibility.reference}</small>)}
               </div>
+              <label className="product-responsibility-field">Accu
+                <input value={linkedBatteryNumber} readOnly aria-label="Gekoppelde accu" />
+              </label>
               <label>Wie beheert het productdossier?
                 <select value={draft.complianceResponsibilityOverride ?? ''} onChange={(event) => setDraft((current) => ({
                   ...current,
