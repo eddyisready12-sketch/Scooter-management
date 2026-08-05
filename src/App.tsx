@@ -3899,6 +3899,7 @@ export function App() {
   const [data, setData] = useState<AppData>(demoData);
   const [query, setQuery] = useState('');
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
+  const [selectedBattery, setSelectedBattery] = useState<Battery | null>(null);
   const [focusedContainerId, setFocusedContainerId] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedProductTab, setSelectedProductTab] = useState<ProductModalTab>('basic');
@@ -5647,12 +5648,19 @@ export function App() {
       {selectedScooter && (
         <ScooterDrawer
           scooter={selectedScooter}
-          battery={data.batteries.find((battery) => battery.scooterFrame?.trim().toLowerCase() === selectedScooter.frameNumber.trim().toLowerCase())}
+          battery={data.batteries.find((battery) => (
+            battery.scooterFrame?.trim().toLowerCase() === selectedScooter.frameNumber.trim().toLowerCase()
+            || (selectedScooter.batteryNumber && battery.lotNumber.trim().toLowerCase() === selectedScooter.batteryNumber.trim().toLowerCase())
+          ))}
           dealers={data.dealers}
           warranties={data.warranties.filter((warranty) => warranty.scooterFrame === selectedScooter.frameNumber)}
           maintenance={data.maintenance.filter((record) => record.scooterFrame === selectedScooter.frameNumber)}
           documents={data.documents.filter((document) => document.scooterFrame === selectedScooter.frameNumber)}
           onClose={() => setSelectedScooter(null)}
+          onOpenBattery={(battery) => {
+            setSelectedScooter(null);
+            setSelectedBattery(battery);
+          }}
           onUpdate={updateScooter}
           container={data.containers.find((container) => container.id === selectedScooter.containerId)}
           onOpenContainer={(containerId) => {
@@ -5663,6 +5671,23 @@ export function App() {
           onAddDocument={addDocument}
           onOpenDocument={openDocument}
           onDownloadDocument={downloadDocument}
+        />
+      )}
+      {selectedBattery && (
+        <BatteryDetailModal
+          battery={selectedBattery}
+          batteryModels={data.batteryModels}
+          dealers={data.dealers}
+          scooters={data.scooters}
+          onClose={() => setSelectedBattery(null)}
+          onSelectScooter={(scooter) => {
+            setSelectedBattery(null);
+            setSelectedScooter(scooter);
+          }}
+          onUpdate={async (battery) => {
+            await updateBattery(battery);
+            setSelectedBattery(battery);
+          }}
         />
       )}
       {selectedProduct && (
@@ -13849,6 +13874,7 @@ function ScooterDrawer({
   maintenance,
   documents,
   onClose,
+  onOpenBattery,
   onUpdate,
   onOpenContainer,
   onAddDocument,
@@ -13863,6 +13889,7 @@ function ScooterDrawer({
   maintenance: MaintenanceRecord[];
   documents: DocumentRecord[];
   onClose: () => void;
+  onOpenBattery: (battery: Battery) => void;
   onUpdate: (scooter: Scooter) => void | Promise<void>;
   onOpenContainer: (containerId: string) => void;
   onAddDocument: (scooterFrame: string, type: DocumentRecord['type'], note: string, file: File) => Promise<DocumentRecord>;
@@ -13982,7 +14009,9 @@ function ScooterDrawer({
               <dt>Engine nummer</dt><dd>{scooter.engineNumber || '-'}</dd>
               <dt>Merk</dt><dd>{scooter.brand}</dd>
               <dt>Model</dt><dd>{scooter.model}</dd>
-              <dt>Accu nummer</dt><dd>{battery?.lotNumber || scooter.batteryNumber || ''}</dd>
+              <dt>Accu nummer</dt><dd>{battery
+                ? <button type="button" className="link-button" onClick={() => onOpenBattery(battery)}>{battery.lotNumber}</button>
+                : scooter.batteryNumber || ''}</dd>
               <dt>Kleur</dt><dd>{scooter.color}</dd>
               <dt>Kleur No</dt><dd>{scooter.colorNumber || '-'}</dd>
               <dt>Snelheid</dt><dd>{normalizeSpeedValue(scooter.speed)}</dd>
