@@ -5647,6 +5647,7 @@ export function App() {
       {selectedScooter && (
         <ScooterDrawer
           scooter={selectedScooter}
+          battery={data.batteries.find((battery) => battery.scooterFrame?.trim().toLowerCase() === selectedScooter.frameNumber.trim().toLowerCase())}
           dealers={data.dealers}
           warranties={data.warranties.filter((warranty) => warranty.scooterFrame === selectedScooter.frameNumber)}
           maintenance={data.maintenance.filter((record) => record.scooterFrame === selectedScooter.frameNumber)}
@@ -13841,6 +13842,7 @@ function ContainerListPanel({
 
 function ScooterDrawer({
   scooter,
+  battery,
   dealers,
   container,
   warranties,
@@ -13854,6 +13856,7 @@ function ScooterDrawer({
   onDownloadDocument,
 }: {
   scooter: Scooter;
+  battery?: Battery;
   dealers: Dealer[];
   container?: Container;
   warranties: WarrantyPart[];
@@ -13979,6 +13982,7 @@ function ScooterDrawer({
               <dt>Engine nummer</dt><dd>{scooter.engineNumber || '-'}</dd>
               <dt>Merk</dt><dd>{scooter.brand}</dd>
               <dt>Model</dt><dd>{scooter.model}</dd>
+              <dt>Accu nummer</dt><dd>{battery?.lotNumber || scooter.batteryNumber || ''}</dd>
               <dt>Kleur</dt><dd>{scooter.color}</dd>
               <dt>Kleur No</dt><dd>{scooter.colorNumber || '-'}</dd>
               <dt>Snelheid</dt><dd>{normalizeSpeedValue(scooter.speed)}</dd>
@@ -13998,6 +14002,7 @@ function ScooterDrawer({
               <label>Kleur No<input value={draft.colorNumber ?? ''} onChange={(e) => setDraft({ ...draft, colorNumber: e.target.value })} /></label>
               <label>Snelheid<input value={draft.speed} onChange={(e) => setDraft({ ...draft, speed: e.target.value })} /></label>
               <label>Kenteken<input value={draft.licensePlate ?? ''} onChange={(e) => setDraft({ ...draft, licensePlate: e.target.value })} /></label>
+              <label>Accu nummer<input value={battery?.lotNumber || draft.batteryNumber || ''} readOnly /></label>
               <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{(Object.keys(statusColor) as ScooterStatus[]).map((status) => <option key={status} value={status}>{scooterStatusLabel(status)}</option>)}</select></label>
               <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value })}><option value="">Geen dealer</option>{selectableDealers.map((dealer) => <option value={dealer.id} key={dealer.id}>{dealer.company || dealer.name}</option>)}</select></label>
               <label>Factuur<input value={draft.invoiceNumber ?? ''} onChange={(e) => setDraft({ ...draft, invoiceNumber: e.target.value })} /></label>
