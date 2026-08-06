@@ -1112,6 +1112,10 @@ function getProductComplianceSummary(
   const packagingSupplierStates = activePackagingLayers.map((layer) => {
     const supplier = findSupplierByName(supplierRecords, layer.packagingSupplier);
     const linkedPackagingItem = supplier?.packagingItems?.find((item) => item.id === layer.packagingCatalogItemId);
+    const linkedItemHasDocument = Boolean(
+      linkedPackagingItem
+      && supplier?.ppwrDocuments?.some((document) => document.packagingItemIds?.includes(linkedPackagingItem.id)),
+    );
     const linkedItemIsComplete = Boolean(
       linkedPackagingItem
       && linkedPackagingItem.actief !== false
@@ -1119,7 +1123,8 @@ function getProductComplianceSummary(
       && linkedPackagingItem.gewichtGram > 0
       && linkedPackagingItem.gewichtBasis
       && linkedPackagingItem.zorgwekkendeStoffen
-      && linkedPackagingItem.bron,
+      && linkedPackagingItem.bron
+      && linkedItemHasDocument,
     );
     const layerIsComplete = Boolean(
       hasText(layer.material)
@@ -1134,7 +1139,9 @@ function getProductComplianceSummary(
     return {
       layer,
       supplier,
-      hasProfile: layerIsComplete || linkedItemIsComplete || hasPpwrSupplierProfile(supplier),
+      hasProfile: linkedPackagingItem
+        ? linkedItemIsComplete
+        : layerIsComplete || hasPpwrSupplierProfile(supplier),
     };
   });
   const packagingIssues: ProductComplianceIssue[] = [];
@@ -11479,6 +11486,10 @@ function ProductDetailModal({
       weightGrams: item.gewichtGram > 0 ? String(item.gewichtGram) : undefined,
       weightBasis: item.gewichtBasis,
       recycledContentPercent: item.recyclaatPercentage == null ? undefined : String(item.recyclaatPercentage),
+      ...(item.categorie === 'productetiket' ? {
+        packagingRole: 'Primair' as const,
+        productStickerMaterial: item.materiaalcode.toUpperCase().includes('PP') ? 'Plastic PP' as const : 'Papier' as const,
+      } : {}),
     });
   }
 

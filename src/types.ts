@@ -275,6 +275,7 @@ export type VerpakkingsLaag = {
 
 export type IngekochtVerpakkingsartikel = {
   id: string;
+  categorie?: 'productetiket' | 'overig';
   orderNummer: string;
   besteldOp?: string;
   artikelCode: string;
@@ -338,6 +339,7 @@ export type Supplier = {
     storagePath?: string;
     fileUrl?: string;
     uploadedAt: string;
+    packagingItemIds?: string[];
   }>;
 };
 

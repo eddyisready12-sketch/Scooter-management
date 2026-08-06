@@ -91,6 +91,7 @@ export function createPackagingProfileLayer(): VerpakkingsLaag {
 export function createPurchasedPackagingItem(): IngekochtVerpakkingsartikel {
   return {
     id: `verpakking-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    categorie: 'overig',
     orderNummer: '',
     artikelCode: '',
     omschrijving: '',

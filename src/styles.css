@@ -7875,6 +7875,39 @@ dd {
 .supplier-document-row > div { display: grid; gap: 3px; }
 .supplier-document-row span { color: #64748b; font-size: 12px; }
 
+.supplier-document-item-links {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 6px 12px !important;
+  margin-top: 8px;
+}
+
+.supplier-document-item-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.supplier-document-item-link input {
+  margin: 0;
+}
+
+.packaging-item-document-summary {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.packaging-item-document-summary span {
+  color: #64748b;
+  font-size: 12px;
+}
+
 .compliance-detail-dialog .compliance-tabs {
   position: sticky;
   top: 86px;

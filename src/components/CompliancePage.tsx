@@ -2142,6 +2142,41 @@ export function CompliancePage({
     } : current);
   }
 
+  function addCrazyLabelsFormats() {
+    setDraftPackagingSupplier((current) => {
+      if (!current) return current;
+      const existingItems = current.packagingItems ?? [];
+      const formats = [
+        { artikelCode: 'DYMO-89X36', omschrijving: 'Productetiket DYMO 89 × 36 mm', afmetingen: '89 × 36 mm' },
+        { artikelCode: 'ZEBRA-80X42', omschrijving: 'Productetiket ZEBRA 80 × 42 mm', afmetingen: '80 × 42 mm' },
+        { artikelCode: 'ZEBRA-80X36', omschrijving: 'Productetiket ZEBRA 80 × 36 mm', afmetingen: '80 × 36 mm' },
+      ];
+      const existingCodes = new Set(existingItems.map((item) => item.artikelCode.trim().toLowerCase()));
+      const additions = formats
+        .filter((format) => !existingCodes.has(format.artikelCode.toLowerCase()))
+        .map((format, index) => ({
+          ...createPurchasedPackagingItem(),
+          id: `verpakking-label-${Date.now()}-${index + 1}`,
+          categorie: 'productetiket' as const,
+          ...format,
+        }));
+      return { ...current, packagingItems: [...existingItems, ...additions] };
+    });
+  }
+
+  function toggleSupplierDocumentPackagingItem(documentId: string, itemId: string, linked: boolean) {
+    setDraftPackagingSupplier((current) => current ? {
+      ...current,
+      ppwrDocuments: (current.ppwrDocuments ?? []).map((document) => {
+        if (document.id !== documentId) return document;
+        const linkedItemIds = new Set(document.packagingItemIds ?? []);
+        if (linked) linkedItemIds.add(itemId);
+        else linkedItemIds.delete(itemId);
+        return { ...document, packagingItemIds: Array.from(linkedItemIds) };
+      }),
+    } : current);
+  }
+
   async function addSupplierDocument(file: File) {
     if (!draftPackagingSupplier) return;
     setSupplierDocumentMessage('Document uploaden...');
@@ -2381,13 +2416,20 @@ export function CompliancePage({
                 )}
 
                 {packagingDetailTab === 'purchased' && (<section className="panel">
-                  <div className="panel-title"><span>Ingekochte verpakkingen</span><button type="button" className="secondary-button" onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, packagingItems: [...(current.packagingItems ?? []), createPurchasedPackagingItem()] } : current)}><Plus size={14} /> Verpakking toevoegen</button></div>
+                  <div className="panel-title">
+                    <span>Ingekochte verpakkingen</span>
+                    <div className="page-title-actions">
+                      <button type="button" className="secondary-button" onClick={addCrazyLabelsFormats}><Plus size={14} /> Crazy Labels-formaten</button>
+                      <button type="button" className="secondary-button" onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, packagingItems: [...(current.packagingItems ?? []), createPurchasedPackagingItem()] } : current)}><Plus size={14} /> Verpakking toevoegen</button>
+                    </div>
+                  </div>
                   <p className="packaging-section-explanation">Concrete inkooporders en verpakkingsartikelen van deze leverancier. Leg een artikel één keer vast; daarna kan het aan meerdere producten worden gekoppeld.</p>
                   <div className="supplier-profile-stack">
                     {(draftPackagingSupplier.packagingItems ?? []).map((item) => (
                       <article className="supplier-profile-layer" key={item.id}>
                         <div className="supplier-profile-layer-title"><strong>{item.orderNummer ? `Order ${item.orderNummer}` : 'Nieuwe ingekochte verpakking'}{item.artikelCode ? ` · ${item.artikelCode}` : ''}</strong><button type="button" className="danger-icon-button" aria-label="Ingekochte verpakking verwijderen" onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, packagingItems: (current.packagingItems ?? []).filter((entry) => entry.id !== item.id) } : current)}><Trash2 size={16} /></button></div>
                         <div className="compliance-form-grid profile-grid">
+                          <label><span>Categorie</span><select value={item.categorie || 'overig'} onChange={(event) => updatePurchasedPackagingItem(item.id, { categorie: event.target.value as NonNullable<typeof item.categorie> })}><option value="productetiket">Productetiket</option><option value="overig">Overige verpakking</option></select></label>
                           <label><span>Ordernummer</span><input value={item.orderNummer} onChange={(event) => updatePurchasedPackagingItem(item.id, { orderNummer: event.target.value })} /></label>
                           <label><span>Besteld op</span><input type="date" value={item.besteldOp || ''} onChange={(event) => updatePurchasedPackagingItem(item.id, { besteldOp: event.target.value || undefined })} /></label>
                           <label><span>Artikelcode</span><input value={item.artikelCode} onChange={(event) => updatePurchasedPackagingItem(item.id, { artikelCode: event.target.value })} placeholder="Bijv. 00324" /></label>
@@ -2402,6 +2444,10 @@ export function CompliancePage({
                           <label><span>Bron</span><select value={item.bron} onChange={(event) => updatePurchasedPackagingItem(item.id, { bron: event.target.value as typeof item.bron })}><option value="opgave_leverancier">Opgave leverancier</option><option value="eigen_meting">Eigen meting</option><option value="schatting">Schatting</option></select></label>
                           <label className="compliance-checkbox-label"><input type="checkbox" checked={item.herbruikbaar} onChange={(event) => updatePurchasedPackagingItem(item.id, { herbruikbaar: event.target.checked })} /><span>Herbruikbaar</span></label>
                           <label className="compliance-checkbox-label"><input type="checkbox" checked={item.actief} onChange={(event) => updatePurchasedPackagingItem(item.id, { actief: event.target.checked })} /><span>Actief artikel</span></label>
+                          <div className="span-2 packaging-item-document-summary">
+                            <strong>Documentatie</strong>
+                            <span>{(draftPackagingSupplier.ppwrDocuments ?? []).filter((document) => document.packagingItemIds?.includes(item.id)).map((document) => document.fileName).join(', ') || 'Nog geen document aan dit artikel gekoppeld'}</span>
+                          </div>
                         </div>
                       </article>
                     ))}
@@ -2420,7 +2466,23 @@ export function CompliancePage({
                       {(draftPackagingSupplier.ppwrDocuments ?? []).map((document) => (
                         <div className="supplier-document-row" key={document.id}>
                           <FileText size={18} />
-                          <div><strong>{document.fileName}</strong><span>Geüpload op {formatDateTime(document.uploadedAt)}</span></div>
+                          <div>
+                            <strong>{document.fileName}</strong>
+                            <span>Geüpload op {formatDateTime(document.uploadedAt)}</span>
+                            <div className="supplier-document-item-links">
+                              {(draftPackagingSupplier.packagingItems ?? []).map((item) => (
+                                <label key={`${document.id}-${item.id}`} className="supplier-document-item-link">
+                                  <input
+                                    type="checkbox"
+                                    checked={document.packagingItemIds?.includes(item.id) ?? false}
+                                    onChange={(event) => toggleSupplierDocumentPackagingItem(document.id, item.id, event.target.checked)}
+                                  />
+                                  <span>{item.artikelCode || item.omschrijving || 'Verpakkingsartikel'}</span>
+                                </label>
+                              ))}
+                              {(draftPackagingSupplier.packagingItems?.length ?? 0) === 0 ? <span>Voeg eerst een ingekocht verpakkingsartikel toe.</span> : null}
+                            </div>
+                          </div>
                           <button type="button" className="icon-button danger" aria-label={`${document.fileName} verwijderen`} onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, ppwrDocuments: (current.ppwrDocuments ?? []).filter((item) => item.id !== document.id) } : current)}><Trash2 size={15} /></button>
                         </div>
                       ))}
