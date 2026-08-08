@@ -497,6 +497,7 @@ export type ComplianceProductLink = {
 
 export type ProductPackagingLayer = {
   name?: string;
+  componentType?: 'packaging' | 'product_sticker';
   material?: string;
   recycleCode?: string;
   packagingSupplier?: string;

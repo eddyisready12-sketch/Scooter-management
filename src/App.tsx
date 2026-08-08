@@ -147,10 +147,9 @@ const packagingMaterialOptions = [
   { value: 'PET', label: 'PET', recycleCode: 'PET 1', recycleFamily: 'PET', recycleNumber: '1', wasteStream: 'Plastic / PMD' },
 ] as const;
 
-const packagingLayerNames = ['01. Omverpakking', '02. Binnenzak', '03. Label / sticker', '04. Transportverpakking', '05. Extra component'] as const;
+const packagingLayerNames = Array.from({ length: 10 }, (_, index) => `Verpakkingscomponent ${index + 1}`);
 const packagingRoleOptions = ['Primair', 'Secundair', 'Tertiair'] as const;
 const recyclabilityClassOptions = ['Klasse A', 'Klasse B', 'Klasse C', 'Klasse D', 'Klasse E'] as const;
-const productStickerMaterialOptions = ['Geen', 'Papier', 'Plastic PP'] as const;
 const productComplianceCategoryOptions = [
   'STANDARD_PART',
   'SAFETY_RELEVANT_PART',
@@ -578,7 +577,7 @@ function findPackagingMaterialOption(value?: string) {
 
 function isStickerPackagingLayer(layer: ProductPackagingLayer) {
   const name = (layer.name ?? '').toLowerCase();
-  return name.includes('sticker') || name.includes('label');
+  return layer.componentType === 'product_sticker' || name.includes('sticker') || name.includes('label') || name.includes('etiket');
 }
 
 function asOptionalTrimmedString(value: unknown): string | undefined {
@@ -595,7 +594,7 @@ function asOptionalTrimmedString(value: unknown): string | undefined {
 }
 
 function createEmptyPackagingLayer(index: number): ProductPackagingLayer {
-  return { name: packagingLayerNames[index] };
+  return { name: packagingLayerNames[index], componentType: 'packaging' };
 }
 
 function toPackagingLayerRecords(value: unknown): Record<string, unknown>[] {
@@ -641,6 +640,7 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
       const record = layer && typeof layer === 'object' ? (layer as Record<string, unknown>) : {};
       return {
         name: readPackagingLayerField(record, ['name', 'layerName', 'title']) || packagingLayerNames[index],
+        componentType: readPackagingLayerField(record, ['componentType', 'component_type']) as ProductPackagingLayer['componentType'],
         material: readPackagingLayerField(record, ['material', 'packagingMaterial', 'packaging_material']),
         recycleCode: readPackagingLayerField(record, ['recycleCode', 'recycle_code', 'code']),
         packagingSupplier: readPackagingLayerField(record, ['packagingSupplier', 'packaging_supplier', 'supplier', 'supplierName', 'supplier_name']),
@@ -687,12 +687,35 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
 
   const layers = (storedLayers.length > 0 ? storedLayers : fallbackLayers).slice(0, packagingLayerNames.length);
 
-  while (layers.length < 2) {
+  const hasSeparateStickerLayer = layers.some(isStickerPackagingLayer);
+  const legacyStickerMaterial = layers.find((layer) => (
+    !isStickerPackagingLayer(layer)
+    && layer.productStickerMaterial
+    && layer.productStickerMaterial !== 'Geen'
+  ))?.productStickerMaterial;
+
+  if (!hasSeparateStickerLayer && legacyStickerMaterial && layers.length < packagingLayerNames.length) {
+    layers.forEach((layer) => {
+      if (!isStickerPackagingLayer(layer)) layer.productStickerMaterial = undefined;
+    });
+    const stickerIsPlastic = legacyStickerMaterial === 'Plastic PP';
+    layers.push({
+      name: 'Productsticker',
+      componentType: 'product_sticker',
+      material: stickerIsPlastic ? 'PP' : 'PAP 22',
+      recycleCode: stickerIsPlastic ? 'PP 5' : 'PAP 22',
+      packagingRole: 'Primair',
+      productStickerMaterial: legacyStickerMaterial,
+    });
+  }
+
+  while (layers.length < 1) {
     layers.push(createEmptyPackagingLayer(layers.length));
   }
 
   return layers.map((layer, index) => ({
     name: asOptionalTrimmedString(layer.name) || packagingLayerNames[index],
+    componentType: layer.componentType || (isStickerPackagingLayer(layer) ? 'product_sticker' : 'packaging'),
     material: asOptionalTrimmedString(layer.material),
     recycleCode: asOptionalTrimmedString(layer.recycleCode),
     packagingSupplier: asOptionalTrimmedString(layer.packagingSupplier),
@@ -1132,7 +1155,7 @@ function getProductComplianceSummary(
       && hasText(layer.recycledContentPercent)
       && hasText(layer.recyclabilityClass)
       && hasText(layer.packagingRole)
-      && hasText(layer.productStickerMaterial)
+      && (!isStickerPackagingLayer(layer) || hasText(layer.productStickerMaterial))
       && hasText(layer.packagingSupplier)
       && findPackagingMaterialOption(layer.material)?.wasteStream,
     );
@@ -1176,7 +1199,7 @@ function getProductComplianceSummary(
     } else if (!hasProfile) {
       packagingIssues.push({ id: `packaging-supplier-ppwr-${index}`, domain: 'packaging', level: 'warning', label: `PPWR-profiel van leverancier is onvolledig bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
     }
-    if (!hasText(layer.productStickerMaterial)) {
+    if (isStickerPackagingLayer(layer) && !hasText(layer.productStickerMaterial)) {
       packagingIssues.push({ id: `packaging-label-${index}`, domain: 'packaging', level: 'warning', label: `Labelinformatie ontbreekt bij laag ${layerNumber}`, tab: 'packaging', section: 'packagingLayers' });
     }
   });
@@ -11244,6 +11267,7 @@ function ProductDetailModal({
   }, [draft.imageUrl]);
 
   const packagingLayers = draft.packagingLayers ?? normalizePackagingLayers(draft);
+  const hasProductStickerLayer = packagingLayers.some(isStickerPackagingLayer);
   const derivedPackagingWasteStream = summarizePackagingWasteStream(
     packagingLayers.map((layer) => layer.material).filter(Boolean) as string[],
   );
@@ -11348,6 +11372,7 @@ function ProductDetailModal({
           .slice(0, packagingLayerNames.length)
           .map((layer, index) => ({
             name: asOptionalTrimmedString(layer.name) || packagingLayerNames[index],
+            componentType: layer.componentType || (isStickerPackagingLayer(layer) ? 'product_sticker' as const : 'packaging' as const),
             material: asOptionalTrimmedString(layer.material),
             recycleCode: asOptionalTrimmedString(layer.recycleCode),
             packagingSupplier: asOptionalTrimmedString(layer.packagingSupplier),
@@ -11452,7 +11477,8 @@ function ProductDetailModal({
       nextLayers[index] = {
         ...currentLayer,
         ...updates,
-        name: currentLayer.name ?? packagingLayerNames[index],
+        name: updates.name ?? currentLayer.name ?? packagingLayerNames[index],
+        componentType: updates.componentType ?? currentLayer.componentType ?? 'packaging',
       };
 
       return {
@@ -11464,9 +11490,15 @@ function ProductDetailModal({
 
   function applyPackagingMaterial(index: number, value: string) {
     const option = findPackagingMaterialOption(value);
+    const stickerLayer = isStickerPackagingLayer(packagingLayers[index] ?? createEmptyPackagingLayer(index));
     updatePackagingLayer(index, {
       material: value || undefined,
       recycleCode: value ? option?.recycleCode ?? undefined : undefined,
+      ...(stickerLayer ? {
+        productStickerMaterial: value
+          ? (value.toUpperCase().includes('PP') ? 'Plastic PP' as const : 'Papier' as const)
+          : undefined,
+      } : {}),
     });
   }
 
@@ -11487,6 +11519,8 @@ function ProductDetailModal({
       weightBasis: item.gewichtBasis,
       recycledContentPercent: item.recyclaatPercentage == null ? undefined : String(item.recyclaatPercentage),
       ...(item.categorie === 'productetiket' ? {
+        name: 'Productsticker',
+        componentType: 'product_sticker' as const,
         packagingRole: 'Primair' as const,
         productStickerMaterial: item.materiaalcode.toUpperCase().includes('PP') ? 'Plastic PP' as const : 'Papier' as const,
       } : {}),
@@ -11502,21 +11536,29 @@ function ProductDetailModal({
     });
   }
 
+  function addProductStickerLayer() {
+    setDraft((current) => {
+      const nextLayers = [...(current.packagingLayers ?? normalizePackagingLayers(current))];
+      if (nextLayers.length >= packagingLayerNames.length || nextLayers.some(isStickerPackagingLayer)) return current;
+      nextLayers.push({
+        name: 'Productsticker',
+        componentType: 'product_sticker',
+        packagingRole: 'Primair',
+      });
+      return { ...current, packagingLayers: nextLayers };
+    });
+  }
+
   function removePackagingLayer(index: number) {
     setDraft((current) => {
       const currentLayers = [...(current.packagingLayers ?? normalizePackagingLayers(current))];
       const nextLayers = currentLayers.filter((_, layerIndex) => layerIndex !== index);
-      while (nextLayers.length < 2) {
+      while (nextLayers.length < 1) {
         nextLayers.push(createEmptyPackagingLayer(nextLayers.length));
       }
       return {
         ...current,
-        packagingLayers: nextLayers
-          .slice(0, packagingLayerNames.length)
-          .map((layer, layerIndex) => ({
-            ...layer,
-            name: packagingLayerNames[layerIndex],
-          })),
+        packagingLayers: nextLayers.slice(0, packagingLayerNames.length),
       };
     });
   }
@@ -12172,9 +12214,14 @@ function ProductDetailModal({
                 <div className="product-form-subsection" ref={packagingGeneralSectionRef}>
                   <div className="product-subsection-header">
                     <h3>Verpakking algemeen</h3>
-                    <button type="button" className="secondary-button" onClick={addPackagingLayer} disabled={packagingLayers.length >= packagingLayerNames.length}>
-                      <Plus size={16} /> Laag toevoegen
-                    </button>
+                    <div className="page-title-actions">
+                      <button type="button" className="secondary-button" onClick={addProductStickerLayer} disabled={hasProductStickerLayer || packagingLayers.length >= packagingLayerNames.length}>
+                        <Plus size={16} /> Productsticker toevoegen
+                      </button>
+                      <button type="button" className="secondary-button" onClick={addPackagingLayer} disabled={packagingLayers.length >= packagingLayerNames.length}>
+                        <Plus size={16} /> Verpakkingscomponent toevoegen
+                      </button>
+                    </div>
                   </div>
                   <div className="packaging-meta-grid">
                     <label>Stuks per verpakking
@@ -12205,7 +12252,6 @@ function ProductDetailModal({
                     <span>Gewicht (g)</span>
                     <span>% PCR</span>
                     <span>Recyclebaar</span>
-                    <span>Productsticker</span>
                     <span>Labelicoon</span>
                     <span className="sr-only">Acties</span>
                   </div>
@@ -12214,13 +12260,25 @@ function ProductDetailModal({
                       const selectedOption = findPackagingMaterialOption(layer.material);
                       const layerWasteStream = selectedOption?.wasteStream ?? '';
                       const selectedPackagingSupplier = supplierRecords.find((supplier) => supplierNameMatches(supplier, layer.packagingSupplier));
-                      const availableCatalogItems = (selectedPackagingSupplier?.packagingItems ?? []).filter((item) => item.actief || item.id === layer.packagingCatalogItemId);
+                      const stickerLayer = isStickerPackagingLayer(layer);
+                      const availableCatalogItems = (selectedPackagingSupplier?.packagingItems ?? []).filter((item) => (
+                        (item.actief || item.id === layer.packagingCatalogItemId)
+                        && (!stickerLayer || item.categorie === 'productetiket')
+                      ));
 
                       return (
                         <div key={`${layer.name ?? packagingLayerNames[index]}-${index}`} className="packaging-layer-card">
                           <div className="packaging-layer-grid">
                             <div className="packaging-layer-name">
-                              <strong>{layer.name ?? packagingLayerNames[index]}</strong>
+                              <label>
+                                <span className="packaging-layer-mobile-label">Naam component</span>
+                                <input
+                                  value={layer.name ?? packagingLayerNames[index]}
+                                  onChange={(event) => updatePackagingLayer(index, { name: event.target.value })}
+                                  placeholder="Bijv. Doos, zak, blister of beschermfolie"
+                                />
+                              </label>
+                              {stickerLayer ? <span className="compliance-status-pill concept">Productsticker</span> : null}
                             </div>
                             <div className="packaging-layer-field">
                               <span className="packaging-layer-mobile-label">Materiaalcode</span>
@@ -12278,13 +12336,6 @@ function ProductDetailModal({
                               <select value={layer.recyclabilityClass ?? ''} onChange={(event) => updatePackagingLayer(index, { recyclabilityClass: (event.target.value || undefined) as ProductPackagingLayer['recyclabilityClass'] })}>
                                 <option value="">Selecteer...</option>
                                 {recyclabilityClassOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                              </select>
-                            </div>
-                            <div className="packaging-layer-field">
-                              <span className="packaging-layer-mobile-label">Productsticker</span>
-                              <select value={layer.productStickerMaterial ?? ''} onChange={(event) => updatePackagingLayer(index, { productStickerMaterial: (event.target.value || undefined) as ProductPackagingLayer['productStickerMaterial'] })}>
-                                <option value="">N.v.t.</option>
-                                {productStickerMaterialOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                               </select>
                             </div>
                             <div className="packaging-layer-preview">
