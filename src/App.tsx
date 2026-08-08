@@ -12282,7 +12282,7 @@ function ProductDetailModal({
                             </div>
                             <div className="packaging-layer-field">
                               <span className="packaging-layer-mobile-label">Materiaalcode</span>
-                              <select value={layer.material ?? ''} onChange={(event) => applyPackagingMaterial(index, event.target.value)}>
+                              <select value={layer.material ?? ''} onChange={(event) => applyPackagingMaterial(index, event.target.value)} disabled={Boolean(layer.packagingCatalogItemId)} title={layer.packagingCatalogItemId ? 'Automatisch gekoppeld aan het gekozen formaat' : undefined}>
                                 <option value="">Selecteer...</option>
                                 {layer.material && !selectedOption ? <option value={layer.material}>{layer.material}</option> : null}
                                 {packagingMaterialOptions.map((option) => <option key={`${index}-${option.recycleCode}`} value={option.value}>{option.label}</option>)}
@@ -12296,11 +12296,15 @@ function ProductDetailModal({
                               </select>
                             </div>
                             <div className="packaging-layer-field">
-                              <span className="packaging-layer-mobile-label">Ingekochte verpakking</span>
+                              <span className="packaging-layer-mobile-label">{stickerLayer ? 'Etiketformaat' : 'Formaat / verpakking'}</span>
                               <select value={layer.packagingCatalogItemId ?? ''} onChange={(event) => applyPackagingCatalogItem(index, event.target.value)} disabled={!selectedPackagingSupplier || availableCatalogItems.length === 0}>
                                 <option value="">{selectedPackagingSupplier && availableCatalogItems.length === 0 ? 'Geen artikelen vastgelegd' : 'Selecteer artikel...'}</option>
-                                {availableCatalogItems.map((item) => <option key={item.id} value={item.id}>Order {item.orderNummer || '-'} · {item.artikelCode || item.omschrijving || 'Verpakking'}{item.afmetingen ? ` · ${item.afmetingen}` : ''}</option>)}
+                                {availableCatalogItems
+                                  .slice()
+                                  .sort((left, right) => (left.afmetingen || left.omschrijving).localeCompare(right.afmetingen || right.omschrijving, 'nl', { numeric: true, sensitivity: 'base' }))
+                                  .map((item) => <option key={item.id} value={item.id}>{item.afmetingen || item.omschrijving || item.artikelCode || 'Formaat niet vastgelegd'}</option>)}
                               </select>
+                              {layer.packagingCatalogItemId ? <small>Materiaalcode, gewicht en leverancier zijn gekoppeld aan dit formaat.</small> : null}
                             </div>
                             <div className="packaging-layer-field">
                               <span className="packaging-layer-mobile-label">Rol</span>
