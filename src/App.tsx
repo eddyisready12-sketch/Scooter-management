@@ -2245,9 +2245,10 @@ function buildScooterBarcodeDataUrl(value: string) {
   return canvas.toDataURL('image/png');
 }
 
-function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer) {
-  const barcodeValue = escapeLabelValue(scooter.frameNumber);
-  const frameLabel = escapeLabelValue(scooter.frameNumber);
+function buildDymoScooterLabelXml(scooter: Scooter, dealer?: Dealer, identifier: 'frame' | 'engine' = 'frame') {
+  const identifierValue = identifier === 'engine' ? scooter.engineNumber : scooter.frameNumber;
+  const barcodeValue = escapeLabelValue(identifierValue);
+  const frameLabel = escapeLabelValue(identifierValue);
   const dealerLine = dealer?.company || scooter.color || '';
   const dealerAddressLine = [
     dealer?.address?.trim() || '',
@@ -2706,10 +2707,15 @@ async function getAvailableDymoPrinter() {
   throw new Error(`Geen actieve DYMO Connect webservice of LabelWriter printer gevonden. Getest: ${failedEndpoints.slice(0, 6).join(', ')}.`);
 }
 
-async function printScooterDymoLabel(scooter: Scooter, dealer?: Dealer) {
+async function printScooterDymoLabel(scooter: Scooter, dealer?: Dealer, identifier: 'frame' | 'engine' = 'frame') {
+  const identifierValue = identifier === 'engine' ? scooter.engineNumber : scooter.frameNumber;
+  if (!identifierValue?.trim()) {
+    throw new Error(identifier === 'engine' ? 'Motornummer ontbreekt.' : 'Framenummer ontbreekt.');
+  }
   const { dymo, printerName } = await getAvailableDymoPrinter();
-  const labelXml = buildDymoScooterLabelXml(scooter, dealer);
-  const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Scooter ${scooter.frameNumber}` });
+  const labelXml = buildDymoScooterLabelXml(scooter, dealer, identifier);
+  const labelType = identifier === 'engine' ? 'Motornummer' : 'Framenummer';
+  const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `${labelType} ${identifierValue}` });
   if (!printResult.success) {
     throw printResult.data instanceof Error ? printResult.data : new Error(String(printResult.data));
   }
@@ -10072,6 +10078,8 @@ function ContainerAvailabilityBoard({
   const [markingAvailable, setMarkingAvailable] = useState(false);
   const [markMessage, setMarkMessage] = useState('');
   const [markMessageType, setMarkMessageType] = useState<'success' | 'warning'>('success');
+  const [printingBarcode, setPrintingBarcode] = useState('');
+  const [printMessage, setPrintMessage] = useState('');
   const [filters, setFilters] = useState({
     model: '',
     color: '',
@@ -10089,10 +10097,31 @@ function ContainerAvailabilityBoard({
     (!filters.color || scooter.color === filters.color) &&
     (!filters.speed || normalizeSpeedValue(scooter.speed) === filters.speed)
   )), [filters.color, filters.model, filters.speed, scooters]);
-  const barcodeByScooterId = useMemo(() => {
-    const entries = filteredScooters.map((scooter) => [scooter.id, buildScooterBarcodeDataUrl(scooter.frameNumber)] as const);
+  const barcodesByScooterId = useMemo(() => {
+    const entries = filteredScooters.map((scooter) => [scooter.id, {
+      frame: buildScooterBarcodeDataUrl(scooter.frameNumber),
+      engine: buildScooterBarcodeDataUrl(scooter.engineNumber),
+    }] as const);
     return new Map(entries);
   }, [filteredScooters]);
+
+  async function handleBarcodePrint(scooter: Scooter, identifier: 'frame' | 'engine') {
+    const printKey = `${scooter.id}-${identifier}`;
+    setPrintingBarcode(printKey);
+    setPrintMessage('');
+    try {
+      const printerName = await printScooterDymoLabel(
+        scooter,
+        dealers.find((dealer) => dealer.id === scooter.dealerId),
+        identifier,
+      );
+      setPrintMessage(`${identifier === 'engine' ? 'Motornummer' : 'Framenummer'} verstuurd naar ${printerName}.`);
+    } catch (error) {
+      setPrintMessage(`DYMO print mislukt: ${importErrorMessage(error)}`);
+    } finally {
+      setPrintingBarcode('');
+    }
+  }
 
   return (
     <div className="container-availability-board">
@@ -10152,6 +10181,7 @@ function ContainerAvailabilityBoard({
         </div>
       ) : null}
       {markMessage ? <div className={`inline-notice ${markMessageType === 'warning' ? 'warning-notice' : 'success-notice'}`}>{markMessage}</div> : null}
+      {printMessage ? <div className="inline-notice">{printMessage}</div> : null}
       <div className="container-board-filters">
         <div className="container-board-filters-header">
           <div>
@@ -10207,11 +10237,15 @@ function ContainerAvailabilityBoard({
               {isOpen && (
                 <div className="container-card-scooter-list">
                   {statusScooters.length ? statusScooters.map((scooter) => (
-                    <button
-                      type="button"
+                    <div
                       className="container-card-scooter-row"
                       key={scooter.id}
                       onClick={() => onSelect(scooter)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') onSelect(scooter);
+                      }}
+                      role="button"
+                      tabIndex={0}
                     >
                       <div className="container-card-scooter-copy">
                         <strong>{scooter.frameNumber}</strong>
@@ -10222,12 +10256,29 @@ function ContainerAvailabilityBoard({
                           <small>{dealerName(dealers, scooter.dealerId) || '-'}</small>
                         </div>
                       </div>
-                      {barcodeByScooterId.get(scooter.id) ? (
-                        <div className="container-card-scooter-barcode-wrap">
-                          <img className="container-card-scooter-barcode" src={barcodeByScooterId.get(scooter.id)} alt={`Barcode ${scooter.frameNumber}`} />
-                        </div>
-                      ) : null}
-                    </button>
+                      <div className="container-card-scooter-barcodes">
+                        {barcodesByScooterId.get(scooter.id)?.frame ? (
+                          <div className="container-card-scooter-barcode-item">
+                            <small>Framenummer</small>
+                            <img className="container-card-scooter-barcode" src={barcodesByScooterId.get(scooter.id)?.frame} alt={`Barcode framenummer ${scooter.frameNumber}`} />
+                            <button type="button" className="secondary-button compact-button" disabled={Boolean(printingBarcode)} onClick={(event) => {
+                              event.stopPropagation();
+                              void handleBarcodePrint(scooter, 'frame');
+                            }}><Printer size={14} /> {printingBarcode === `${scooter.id}-frame` ? 'Printen...' : 'Print DYMO'}</button>
+                          </div>
+                        ) : null}
+                        {barcodesByScooterId.get(scooter.id)?.engine ? (
+                          <div className="container-card-scooter-barcode-item">
+                            <small>Motornummer</small>
+                            <img className="container-card-scooter-barcode" src={barcodesByScooterId.get(scooter.id)?.engine} alt={`Barcode motornummer ${scooter.engineNumber}`} />
+                            <button type="button" className="secondary-button compact-button" disabled={Boolean(printingBarcode)} onClick={(event) => {
+                              event.stopPropagation();
+                              void handleBarcodePrint(scooter, 'engine');
+                            }}><Printer size={14} /> {printingBarcode === `${scooter.id}-engine` ? 'Printen...' : 'Print DYMO'}</button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
                   )) : <p className="container-card-empty">Geen scooters</p>}
                 </div>
               )}
