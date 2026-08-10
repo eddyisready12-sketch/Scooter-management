@@ -3796,6 +3796,19 @@ function containerSortTime(container: Container) {
   return Number.isNaN(time) ? 0 : time;
 }
 
+function scooterBelongsToContainer(scooter: Scooter, container: Container) {
+  if (!scooter.containerId) return false;
+  if (scooter.containerId === container.id) return true;
+
+  // Oudere Excel/CSV-imports voegden de aankomstdatum aan de container-ID toe.
+  // Herken die koppeling ook, zodat reeds geimporteerde scooters zichtbaar blijven.
+  const baseId = stableId('container', container.number);
+  const legacySuffix = scooter.containerId.startsWith(baseId)
+    ? scooter.containerId.slice(baseId.length)
+    : '';
+  return /^\d{8}$/.test(legacySuffix);
+}
+
 function parseContainerScooterRows(content: string, containerId: string): Scooter[] {
   return content
     .split(/\r?\n/)
@@ -5097,9 +5110,10 @@ export function App() {
     };
 
     const updatedScooters = data.scooters
-      .filter((scooter) => scooter.containerId === container.id && scooter.status === 'Nog onderweg')
+      .filter((scooter) => scooterBelongsToContainer(scooter, container) && scooter.status === 'Nog onderweg')
       .map((scooter) => ({
         ...scooter,
+        containerId: container.id,
         status: 'Beschikbaar' as const,
         arrivedAt,
       }));
@@ -5232,7 +5246,7 @@ export function App() {
           const update: Scooter = {
             ...existing,
             engineNumber: existing.engineNumber?.trim() ? existing.engineNumber : imported.engineNumber,
-            containerId: existing.containerId || container.id,
+            containerId: container.id,
             arrivedAt: existing.arrivedAt || container.arrivedAt,
             model: existing.model || imported.model,
             color: existing.color || imported.color,
@@ -8306,9 +8320,9 @@ function Containers({
             <div className="container-import-form">
               <div className="form-grid">
                 <label>Import modus
-                  <select name="importMode" defaultValue="update-existing">
-                    <option value="update-existing">Bestaande scooters bijwerken</option>
+                  <select name="importMode" defaultValue="create">
                     <option value="create">Nieuwe scooters importeren</option>
+                    <option value="update-existing">Bestaande scooters bijwerken</option>
                   </select>
                 </label>
                 <label>Type<select name="type" defaultValue="Scooters"><option>Scooters</option></select></label>
@@ -13901,7 +13915,7 @@ function ContainerListPanel({
     <section className="panel list-panel">
       <div className="panel-title"><Boxes size={16} /> {title}</div>
       {containers.length === 0 ? <p className="empty">{emptyMessage}</p> : containers.map((container) => {
-        const containerScooters = scooters.filter((scooter) => scooter.containerId === container.id);
+        const containerScooters = scooters.filter((scooter) => scooterBelongsToContainer(scooter, container));
         const readyScooters = containerScooters.filter((scooter) => scooter.status === 'Beschikbaar' || scooter.status === 'In consignatie').length;
         const isOpen = openContainerId === container.id;
         return (
