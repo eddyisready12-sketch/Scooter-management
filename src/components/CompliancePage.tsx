@@ -26,6 +26,7 @@ import {
   testPlanFulfilled,
 } from '../lib/compliance';
 import { createPackagingProfileLayer, createPurchasedPackagingItem, migrateSupplierPpwr, ppwrSupplierStatus, roleHerkomst } from '../lib/ppwr-suppliers';
+import { findPackagingMaterialOption, packagingMaterialOptions } from '../lib/packaging-materials';
 import type {
   ComplianceFamilyDocument,
   ComplianceFamilyRequirement,
@@ -45,6 +46,25 @@ import type {
 type ComplianceModuleView = 'dashboard' | 'families' | 'unlinked' | 'documents' | 'templates' | 'packagingSuppliers';
 type ComplianceDetailTab = 'basic' | 'risks' | 'warnings' | 'requirements' | 'tests' | 'documents' | 'links' | 'revisions' | 'dossier';
 type ComplianceDashboardTab = 'incomplete' | 'outsourced' | 'highRisk' | 'requirements' | 'tests' | 'missingDocuments' | 'expiringDocuments' | 'expiredDocuments';
+
+function SupplierPackagingLabelPreview({ materialCode }: { materialCode: string }) {
+  const option = findPackagingMaterialOption(materialCode);
+  if (!option) return <small>Geen herkenbaar labelicoon voor deze materiaalcode.</small>;
+  return (
+    <div className="supplier-packaging-label-preview">
+      <svg viewBox="0 0 100 112" aria-hidden="true">
+        <g fill="none" stroke="currentColor" strokeWidth="7" strokeLinejoin="round">
+          <path d="M31.63 31.5 44.78 9.57s5.29-5.12 9.92-.49l12.25 20.78" />
+          <path d="M45.95 70 20.38 69.57S13.31 67.55 15 61.23l11.87-21" />
+          <path d="M72.13 38.35 84.54 60.7s1.79 7.14-4.53 8.83l-24.12.23" />
+        </g>
+        <text x="50" y="54" textAnchor="middle">{option.recycleNumber}</text>
+        <text x="50" y="98" textAnchor="middle">{option.recycleFamily}</text>
+      </svg>
+      <span><strong>Labelicoon</strong><small>{option.recycleCode} · {option.wasteStream}</small></span>
+    </div>
+  );
+}
 
 type CompliancePageProps = {
   products: Product[];
@@ -2435,7 +2455,8 @@ export function CompliancePage({
                           <label><span>Artikelcode</span><input value={item.artikelCode} onChange={(event) => updatePurchasedPackagingItem(item.id, { artikelCode: event.target.value })} placeholder="Bijv. 00324" /></label>
                           <label><span>Omschrijving</span><input value={item.omschrijving} onChange={(event) => updatePurchasedPackagingItem(item.id, { omschrijving: event.target.value })} placeholder="Bijv. LDPE-zak" /></label>
                           <label><span>Afmetingen</span><input value={item.afmetingen || ''} onChange={(event) => updatePurchasedPackagingItem(item.id, { afmetingen: event.target.value || undefined })} placeholder="Bijv. 150 × 120 mm" /></label>
-                          <label><span>Materiaalcode</span><input value={item.materiaalcode} onChange={(event) => updatePurchasedPackagingItem(item.id, { materiaalcode: event.target.value })} placeholder="Bijv. PE-LD 04" /></label>
+                          <label><span>Materiaalcode</span><input list="packaging-material-codes" value={item.materiaalcode} onChange={(event) => updatePurchasedPackagingItem(item.id, { materiaalcode: event.target.value })} placeholder="Bijv. PE-LD 04" /></label>
+                          <div><SupplierPackagingLabelPreview materialCode={item.materiaalcode} /></div>
                           <label><span>Gewicht (g)</span><input type="number" min="0" step="0.01" value={item.gewichtGram || ''} onChange={(event) => updatePurchasedPackagingItem(item.id, { gewichtGram: Number(event.target.value) })} /></label>
                           <label><span>Gewichtsbasis</span><select value={item.gewichtBasis} onChange={(event) => updatePurchasedPackagingItem(item.id, { gewichtBasis: event.target.value as typeof item.gewichtBasis })}><option value="per_stuk">Per stuk</option><option value="per_doos">Per doos</option></select></label>
                           <label><span>Aantal ingekocht</span><input type="number" min="0" step="1" value={item.aantalIngekocht ?? ''} onChange={(event) => updatePurchasedPackagingItem(item.id, { aantalIngekocht: event.target.value === '' ? undefined : Number(event.target.value) })} /></label>
@@ -2452,6 +2473,9 @@ export function CompliancePage({
                       </article>
                     ))}
                     {(draftPackagingSupplier.packagingItems ?? []).length === 0 ? <p className="empty">Nog geen ingekochte verpakkingen vastgelegd.</p> : null}
+                    <datalist id="packaging-material-codes">
+                      {packagingMaterialOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </datalist>
                   </div>
                 </section>)}
 

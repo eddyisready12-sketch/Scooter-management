@@ -42,6 +42,7 @@ import { CompliancePage } from './components/CompliancePage';
 import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseExactBatchTransactionsImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
 import { migratePpwrLocalStorage, migrateSupplierPpwr, ppwrSupplierStatus } from './lib/ppwr-suppliers';
+import { findPackagingMaterialOption, packagingMaterialOptions } from './lib/packaging-materials';
 import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, fetchProductById, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceComplianceFamilyDocuments, replaceComplianceFamilyRequirements, replaceComplianceFamilyRevisions, replaceComplianceFamilyRisks, replaceComplianceFamilyTestPlans, replaceComplianceFamilyWarnings, replaceComplianceProductTests, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, uploadSupplierDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRequirements, upsertComplianceFamilyRevisions, upsertComplianceFamilyRisks, upsertComplianceFamilyTestPlans, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertComplianceProductTests, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
@@ -137,16 +138,6 @@ const loginStorageKey = 'rso-admin-session';
 const appCommitSha = typeof __APP_COMMIT_SHA__ === 'string' && __APP_COMMIT_SHA__.trim()
   ? __APP_COMMIT_SHA__.trim()
   : 'onbekend';
-const packagingMaterialOptions = [
-  { value: 'PAP 20', label: 'PAP 20 - Golfkarton', recycleCode: 'PAP 20', recycleFamily: 'PAP', recycleNumber: '20', wasteStream: 'Papier en karton' },
-  { value: 'PAP 21', label: 'PAP 21 - Massief karton', recycleCode: 'PAP 21', recycleFamily: 'PAP', recycleNumber: '21', wasteStream: 'Papier en karton' },
-  { value: 'PAP 22', label: 'PAP 22 - Papier', recycleCode: 'PAP 22', recycleFamily: 'PAP', recycleNumber: '22', wasteStream: 'Papier en karton' },
-  { value: 'PE-LD 04', label: 'PE-LD 04 - LDPE plastic', recycleCode: 'PE-LD 04', recycleFamily: 'LDPE', recycleNumber: '4', wasteStream: 'Plastic / PMD' },
-  { value: 'HDPE', label: 'HDPE', recycleCode: 'HDPE 2', recycleFamily: 'HDPE', recycleNumber: '2', wasteStream: 'Plastic / PMD' },
-  { value: 'PP', label: 'PP', recycleCode: 'PP 5', recycleFamily: 'PP', recycleNumber: '5', wasteStream: 'Plastic / PMD' },
-  { value: 'PET', label: 'PET', recycleCode: 'PET 1', recycleFamily: 'PET', recycleNumber: '1', wasteStream: 'Plastic / PMD' },
-] as const;
-
 const packagingLayerNames = Array.from({ length: 10 }, (_, index) => `Verpakkingscomponent ${index + 1}`);
 const packagingRoleOptions = ['Primair', 'Secundair', 'Tertiair'] as const;
 const recyclabilityClassOptions = ['Klasse A', 'Klasse B', 'Klasse C', 'Klasse D', 'Klasse E'] as const;
@@ -569,10 +560,6 @@ function rdwDateToInputDate(value?: string) {
 
 function dealerName(dealers: Dealer[], dealerId?: string) {
   return dealers.find((dealer) => dealer.id === dealerId)?.company ?? '';
-}
-
-function findPackagingMaterialOption(value?: string) {
-  return packagingMaterialOptions.find((option) => option.value === value || option.recycleCode === value);
 }
 
 function isStickerPackagingLayer(layer: ProductPackagingLayer) {
