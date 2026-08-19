@@ -99,6 +99,8 @@ type CompliancePageProps = {
   onSavePackagingSupplier: (supplier: Supplier) => Promise<void>;
   onUploadSupplierDocument: (file: File, supplierId: string) => Promise<string>;
   onSelectProduct: (product: Product, tab?: 'basic' | 'gpsr') => void;
+  /** When true, render only the PPWR-suppliers view without the GPSR chrome (used inside the Verpakking screen). */
+  embedded?: boolean;
 };
 
 const moduleViews: Array<{ id: ComplianceModuleView; label: string; icon: typeof LayoutDashboard }> = [
@@ -257,8 +259,9 @@ export function CompliancePage({
   onSavePackagingSupplier,
   onUploadSupplierDocument,
   onSelectProduct,
+  embedded = false,
 }: CompliancePageProps) {
-  const [moduleView, setModuleView] = useState<ComplianceModuleView>('dashboard');
+  const [moduleView, setModuleView] = useState<ComplianceModuleView>(embedded ? 'packagingSuppliers' : 'dashboard');
   const [detailTab, setDetailTab] = useState<ComplianceDetailTab>('basic');
   const [dashboardTab, setDashboardTab] = useState<ComplianceDashboardTab>('incomplete');
   const [familyQuery, setFamilyQuery] = useState('');
@@ -300,6 +303,8 @@ export function CompliancePage({
   const [draftTests, setDraftTests] = useState<ComplianceProductTest[]>([]);
   const [draftRevisions, setDraftRevisions] = useState<ComplianceFamilyRevision[]>([]);
   const [draftLinks, setDraftLinks] = useState<ComplianceProductLink[]>([]);
+  const [selectedProductIdsToLink, setSelectedProductIdsToLink] = useState<Set<string>>(new Set());
+  const [selectedLinkIdsToRemove, setSelectedLinkIdsToRemove] = useState<Set<string>>(new Set());
   const [unlinkingLinkId, setUnlinkingLinkId] = useState('');
   const [linkActionMessage, setLinkActionMessage] = useState('');
   const familyDetailRef = useRef<HTMLElement | null>(null);
@@ -327,6 +332,8 @@ export function CompliancePage({
 
     if (previousSelectedFamilyIdRef.current !== selectedFamilyId) {
       setLinkPage(1);
+      setSelectedProductIdsToLink(new Set());
+      setSelectedLinkIdsToRemove(new Set());
       previousSelectedFamilyIdRef.current = selectedFamilyId;
     }
   }, [documents, families, links, requirements, revisions, risks, selectedFamilyId, testPlans, tests, warnings]);
@@ -927,6 +934,71 @@ export function CompliancePage({
       setLinkActionMessage(`Ontkoppelen mislukt: ${error instanceof Error ? error.message : 'onbekende fout'}`);
     } finally {
       setUnlinkingLinkId('');
+    }
+  }
+
+  async function addSelectedProductLinks() {
+    if (!draftFamily || selectedProductIdsToLink.size === 0 || saving) return;
+    const selectedProducts = products.filter((product) => product.id && selectedProductIdsToLink.has(product.id));
+    if (selectedProducts.length === 0) return;
+    const timestamp = new Date().toISOString();
+    const nextLinks = [...draftLinks];
+    const newRevisions: ComplianceFamilyRevision[] = [];
+    const activatedLinks = selectedProducts.map((product) => {
+      const existingLink = nextLinks.find((link) => link.productId === product.id);
+      const activatedLink: ComplianceProductLink = {
+        ...existingLink,
+        id: existingLink?.id || createComplianceEntityId('compliance-link'),
+        familyId: draftFamily.id,
+        productId: product.id,
+        variantDescription: product.articleGroup || '',
+        status: 'active',
+        linkedBy: 'handmatig',
+        createdAt: existingLink?.createdAt || timestamp,
+        updatedAt: timestamp,
+      };
+      const existingIndex = nextLinks.findIndex((link) => link.id === activatedLink.id);
+      if (existingIndex >= 0) nextLinks[existingIndex] = activatedLink;
+      else nextLinks.push(activatedLink);
+      newRevisions.push({ id: createComplianceEntityId('compliance-revision'), familyId: draftFamily.id, changeNote: `Product gekoppeld (${product.code || product.id})`, createdAt: timestamp });
+      return activatedLink;
+    });
+    setSaving(true);
+    setLinkActionMessage('');
+    try {
+      await Promise.all(activatedLinks.map((link, index) => onActivateProductLink(link, newRevisions[index])));
+      setDraftLinks(nextLinks);
+      setDraftRevisions((current) => [...newRevisions, ...current]);
+      setSelectedProductIdsToLink(new Set());
+      setProductSearch('');
+      setLinkActionMessage(`${activatedLinks.length} producten zijn gekoppeld.`);
+    } catch (error) {
+      setLinkActionMessage(`Bulk koppelen mislukt: ${error instanceof Error ? error.message : 'onbekende fout'}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deactivateSelectedLinks() {
+    if (!draftFamily || selectedLinkIdsToRemove.size === 0 || saving || unlinkingLinkId) return;
+    const selectedLinks = draftLinks.filter((link) => selectedLinkIdsToRemove.has(link.id) && (link.status ?? 'active') === 'active');
+    if (selectedLinks.length === 0) return;
+    const timestamp = new Date().toISOString();
+    const updatedLinks = selectedLinks.map((link) => ({ ...link, status: 'inactive' as const, updatedAt: timestamp }));
+    const newRevisions = selectedLinks.map((link) => ({ id: createComplianceEntityId('compliance-revision'), familyId: draftFamily.id, changeNote: `Product ontkoppeld (${link.productId})`, createdAt: timestamp }));
+    setSaving(true);
+    setLinkActionMessage('');
+    try {
+      await Promise.all(updatedLinks.map((link, index) => onDeactivateProductLink(link, newRevisions[index])));
+      const updatedById = new Map(updatedLinks.map((link) => [link.id, link]));
+      setDraftLinks((current) => current.map((link) => updatedById.get(link.id) ?? link));
+      setDraftRevisions((current) => [...newRevisions, ...current]);
+      setSelectedLinkIdsToRemove(new Set());
+      setLinkActionMessage(`${updatedLinks.length} producten zijn ontkoppeld.`);
+    } catch (error) {
+      setLinkActionMessage(`Bulk ontkoppelen mislukt: ${error instanceof Error ? error.message : 'onbekende fout'}`);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -1774,26 +1846,46 @@ export function CompliancePage({
 
                       {productSearch.trim() ? (
                         <div className="compliance-product-search-results">
+                          <div className="compliance-bulk-bar">
+                            <label className="compliance-checkbox-label">
+                              <input type="checkbox" checked={searchableUnlinkedProducts.length > 0 && searchableUnlinkedProducts.every((product) => selectedProductIdsToLink.has(product.id))} onChange={(event) => setSelectedProductIdsToLink((current) => { const next = new Set(current); searchableUnlinkedProducts.forEach((product) => event.target.checked ? next.add(product.id) : next.delete(product.id)); return next; })} />
+                              Selecteer alle zoekresultaten
+                            </label>
+                            <button type="button" className="primary-button" disabled={selectedProductIdsToLink.size === 0 || saving} onClick={() => void addSelectedProductLinks()}>{saving ? 'Koppelen…' : `Koppel geselecteerde (${selectedProductIdsToLink.size})`}</button>
+                          </div>
                           {searchableUnlinkedProducts.map((product) => (
-                            <button type="button" key={product.id} onClick={() => addProductLink(product)}>
-                              <strong>{product.code}</strong>
-                              <span>{product.description}</span>
-                            </button>
+                            <label className="compliance-product-select-row" key={product.id}>
+                              <input type="checkbox" checked={selectedProductIdsToLink.has(product.id)} onChange={(event) => setSelectedProductIdsToLink((current) => { const next = new Set(current); event.target.checked ? next.add(product.id) : next.delete(product.id); return next; })} />
+                              <span><strong>{product.code}</strong><span>{product.description}</span></span>
+                              <button type="button" className="secondary-button compliance-row-action-button" onClick={() => void addProductLink(product)}>Direct koppelen</button>
+                            </label>
                           ))}
                           {searchableUnlinkedProducts.length === 0 ? <p className="empty">Geen niet-gekoppelde producten gevonden.</p> : null}
                         </div>
                       ) : null}
 
                       <div className="compliance-linked-products-table">
+                        {filteredFamilyProducts.length > 0 ? (
+                          <div className="compliance-bulk-bar">
+                            <label className="compliance-checkbox-label">
+                              <input type="checkbox" checked={filteredFamilyProducts.every(({ link }) => selectedLinkIdsToRemove.has(link.id))} onChange={(event) => setSelectedLinkIdsToRemove((current) => { const next = new Set(current); filteredFamilyProducts.forEach(({ link }) => event.target.checked ? next.add(link.id) : next.delete(link.id)); return next; })} />
+                              Selecteer alle gefilterde producten
+                            </label>
+                            <button type="button" className="danger-button" disabled={selectedLinkIdsToRemove.size === 0 || saving || Boolean(unlinkingLinkId)} onClick={() => void deactivateSelectedLinks()}>{saving ? 'Ontkoppelen…' : `Ontkoppel geselecteerde (${selectedLinkIdsToRemove.size})`}</button>
+                          </div>
+                        ) : null}
                         <div className="compliance-linked-products-header">
-                          <span>Artikelnummer</span>
+                          <span>Selectie / artikelnummer</span>
                           <span>Omschrijving</span>
                           <span>Categorie</span>
                           <span className="compliance-linked-products-actions-heading">Acties</span>
                         </div>
                         {pagedLinkedProducts.map(({ link, product }) => (
                           <div className="compliance-linked-products-row" key={link.id}>
-                            <strong>{product?.code || '-'}</strong>
+                            <label className="compliance-checkbox-label">
+                              <input type="checkbox" checked={selectedLinkIdsToRemove.has(link.id)} onChange={(event) => setSelectedLinkIdsToRemove((current) => { const next = new Set(current); event.target.checked ? next.add(link.id) : next.delete(link.id); return next; })} />
+                              <strong>{product?.code || '-'}</strong>
+                            </label>
                             <span>{product?.description || link.variantDescription || '-'}</span>
                             <span>{product?.articleGroup || link.variantDescription || '-'}</span>
                             <div className="compliance-linked-product-actions">
@@ -1918,7 +2010,7 @@ export function CompliancePage({
     const suggestionLabel = (product: Product) => {
       const suggestion = unlinkedSuggestions.find((item) => item.productId === product.id);
       const family = suggestion ? families.find((item) => item.id === suggestion.familyId) : null;
-      return family ? `${family.code} - ${family.name}` : 'Geen suggestie';
+      return family ? family.name : 'Geen suggestie';
     };
     const sortedUnlinkedProducts = [...productsWithoutFamily].sort((left, right) => {
       const values = {
@@ -1977,7 +2069,7 @@ export function CompliancePage({
                     <strong>{product.code || '-'}</strong>
                     <span>{product.description || '-'}</span>
                     <span>{product.articleGroup || '-'}</span>
-                    <span>{family ? `${family.code} - ${family.name}` : 'Geen suggestie'}</span>
+                    <span>{family?.name || 'Geen suggestie'}</span>
                     <div className="compliance-unlinked-link-action">
                       <select
                         aria-label={`Productfamilie voor ${product.code}`}
@@ -1987,7 +2079,7 @@ export function CompliancePage({
                         <option value="">Kies productfamilie...</option>
                         {[...families]
                           .sort((left, right) => left.name.localeCompare(right.name, 'nl', { sensitivity: 'base' }))
-                          .map((option) => <option key={option.id} value={option.id}>{option.code} - {option.name}</option>)}
+                          .map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
                       </select>
                       <button
                         type="button"
@@ -2547,6 +2639,17 @@ export function CompliancePage({
     );
   }
 
+  if (embedded) {
+    return (
+      <div className="compliance-module-shell compliance-embedded">
+        <div className="compliance-main">
+          {message ? <div className="inline-notice success-notice">{message}</div> : null}
+          {renderPackagingSuppliersView()}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="compliance-module-shell">
       <div className="compliance-main">
@@ -2583,10 +2686,6 @@ export function CompliancePage({
             <button type="button" className={moduleView === 'templates' ? 'active' : ''} onClick={() => setModuleView('templates')}>
               <DatabaseZap size={15} />
               <span>Templates laden</span>
-            </button>
-            <button type="button" className={moduleView === 'packagingSuppliers' ? 'active' : ''} onClick={() => setModuleView('packagingSuppliers')}>
-              <ShieldCheck size={15} />
-              <span>PPWR leveranciers</span>
             </button>
           </div>
         </div>

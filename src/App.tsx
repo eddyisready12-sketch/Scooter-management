@@ -1,9 +1,11 @@
 import { ChangeEvent, FormEvent, Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowUpDown,
   BatteryCharging,
   Bike,
   Boxes,
+  Truck,
   BriefcaseBusiness,
   CalendarDays,
   ChevronDown,
@@ -202,21 +204,48 @@ const euMemberStates = [
 ] as const;
 const euMemberStateMap = new Map<string, string>(euMemberStates.map((country) => [country.code, country.name]));
 
-const views: Array<{ id: View; label: string; icon: typeof Home }> = [
-  { id: 'dashboard', label: 'Dashboard', icon: Home },
-  { id: 'batteries', label: 'Accu', icon: BatteryCharging },
-  { id: 'containers', label: 'Containers', icon: Boxes },
-  { id: 'dealers', label: 'Dealers', icon: UsersRound },
-  { id: 'warranty', label: 'Garantie claims', icon: ShieldCheck },
-  { id: 'costBatches', label: 'Import China', icon: FileText },
-  { id: 'suppliers', label: 'Leveranciers', icon: Factory },
-  { id: 'maintenance', label: 'Onderhoud', icon: ClipboardList },
-  { id: 'products', label: 'Producten', icon: BriefcaseBusiness },
-  { id: 'compliance', label: 'Compliance', icon: DatabaseZap },
-  { id: 'scooters', label: 'Scooters', icon: Bike },
-  { id: 'sales', label: 'Verkoop', icon: CircleDollarSign },
-  { id: 'packaging', label: 'Verpakking', icon: PackagePlus },
+const navGroups: Array<{ group: string; items: Array<{ id: View; label: string; icon: typeof Home }> }> = [
+  {
+    group: 'Overzicht',
+    items: [
+      { id: 'dashboard', label: 'Dashboard', icon: Home },
+    ],
+  },
+  {
+    group: 'Voorraad',
+    items: [
+      { id: 'scooters', label: 'Scooters', icon: Bike },
+      { id: 'batteries', label: 'Accu', icon: BatteryCharging },
+      { id: 'sales', label: 'Verkoop', icon: CircleDollarSign },
+    ],
+  },
+  {
+    group: 'Inkoop & import',
+    items: [
+      { id: 'containers', label: 'Containers', icon: Boxes },
+      { id: 'costBatches', label: 'Import China', icon: FileText },
+      { id: 'suppliers', label: 'Leveranciers', icon: Factory },
+    ],
+  },
+  {
+    group: 'Producten & compliance',
+    items: [
+      { id: 'products', label: 'Producten', icon: BriefcaseBusiness },
+      { id: 'compliance', label: 'Compliance', icon: DatabaseZap },
+      { id: 'packaging', label: 'Verpakking', icon: PackagePlus },
+    ],
+  },
+  {
+    group: 'Relaties & service',
+    items: [
+      { id: 'dealers', label: 'Dealers', icon: UsersRound },
+      { id: 'warranty', label: 'Garantie claims', icon: ShieldCheck },
+      { id: 'maintenance', label: 'Onderhoud', icon: ClipboardList },
+    ],
+  },
 ];
+
+const views: Array<{ id: View; label: string; icon: typeof Home }> = navGroups.flatMap((section) => section.items);
 
 const statusColor: Record<ScooterStatus, string> = {
   Beschikbaar: 'pink',
@@ -3932,6 +3961,8 @@ export function App() {
   const [loginSession, setLoginSession] = useState<LoginSession | null>(() => (supabase ? null : readStoredLoginSession()));
   const [authLoading, setAuthLoading] = useState(Boolean(supabase));
   const [view, setView] = useState<View>('dashboard');
+  const [navOpen, setNavOpen] = useState(false);
+  const [packagingTab, setPackagingTab] = useState<'overview' | 'ppwrSuppliers'>('overview');
   const [data, setData] = useState<AppData>(demoData);
   const [query, setQuery] = useState('');
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
@@ -5562,7 +5593,8 @@ export function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={navOpen ? 'app-shell nav-open' : 'app-shell'}>
+      {navOpen && <div className="nav-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />}
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">
@@ -5574,21 +5606,26 @@ export function App() {
           </div>
         </div>
         <nav>
-          {views.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button className={view === item.id ? 'active' : ''} key={item.id} onClick={() => setView(item.id)}>
-                <Icon size={16} />
-                {item.label}
-              </button>
-            );
-          })}
+          {navGroups.map((section) => (
+            <div className="nav-group" key={section.group}>
+              <div className="nav-group-label">{section.group}</div>
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button className={view === item.id ? 'active' : ''} key={item.id} onClick={() => { setView(item.id); setNavOpen(false); }}>
+                    <Icon size={16} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
       </aside>
 
       <main className="workspace">
         <header className="topbar">
-          <button className="icon-button" aria-label="Menu">
+          <button className="icon-button" aria-label="Menu" onClick={() => setNavOpen((open) => !open)}>
             <Menu size={18} />
           </button>
           <div className="topbar-center">
@@ -5617,18 +5654,55 @@ export function App() {
         </header>
 
         <section className="content">
-          {view === 'dashboard' && <Dashboard data={data} onNavigate={setView} />}
+          {view === 'dashboard' && <Dashboard data={data} onNavigate={(nextView, scooterStatus) => {
+            if (scooterStatus) setStatusFilter(scooterStatus);
+            setView(nextView);
+          }} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onMarkContainerAvailable={markContainerAvailable} focusedContainerId={focusedContainerId} />}
           {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onPrintOuterBoxLabel={printBatchOuterBoxLabel} onPreviewOuterBoxLabel={previewBatchOuterBoxLabel} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
           {view === 'packaging' && (
-            <PackagingOverviewPage
-              registrations={data.productPackagingRegistrations}
-              exactSalesPackagingOverrides={data.exactSalesPackagingOverrides}
-              batches={data.containerCostBatches}
-              products={data.products}
-              supplierRecords={data.suppliers}
-              onSelectProduct={openProduct}
-            />
+            <>
+              <div className="subtabs">
+                <button type="button" className={`subtab-button${packagingTab === 'overview' ? ' active' : ''}`} onClick={() => setPackagingTab('overview')}>Verpakkingsoverzicht</button>
+                <button type="button" className={`subtab-button${packagingTab === 'ppwrSuppliers' ? ' active' : ''}`} onClick={() => setPackagingTab('ppwrSuppliers')}>PPWR leveranciers</button>
+              </div>
+              {packagingTab === 'overview' ? (
+                <PackagingOverviewPage
+                  registrations={data.productPackagingRegistrations}
+                  exactSalesPackagingOverrides={data.exactSalesPackagingOverrides}
+                  batches={data.containerCostBatches}
+                  products={data.products}
+                  supplierRecords={data.suppliers}
+                  onSelectProduct={openProduct}
+                />
+              ) : (
+                <CompliancePage
+                  embedded
+                  products={data.products}
+                  scooters={data.scooters}
+                  families={data.complianceFamilies}
+                  risks={data.complianceFamilyRisks}
+                  warnings={data.complianceFamilyWarnings}
+                  documents={data.complianceFamilyDocuments}
+                  requirements={data.complianceFamilyRequirements}
+                  testPlans={data.complianceFamilyTestPlans}
+                  tests={data.complianceProductTests}
+                  revisions={data.complianceFamilyRevisions}
+                  links={data.complianceProductLinks}
+                  suppliers={data.suppliers}
+                  importers={data.importers}
+                  message={complianceMessage}
+                  onSeedTemplates={seedComplianceTemplates}
+                  onSaveFamilyBundle={saveComplianceFamilyBundle}
+                  onAutoLinkProducts={autoLinkComplianceProducts}
+                  onDeactivateProductLink={deactivateComplianceProductLink}
+                  onActivateProductLink={activateComplianceProductLink}
+                  onSavePackagingSupplier={upsertSupplierRecord}
+                  onUploadSupplierDocument={uploadSupplierDocument}
+                  onSelectProduct={openProduct}
+                />
+              )}
+            </>
           )}
           {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
           {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
@@ -5847,18 +5921,122 @@ function ExpandableNotice({ message, details }: { message: string; details?: str
 
 function Dashboard({ data, onNavigate }: {
   data: AppData;
-  onNavigate: (view: View) => void;
+  onNavigate: (view: View, scooterStatus?: ScooterStatus) => void;
 }) {
-  const dashboardLinks = views.filter(({ id }) => id !== 'dashboard');
+  const dashboardLinks = views
+    .filter(({ id }) => id !== 'dashboard')
+    .sort((a, b) => a.label.localeCompare(b.label, 'nl', { sensitivity: 'base' }));
+  const scooters = data.scooters;
+  const total = scooters.length;
+
+  const statusCounts = useMemo(() => {
+    const counts = new Map<ScooterStatus, number>();
+    for (const s of scooters) counts.set(s.status, (counts.get(s.status) ?? 0) + 1);
+    return counts;
+  }, [scooters]);
+
+  const available = statusCounts.get('Beschikbaar') ?? 0;
+  const enRoute = statusCounts.get('Nog onderweg') ?? 0;
+  const soldCustomer = statusCounts.get('Verkocht klant') ?? 0;
+  const soldDealer = statusCounts.get('Verkocht dealer') ?? 0;
+  const sold = soldCustomer + soldDealer;
+
+  const containersEnRoute = data.containers.filter((c) => c.status !== 'Aangekomen');
+  const openWarranties = data.warranties.filter((w) => w.status !== 'Afgehandeld' && w.status !== 'Afgewezen' && w.status !== 'Vervangen').length;
+  const maintenanceAttention = data.maintenance.filter((m) => m.status === 'Aandacht nodig').length;
+  const batteriesAvailable = data.batteries.filter((b) => b.status === 'Beschikbaar' || b.status === 'Voorraad').length;
+
+  const statusOrder: ScooterStatus[] = ['Beschikbaar', 'In optie', 'Af te leveren', 'Verkocht dealer', 'Verkocht klant', 'In consignatie', 'Nog onderweg', 'Overig'];
+  const statusBars = statusOrder
+    .map((status) => ({ status, count: statusCounts.get(status) ?? 0 }))
+    .filter((row) => row.count > 0);
+
+  const kpis: Array<{ label: string; value: number; sub: string; icon: typeof Home; tone: string; view: View }> = [
+    { label: 'Totaal geregistreerd', value: total, sub: 'inclusief verkochte scooters', icon: Bike, tone: 'brand', view: 'scooters' },
+    { label: 'Beschikbaar', value: available, sub: 'direct leverbaar', icon: CheckCircle2, tone: 'green', view: 'scooters' },
+    { label: 'Onderweg', value: enRoute, sub: `${containersEnRoute.length} containers actief`, icon: Truck, tone: 'amber', view: 'containers' },
+    { label: 'Verkocht', value: sold, sub: `${soldDealer} dealer · ${soldCustomer} klant`, icon: CircleDollarSign, tone: 'violet', view: 'sales' },
+  ];
+
   return (
     <>
       <div className="page-title-row">
         <div>
           <h1>Dashboard</h1>
-          <span>Totaal voorraad: {data.scooters.length}</span>
+          <span className="section-subtitle">Overzicht van alle scooters, import en openstaande acties</span>
         </div>
       </div>
-      <section className="panel dashboard-links-panel">
+
+      <div className="dash-kpi-grid">
+        {kpis.map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <button key={kpi.label} type="button" className={`dash-kpi tone-${kpi.tone}`} onClick={() => onNavigate(kpi.view)}>
+              <span className="dash-kpi-icon"><Icon size={19} /></span>
+              <span className="dash-kpi-body">
+                <span className="dash-kpi-label">{kpi.label}</span>
+                <strong className="dash-kpi-value">{kpi.value}</strong>
+                <span className="dash-kpi-sub">{kpi.sub}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="dash-columns">
+        <section className="panel">
+          <div className="panel-title">
+            <span className="panel-title-label"><Gauge size={16} /> Scooters per status</span>
+            <button type="button" className="link-button" onClick={() => onNavigate('scooters')}>Bekijk scooters →</button>
+          </div>
+          {statusBars.length === 0 ? (
+            <div className="empty-state"><strong>Nog geen scooters</strong><span>Importeer scooters om hier het overzicht te zien.</span></div>
+          ) : (
+            <div className="dash-bars">
+              {statusBars.map((row) => (
+                <button type="button" className="dash-bar-row" key={row.status} onClick={() => onNavigate('scooters', row.status)} aria-label={`Bekijk scooters met status ${row.status}`}>
+                  <span className={`dash-bar-dot dot-${statusColor[row.status]}`} />
+                  <span className="dash-bar-label">{row.status}</span>
+                  <span className="dash-bar-track">
+                    <span className={`dash-bar-fill fill-${statusColor[row.status]}`} style={{ width: `${total ? (row.count / total) * 100 : 0}%` }} />
+                  </span>
+                  <span className="dash-bar-count">{row.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="panel">
+          <div className="panel-title">
+            <span className="panel-title-label"><AlertTriangle size={16} /> Aandacht nodig</span>
+          </div>
+          <div className="dash-attention">
+            <button type="button" className="dash-attention-row" onClick={() => onNavigate('containers')}>
+              <span className="dash-attention-icon tone-amber"><Truck size={17} /></span>
+              <span className="dash-attention-copy"><strong>{containersEnRoute.length}</strong> containers onderweg</span>
+              <ChevronRight size={16} />
+            </button>
+            <button type="button" className="dash-attention-row" onClick={() => onNavigate('warranty')}>
+              <span className="dash-attention-icon tone-red"><ShieldCheck size={17} /></span>
+              <span className="dash-attention-copy"><strong>{openWarranties}</strong> openstaande garantieclaims</span>
+              <ChevronRight size={16} />
+            </button>
+            <button type="button" className="dash-attention-row" onClick={() => onNavigate('maintenance')}>
+              <span className="dash-attention-icon tone-amber"><Wrench size={17} /></span>
+              <span className="dash-attention-copy"><strong>{maintenanceAttention}</strong> onderhoudsbeurten met aandacht</span>
+              <ChevronRight size={16} />
+            </button>
+            <button type="button" className="dash-attention-row" onClick={() => onNavigate('batteries')}>
+              <span className="dash-attention-icon tone-green"><BatteryCharging size={17} /></span>
+              <span className="dash-attention-copy"><strong>{batteriesAvailable}</strong> accu's op voorraad</span>
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <section className="panel">
         <div className="panel-title">
           <span className="panel-title-label"><DatabaseZap size={16} /> Snelkoppelingen</span>
         </div>
@@ -7637,7 +7815,10 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
   }, [availableDealers, dealerFilter]);
 
   useEffect(() => {
-    setSelectedYears((current) => current.filter((year) => yearOptions.includes(year)));
+    setSelectedYears((current) => {
+      const next = current.filter((year) => yearOptions.includes(year));
+      return next.length === current.length ? current : next;
+    });
   }, [yearOptions]);
 
   useEffect(() => {
@@ -10301,7 +10482,12 @@ function Scooters({ data, query, setQuery, scooters, onSelect, message, messageD
   ];
   return (
     <>
-      <h1>Scooters</h1>
+      <div className="page-title-row">
+        <div>
+          <h1>Scooters</h1>
+          <span className="section-subtitle">Kies een categorie om de voorraad te bekijken en te filteren</span>
+        </div>
+      </div>
       <ExpandableNotice message={message} details={messageDetails} />
       <div className="stat-grid scooter-status-grid">
         {cards.map(({ status, label, icon: Icon }) => (
@@ -10310,15 +10496,15 @@ function Scooters({ data, query, setQuery, scooters, onSelect, message, messageD
             key={status}
             onClick={() => setStatusFilter(statusFilter === status ? 'all' : status)}
           >
-            <div className={`stat-icon ${statusColor[status]}`}><Icon size={24} /></div>
+            <div className={`stat-icon ${statusColor[status]}`}><Icon size={22} /></div>
             <div><span>{label}</span><strong>{countByStatus(data.scooters, status)}</strong></div>
           </button>
         ))}
       </div>
-      {statusFilter !== 'all' && (
-        <div className="filter-notice">
-          Gefilterd op <strong>{scooterStatusLabel(statusFilter)}</strong>
-          <button onClick={() => setStatusFilter('all')}>Toon alles</button>
+      {statusFilter === 'all' && (
+        <div className="empty-state">
+          <strong>Selecteer een categorie hierboven</strong>
+          <span>Klik op een statuskaart om de bijbehorende scooters te bekijken, te sorteren en te exporteren.</span>
         </div>
       )}
       {statusFilter !== 'all' && (
@@ -11268,19 +11454,6 @@ function ProductDetailModal({
   const [labelQuantity, setLabelQuantity] = useState('1');
   const [productImageFailed, setProductImageFailed] = useState(false);
 
-  const linkedScooter = useMemo(() => {
-    const productReferences = [draft.code, draft.supplierItemNo, draft.serialNumber, draft.traceabilityCode]
-      .map((value) => value?.trim().toLowerCase())
-      .filter((value): value is string => Boolean(value));
-    return scooters.find((scooter) => productReferences.includes(scooter.frameNumber.trim().toLowerCase()));
-  }, [draft.code, draft.serialNumber, draft.supplierItemNo, draft.traceabilityCode, scooters]);
-  const linkedBatteryNumber = useMemo(() => {
-    if (!linkedScooter) return '';
-    return batteries.find((battery) => battery.scooterFrame?.trim().toLowerCase() === linkedScooter.frameNumber.trim().toLowerCase())?.lotNumber
-      ?? linkedScooter.batteryNumber
-      ?? '';
-  }, [batteries, linkedScooter]);
-
   useEffect(() => {
     const nextDraft = createProductDraft(product);
     const selectedSupplier = nextDraft.supplier
@@ -11775,9 +11948,6 @@ function ProductDetailModal({
                   ? <a href={complianceResponsibility.reference} target="_blank" rel="noreferrer">Open onderbouwing</a>
                   : <small>Onderbouwing: {complianceResponsibility.reference}</small>)}
               </div>
-              <label className="product-responsibility-field">Accu
-                <input value={linkedBatteryNumber} readOnly aria-label="Gekoppelde accu" />
-              </label>
               <label>Wie beheert het productdossier?
                 <select value={draft.complianceResponsibilityOverride ?? ''} onChange={(event) => setDraft((current) => ({
                   ...current,
@@ -12496,19 +12666,20 @@ function ProductDetailModal({
                 disabled={saving}
                 onClick={() => setSaveMode('product')}
               >
-                {saving && saveMode === 'product' ? 'Opslaan...' : 'Opslaan'}
+                {saving && saveMode === 'product' ? 'Opslaan...' : 'Alleen opslaan'}
               </button>
               <button
                 className="primary-button"
                 type="submit"
                 disabled={saving}
                 onClick={() => setSaveMode('apply')}
+                title={applyBatchNumber ? `Wijzigingen ook toepassen op batch ${applyBatchNumber}` : 'Wijzigingen ook toepassen op de bijbehorende batchregels'}
               >
                 {saving && saveMode === 'apply'
                   ? 'Toepassen...'
                   : applyBatchNumber
-                    ? `Opslaan + toepassen op batch ${applyBatchNumber}`
-                    : 'Opslaan + toepassen op batchregels'}
+                    ? `Opslaan en toepassen · ${applyBatchNumber}`
+                    : 'Opslaan en toepassen'}
               </button>
             </div>
           </div>
