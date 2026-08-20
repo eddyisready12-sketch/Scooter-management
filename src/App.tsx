@@ -5935,7 +5935,9 @@ function Dashboard({ data, onNavigate }: {
     return counts;
   }, [scooters]);
 
-  const available = statusCounts.get('Beschikbaar') ?? 0;
+  const directlyAvailable = statusCounts.get('Beschikbaar') ?? 0;
+  const inConsignment = statusCounts.get('In consignatie') ?? 0;
+  const available = directlyAvailable + inConsignment;
   const enRoute = statusCounts.get('Nog onderweg') ?? 0;
   const soldCustomer = statusCounts.get('Verkocht klant') ?? 0;
   const soldDealer = statusCounts.get('Verkocht dealer') ?? 0;
@@ -5952,10 +5954,10 @@ function Dashboard({ data, onNavigate }: {
     .filter((row) => row.count > 0);
 
   const kpis: Array<{ label: string; value: number; sub: string; icon: typeof Home; tone: string; view: View }> = [
-    { label: 'Totaal geregistreerd', value: total, sub: 'inclusief verkochte scooters', icon: Bike, tone: 'brand', view: 'scooters' },
-    { label: 'Beschikbaar', value: available, sub: 'direct leverbaar', icon: CheckCircle2, tone: 'green', view: 'scooters' },
+    { label: 'Beschikbaar', value: available, sub: `${directlyAvailable} beschikbaar · ${inConsignment} consignatie`, icon: CheckCircle2, tone: 'green', view: 'scooters' },
     { label: 'Onderweg', value: enRoute, sub: `${containersEnRoute.length} containers actief`, icon: Truck, tone: 'amber', view: 'containers' },
     { label: 'Verkocht', value: sold, sub: `${soldDealer} dealer · ${soldCustomer} klant`, icon: CircleDollarSign, tone: 'violet', view: 'sales' },
+    { label: 'Totaal geregistreerd', value: total, sub: 'inclusief verkochte scooters', icon: Bike, tone: 'brand', view: 'scooters' },
   ];
 
   return (
