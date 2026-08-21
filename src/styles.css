@@ -3216,6 +3216,59 @@ tbody tr:hover {
   min-width: 0;
 }
 
+.packaging-layer-field-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 16px;
+}
+
+.packaging-field-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 1px solid #bcd8f8;
+  border-radius: 50%;
+  background: #e8f2fd;
+  color: #0f5eaa;
+  cursor: help;
+}
+
+.packaging-field-tooltip {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: 280px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: normal;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+}
+
+.packaging-field-info:hover .packaging-field-tooltip,
+.packaging-field-info:focus-visible .packaging-field-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
 .packaging-layer-preview {
   display: grid;
   gap: 6px;
@@ -8288,6 +8341,25 @@ dd {
 
 .packaging-plan-result .total strong {
   color: #0f5eaa;
+}
+
+.packaging-layer-card.is-required-sticker {
+  border-color: #bcd8f8;
+  box-shadow: inset 3px 0 #1677d2;
+}
+
+.packaging-required-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid #bcd8f8;
+  border-radius: 999px;
+  background: #e8f2fd;
+  color: #0f5eaa;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 @media (max-width: 680px) {

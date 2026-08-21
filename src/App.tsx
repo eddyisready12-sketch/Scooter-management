@@ -20,6 +20,7 @@ import {
   Factory,
   Gauge,
   Home,
+  Info,
   Lock,
   LogOut,
   Menu,
@@ -766,6 +767,16 @@ function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
       productStickerMaterial: legacyStickerMaterial,
     });
   }
+
+  if (!layers.some(isStickerPackagingLayer)) {
+    layers.unshift({
+      name: 'Productsticker',
+      componentType: 'product_sticker',
+      packagingRole: 'Primair',
+    });
+  }
+
+  layers.sort((left, right) => Number(isStickerPackagingLayer(right)) - Number(isStickerPackagingLayer(left)));
 
   while (layers.length < 1) {
     layers.push(createEmptyPackagingLayer(layers.length));
@@ -11665,7 +11676,6 @@ function ProductDetailModal({
   }, [draft.imageUrl]);
 
   const packagingLayers = draft.packagingLayers ?? normalizePackagingLayers(draft);
-  const hasProductStickerLayer = packagingLayers.some(isStickerPackagingLayer);
   const derivedPackagingWasteStream = summarizePackagingWasteStream(
     packagingLayers.map((layer) => layer.material).filter(Boolean) as string[],
   );
@@ -11934,22 +11944,10 @@ function ProductDetailModal({
     });
   }
 
-  function addProductStickerLayer() {
-    setDraft((current) => {
-      const nextLayers = [...(current.packagingLayers ?? normalizePackagingLayers(current))];
-      if (nextLayers.length >= packagingLayerNames.length || nextLayers.some(isStickerPackagingLayer)) return current;
-      nextLayers.push({
-        name: 'Productsticker',
-        componentType: 'product_sticker',
-        packagingRole: 'Primair',
-      });
-      return { ...current, packagingLayers: nextLayers };
-    });
-  }
-
   function removePackagingLayer(index: number) {
     setDraft((current) => {
       const currentLayers = [...(current.packagingLayers ?? normalizePackagingLayers(current))];
+      if (isStickerPackagingLayer(currentLayers[index])) return current;
       const nextLayers = currentLayers.filter((_, layerIndex) => layerIndex !== index);
       while (nextLayers.length < 1) {
         nextLayers.push(createEmptyPackagingLayer(nextLayers.length));
@@ -12610,9 +12608,6 @@ function ProductDetailModal({
                   <div className="product-subsection-header">
                     <h3>Verpakking algemeen</h3>
                     <div className="page-title-actions">
-                      <button type="button" className="secondary-button" onClick={addProductStickerLayer} disabled={hasProductStickerLayer || packagingLayers.length >= packagingLayerNames.length}>
-                        <Plus size={16} /> Productsticker toevoegen
-                      </button>
                       <button type="button" className="secondary-button" onClick={addPackagingLayer} disabled={packagingLayers.length >= packagingLayerNames.length}>
                         <Plus size={16} /> Verpakkingscomponent toevoegen
                       </button>
@@ -12662,7 +12657,7 @@ function ProductDetailModal({
                       ));
 
                       return (
-                        <div key={`${layer.name ?? packagingLayerNames[index]}-${index}`} className="packaging-layer-card">
+                        <div key={`${layer.name ?? packagingLayerNames[index]}-${index}`} className={`packaging-layer-card${stickerLayer ? ' is-required-sticker' : ''}`}>
                           <div className="packaging-layer-grid">
                             <div className="packaging-layer-name">
                               <label>
@@ -12691,7 +12686,15 @@ function ProductDetailModal({
                               </select>
                             </div>
                             <div className="packaging-layer-field">
-                              <span className="packaging-layer-mobile-label">{stickerLayer ? 'Etiketformaat' : 'Formaat / verpakking'}</span>
+                              <span className="packaging-layer-field-heading">
+                                <span className="packaging-layer-mobile-label">{stickerLayer ? 'Etiketformaat' : 'Formaat / verpakking'}</span>
+                                {layer.packagingCatalogItemId ? (
+                                  <span className="packaging-field-info" tabIndex={0} aria-label="Meer informatie over het gekozen formaat">
+                                    <Info size={14} aria-hidden="true" />
+                                    <span className="packaging-field-tooltip" role="tooltip">Materiaalcode, gewicht en leverancier zijn gekoppeld aan dit formaat.</span>
+                                  </span>
+                                ) : null}
+                              </span>
                               <select value={layer.packagingCatalogItemId ?? ''} onChange={(event) => applyPackagingCatalogItem(index, event.target.value)} disabled={!selectedPackagingSupplier || availableCatalogItems.length === 0}>
                                 <option value="">{selectedPackagingSupplier && availableCatalogItems.length === 0 ? 'Geen artikelen vastgelegd' : 'Selecteer artikel...'}</option>
                                 {availableCatalogItems
@@ -12699,7 +12702,6 @@ function ProductDetailModal({
                                   .sort((left, right) => (left.afmetingen || left.omschrijving).localeCompare(right.afmetingen || right.omschrijving, 'nl', { numeric: true, sensitivity: 'base' }))
                                   .map((item) => <option key={item.id} value={item.id}>{item.afmetingen || item.omschrijving || item.artikelCode || 'Formaat niet vastgelegd'}</option>)}
                               </select>
-                              {layer.packagingCatalogItemId ? <small>Materiaalcode, gewicht en leverancier zijn gekoppeld aan dit formaat.</small> : null}
                             </div>
                             <div className="packaging-layer-field">
                               <span className="packaging-layer-mobile-label">Rol</span>
@@ -12742,15 +12744,19 @@ function ProductDetailModal({
                               {isStickerPackagingLayer(layer) ? <span className="packaging-label-skip">Niet op label</span> : <PackagingMaterialIcon option={selectedOption} compact />}
                             </div>
                             <div className="packaging-layer-actions">
-                              <button
-                                type="button"
-                                className="danger-icon-button"
-                                onClick={() => removePackagingLayer(index)}
-                                disabled={packagingLayers.length <= 2 && !layer.material && !layer.recycleCode && !layer.packagingSupplier && !layer.packagingCatalogItemId && !layer.weightGrams && !layer.recycledContentPercent && !layer.recyclabilityClass && !layer.packagingRole && !layer.productStickerMaterial}
-                                aria-label={`${layer.name ?? packagingLayerNames[index]} verwijderen`}
-                              >
-                                <XCircle size={18} />
-                              </button>
+                              {stickerLayer ? (
+                                <span className="packaging-required-badge">Verplicht</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="danger-icon-button"
+                                  onClick={() => removePackagingLayer(index)}
+                                  disabled={packagingLayers.length <= 2 && !layer.material && !layer.recycleCode && !layer.packagingSupplier && !layer.packagingCatalogItemId && !layer.weightGrams && !layer.recycledContentPercent && !layer.recyclabilityClass && !layer.packagingRole && !layer.productStickerMaterial}
+                                  aria-label={`${layer.name ?? packagingLayerNames[index]} verwijderen`}
+                                >
+                                  <XCircle size={18} />
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
