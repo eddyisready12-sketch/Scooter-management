@@ -2310,6 +2310,9 @@ export function CompliancePage({
   function renderPackagingSuppliersView() {
     const selectedUsage = allPackagingSupplierRows.find((row) => row.key === selectedPackagingSupplierKey)?.usage;
     const profileLayers = draftPackagingSupplier?.packagingProfile ?? [];
+    const activePurchasedPackagingItems = (draftPackagingSupplier?.packagingItems ?? []).filter((item) => item.actief !== false);
+    const hasVerifiedPackagingSource = profileLayers.some((layer) => layer.bron !== 'schatting')
+      || activePurchasedPackagingItems.some((item) => item.bron !== 'schatting');
     const profileBases = new Set(profileLayers.map((layer) => layer.gewichtBasis));
     const profileBasisLabel = profileBases.size > 1 ? 'gemengd' : profileLayers[0]?.gewichtBasis === 'per_doos' ? 'doos' : 'stuk';
     const linkedProductWeights = (selectedUsage?.products ?? []).map((product) => Number(product.packagingWeightTotalGrams || product.packagingWeightPrimaryGrams || 0));
@@ -2324,7 +2327,7 @@ export function CompliancePage({
       } else {
         if (profileLayers.length === 0) ppwrMissingItems.push('minimaal één profiellaag');
         if (profileLayers.some((layer) => !layer.materiaalcode.trim() || layer.gewichtGram <= 0)) ppwrMissingItems.push('materiaalcode of gewicht per laag');
-        if (profileLayers.length > 0 && !profileLayers.some((layer) => layer.bron !== 'schatting')) ppwrMissingItems.push('geverifieerde databron');
+        if (profileLayers.length > 0 && !hasVerifiedPackagingSource) ppwrMissingItems.push('geverifieerde databron');
       }
     }
     const ppwrTotalChecks = draftPackagingSupplier?.herkomst === 'eu' ? 4 : 5;
@@ -2586,17 +2589,39 @@ export function CompliancePage({
                             <strong>{document.fileName}</strong>
                             <span>Geüpload op {formatDateTime(document.uploadedAt)}</span>
                             <div className="supplier-document-item-links">
-                              {(draftPackagingSupplier.packagingItems ?? []).map((item) => (
-                                <label key={`${document.id}-${item.id}`} className="supplier-document-item-link">
-                                  <input
-                                    type="checkbox"
-                                    checked={document.packagingItemIds?.includes(item.id) ?? false}
-                                    onChange={(event) => toggleSupplierDocumentPackagingItem(document.id, item.id, event.target.checked)}
-                                  />
-                                  <span>{item.artikelCode || item.omschrijving || 'Verpakkingsartikel'}</span>
-                                </label>
-                              ))}
-                              {(draftPackagingSupplier.packagingItems?.length ?? 0) === 0 ? <span>Voeg eerst een ingekocht verpakkingsartikel toe.</span> : null}
+                              {(draftPackagingSupplier.packagingItems?.length ?? 0) > 0 ? (
+                                <>
+                                  <div className="supplier-document-link-header">
+                                    <div>
+                                      <strong>Koppel dit document aan</strong>
+                                      <span>Selecteer de verpakkingsartikelen waarvoor dit document als bewijs geldt.</span>
+                                    </div>
+                                    <span className="supplier-document-link-count">
+                                      {document.packagingItemIds?.length ?? 0} van {draftPackagingSupplier.packagingItems?.length ?? 0} geselecteerd
+                                    </span>
+                                  </div>
+                                  <div className="supplier-document-link-actions">
+                                    <button type="button" className="secondary-button compact-button" onClick={() => (draftPackagingSupplier.packagingItems ?? []).forEach((item) => toggleSupplierDocumentPackagingItem(document.id, item.id, true))}>Alles selecteren</button>
+                                    <button type="button" className="secondary-button compact-button" onClick={() => (draftPackagingSupplier.packagingItems ?? []).forEach((item) => toggleSupplierDocumentPackagingItem(document.id, item.id, false))}>Selectie wissen</button>
+                                  </div>
+                                  <div className="supplier-document-item-options">
+                                    {(draftPackagingSupplier.packagingItems ?? []).map((item) => (
+                                      <label key={`${document.id}-${item.id}`} className={`supplier-document-item-link${document.packagingItemIds?.includes(item.id) ? ' selected' : ''}`}>
+                                        <input
+                                          type="checkbox"
+                                          checked={document.packagingItemIds?.includes(item.id) ?? false}
+                                          onChange={(event) => toggleSupplierDocumentPackagingItem(document.id, item.id, event.target.checked)}
+                                        />
+                                        <span>
+                                          <strong>{item.artikelCode || 'Geen artikelcode'}</strong>
+                                          <small>{[item.omschrijving, item.afmetingen].filter(Boolean).join(' · ') || 'Verpakkingsartikel'}</small>
+                                        </span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                  {(document.packagingItemIds?.length ?? 0) === 0 ? <span className="supplier-document-link-warning">Nog geen artikel geselecteerd. Dit document telt daardoor nog niet mee als bewijs.</span> : null}
+                                </>
+                              ) : <span>Voeg eerst een ingekocht verpakkingsartikel toe.</span>}
                             </div>
                           </div>
                           <button type="button" className="icon-button danger" aria-label={`${document.fileName} verwijderen`} onClick={() => setDraftPackagingSupplier((current) => current ? { ...current, ppwrDocuments: (current.ppwrDocuments ?? []).filter((item) => item.id !== document.id) } : current)}><Trash2 size={15} /></button>

@@ -70,7 +70,8 @@ export function ppwrSupplierStatus(supplier?: Supplier): PpwrSupplierStatus {
   const allValid = layers.length > 0 && layers.every((layer) => (
     Boolean(layer.id && layer.rol && layer.materiaalcode.trim() && layer.gewichtGram > 0 && layer.gewichtBasis && layer.zorgwekkendeStoffen && layer.bron)
   ));
-  const hasVerifiedSource = layers.some((layer) => layer.bron !== 'schatting');
+  const hasVerifiedSource = layers.some((layer) => layer.bron !== 'schatting')
+    || (migrated.packagingItems ?? []).some((item) => item.actief !== false && item.bron !== 'schatting');
   return allValid && hasVerifiedSource ? 'compleet' : 'aanvullen';
 }
 
