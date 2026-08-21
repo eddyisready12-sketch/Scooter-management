@@ -4211,16 +4211,18 @@ tbody tr:hover {
 
 .container-scooter-table.import-batch-lines-table {
   table-layout: fixed;
+  width: 100%;
+  min-width: 0;
 }
 
 .container-scooter-table.import-batch-lines-table th:first-child,
 .container-scooter-table.import-batch-lines-table td:first-child {
-  width: 5%;
+  width: 4%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(2),
 .container-scooter-table.import-batch-lines-table td:nth-child(2) {
-  width: 8%;
+  width: 7%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(3),
@@ -4235,22 +4237,22 @@ tbody tr:hover {
 
 .container-scooter-table.import-batch-lines-table th:nth-child(5),
 .container-scooter-table.import-batch-lines-table td:nth-child(5) {
-  width: 7%;
+  width: 6%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(6),
 .container-scooter-table.import-batch-lines-table td:nth-child(6) {
-  width: 9%;
+  width: 8%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(7),
 .container-scooter-table.import-batch-lines-table td:nth-child(7) {
-  width: 10%;
+  width: 9%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(8),
 .container-scooter-table.import-batch-lines-table td:nth-child(8) {
-  width: 10%;
+  width: 9%;
 }
 
 .container-scooter-table.import-batch-lines-table th:nth-child(9),
@@ -4260,7 +4262,26 @@ tbody tr:hover {
 
 .container-scooter-table.import-batch-lines-table th:nth-child(10),
 .container-scooter-table.import-batch-lines-table td:nth-child(10) {
-  width: 11%;
+  width: 15%;
+}
+
+.container-scooter-table.import-batch-lines-table .import-batch-description-cell {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.container-scooter-table.import-batch-lines-table .import-batch-label-stack {
+  min-width: 0;
+}
+
+.container-scooter-table.import-batch-lines-table .import-label-actions {
+  gap: 3px;
+}
+
+.container-scooter-table.import-batch-lines-table .import-label-actions .icon-button {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
 }
 
 .import-line-number {
