@@ -91,7 +91,11 @@ type PendingBatchLabelPrint = {
 };
 type BatchPackagingPlan = {
   looseUnits: number;
-  unitsPerGroupedPackage: number;
+  unitsPerGroupedPackage?: number;
+  groups?: Array<{
+    unitsPerPackage: number;
+    packages: number;
+  }>;
 };
 
 const batchPackagingPlanMarker = '[PACKAGING_PLAN]';
@@ -103,8 +107,14 @@ function readBatchPackagingPlan(line: ContainerCostLine): BatchPackagingPlan | n
     const parsed = JSON.parse(line.componentsNote!.slice(markerIndex + batchPackagingPlanMarker.length).trim()) as Partial<BatchPackagingPlan>;
     const quantity = Math.max(0, Math.round(parseDecimal(line.quantity)));
     const looseUnits = Math.max(0, Math.min(quantity, Math.round(Number(parsed.looseUnits) || 0)));
+    const groups = Array.isArray(parsed.groups)
+      ? parsed.groups.map((group) => ({
+        unitsPerPackage: Math.max(1, Math.round(Number(group.unitsPerPackage) || 1)),
+        packages: Math.max(0, Math.round(Number(group.packages) || 0)),
+      })).filter((group) => group.packages > 0)
+      : undefined;
     const unitsPerGroupedPackage = Math.max(1, Math.round(Number(parsed.unitsPerGroupedPackage) || 1));
-    return { looseUnits, unitsPerGroupedPackage };
+    return { looseUnits, unitsPerGroupedPackage, groups };
   } catch {
     return null;
   }
@@ -127,9 +137,15 @@ function batchPackagingCounts(line: ContainerCostLine) {
   const quantity = Math.max(0, Math.round(parseDecimal(line.quantity)));
   const plan = readBatchPackagingPlan(line);
   if (!plan) return null;
-  const groupedUnits = Math.max(0, quantity - plan.looseUnits);
-  const groupedPackages = groupedUnits > 0 ? Math.ceil(groupedUnits / plan.unitsPerGroupedPackage) : 0;
-  return { ...plan, quantity, groupedUnits, groupedPackages, totalPackages: plan.looseUnits + groupedPackages };
+  const groups = plan.groups?.length
+    ? plan.groups
+    : [{
+      unitsPerPackage: plan.unitsPerGroupedPackage ?? 1,
+      packages: Math.ceil(Math.max(0, quantity - plan.looseUnits) / (plan.unitsPerGroupedPackage ?? 1)),
+    }];
+  const groupedUnits = groups.reduce((sum, group) => sum + group.unitsPerPackage * group.packages, 0);
+  const groupedPackages = groups.reduce((sum, group) => sum + group.packages, 0);
+  return { ...plan, groups, quantity, groupedUnits, groupedPackages, totalPackages: plan.looseUnits + groupedPackages, allocatedUnits: plan.looseUnits + groupedUnits };
 }
 type LoginSession = {
   email: string;
@@ -1499,9 +1515,12 @@ function buildPackagingRegistrationsForBatch(
         productDescription: product.description || line.description,
         productBarcode: product.barcode,
         quantity: line.quantity,
-        packagingUnit: packagingPlan ? `${packagingPlan.looseUnits} los + ${packagingPlan.groupedUnits} per ${packagingPlan.unitsPerGroupedPackage}` : product.packagingUnit || '1',
+        packagingUnit: packagingPlan ? [
+          `${packagingPlan.looseUnits} los`,
+          ...packagingPlan.groups.map((group) => `${group.packages} × ${group.unitsPerPackage}`),
+        ].join(' + ') : product.packagingUnit || '1',
         packagesCount: formatDecimal(packagesCount, 8),
-        unitsPerPackage: packagingPlan ? formatDecimal(packagingPlan.unitsPerGroupedPackage, 8) : formatDecimal(unitsPerPackage, 8),
+        unitsPerPackage: packagingPlan?.groups.length === 1 ? formatDecimal(packagingPlan.groups[0].unitsPerPackage, 8) : packagingPlan ? 'gemengd' : formatDecimal(unitsPerPackage, 8),
         layerName: layer.name || packagingLayerNames[index] || `Laag ${index + 1}`,
         material,
         recycleCode: layer.recycleCode,
@@ -2030,7 +2049,7 @@ function canvasToZplGraphic(canvas: HTMLCanvasElement) {
   return `^GFA,${totalBytes},${totalBytes},${bytesPerRow},${hex}`;
 }
 
-async function buildZebraProductLabelRasterZpl(product: Product, size: ZebraProductLabelSize) {
+async function buildZebraProductLabelRasterZpl(product: Product, size: ZebraProductLabelSize, quantityPerPackage?: number) {
   const layout = zebraProductLabelLayouts[size];
   const barcodeSource = product.barcode?.trim() || product.code.trim();
   const batchCode = product.batchNumber?.trim() || product.batch?.trim() || product.traceabilityCode?.trim();
@@ -2093,6 +2112,12 @@ async function buildZebraProductLabelRasterZpl(product: Product, size: ZebraProd
   context.fillText(description, 18, 82, 604);
   drawContainedImage(context, barcodeCanvas, 18, 108, 350, compact ? 105 : 112);
   drawContainedImage(context, logo, 420, 12, 185, 50);
+  if (quantityPerPackage && quantityPerPackage > 1) {
+    context.textAlign = 'center';
+    context.font = '700 22px Arial';
+    context.fillText(`Aantal ${quantityPerPackage}`, 500, 68, 190);
+    context.textAlign = 'left';
+  }
   drawContainedImage(context, qrCanvas, 498, compact ? 182 : 216, 78, 78);
 
   const country = product.countryOfOrigin?.trim() || 'China';
@@ -2440,7 +2465,7 @@ function productImporterLabelValue(product: Product) {
   return 'Yreb b.v.\nHoekerstraat 12A\n3133KR Vlaardingen\nInfo@rso-parts.nl';
 }
 
-function buildDymoProductLabelXml(product: Product, logoBase64: string, materialIconsBase64: string | null, barcodeBase64: string | null) {
+function buildDymoProductLabelXml(product: Product, logoBase64: string, materialIconsBase64: string | null, barcodeBase64: string | null, quantityPerPackage?: number) {
   const barcodeSource = product.barcode?.trim() || product.code.trim();
   if (!barcodeSource) {
     throw new Error('Product heeft geen barcode of code om te printen.');
@@ -2576,6 +2601,7 @@ function buildDymoProductLabelXml(product: Product, logoBase64: string, material
   </DrawCommands>
   ${textObject({ name: 'ProductCode', value: escapedCode, x: 220, y: 210, width: 1800, height: 300, size: 14 })}
   ${textObject({ name: 'ProductDescription', value: escapedDescription, x: 220, y: 540, width: 2700, height: 290, size: 10 })}
+  ${quantityPerPackage && quantityPerPackage > 1 ? textObject({ name: 'PackageQuantity', value: `Aantal ${quantityPerPackage}`, x: 3380, y: 590, width: 1420, height: 240, size: 12, bold: true, alignment: 'Center' }) : ''}
   <ObjectInfo>
     <ImageObject>
       <Name>RsoLogo</Name>
@@ -2630,18 +2656,24 @@ function buildDymoOuterBoxLabelXml({
   barcodeValue,
   batchCode,
   quantity,
+  responsibleParty,
+  countryOfOrigin,
 }: {
   articleNumber: string;
   description: string;
   barcodeValue: string;
   batchCode: string;
   quantity: string;
+  responsibleParty: string;
+  countryOfOrigin: string;
 }) {
   const escapedArticleNumber = escapeLabelValue(articleNumber);
   const escapedDescription = escapeLabelValue(description);
   const escapedBatchCode = escapeLabelValue(batchCode);
   const escapedQuantity = escapeLabelValue(quantity);
   const escapedBarcode = escapeLabelValue(barcodeValue);
+  const escapedResponsibleParty = escapeLabelValue(responsibleParty);
+  const escapedOrigin = escapeLabelValue(countryOfOrigin.toLowerCase().startsWith('made in') ? countryOfOrigin : `Made in ${countryOfOrigin}`);
   const barcodeBase64 = buildOuterBoxBarcodeBase64(barcodeValue);
 
   const textObject = ({
@@ -2740,7 +2772,9 @@ function buildDymoOuterBoxLabelXml({
     <RoundRectangle X="0" Y="0" Width="${dymo99012Layout.width}" Height="${dymo99012Layout.height}" Rx="180" Ry="180" />
   </DrawCommands>
   ${textObject({ name: 'ArticleValue', value: escapedArticleNumber, x: 220, y: 130, width: 2200, height: 260, size: 16, bold: true })}
-  ${textObject({ name: 'DescriptionValue', value: escapedDescription, x: 220, y: 440, width: 2050, height: 560, size: 18, bold: true })}
+  ${textObject({ name: 'DescriptionValue', value: escapedDescription, x: 220, y: 410, width: 2050, height: 390, size: 14, bold: true })}
+  ${textObject({ name: 'ResponsibleParty', value: escapedResponsibleParty, x: 220, y: 820, width: 2050, height: 760, size: 6 })}
+  ${textObject({ name: 'Origin', value: escapedOrigin, x: 220, y: 1600, width: 1100, height: 140, size: 6, bold: true })}
   ${barcodeObject}
   ${textObject({ name: 'QuantityLabel', value: 'Aantal', x: 2450, y: 100, width: 2220, height: 130, size: 8, bold: true, alignment: 'Center' })}
   ${textObject({ name: 'QuantityValue', value: escapedQuantity, x: 2450, y: 240, width: 2220, height: 300, size: 18, bold: true, alignment: 'Center' })}
@@ -2792,12 +2826,12 @@ async function printScooterDymoLabel(scooter: Scooter, dealer?: Dealer, identifi
   return printerName;
 }
 
-async function printProductDymoLabel(product: Product, quantity = 1) {
+async function printProductDymoLabel(product: Product, quantity = 1, quantityPerPackage?: number) {
   const { dymo, printerName } = await getAvailableDymoPrinter();
   const logoBase64 = await imageUrlToBase64(rsoLogoUrl);
   const materialIconsBase64 = await buildMaterialIconsBase64(product);
   const barcodeBase64 = buildProductBarcodeBase64(product.barcode?.trim() || product.code.trim());
-  const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64, barcodeBase64);
+  const labelXml = buildDymoProductLabelXml(product, logoBase64, materialIconsBase64, barcodeBase64, quantityPerPackage);
   for (let index = 0; index < quantity; index += 1) {
     const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Product ${product.code || product.description} (${index + 1}/${quantity})` });
     if (!printResult.success) {
@@ -2837,9 +2871,9 @@ async function getAvailableZebraPrinter() {
   throw new Error(`Geen Zebra ZD421 gevonden. Start Zebra Browser Print en controleer de printerverbinding. Getest: ${failedEndpoints.join(', ')}.`);
 }
 
-async function printProductZebraLabel(product: Product, quantity = 1, size: ZebraProductLabelSize = '80x42') {
+async function printProductZebraLabel(product: Product, quantity = 1, size: ZebraProductLabelSize = '80x42', quantityPerPackage?: number) {
   const { endpoint, printer } = await getAvailableZebraPrinter();
-  const { zpl } = await buildZebraProductLabelRasterZpl(product, size);
+  const { zpl } = await buildZebraProductLabelRasterZpl(product, size, quantityPerPackage);
 
   for (let index = 0; index < quantity; index += 1) {
     const response = await fetch(`${endpoint}/write`, {
@@ -2855,14 +2889,14 @@ async function printProductZebraLabel(product: Product, quantity = 1, size: Zebr
   return `${printer.name || 'Zebra ZD421'} (${zebraProductLabelLayouts[size].label})`;
 }
 
-async function previewProductZebraLabel(product: Product, size: ZebraProductLabelSize) {
+async function previewProductZebraLabel(product: Product, size: ZebraProductLabelSize, quantityPerPackage?: number) {
   const previewWindow = window.open('', '_blank', 'popup,width=920,height=650');
   if (!previewWindow) {
     throw new Error('Het voorbeeldvenster is geblokkeerd. Sta pop-ups voor deze website toe en probeer opnieuw.');
   }
 
   try {
-    const { dataUrl } = await buildZebraProductLabelRasterZpl(product, size);
+    const { dataUrl } = await buildZebraProductLabelRasterZpl(product, size, quantityPerPackage);
     const layout = zebraProductLabelLayouts[size];
     previewWindow.document.open();
     previewWindow.document.write(`<!doctype html>
@@ -2904,6 +2938,8 @@ async function printOuterBoxDymoLabel({
   batchCode,
   quantityPerLabel,
   labelsToPrint,
+  responsibleParty,
+  countryOfOrigin,
 }: {
   articleNumber: string;
   description: string;
@@ -2911,6 +2947,8 @@ async function printOuterBoxDymoLabel({
   batchCode: string;
   quantityPerLabel: number;
   labelsToPrint: number;
+  responsibleParty: string;
+  countryOfOrigin: string;
 }) {
   const { dymo, printerName } = await getAvailableDymoPrinter();
   const labelXml = buildDymoOuterBoxLabelXml({
@@ -2919,6 +2957,8 @@ async function printOuterBoxDymoLabel({
     barcodeValue,
     batchCode,
     quantity: formatQuantity(quantityPerLabel),
+    responsibleParty,
+    countryOfOrigin,
   });
   for (let index = 0; index < labelsToPrint; index += 1) {
     const printResult = await dymo.printLabel(printerName, labelXml, { jobTitle: `Omdoos ${articleNumber} (${index + 1}/${labelsToPrint})` });
@@ -2935,12 +2975,16 @@ function openOuterBoxLabelPreview({
   barcodeValue,
   batchCode,
   quantityPerLabel,
+  responsibleParty,
+  countryOfOrigin,
 }: {
   articleNumber: string;
   description: string;
   barcodeValue: string;
   batchCode: string;
   quantityPerLabel: number;
+  responsibleParty: string;
+  countryOfOrigin: string;
 }) {
   const barcodeBase64 = buildOuterBoxBarcodeBase64(barcodeValue);
   const previewWindow = window.open('', '_blank', 'width=1100,height=700');
@@ -2953,6 +2997,8 @@ function openOuterBoxLabelPreview({
   const batchHtml = escapeLabelValue(batchCode);
   const quantityHtml = escapeLabelValue(formatQuantity(quantityPerLabel));
   const barcodeHtml = escapeLabelValue(barcodeValue);
+  const responsiblePartyHtml = escapeLabelValue(responsibleParty).replace(/\n/g, '<br>');
+  const originHtml = escapeLabelValue(countryOfOrigin.toLowerCase().startsWith('made in') ? countryOfOrigin : `Made in ${countryOfOrigin}`);
   const barcodeImage = barcodeBase64 ? `data:image/png;base64,${barcodeBase64}` : '';
 
   previewWindow.opener = null;
@@ -3022,6 +3068,17 @@ function openOuterBoxLabelPreview({
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
+          }
+          .responsible-party {
+            max-width: 42mm;
+            font-size: 1.65mm;
+            line-height: 1.2;
+            color: #334155;
+          }
+          .origin {
+            margin-top: 0.6mm;
+            font-size: 1.7mm;
+            font-weight: 700;
           }
           .bottom-row {
             display: grid;
@@ -3096,7 +3153,11 @@ function openOuterBoxLabelPreview({
             <p class="preview-note">Lokale preview zonder printer. Verhouding is afgestemd op de DYMO-sticker.</p>
             <div class="sticker">
               <div class="article-number">${articleHtml}</div>
-              <div class="description">${descriptionHtml}</div>
+              <div>
+                <div class="description">${descriptionHtml}</div>
+                <div class="responsible-party">${responsiblePartyHtml}</div>
+                <div class="origin">${originHtml}</div>
+              </div>
               <div class="bottom-row">
                 <div class="details-grid">
                   <div class="detail-card">
@@ -4786,6 +4847,7 @@ export function App() {
     quantity: number,
     printer: 'dymo' | 'zebra' = 'dymo',
     zebraSize: ZebraProductLabelSize = '80x42',
+    quantityPerPackage?: number,
   ) {
     const batchCode = batch.orderNumber || batch.containerNumber || line.batchId;
     const sourceProduct = productFromCostLine(line, product);
@@ -4797,8 +4859,8 @@ export function App() {
     };
 
     const printerName = printer === 'zebra'
-      ? await printProductZebraLabel(labelProduct, quantity, zebraSize)
-      : await printProductDymoLabel(labelProduct, quantity);
+      ? await printProductZebraLabel(labelProduct, quantity, zebraSize, quantityPerPackage)
+      : await printProductDymoLabel(labelProduct, quantity, quantityPerPackage);
     const printedAt = new Date().toISOString();
     const registrations = buildPackagingRegistrationsForBatch(batch, [line], [labelProduct])
       .map((registration) => ({
@@ -4820,7 +4882,7 @@ export function App() {
   async function printBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
     const sourceProduct = productFromCostLine(line, product);
     const packagingPlan = batchPackagingCounts(line);
-    const defaultUnits = packagingPlan?.unitsPerGroupedPackage ?? Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
+    const defaultUnits = packagingPlan?.groups[0]?.unitsPerPackage ?? Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
     const unitsAnswer = window.prompt('Hoeveel stuks moeten op de omdoos-sticker staan?', String(defaultUnits));
     if (unitsAnswer === null) return null;
     const quantityPerLabel = Number(unitsAnswer.replace(',', '.'));
@@ -4828,7 +4890,8 @@ export function App() {
       throw new Error('Vul een heel aantal stuks in tussen 1 en 100000.');
     }
 
-    const labelsAnswer = window.prompt('Hoeveel omdoos-stickers wil je printen?', String(packagingPlan?.groupedPackages ?? 1));
+    const matchingGroup = packagingPlan?.groups.find((group) => group.unitsPerPackage === quantityPerLabel);
+    const labelsAnswer = window.prompt('Hoeveel omdoos-stickers wil je printen?', String(matchingGroup?.packages ?? 1));
     if (labelsAnswer === null) return null;
     const labelsToPrint = Number(labelsAnswer.replace(',', '.'));
     if (!Number.isInteger(labelsToPrint) || labelsToPrint < 1) {
@@ -4856,13 +4919,15 @@ export function App() {
       batchCode,
       quantityPerLabel,
       labelsToPrint,
+      responsibleParty: productImporterLabelValue(sourceProduct),
+      countryOfOrigin: sourceProduct.countryOfOrigin?.trim() || 'China',
     });
   }
 
   function previewBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
     const sourceProduct = productFromCostLine(line, product);
     const packagingPlan = batchPackagingCounts(line);
-    const defaultUnits = packagingPlan?.unitsPerGroupedPackage ?? Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
+    const defaultUnits = packagingPlan?.groups[0]?.unitsPerPackage ?? Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
     const unitsAnswer = window.prompt('Hoeveel stuks moeten op de omdoos-sticker staan?', String(defaultUnits));
     if (unitsAnswer === null) return;
     const quantityPerLabel = Number(unitsAnswer.replace(',', '.'));
@@ -4890,6 +4955,8 @@ export function App() {
       barcodeValue,
       batchCode,
       quantityPerLabel,
+      responsibleParty: productImporterLabelValue(sourceProduct),
+      countryOfOrigin: sourceProduct.countryOfOrigin?.trim() || 'China',
     });
   }
 
@@ -5913,7 +5980,8 @@ export function App() {
           }}
           applyBatchNumber={selectedProductApplyBatchNumber}
           defaultLabelQuantity={pendingBatchLabelPrint ? batchPackagingCounts(pendingBatchLabelPrint.line)?.looseUnits : undefined}
-          onPrintLabel={pendingBatchLabelPrint ? async (product, quantity, printer, zebraSize) => {
+          packagingVariants={pendingBatchLabelPrint ? batchPackagingCounts(pendingBatchLabelPrint.line)?.groups : undefined}
+          onPrintLabel={pendingBatchLabelPrint ? async (product, quantity, printer, zebraSize, quantityPerPackage) => {
             return printBatchProductLabel(
               pendingBatchLabelPrint.batch,
               pendingBatchLabelPrint.line,
@@ -5921,6 +5989,7 @@ export function App() {
               quantity,
               printer ?? 'dymo',
               zebraSize ?? '80x42',
+              quantityPerPackage,
             );
           } : undefined}
         />
@@ -8640,7 +8709,9 @@ function CostBatchesPage({
   const [printMessage, setPrintMessage] = useState('');
   const [packagingPlanLine, setPackagingPlanLine] = useState<ContainerCostLine | null>(null);
   const [looseUnitsDraft, setLooseUnitsDraft] = useState('0');
-  const [groupSizeDraft, setGroupSizeDraft] = useState('50');
+  const [packagingGroupDrafts, setPackagingGroupDrafts] = useState<Array<{ id: string; unitsPerPackage: string; packages: string }>>([
+    { id: 'group-1', unitsPerPackage: '50', packages: '1' },
+  ]);
   const [packagingPlanSaving, setPackagingPlanSaving] = useState(false);
   const [packagingMessage, setPackagingMessage] = useState('');
   const [importToolTab, setImportToolTab] = useState<'batch' | 'scooterPackaging'>('batch');
@@ -8673,11 +8744,15 @@ function CostBatchesPage({
     if (!packagingPlanLine) return null;
     const quantity = Math.max(0, Math.round(parseDecimal(packagingPlanLine.quantity)));
     const looseUnits = Math.max(0, Math.min(quantity, Math.round(parseDecimal(looseUnitsDraft))));
-    const unitsPerGroupedPackage = Math.max(1, Math.round(parseDecimal(groupSizeDraft)) || 1);
-    const groupedUnits = Math.max(0, quantity - looseUnits);
-    const groupedPackages = groupedUnits > 0 ? Math.ceil(groupedUnits / unitsPerGroupedPackage) : 0;
-    return { quantity, looseUnits, unitsPerGroupedPackage, groupedUnits, groupedPackages, totalPackages: looseUnits + groupedPackages };
-  }, [groupSizeDraft, looseUnitsDraft, packagingPlanLine]);
+    const groups = packagingGroupDrafts.map((group) => ({
+      unitsPerPackage: Math.max(1, Math.round(parseDecimal(group.unitsPerPackage)) || 1),
+      packages: Math.max(0, Math.round(parseDecimal(group.packages))),
+    }));
+    const groupedUnits = groups.reduce((sum, group) => sum + group.unitsPerPackage * group.packages, 0);
+    const groupedPackages = groups.reduce((sum, group) => sum + group.packages, 0);
+    const allocatedUnits = looseUnits + groupedUnits;
+    return { quantity, looseUnits, groups, groupedUnits, groupedPackages, totalPackages: looseUnits + groupedPackages, allocatedUnits, remainingUnits: quantity - allocatedUnits };
+  }, [looseUnitsDraft, packagingGroupDrafts, packagingPlanLine]);
 
   async function savePackagingDraft(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -8714,7 +8789,11 @@ function CostBatchesPage({
     const existing = batchPackagingCounts(line);
     setPackagingPlanLine(line);
     setLooseUnitsDraft(String(existing?.looseUnits ?? 0));
-    setGroupSizeDraft(String(existing?.unitsPerGroupedPackage ?? 50));
+    setPackagingGroupDrafts((existing?.groups.length ? existing.groups : [{ unitsPerPackage: 50, packages: 1 }]).map((group, index) => ({
+      id: `group-${Date.now()}-${index}`,
+      unitsPerPackage: String(group.unitsPerPackage),
+      packages: String(group.packages),
+    })));
     setPackagingMessage('');
   }
 
@@ -8723,14 +8802,19 @@ function CostBatchesPage({
     if (!packagingPlanLine) return;
     const quantity = Math.max(0, Math.round(parseDecimal(packagingPlanLine.quantity)));
     const looseUnits = Math.round(parseDecimal(looseUnitsDraft));
-    const unitsPerGroupedPackage = Math.round(parseDecimal(groupSizeDraft));
-    if (looseUnits < 0 || looseUnits > quantity || unitsPerGroupedPackage < 1) {
-      setPackagingMessage(`Vul 0 t/m ${quantity} losse stuks in en minimaal 1 stuk per grootverpakking.`);
+    const groups = packagingGroupDrafts.map((group) => ({ unitsPerPackage: Math.round(parseDecimal(group.unitsPerPackage)), packages: Math.round(parseDecimal(group.packages)) }));
+    const allocatedUnits = looseUnits + groups.reduce((sum, group) => sum + group.unitsPerPackage * group.packages, 0);
+    if (looseUnits < 0 || looseUnits > quantity || groups.some((group) => group.unitsPerPackage < 1 || group.packages < 1)) {
+      setPackagingMessage(`Vul 0 t/m ${quantity} losse stuks in en per variant minimaal 1 stuk en 1 verpakking.`);
+      return;
+    }
+    if (allocatedUnits !== quantity) {
+      setPackagingMessage(`De verdeling moet exact ${quantity} stuks zijn. Nu zijn ${allocatedUnits} stuks toegewezen.`);
       return;
     }
     setPackagingPlanSaving(true);
     try {
-      await onSaveBatchPackagingPlan(packagingPlanLine, { looseUnits, unitsPerGroupedPackage });
+      await onSaveBatchPackagingPlan(packagingPlanLine, { looseUnits, groups });
       setPrintMessage(`Verpakkingsverdeling opgeslagen voor ${packagingPlanLine.referenceCode}.`);
       setPackagingPlanLine(null);
     } catch (error) {
@@ -9262,7 +9346,7 @@ function CostBatchesPage({
                                                 </div>
                                                 {packagingPlan ? (
                                                   <small className="import-label-meta packaging-plan-summary">
-                                                    {packagingPlan.looseUnits} los + {packagingPlan.groupedPackages} × {packagingPlan.unitsPerGroupedPackage} = {packagingPlan.totalPackages} verpakkingen
+                                                    {[`${packagingPlan.looseUnits} los`, ...packagingPlan.groups.map((group) => `${group.packages} × ${group.unitsPerPackage}`)].join(' + ')} = {packagingPlan.totalPackages} verpakkingen
                                                   </small>
                                                 ) : null}
                                                 <span className={`import-label-status ${isPrinted ? 'is-printed' : 'is-pending'}`}>
@@ -9307,14 +9391,32 @@ function CostBatchesPage({
               <label>Los te verkopen stuks
                 <input type="number" min="0" max={packagingPlanPreview.quantity} step="1" value={looseUnitsDraft} onChange={(event) => setLooseUnitsDraft(event.target.value)} required />
               </label>
-              <label>Stuks per grootverpakking
-                <input type="number" min="1" step="1" value={groupSizeDraft} onChange={(event) => setGroupSizeDraft(event.target.value)} required />
-              </label>
+            </div>
+            <div className="packaging-variant-section">
+              <div className="packaging-variant-header">
+                <div><strong>Voorverpakte varianten</strong><span>Voeg bijvoorbeeld een 5-stuks- en een 50-stuksvariant toe.</span></div>
+                <button type="button" className="secondary-button compact-button" onClick={() => setPackagingGroupDrafts((current) => [...current, { id: `group-${Date.now()}`, unitsPerPackage: '5', packages: '1' }])}><Plus size={14} /> Variant toevoegen</button>
+              </div>
+              <div className="packaging-variant-list">
+                {packagingGroupDrafts.map((group, index) => (
+                  <div className="packaging-variant-row" key={group.id}>
+                    <label>Stuks per verpakking<input type="number" min="1" step="1" value={group.unitsPerPackage} onChange={(event) => setPackagingGroupDrafts((current) => current.map((item) => item.id === group.id ? { ...item, unitsPerPackage: event.target.value } : item))} required /></label>
+                    <span>×</span>
+                    <label>Aantal verpakkingen<input type="number" min="1" step="1" value={group.packages} onChange={(event) => setPackagingGroupDrafts((current) => current.map((item) => item.id === group.id ? { ...item, packages: event.target.value } : item))} required /></label>
+                    <strong>{packagingPlanPreview.groups[index].unitsPerPackage * packagingPlanPreview.groups[index].packages} stuks</strong>
+                    <button type="button" className="danger-icon-button" aria-label="Variant verwijderen" disabled={packagingGroupDrafts.length === 1} onClick={() => setPackagingGroupDrafts((current) => current.filter((item) => item.id !== group.id))}><XCircle size={16} /></button>
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="packaging-plan-result">
               <div><span>Losse labels en zakjes</span><strong>{packagingPlanPreview.looseUnits}</strong></div>
-              <div><span>Grootverpakkingslabels en zakjes</span><strong>{packagingPlanPreview.groupedPackages}</strong><small>{packagingPlanPreview.groupedUnits} stuks ÷ {packagingPlanPreview.unitsPerGroupedPackage}</small></div>
+              <div><span>Voorverpakkingslabels en zakjes</span><strong>{packagingPlanPreview.groupedPackages}</strong><small>{packagingPlanPreview.groupedUnits} stuks verdeeld over {packagingPlanPreview.groups.length} varianten</small></div>
               <div className="total"><span>Totaal verpakkingen</span><strong>{packagingPlanPreview.totalPackages}</strong></div>
+            </div>
+            <div className={`packaging-allocation-status${packagingPlanPreview.remainingUnits === 0 ? ' complete' : ' incomplete'}`}>
+              <strong>{packagingPlanPreview.allocatedUnits} van {packagingPlanPreview.quantity} stuks toegewezen</strong>
+              <span>{packagingPlanPreview.remainingUnits === 0 ? 'De verdeling klopt.' : packagingPlanPreview.remainingUnits > 0 ? `Nog ${packagingPlanPreview.remainingUnits} stuks verdelen.` : `${Math.abs(packagingPlanPreview.remainingUnits)} stuks te veel verdeeld.`}</span>
             </div>
             {packagingMessage ? <div className="notice compact">{packagingMessage}</div> : null}
             <div className="modal-actions">
@@ -11599,6 +11701,7 @@ function ProductDetailModal({
   onSaveAndApplyPackaging,
   applyBatchNumber,
   defaultLabelQuantity,
+  packagingVariants,
   onPrintLabel,
 }: {
   product: Product;
@@ -11617,11 +11720,13 @@ function ProductDetailModal({
   onSaveAndApplyPackaging: (product: Product, batchNumber?: string) => Promise<void>;
   applyBatchNumber?: string;
   defaultLabelQuantity?: number;
+  packagingVariants?: Array<{ unitsPerPackage: number; packages: number }>;
   onPrintLabel?: (
     product: Product,
     quantity: number,
     printer?: 'dymo' | 'zebra',
     zebraSize?: ZebraProductLabelSize,
+    quantityPerPackage?: number,
   ) => Promise<string>;
 }) {
   const [draft, setDraft] = useState<Product>(() => createProductDraft(product));
@@ -11635,6 +11740,7 @@ function ProductDetailModal({
   const [labelPrinter, setLabelPrinter] = useState<'dymo' | 'zebra'>('zebra');
   const [zebraLabelSize, setZebraLabelSize] = useState<ZebraProductLabelSize>('80x42');
   const [labelQuantity, setLabelQuantity] = useState('1');
+  const [labelPackageUnits, setLabelPackageUnits] = useState<number | null>(null);
   const [productImageFailed, setProductImageFailed] = useState(false);
 
   useEffect(() => {
@@ -11669,6 +11775,7 @@ function ProductDetailModal({
     setActiveTab(initialTab);
     setChecklistExpanded(false);
     setLabelQuantity(defaultLabelQuantity && defaultLabelQuantity > 0 ? String(defaultLabelQuantity) : '1');
+    setLabelPackageUnits(null);
   }, [product, supplierRecords, importers, initialTab, defaultLabelQuantity]);
 
   useEffect(() => {
@@ -12005,17 +12112,17 @@ function ProductDetailModal({
           setDymoMessage('De grafische preview is beschikbaar voor de Zebra ZD421.');
           return;
         }
-        await previewProductZebraLabel(draft, zebraLabelSize);
+        await previewProductZebraLabel(draft, zebraLabelSize, labelPackageUnits ?? undefined);
         setDymoMessage(`Voorbeeld voor ${zebraProductLabelLayouts[zebraLabelSize].label} geopend; er is niets geprint.`);
         setPrintDialogOpen(false);
         return;
       }
 
       const printerName = onPrintLabel
-        ? await onPrintLabel(draft, quantity, labelPrinter, zebraLabelSize)
+        ? await onPrintLabel(draft, quantity, labelPrinter, zebraLabelSize, labelPackageUnits ?? undefined)
         : labelPrinter === 'zebra'
-          ? await printProductZebraLabel(draft, quantity, zebraLabelSize)
-          : await printProductDymoLabel(draft, quantity);
+          ? await printProductZebraLabel(draft, quantity, zebraLabelSize, labelPackageUnits ?? undefined)
+          : await printProductDymoLabel(draft, quantity, labelPackageUnits ?? undefined);
       const format = labelPrinter === 'zebra' ? ` op ${zebraProductLabelLayouts[zebraLabelSize].label}` : '';
       setDymoMessage(`${quantity} productlabel${quantity === 1 ? '' : 's'}${format} verstuurd naar ${printerName}.`);
       setPrintDialogOpen(false);
@@ -12092,6 +12199,24 @@ function ProductDetailModal({
                   </div>
                 </fieldset>
               )}
+
+              {packagingVariants?.length ? (
+                <fieldset className="product-print-choice-group">
+                  <legend>Labelsoort</legend>
+                  <div className="product-print-options packaging-variant-options">
+                    <button type="button" className={`product-print-option ${labelPackageUnits === null ? 'selected' : ''}`} onClick={() => { setLabelPackageUnits(null); setLabelQuantity(defaultLabelQuantity && defaultLabelQuantity > 0 ? String(defaultLabelQuantity) : '1'); }}>
+                      <span className="product-print-option-check">{labelPackageUnits === null && <CheckCircle2 size={19} />}</span>
+                      <span><strong>Los product</strong><small>1 stuk per label</small></span>
+                    </button>
+                    {packagingVariants.map((variant) => (
+                      <button type="button" key={variant.unitsPerPackage} className={`product-print-option ${labelPackageUnits === variant.unitsPerPackage ? 'selected' : ''}`} onClick={() => { setLabelPackageUnits(variant.unitsPerPackage); setLabelQuantity(String(variant.packages)); }}>
+                        <span className="product-print-option-check">{labelPackageUnits === variant.unitsPerPackage && <CheckCircle2 size={19} />}</span>
+                        <span><strong>{variant.unitsPerPackage}-stuksverpakking</strong><small>{variant.packages} labels printen</small></span>
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
 
               <label className="product-print-quantity">
                 <span>Aantal labels</span>
