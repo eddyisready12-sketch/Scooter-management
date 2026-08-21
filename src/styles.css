@@ -8201,6 +8201,81 @@ dd {
   gap: 2px;
 }
 
+.import-packaging-plan-button {
+  color: #1677d2;
+  border-color: #bcd8f8;
+  background: #eef6ff;
+}
+
+.packaging-plan-summary {
+  color: #0f5eaa;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.packaging-plan-modal {
+  width: min(620px, calc(100vw - 32px));
+}
+
+.packaging-plan-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 20px;
+}
+
+.packaging-plan-form-grid label {
+  display: grid;
+  gap: 7px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.packaging-plan-result {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 20px 20px;
+}
+
+.packaging-plan-result > div {
+  display: grid;
+  gap: 4px;
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid #dbe3ea;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.packaging-plan-result span,
+.packaging-plan-result small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.packaging-plan-result strong {
+  color: #0f172a;
+  font-size: 24px;
+}
+
+.packaging-plan-result .total {
+  border-color: #bcd8f8;
+  background: #e8f2fd;
+}
+
+.packaging-plan-result .total strong {
+  color: #0f5eaa;
+}
+
+@media (max-width: 680px) {
+  .packaging-plan-form-grid,
+  .packaging-plan-result {
+    grid-template-columns: 1fr;
+  }
+}
+
 .compliance-product-search-results button {
   width: 100%;
   display: grid;

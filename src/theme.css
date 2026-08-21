@@ -7,11 +7,11 @@
 
 /* ---- 1. Design tokens ---------------------------------------------------- */
 :root {
-  /* Brand + accent — RSO red (from the RSD "Enjoy your ride" logo) */
-  --rso-brand: #c20c1d;
-  --rso-brand-strong: #9d0a17;
-  --rso-brand-soft: #fcebec;
-  --rso-brand-ring: rgba(194, 12, 29, 0.30);
+  /* Primary interface accent */
+  --rso-brand: #1677d2;
+  --rso-brand-strong: #0f5eaa;
+  --rso-brand-soft: #e8f2fd;
+  --rso-brand-ring: rgba(22, 119, 210, 0.28);
   --rso-green: #1c7a41;      /* logo tagline banner green */
   --rso-green-strong: #14622f;
 
@@ -195,7 +195,7 @@ h1, h2, h3, h4 { color: var(--c-ink); letter-spacing: -0.01em; }
   border-radius: 0 3px 3px 0;
   background: var(--rso-brand);
 }
-.sidebar nav button.active svg { opacity: 1; color: #ff5a68; }
+.sidebar nav button.active svg { opacity: 1; color: #69b9ff; }
 
 /* ---- 4. Workspace + topbar ---------------------------------------------- */
 .workspace { display: flex; flex-direction: column; min-height: 100vh; background: var(--c-bg); }
@@ -922,7 +922,7 @@ td .num, td.num, .num { font-variant-numeric: tabular-nums; }
 }
 .modal-header > button:last-child:not(.primary-button):not(.secondary-button):hover { background: var(--c-surface-3); color: var(--c-ink); }
 
-/* ---- 18. Legacy accent bridge (retarget old blue → RSO red / neutral) ---- */
+/* ---- 18. Legacy accent bridge (align old accents with the design system) --- */
 .dashboard-link-icon { color: var(--rso-brand); }
 .scooter-status-card span, .stat-card span, .record-row span { color: var(--c-muted); }
 .stat-button.selected { border-color: var(--rso-brand); }

@@ -88,6 +88,48 @@ type PendingBatchLabelPrint = {
   line: ContainerCostLine;
   product?: Product;
 };
+type BatchPackagingPlan = {
+  looseUnits: number;
+  unitsPerGroupedPackage: number;
+};
+
+const batchPackagingPlanMarker = '[PACKAGING_PLAN]';
+
+function readBatchPackagingPlan(line: ContainerCostLine): BatchPackagingPlan | null {
+  const markerIndex = line.componentsNote?.lastIndexOf(batchPackagingPlanMarker) ?? -1;
+  if (markerIndex < 0) return null;
+  try {
+    const parsed = JSON.parse(line.componentsNote!.slice(markerIndex + batchPackagingPlanMarker.length).trim()) as Partial<BatchPackagingPlan>;
+    const quantity = Math.max(0, Math.round(parseDecimal(line.quantity)));
+    const looseUnits = Math.max(0, Math.min(quantity, Math.round(Number(parsed.looseUnits) || 0)));
+    const unitsPerGroupedPackage = Math.max(1, Math.round(Number(parsed.unitsPerGroupedPackage) || 1));
+    return { looseUnits, unitsPerGroupedPackage };
+  } catch {
+    return null;
+  }
+}
+
+function writeBatchPackagingPlan(line: ContainerCostLine, plan: BatchPackagingPlan): string {
+  const existing = line.componentsNote ?? '';
+  const markerIndex = existing.lastIndexOf(batchPackagingPlanMarker);
+  const notes = (markerIndex >= 0 ? existing.slice(0, markerIndex) : existing).trimEnd();
+  return `${notes}${notes ? '\n\n' : ''}${batchPackagingPlanMarker}${JSON.stringify(plan)}`;
+}
+
+function batchLineNotesWithoutPlan(line: ContainerCostLine) {
+  const notes = line.componentsNote ?? '';
+  const markerIndex = notes.lastIndexOf(batchPackagingPlanMarker);
+  return (markerIndex >= 0 ? notes.slice(0, markerIndex) : notes).trim();
+}
+
+function batchPackagingCounts(line: ContainerCostLine) {
+  const quantity = Math.max(0, Math.round(parseDecimal(line.quantity)));
+  const plan = readBatchPackagingPlan(line);
+  if (!plan) return null;
+  const groupedUnits = Math.max(0, quantity - plan.looseUnits);
+  const groupedPackages = groupedUnits > 0 ? Math.ceil(groupedUnits / plan.unitsPerGroupedPackage) : 0;
+  return { ...plan, quantity, groupedUnits, groupedPackages, totalPackages: plan.looseUnits + groupedPackages };
+}
 type LoginSession = {
   email: string;
   name: string;
@@ -1420,7 +1462,8 @@ function buildPackagingRegistrationsForBatch(
 
     const quantity = parseDecimal(line.quantity);
     const unitsPerPackage = unitsPerPackageFromProduct(product);
-    const packagesCount = unitsPerPackage > 0 ? Math.ceil(quantity / unitsPerPackage) : quantity;
+    const packagingPlan = batchPackagingCounts(line);
+    const packagesCount = packagingPlan?.totalPackages ?? (unitsPerPackage > 0 ? Math.ceil(quantity / unitsPerPackage) : quantity);
     const layersWithValues = normalizePackagingLayers(product)
       .filter((layer) => layer.material || layer.recycleCode || layer.weightGrams);
     const layers = layersWithValues.length > 0
@@ -1445,9 +1488,9 @@ function buildPackagingRegistrationsForBatch(
         productDescription: product.description || line.description,
         productBarcode: product.barcode,
         quantity: line.quantity,
-        packagingUnit: product.packagingUnit || '1',
+        packagingUnit: packagingPlan ? `${packagingPlan.looseUnits} los + ${packagingPlan.groupedUnits} per ${packagingPlan.unitsPerGroupedPackage}` : product.packagingUnit || '1',
         packagesCount: formatDecimal(packagesCount, 8),
-        unitsPerPackage: formatDecimal(unitsPerPackage, 8),
+        unitsPerPackage: packagingPlan ? formatDecimal(packagingPlan.unitsPerGroupedPackage, 8) : formatDecimal(unitsPerPackage, 8),
         layerName: layer.name || packagingLayerNames[index] || `Laag ${index + 1}`,
         material,
         recycleCode: layer.recycleCode,
@@ -4765,7 +4808,8 @@ export function App() {
 
   async function printBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
     const sourceProduct = productFromCostLine(line, product);
-    const defaultUnits = Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
+    const packagingPlan = batchPackagingCounts(line);
+    const defaultUnits = packagingPlan?.unitsPerGroupedPackage ?? Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
     const unitsAnswer = window.prompt('Hoeveel stuks moeten op de omdoos-sticker staan?', String(defaultUnits));
     if (unitsAnswer === null) return null;
     const quantityPerLabel = Number(unitsAnswer.replace(',', '.'));
@@ -4773,7 +4817,7 @@ export function App() {
       throw new Error('Vul een heel aantal stuks in tussen 1 en 100000.');
     }
 
-    const labelsAnswer = window.prompt('Hoeveel omdoos-stickers wil je printen?', '1');
+    const labelsAnswer = window.prompt('Hoeveel omdoos-stickers wil je printen?', String(packagingPlan?.groupedPackages ?? 1));
     if (labelsAnswer === null) return null;
     const labelsToPrint = Number(labelsAnswer.replace(',', '.'));
     if (!Number.isInteger(labelsToPrint) || labelsToPrint < 1) {
@@ -4806,7 +4850,8 @@ export function App() {
 
   function previewBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
     const sourceProduct = productFromCostLine(line, product);
-    const defaultUnits = Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
+    const packagingPlan = batchPackagingCounts(line);
+    const defaultUnits = packagingPlan?.unitsPerGroupedPackage ?? Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
     const unitsAnswer = window.prompt('Hoeveel stuks moeten op de omdoos-sticker staan?', String(defaultUnits));
     if (unitsAnswer === null) return;
     const quantityPerLabel = Number(unitsAnswer.replace(',', '.'));
@@ -4852,6 +4897,33 @@ export function App() {
         containerCostLines: current.containerCostLines.map((item) => item.id === line.id ? line : item),
       }));
       showCsvMessage(`Bestellijst status opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
+  async function saveBatchPackagingPlan(line: ContainerCostLine, plan: BatchPackagingPlan) {
+    const updatedLine = { ...line, componentsNote: writeBatchPackagingPlan(line, plan) };
+    const batch = data.containerCostBatches.find((item) => item.id === line.batchId);
+    const registrations = batch ? buildPackagingRegistrationsForBatch(batch, [updatedLine], data.products) : [];
+
+    setData((current) => {
+      const registrationMap = new Map(current.productPackagingRegistrations.map((item) => [item.id, item]));
+      registrations.forEach((item) => registrationMap.set(item.id, item));
+      return {
+        ...current,
+        containerCostLines: current.containerCostLines.map((item) => item.id === line.id ? updatedLine : item),
+        productPackagingRegistrations: Array.from(registrationMap.values()),
+      };
+    });
+
+    try {
+      await upsertContainerCostLines([updatedLine]);
+      if (registrations.length > 0) await upsertProductPackagingRegistrations(registrations);
+    } catch (error) {
+      setData((current) => ({
+        ...current,
+        containerCostLines: current.containerCostLines.map((item) => item.id === line.id ? line : item),
+      }));
+      throw error;
     }
   }
 
@@ -5659,7 +5731,7 @@ export function App() {
             setView(nextView);
           }} />}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onMarkContainerAvailable={markContainerAvailable} focusedContainerId={focusedContainerId} />}
-          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onPrintOuterBoxLabel={printBatchOuterBoxLabel} onPreviewOuterBoxLabel={previewBatchOuterBoxLabel} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
+          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onPrintOuterBoxLabel={printBatchOuterBoxLabel} onPreviewOuterBoxLabel={previewBatchOuterBoxLabel} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveBatchPackagingPlan={saveBatchPackagingPlan} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
           {view === 'packaging' && (
             <>
               <div className="subtabs">
@@ -5829,6 +5901,7 @@ export function App() {
             setSelectedProduct(nextProduct);
           }}
           applyBatchNumber={selectedProductApplyBatchNumber}
+          defaultLabelQuantity={pendingBatchLabelPrint ? batchPackagingCounts(pendingBatchLabelPrint.line)?.looseUnits : undefined}
           onPrintLabel={pendingBatchLabelPrint ? async (product, quantity, printer, zebraSize) => {
             return printBatchProductLabel(
               pendingBatchLabelPrint.batch,
@@ -8535,6 +8608,7 @@ function CostBatchesPage({
   onPrintOuterBoxLabel,
   onPreviewOuterBoxLabel,
   onTogglePurchaseOrderLine,
+  onSaveBatchPackagingPlan,
   onSaveScooterPackagingSpec,
 }: {
   data: AppData;
@@ -8544,6 +8618,7 @@ function CostBatchesPage({
   onPrintOuterBoxLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => Promise<string | null>;
   onPreviewOuterBoxLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
   onTogglePurchaseOrderLine: (line: ContainerCostLine, purchaseOrderAdded: boolean) => Promise<void>;
+  onSaveBatchPackagingPlan: (line: ContainerCostLine, plan: BatchPackagingPlan) => Promise<void>;
   onSaveScooterPackagingSpec: (spec: ScooterPackagingSpec) => Promise<boolean>;
 }) {
   const [showCostModal, setShowCostModal] = useState(false);
@@ -8552,6 +8627,10 @@ function CostBatchesPage({
   const [importBatchSearchQuery, setImportBatchSearchQuery] = useState('');
   const [importBatchLabelFilter, setImportBatchLabelFilter] = useState<'all' | 'printed' | 'pending'>('all');
   const [printMessage, setPrintMessage] = useState('');
+  const [packagingPlanLine, setPackagingPlanLine] = useState<ContainerCostLine | null>(null);
+  const [looseUnitsDraft, setLooseUnitsDraft] = useState('0');
+  const [groupSizeDraft, setGroupSizeDraft] = useState('50');
+  const [packagingPlanSaving, setPackagingPlanSaving] = useState(false);
   const [packagingMessage, setPackagingMessage] = useState('');
   const [importToolTab, setImportToolTab] = useState<'batch' | 'scooterPackaging'>('batch');
   const [packagingDraft, setPackagingDraft] = useState<ScooterPackagingSpec>({
@@ -8579,6 +8658,15 @@ function CostBatchesPage({
     [data.containerCostLines],
   );
   const editingBatchLines = editingBatch ? visibleContainerCostLines.filter((line) => line.batchId === editingBatch.id) : [];
+  const packagingPlanPreview = useMemo(() => {
+    if (!packagingPlanLine) return null;
+    const quantity = Math.max(0, Math.round(parseDecimal(packagingPlanLine.quantity)));
+    const looseUnits = Math.max(0, Math.min(quantity, Math.round(parseDecimal(looseUnitsDraft))));
+    const unitsPerGroupedPackage = Math.max(1, Math.round(parseDecimal(groupSizeDraft)) || 1);
+    const groupedUnits = Math.max(0, quantity - looseUnits);
+    const groupedPackages = groupedUnits > 0 ? Math.ceil(groupedUnits / unitsPerGroupedPackage) : 0;
+    return { quantity, looseUnits, unitsPerGroupedPackage, groupedUnits, groupedPackages, totalPackages: looseUnits + groupedPackages };
+  }, [groupSizeDraft, looseUnitsDraft, packagingPlanLine]);
 
   async function savePackagingDraft(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -8609,6 +8697,36 @@ function CostBatchesPage({
       hasLining: false,
       boxWeightKg: '',
     });
+  }
+
+  function openPackagingPlan(line: ContainerCostLine) {
+    const existing = batchPackagingCounts(line);
+    setPackagingPlanLine(line);
+    setLooseUnitsDraft(String(existing?.looseUnits ?? 0));
+    setGroupSizeDraft(String(existing?.unitsPerGroupedPackage ?? 50));
+    setPackagingMessage('');
+  }
+
+  async function submitPackagingPlan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!packagingPlanLine) return;
+    const quantity = Math.max(0, Math.round(parseDecimal(packagingPlanLine.quantity)));
+    const looseUnits = Math.round(parseDecimal(looseUnitsDraft));
+    const unitsPerGroupedPackage = Math.round(parseDecimal(groupSizeDraft));
+    if (looseUnits < 0 || looseUnits > quantity || unitsPerGroupedPackage < 1) {
+      setPackagingMessage(`Vul 0 t/m ${quantity} losse stuks in en minimaal 1 stuk per grootverpakking.`);
+      return;
+    }
+    setPackagingPlanSaving(true);
+    try {
+      await onSaveBatchPackagingPlan(packagingPlanLine, { looseUnits, unitsPerGroupedPackage });
+      setPrintMessage(`Verpakkingsverdeling opgeslagen voor ${packagingPlanLine.referenceCode}.`);
+      setPackagingPlanLine(null);
+    } catch (error) {
+      setPackagingMessage(`Opslaan mislukt: ${importErrorMessage(error)}`);
+    } finally {
+      setPackagingPlanSaving(false);
+    }
   }
 
   return (
@@ -8955,7 +9073,7 @@ function CostBatchesPage({
                                           dutchDescription
                                           && dutchDescription.toLowerCase() !== englishDescription.toLowerCase(),
                                         );
-                                        const componentParts = line.componentsNote
+                                        const componentParts = batchLineNotesWithoutPlan(line)
                                           ?.split(' - ')
                                           .map((part) => part.trim())
                                           .filter(Boolean) ?? [];
@@ -8968,6 +9086,7 @@ function CostBatchesPage({
                                           && Boolean(registration.labelPrintedAt),
                                         );
                                         const isPrinted = printedRegistrations.length > 0;
+                                        const packagingPlan = batchPackagingCounts(line);
                                         const printedLabelCount = printedRegistrations.reduce((highest, registration) => {
                                           const candidate = parseDecimal(registration.labelPrintCount);
                                           return candidate > 0 ? Math.max(highest, candidate) : highest;
@@ -9117,7 +9236,24 @@ function CostBatchesPage({
                                                   >
                                                     <Boxes size={16} />
                                                   </button>
+                                                  <button
+                                                    type="button"
+                                                    className="icon-button import-label-print-button import-packaging-plan-button"
+                                                    title="Verdeel losse stuks en grootverpakkingen"
+                                                    aria-label={`Verpakkingsverdeling instellen voor ${line.referenceCode}`}
+                                                    onClick={(event) => {
+                                                      event.stopPropagation();
+                                                      openPackagingPlan(line);
+                                                    }}
+                                                  >
+                                                    <PackagePlus size={16} />
+                                                  </button>
                                                 </div>
+                                                {packagingPlan ? (
+                                                  <small className="import-label-meta packaging-plan-summary">
+                                                    {packagingPlan.looseUnits} los + {packagingPlan.groupedPackages} × {packagingPlan.unitsPerGroupedPackage} = {packagingPlan.totalPackages} verpakkingen
+                                                  </small>
+                                                ) : null}
                                                 <span className={`import-label-status ${isPrinted ? 'is-printed' : 'is-pending'}`}>
                                                   {isPrinted ? `${printedLabelCount > 0 ? formatQuantity(printedLabelCount) : printedRegistrations.length}x geprint` : 'Niet geprint'}
                                                 </span>
@@ -9145,6 +9281,38 @@ function CostBatchesPage({
           </div>
         )}
       </section>
+      {packagingPlanLine && packagingPlanPreview ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => !packagingPlanSaving && setPackagingPlanLine(null)}>
+          <form className="modal-card packaging-plan-modal" onSubmit={submitPackagingPlan} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <span className="eyebrow">Batchverpakking</span>
+                <h2>{packagingPlanLine.referenceCode}</h2>
+                <p>Verdeel {formatQuantity(packagingPlanPreview.quantity)} stuks over losse verkoop en voorverpakte aantallen.</p>
+              </div>
+              <button type="button" className="secondary-button" onClick={() => setPackagingPlanLine(null)} disabled={packagingPlanSaving}>Sluiten</button>
+            </div>
+            <div className="packaging-plan-form-grid">
+              <label>Los te verkopen stuks
+                <input type="number" min="0" max={packagingPlanPreview.quantity} step="1" value={looseUnitsDraft} onChange={(event) => setLooseUnitsDraft(event.target.value)} required />
+              </label>
+              <label>Stuks per grootverpakking
+                <input type="number" min="1" step="1" value={groupSizeDraft} onChange={(event) => setGroupSizeDraft(event.target.value)} required />
+              </label>
+            </div>
+            <div className="packaging-plan-result">
+              <div><span>Losse labels en zakjes</span><strong>{packagingPlanPreview.looseUnits}</strong></div>
+              <div><span>Grootverpakkingslabels en zakjes</span><strong>{packagingPlanPreview.groupedPackages}</strong><small>{packagingPlanPreview.groupedUnits} stuks ÷ {packagingPlanPreview.unitsPerGroupedPackage}</small></div>
+              <div className="total"><span>Totaal verpakkingen</span><strong>{packagingPlanPreview.totalPackages}</strong></div>
+            </div>
+            {packagingMessage ? <div className="notice compact">{packagingMessage}</div> : null}
+            <div className="modal-actions">
+              <button type="button" className="secondary-button" onClick={() => setPackagingPlanLine(null)} disabled={packagingPlanSaving}>Annuleren</button>
+              <button type="submit" className="primary-button" disabled={packagingPlanSaving}>{packagingPlanSaving ? 'Opslaan…' : 'Verdeling opslaan'}</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
       {showCostModal && (
         <ContainerCostModal
           containers={sortedContainers}
@@ -11419,6 +11587,7 @@ function ProductDetailModal({
   onSave,
   onSaveAndApplyPackaging,
   applyBatchNumber,
+  defaultLabelQuantity,
   onPrintLabel,
 }: {
   product: Product;
@@ -11436,6 +11605,7 @@ function ProductDetailModal({
   onSave: (product: Product) => Promise<void>;
   onSaveAndApplyPackaging: (product: Product, batchNumber?: string) => Promise<void>;
   applyBatchNumber?: string;
+  defaultLabelQuantity?: number;
   onPrintLabel?: (
     product: Product,
     quantity: number,
@@ -11487,7 +11657,8 @@ function ProductDetailModal({
     });
     setActiveTab(initialTab);
     setChecklistExpanded(false);
-  }, [product, supplierRecords, importers, initialTab]);
+    setLabelQuantity(defaultLabelQuantity && defaultLabelQuantity > 0 ? String(defaultLabelQuantity) : '1');
+  }, [product, supplierRecords, importers, initialTab, defaultLabelQuantity]);
 
   useEffect(() => {
     setProductImageFailed(false);
