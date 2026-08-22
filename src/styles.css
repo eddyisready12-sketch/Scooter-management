@@ -1325,7 +1325,7 @@ textarea {
 .scooter-table-wrap th:nth-child(2),
 .scooter-table-wrap td:nth-child(2) { width: 13%; }
 .scooter-table-wrap th:nth-child(3),
-.scooter-table-wrap td:nth-child(3) { width: 11%; }
+.scooter-table-wrap td:nth-child(3) { width: 10%; }
 .scooter-table-wrap th:nth-child(4),
 .scooter-table-wrap td:nth-child(4) { width: 7%; }
 .scooter-table-wrap th:nth-child(5),
@@ -1335,13 +1335,13 @@ textarea {
 .scooter-table-wrap th:nth-child(7),
 .scooter-table-wrap td:nth-child(7) { width: 10%; }
 .scooter-table-wrap th:nth-child(8),
-.scooter-table-wrap td:nth-child(8) { width: 15%; }
+.scooter-table-wrap td:nth-child(8) { width: 14%; }
 .scooter-table-wrap th:nth-child(9),
-.scooter-table-wrap td:nth-child(9) { width: 9%; }
+.scooter-table-wrap td:nth-child(9) { width: 8%; }
 .scooter-table-wrap th:nth-child(10),
 .scooter-table-wrap td:nth-child(10),
 .scooter-table-wrap th:nth-child(11),
-.scooter-table-wrap td:nth-child(11) { width: 5%; }
+.scooter-table-wrap td:nth-child(11) { width: 6.5%; }
 
 .scooter-table-wrap .filter-row input,
 .scooter-table-wrap .filter-row select {
