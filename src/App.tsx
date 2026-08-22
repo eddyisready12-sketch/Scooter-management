@@ -8753,6 +8753,25 @@ function CostBatchesPage({
     const allocatedUnits = looseUnits + groupedUnits;
     return { quantity, looseUnits, groups, groupedUnits, groupedPackages, totalPackages: looseUnits + groupedPackages, allocatedUnits, remainingUnits: quantity - allocatedUnits };
   }, [looseUnitsDraft, packagingGroupDrafts, packagingPlanLine]);
+  const previousPackagingPlan = useMemo(() => {
+    if (!packagingPlanLine) return null;
+    const currentBatchIndex = sortedBatches.findIndex((batch) => batch.id === packagingPlanLine.batchId);
+    const olderBatches = currentBatchIndex >= 0 ? sortedBatches.slice(currentBatchIndex + 1) : sortedBatches;
+    const normalizedReference = packagingPlanLine.referenceCode.trim().toLowerCase();
+    for (const batch of olderBatches) {
+      const previousLine = visibleContainerCostLines.find((line) =>
+        line.batchId === batch.id
+        && (
+          (packagingPlanLine.referenceId && line.referenceId === packagingPlanLine.referenceId)
+          || line.referenceCode.trim().toLowerCase() === normalizedReference
+        ),
+      );
+      if (!previousLine) continue;
+      const plan = batchPackagingCounts(previousLine);
+      if (plan) return { batch, line: previousLine, plan };
+    }
+    return null;
+  }, [packagingPlanLine, data.containerCostBatches, visibleContainerCostLines]);
 
   async function savePackagingDraft(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -8795,6 +8814,22 @@ function CostBatchesPage({
       packages: String(group.packages),
     })));
     setPackagingMessage('');
+  }
+
+  function applyPreviousPackagingPlan() {
+    if (!previousPackagingPlan || !packagingPlanLine) return;
+    const { batch, plan } = previousPackagingPlan;
+    setLooseUnitsDraft(String(plan.looseUnits));
+    setPackagingGroupDrafts(plan.groups.map((group, index) => ({
+      id: `previous-group-${Date.now()}-${index}`,
+      unitsPerPackage: String(group.unitsPerPackage),
+      packages: String(group.packages),
+    })));
+    const previousQuantity = Math.max(0, Math.round(parseDecimal(previousPackagingPlan.line.quantity)));
+    const currentQuantity = Math.max(0, Math.round(parseDecimal(packagingPlanLine.quantity)));
+    setPackagingMessage(previousQuantity === currentQuantity
+      ? `Verdeling uit batch ${batch.orderNumber || batch.containerNumber} overgenomen.`
+      : `Verdeling uit batch ${batch.orderNumber || batch.containerNumber} overgenomen. Die batch had ${previousQuantity} stuks; pas de aantallen aan voor de huidige ${currentQuantity} stuks.`);
   }
 
   async function submitPackagingPlan(event: FormEvent<HTMLFormElement>) {
@@ -9392,6 +9427,19 @@ function CostBatchesPage({
                 <input type="number" min="0" max={packagingPlanPreview.quantity} step="1" value={looseUnitsDraft} onChange={(event) => setLooseUnitsDraft(event.target.value)} required />
               </label>
             </div>
+            {previousPackagingPlan ? (
+              <div className="packaging-previous-plan">
+                <div>
+                  <strong>Zelfde verpakking als vorige levering?</strong>
+                  <span>
+                    Batch {previousPackagingPlan.batch.orderNumber || previousPackagingPlan.batch.containerNumber}: {[`${previousPackagingPlan.plan.looseUnits} los`, ...previousPackagingPlan.plan.groups.map((group) => `${group.packages} × ${group.unitsPerPackage}`)].join(' + ')}
+                  </span>
+                </div>
+                <button type="button" className="secondary-button" onClick={applyPreviousPackagingPlan}>
+                  Vorige verdeling overnemen
+                </button>
+              </div>
+            ) : null}
             <div className="packaging-variant-section">
               <div className="packaging-variant-header">
                 <div><strong>Voorverpakte varianten</strong><span>Voeg bijvoorbeeld een 5-stuks- en een 50-stuksvariant toe.</span></div>

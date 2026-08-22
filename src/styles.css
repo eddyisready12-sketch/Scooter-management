@@ -8298,6 +8298,32 @@ dd {
   padding: 20px;
 }
 
+.packaging-previous-plan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 20px 20px;
+  padding: 14px 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+}
+
+.packaging-previous-plan > div {
+  display: grid;
+  gap: 4px;
+}
+
+.packaging-previous-plan strong {
+  color: #1e3a5f;
+}
+
+.packaging-previous-plan span {
+  color: #52677f;
+  font-size: 13px;
+}
+
 .packaging-variant-section {
   display: grid;
   gap: 12px;
@@ -8548,6 +8574,7 @@ dd {
   }
 
   .packaging-variant-header,
+  .packaging-previous-plan,
   .packaging-allocation-status {
     align-items: stretch;
     flex-direction: column;
