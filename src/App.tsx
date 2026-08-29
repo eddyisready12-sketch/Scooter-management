@@ -5318,6 +5318,28 @@ export function App() {
     }
   }
 
+  async function updateContainerEta(container: Container, etaInput: string) {
+    if (!etaInput.trim()) {
+      throw new Error('Vul eerst de verwachte aankomstdatum en tijd in.');
+    }
+    const etaDate = new Date(etaInput);
+    if (Number.isNaN(etaDate.getTime())) {
+      throw new Error('De opgegeven aankomstdatum is ongeldig.');
+    }
+    const updatedContainer: Container = { ...container, eta: etaDate.toISOString() };
+    try {
+      await upsertContainers([updatedContainer]);
+      setData((current) => ({
+        ...current,
+        containers: current.containers.map((item) => item.id === updatedContainer.id ? updatedContainer : item),
+      }));
+      showCsvMessage(`Verwachte aankomst van ${updatedContainer.number} is bijgewerkt.`);
+    } catch (error) {
+      showCsvMessage(`Aankomstdatum opslaan mislukt: ${importErrorMessage(error)}`);
+      throw error;
+    }
+  }
+
   async function updateDealer(updated: Dealer) {
     setData((current) => ({
       ...current,
@@ -5808,7 +5830,7 @@ export function App() {
             if (scooterStatus) setStatusFilter(scooterStatus);
             setView(nextView);
           }} />}
-          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onMarkContainerAvailable={markContainerAvailable} focusedContainerId={focusedContainerId} />}
+          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onUpdateContainerEta={updateContainerEta} onMarkContainerAvailable={markContainerAvailable} focusedContainerId={focusedContainerId} />}
           {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onPrintOuterBoxLabel={printBatchOuterBoxLabel} onPreviewOuterBoxLabel={previewBatchOuterBoxLabel} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveBatchPackagingPlan={saveBatchPackagingPlan} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
           {view === 'packaging' && (
             <>
@@ -6097,6 +6119,27 @@ function Dashboard({ data, onNavigate }: {
   const sold = soldCustomer + soldDealer;
 
   const containersEnRoute = data.containers.filter((c) => c.status !== 'Aangekomen');
+  const nextContainerArrival = containersEnRoute
+    .map((container) => normalizeDateValue(container.eta))
+    .filter((date): date is Date => date instanceof Date && !Number.isNaN(date.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime())[0];
+  const daysUntilArrival = (() => {
+    if (!nextContainerArrival) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const arrivalDay = new Date(nextContainerArrival);
+    arrivalDay.setHours(0, 0, 0, 0);
+    return Math.round((arrivalDay.getTime() - today.getTime()) / 86_400_000);
+  })();
+  const arrivalCountdown = daysUntilArrival === null
+    ? ''
+    : daysUntilArrival === 0
+      ? ' · aankomst vandaag'
+      : daysUntilArrival === 1
+        ? ' · aankomst morgen'
+        : daysUntilArrival > 1
+          ? ` · aankomst over ${daysUntilArrival} dagen`
+          : ` · ETA ${Math.abs(daysUntilArrival)} ${Math.abs(daysUntilArrival) === 1 ? 'dag' : 'dagen'} verstreken`;
   const openWarranties = data.warranties.filter((w) => w.status !== 'Afgehandeld' && w.status !== 'Afgewezen' && w.status !== 'Vervangen').length;
   const maintenanceAttention = data.maintenance.filter((m) => m.status === 'Aandacht nodig').length;
   const batteriesAvailable = data.batteries.filter((b) => b.status === 'Beschikbaar' || b.status === 'Voorraad').length;
@@ -6108,7 +6151,7 @@ function Dashboard({ data, onNavigate }: {
 
   const kpis: Array<{ label: string; value: number; sub: string; icon: typeof Home; tone: string; view: View }> = [
     { label: 'Beschikbaar', value: available, sub: `${directlyAvailable} beschikbaar · ${inConsignment} consignatie`, icon: CheckCircle2, tone: 'green', view: 'scooters' },
-    { label: 'Onderweg', value: enRoute, sub: `${containersEnRoute.length} containers actief`, icon: Truck, tone: 'amber', view: 'containers' },
+    { label: 'Onderweg', value: enRoute, sub: `${containersEnRoute.length} ${containersEnRoute.length === 1 ? 'container' : 'containers'} actief${arrivalCountdown}`, icon: Truck, tone: 'amber', view: 'containers' },
     { label: 'Verkocht', value: sold, sub: `${soldDealer} dealer · ${soldCustomer} klant`, icon: CircleDollarSign, tone: 'violet', view: 'sales' },
     { label: 'Totaal geregistreerd', value: total, sub: 'inclusief verkochte scooters', icon: Bike, tone: 'brand', view: 'scooters' },
   ];
@@ -8561,6 +8604,7 @@ function Containers({
   messageDetails,
   onImport,
   onSelect,
+  onUpdateContainerEta,
   onMarkContainerAvailable,
   focusedContainerId,
 }: {
@@ -8569,6 +8613,7 @@ function Containers({
   messageDetails: string[];
   onImport: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onSelect: (scooter: Scooter) => void;
+  onUpdateContainerEta: (container: Container, etaInput: string) => Promise<void>;
   onMarkContainerAvailable: (container: Container, arrivedAtInput: string) => Promise<void>;
   focusedContainerId?: string | null;
 }) {
@@ -8616,6 +8661,7 @@ function Containers({
             scooters={data.scooters}
             dealers={data.dealers}
             onSelect={onSelect}
+            onUpdateContainerEta={onUpdateContainerEta}
             onMarkContainerAvailable={onMarkContainerAvailable}
             focusedContainerId={focusedContainerId}
             green
@@ -10554,12 +10600,14 @@ function ContainerAvailabilityBoard({
   scooters,
   dealers,
   onSelect,
+  onUpdateContainerEta,
   onMarkContainerAvailable,
 }: {
   container: Container;
   scooters: Scooter[];
   dealers: Dealer[];
   onSelect: (scooter: Scooter) => void;
+  onUpdateContainerEta?: (container: Container, etaInput: string) => Promise<void>;
   onMarkContainerAvailable?: (container: Container, arrivedAtInput: string) => Promise<void>;
 }) {
   const groups: Array<{ status: ScooterStatus; label: string }> = [
@@ -10575,6 +10623,7 @@ function ContainerAvailabilityBoard({
     return toInputDateTimeValue(baseDate);
   });
   const [markingAvailable, setMarkingAvailable] = useState(false);
+  const [savingEta, setSavingEta] = useState(false);
   const [markMessage, setMarkMessage] = useState('');
   const [markMessageType, setMarkMessageType] = useState<'success' | 'warning'>('success');
   const [printingBarcode, setPrintingBarcode] = useState('');
@@ -10638,7 +10687,7 @@ function ContainerAvailabilityBoard({
           <strong className="green-text">{container.status || '-'}</strong>
         </div>
         <div className="container-card-metric">
-          <span>Aangekomen</span>
+          <span>{container.status === 'Aangekomen' ? 'Aangekomen' : 'Verwacht'}</span>
           <strong>{formatDate(container.arrivedAt || container.eta)}</strong>
         </div>
         <div className="container-card-metric">
@@ -10649,13 +10698,36 @@ function ContainerAvailabilityBoard({
       {container.status !== 'Aangekomen' && onMarkContainerAvailable ? (
         <div className="container-card-actions">
           <label className="container-card-arrival-field">
-            <span>Aankomstdatum</span>
+            <span>Verwachte aankomst</span>
             <input
               type="datetime-local"
               value={arrivedAtValue}
               onChange={(event) => setArrivedAtValue(event.target.value)}
             />
           </label>
+          {onUpdateContainerEta ? (
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={savingEta || markingAvailable}
+              onClick={async () => {
+                setSavingEta(true);
+                setMarkMessage('');
+                setMarkMessageType('success');
+                try {
+                  await onUpdateContainerEta(container, arrivedAtValue);
+                  setMarkMessage('Verwachte aankomstdatum is opgeslagen.');
+                } catch (error) {
+                  setMarkMessageType('warning');
+                  setMarkMessage(`Opslaan mislukt: ${importErrorMessage(error)}`);
+                } finally {
+                  setSavingEta(false);
+                }
+              }}
+            >
+              {savingEta ? 'Opslaan...' : 'Datum opslaan'}
+            </button>
+          ) : null}
           <button
             type="button"
             className="primary-button"
@@ -14451,6 +14523,7 @@ function ContainerListPanel({
   scooters,
   dealers,
   onSelect,
+  onUpdateContainerEta,
   onMarkContainerAvailable,
   focusedContainerId,
   green = false,
@@ -14461,6 +14534,7 @@ function ContainerListPanel({
   scooters: Scooter[];
   dealers: Dealer[];
   onSelect: (scooter: Scooter) => void;
+  onUpdateContainerEta?: (container: Container, etaInput: string) => Promise<void>;
   onMarkContainerAvailable?: (container: Container, arrivedAtInput: string) => Promise<void>;
   focusedContainerId?: string | null;
   green?: boolean;
@@ -14495,6 +14569,7 @@ function ContainerListPanel({
                   scooters={containerScooters}
                   dealers={dealers}
                   onSelect={onSelect}
+                  onUpdateContainerEta={onUpdateContainerEta}
                   onMarkContainerAvailable={onMarkContainerAvailable}
                 />
               </div>
