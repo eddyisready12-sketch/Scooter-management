@@ -6144,7 +6144,7 @@ function Dashboard({ data, onNavigate }: {
   const maintenanceAttention = data.maintenance.filter((m) => m.status === 'Aandacht nodig').length;
   const batteriesAvailable = data.batteries.filter((b) => b.status === 'Beschikbaar' || b.status === 'Voorraad').length;
 
-  const statusOrder: ScooterStatus[] = ['Beschikbaar', 'In optie', 'Af te leveren', 'Verkocht dealer', 'Verkocht klant', 'In consignatie', 'Nog onderweg', 'Overig'];
+  const statusOrder: ScooterStatus[] = ['Beschikbaar', 'In optie', 'Af te leveren', 'Verkocht dealer', 'In consignatie', 'Nog onderweg', 'Overig'];
   const statusBars = statusOrder
     .map((status) => ({ status, count: statusCounts.get(status) ?? 0 }))
     .filter((row) => row.count > 0);
@@ -6153,7 +6153,7 @@ function Dashboard({ data, onNavigate }: {
     { label: 'Beschikbaar', value: available, sub: `${directlyAvailable} beschikbaar · ${inConsignment} consignatie`, icon: CheckCircle2, tone: 'green', view: 'scooters' },
     { label: 'Onderweg', value: enRoute, sub: `${containersEnRoute.length} ${containersEnRoute.length === 1 ? 'container' : 'containers'} actief${arrivalCountdown}`, icon: Truck, tone: 'amber', view: 'containers' },
     { label: 'Verkocht', value: sold, sub: `${soldDealer} dealer · ${soldCustomer} klant`, icon: CircleDollarSign, tone: 'violet', view: 'sales' },
-    { label: 'Totaal geregistreerd', value: total, sub: 'inclusief verkochte scooters', icon: Bike, tone: 'brand', view: 'scooters' },
+    { label: 'Totaal geïmporteerd', value: total, sub: 'inclusief verkochte scooters', icon: Bike, tone: 'brand', view: 'scooters' },
   ];
 
   return (
