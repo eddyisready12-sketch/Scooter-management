@@ -6148,6 +6148,7 @@ function Dashboard({ data, onNavigate }: {
   const statusBars = statusOrder
     .map((status) => ({ status, count: statusCounts.get(status) ?? 0 }))
     .filter((row) => row.count > 0);
+  const visibleStatusTotal = statusBars.reduce((sum, row) => sum + row.count, 0);
 
   const kpis: Array<{ label: string; value: number; sub: string; icon: typeof Home; tone: string; view: View }> = [
     { label: 'Beschikbaar', value: available, sub: `${directlyAvailable} beschikbaar · ${inConsignment} consignatie`, icon: CheckCircle2, tone: 'green', view: 'scooters' },
@@ -6196,7 +6197,7 @@ function Dashboard({ data, onNavigate }: {
                   <span className={`dash-bar-dot dot-${statusColor[row.status]}`} />
                   <span className="dash-bar-label">{row.status}</span>
                   <span className="dash-bar-track">
-                    <span className={`dash-bar-fill fill-${statusColor[row.status]}`} style={{ width: `${total ? (row.count / total) * 100 : 0}%` }} />
+                    <span className={`dash-bar-fill fill-${statusColor[row.status]}`} style={{ width: `${visibleStatusTotal ? (row.count / visibleStatusTotal) * 100 : 0}%` }} />
                   </span>
                   <span className="dash-bar-count">{row.count}</span>
                 </button>
