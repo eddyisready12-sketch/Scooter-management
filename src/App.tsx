@@ -3552,9 +3552,17 @@ function parseContainerCostContent(content: string) {
 
   const supplierHeaderIndex = rows.findIndex((line) => {
     const columns = line.split('\t').map((item) => item.trim().toLowerCase());
-    return columns.some((column) => column.includes('ctn no'))
-      && columns.some((column) => column.includes('artikelnummer'))
-      && columns.some((column) => column.includes('item no'));
+    const hasModel = columns.some((column) => column.includes('model'));
+    const hasDescription = columns.some((column) =>
+      column.includes('parts') || column.includes('description') || column.includes('omschrijving'),
+    );
+    const hasQuantity = columns.some((column) =>
+      column === 'qty' || column.includes('quantity') || column.includes('aantal'),
+    );
+    const hasPrice = columns.some((column) =>
+      column.includes('unit price') || column.includes('prijs per stuk'),
+    );
+    return hasModel && hasDescription && hasQuantity && hasPrice;
   });
 
   if (supplierHeaderIndex >= 0) {
