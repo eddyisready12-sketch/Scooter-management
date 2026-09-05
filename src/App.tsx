@@ -3546,8 +3546,9 @@ function combineImportedBodySets(lines: ContainerCostImportDraftLine[]) {
 function parseContainerCostContent(content: string) {
   const rows = content
     .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+    // Keep leading tab characters: empty Excel cells at the start of a row are
+    // real columns (often caused by vertically merged container-number cells).
+    .filter((line) => Boolean(line.trim()));
 
   const supplierHeaderIndex = rows.findIndex((line) => {
     const columns = line.split('\t').map((item) => item.trim().toLowerCase());
