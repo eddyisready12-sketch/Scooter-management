@@ -3562,13 +3562,32 @@ function parseContainerCostContent(content: string) {
     let lastKnownCtnNo = '';
     let lastKnownModel = '';
     let lastKnownSupplier = '';
+    const headerColumns = rows[supplierHeaderIndex].split('\t').map((item) => item.trim().toLowerCase());
+    const columnIndex = (matches: string[]) => headerColumns.findIndex((column) =>
+      matches.some((match) => column.includes(match)),
+    );
+    const ctnNoIndex = columnIndex(['ctn no', 'container no']);
+    const modelIndex = columnIndex(['model']);
+    const articleNumberIndex = columnIndex(['artikelnummer', 'article number']);
+    const itemNoIndex = columnIndex(['item no']);
+    const partsIndex = columnIndex(['parts', 'description', 'omschrijving']);
+    const quantityIndex = columnIndex(['qty', 'quantity', 'aantal']);
+    const unitPriceIndex = columnIndex(['unit price', 'prijs per stuk']);
+    const amountIndex = columnIndex(['amount', 'totaal']);
+    const supplierIndex = columnIndex(['leverancier', 'supplier']);
+    const valueAt = (columns: string[], index: number) => index >= 0 ? columns[index]?.trim() || '' : '';
 
     rows.slice(supplierHeaderIndex + 1).forEach((line, index) => {
       const columns = line.split('\t').map((item) => item.trim());
-      const padded = [...columns];
-      while (padded.length < 9) padded.push('');
-
-      const [ctnNoRaw, modelRaw, articleNumberRaw, itemNoRaw, partsRaw, qtyRaw, unitPriceRaw, amountRaw, supplierRaw] = padded;
+      const ctnNoRaw = valueAt(columns, ctnNoIndex);
+      const modelRaw = valueAt(columns, modelIndex);
+      const articleNumberRaw = valueAt(columns, articleNumberIndex);
+      const itemNoRaw = valueAt(columns, itemNoIndex);
+      const partsRaw = valueAt(columns, partsIndex);
+      const qtyRaw = valueAt(columns, quantityIndex);
+      const unitPriceRaw = valueAt(columns, unitPriceIndex);
+      const amountRaw = valueAt(columns, amountIndex);
+      const supplierRaw = valueAt(columns, supplierIndex);
       const ctnNo = ctnNoRaw || lastKnownCtnNo;
       const model = modelRaw || lastKnownModel;
       const articleNumber = articleNumberRaw;
@@ -3713,20 +3732,23 @@ async function readContainerCostImportFile(file: File) {
     const XLSX = await import('xlsx');
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: 'array' });
-    const firstSheet = workbook.SheetNames[0];
-    if (!firstSheet) return '';
-    const rawRows = XLSX.utils.sheet_to_json<(string | number | null)[]>(workbook.Sheets[firstSheet], {
-      header: 1,
-      defval: '',
-      raw: false,
-    });
+    return workbook.SheetNames.map((name) => {
+      const rawRows = XLSX.utils.sheet_to_json<(string | number | null)[]>(workbook.Sheets[name], {
+        header: 1,
+        defval: '',
+        raw: false,
+      });
 
-    return rawRows
-      .map((row) => row.map((cell) => String(cell ?? '').trim()).join('\t'))
-      .join('\n');
+      return {
+        name,
+        content: rawRows
+          .map((row) => row.map((cell) => String(cell ?? '').trim()).join('\t'))
+          .join('\n'),
+      };
+    });
   }
 
-  return file.text();
+  return [{ name: 'Gegevens', content: await file.text() }];
 }
 
 function defaultContainerCostItems() {
@@ -9651,6 +9673,8 @@ function ContainerCostModal({
   const [notes, setNotes] = useState(initialBatch?.notes ?? '');
   const [content, setContent] = useState('');
   const [importFileName, setImportFileName] = useState('');
+  const [importSheets, setImportSheets] = useState<Array<{ name: string; content: string }>>([]);
+  const [selectedImportSheet, setSelectedImportSheet] = useState('');
   const [draftLines, setDraftLines] = useState<ContainerCostImportDraftLine[]>(
     () => (initialLines ?? []).filter((line) => line.type !== 'scooter').map((line, index) => ({
       id: `draft-existing-${index + 1}-${line.referenceCode}`.replace(/[^a-z0-9-]/gi, '').toLowerCase(),
@@ -9792,9 +9816,12 @@ function ContainerCostModal({
     if (!file) return;
 
     try {
-      const importedContent = await readContainerCostImportFile(file);
-      setContent(importedContent);
-      setDraftLines(parseContainerCostContent(importedContent));
+      const sheets = await readContainerCostImportFile(file);
+      const firstSheet = sheets[0];
+      setImportSheets(sheets);
+      setSelectedImportSheet(firstSheet?.name || '');
+      setContent(firstSheet?.content || '');
+      setDraftLines(firstSheet ? parseContainerCostContent(firstSheet.content) : []);
       setImportFileName(file.name);
     } finally {
       event.target.value = '';
@@ -10562,6 +10589,22 @@ function ContainerCostModal({
             </div>
             <div className="container-content-field container-cost-paste-field">
               <span>{importFileName ? `Bestand geladen: ${importFileName}` : 'Je kunt ook nog steeds handmatig plakken, maar Excel is nu de hoofdroute.'}</span>
+              {importSheets.length > 1 ? (
+                <label>
+                  Tabblad
+                  <select
+                    value={selectedImportSheet}
+                    onChange={(event) => {
+                      const sheet = importSheets.find((item) => item.name === event.target.value);
+                      setSelectedImportSheet(event.target.value);
+                      setContent(sheet?.content || '');
+                      setDraftLines(sheet ? parseContainerCostContent(sheet.content) : []);
+                    }}
+                  >
+                    {importSheets.map((sheet) => <option key={sheet.name} value={sheet.name}>{sheet.name}</option>)}
+                  </select>
+                </label>
+              ) : null}
               <code>Ctn No.  Model  Artikelnummer  Item No.  Parts  Qty  Unit Price  Amount  Leverancier</code>
               <textarea
                 value={content}
@@ -10570,7 +10613,7 @@ function ContainerCostModal({
               />
               <div className="container-command-actions">
                 <button type="button" className="secondary-button" onClick={() => setDraftLines(parseContainerCostContent(content))}>Preview regels</button>
-                <button type="button" className="secondary-button" onClick={() => { setContent(''); setDraftLines([]); }}>Wissen</button>
+                <button type="button" className="secondary-button" onClick={() => { setContent(''); setDraftLines([]); setImportSheets([]); setSelectedImportSheet(''); setImportFileName(''); }}>Wissen</button>
               </div>
             </div>
           </section>
