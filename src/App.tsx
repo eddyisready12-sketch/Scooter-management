@@ -3482,6 +3482,67 @@ function looksLikeItemNumber(value: string) {
   return /[a-z]/i.test(value) && /\d/.test(value);
 }
 
+function normalizedBodySetVariant(description: string) {
+  const match = description.match(/\(([^()]*)\)/);
+  return match?.[1]?.toLowerCase().replace(/[^a-z0-9]/g, '') || '';
+}
+
+function combineImportedBodySets(lines: ContainerCostImportDraftLine[]) {
+  const combined: ContainerCostImportDraftLine[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const parent = lines[index];
+    const isBodySet = parent.type === 'samengesteld'
+      && /\bbody\s*sets?\s*complete\b/i.test(parent.description);
+
+    if (!isBodySet) {
+      combined.push(parent);
+      continue;
+    }
+
+    const parentQuantity = Math.max(0, parseDecimal(parent.quantity));
+    const parentVariant = normalizedBodySetVariant(parent.description);
+    const components: ContainerCostImportDraftLine[] = [];
+    let componentIndex = index + 1;
+
+    while (componentIndex < lines.length) {
+      const candidate = lines[componentIndex];
+      const sameQuantity = parseDecimal(candidate.quantity) === parentQuantity;
+      const sameVariant = Boolean(parentVariant)
+        && normalizedBodySetVariant(candidate.description) === parentVariant;
+      if (candidate.type !== 'onderdeel' || !sameQuantity || !sameVariant) break;
+      components.push(candidate);
+      componentIndex += 1;
+    }
+
+    if (components.length === 0) {
+      combined.push(parent);
+      continue;
+    }
+
+    const setLines = [parent, ...components];
+    const totalAmountUsd = setLines.reduce((sum, line) => {
+      const quantity = Math.max(0, parseDecimal(line.quantity));
+      const amount = Math.max(0, parseDecimal(line.amountUsd));
+      return sum + (amount > 0 ? amount : quantity * Math.max(0, parseDecimal(line.unitPriceUsd)));
+    }, 0);
+    const componentSummary = components
+      .map((line) => `${line.referenceCode}: ${line.description}`)
+      .join(' + ');
+
+    combined.push({
+      ...parent,
+      description: `Kappenset ${parent.model || parent.referenceCode}${parentVariant ? ` (${parent.description.match(/\(([^()]*)\)/)?.[1]})` : ''}`,
+      unitPriceUsd: parentQuantity > 0 ? formatDecimal(totalAmountUsd / parentQuantity, 4) : parent.unitPriceUsd,
+      amountUsd: formatDecimal(totalAmountUsd, 4),
+      componentsNote: [parent.componentsNote, componentSummary].filter(Boolean).join(' | '),
+    });
+    index = componentIndex - 1;
+  }
+
+  return combined;
+}
+
 function parseContainerCostContent(content: string) {
   const rows = content
     .split(/\r?\n/)
@@ -3541,7 +3602,7 @@ function parseContainerCostContent(content: string) {
       });
     });
 
-    return parsed;
+    return combineImportedBodySets(parsed);
   }
 
   const parsed: ContainerCostImportDraftLine[] = [];
@@ -3641,7 +3702,7 @@ function parseContainerCostContent(content: string) {
     });
   });
 
-  return parsed;
+  return combineImportedBodySets(parsed);
 }
 
 async function readContainerCostImportFile(file: File) {
