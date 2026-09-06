@@ -3597,7 +3597,7 @@ function parseContainerCostContent(content: string) {
       const amountRaw = valueAt(columns, amountIndex);
       const supplierRaw = valueAt(columns, supplierIndex);
       const ctnNo = ctnNoRaw || lastKnownCtnNo;
-      const model = modelRaw || lastKnownModel;
+      const model = modelRaw || (ctnNoRaw ? '' : lastKnownModel);
       const articleNumber = articleNumberRaw;
       const itemNo = itemNoRaw;
       const parts = partsRaw;
@@ -3606,7 +3606,11 @@ function parseContainerCostContent(content: string) {
       if (!parts && !articleNumber && !itemNo) return;
 
       lastKnownCtnNo = ctnNo || lastKnownCtnNo;
-      lastKnownModel = model || lastKnownModel;
+      if (ctnNoRaw) {
+        lastKnownModel = modelRaw;
+      } else if (modelRaw) {
+        lastKnownModel = modelRaw;
+      }
       lastKnownSupplier = supplier || lastKnownSupplier;
 
       const referenceCode = articleNumber || itemNo || `${model}-${parts}`.replace(/\s+/g, '-');
