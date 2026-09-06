@@ -3365,6 +3365,10 @@ function roundValue(value: number, digits = 4) {
   return Math.round(value * factor) / factor;
 }
 
+function formatStoredDecimal(value: number, digits = 3) {
+  return String(roundValue(value, digits));
+}
+
 function purchasePricePerUnit(goodsValueEurBase: number, quantity: number) {
   if (quantity <= 0) return 0;
   return roundValue(goodsValueEurBase / quantity, 4);
@@ -3456,7 +3460,7 @@ function mergeContainerCostDraftLines(lines: ContainerCostImportDraftLine[]) {
 
   return Array.from(groups.values()).map(({ first, quantity, amountUsd, totalVolumeCbm, notes, count }) => ({
     ...first,
-    quantity: formatCompactDecimal(quantity, 3),
+    quantity: formatStoredDecimal(quantity, 3),
     volumeCbm: quantity > 0 ? formatDecimal(totalVolumeCbm / quantity, 4) : first.volumeCbm,
     amountUsd: amountUsd > 0 ? formatDecimal(amountUsd, 4) : undefined,
     componentsNote: notes.length > 1 ? `${notes[0]} + ${count - 1} regels samengevoegd` : notes[0],
@@ -9862,7 +9866,7 @@ function ContainerCostModal({
         type: 'scooter',
         referenceCode: `${row.model.trim()}-${row.component}`,
         description: `${row.model.trim()} ${row.component}`,
-        quantity: formatCompactDecimal(quantity, 3),
+        quantity: formatStoredDecimal(quantity, 3),
         volumeCbm: formatDecimal(unitVolumeCbm, 4),
         unitPriceUsd: row.unitPriceUsd.trim() || '0',
         componentsNote: `${row.component} - ${formatCompactDecimal(lengthCm, 1)} x ${formatCompactDecimal(widthCm, 1)} x ${formatCompactDecimal(heightCm, 1)} cm`,
@@ -10220,7 +10224,7 @@ function ContainerCostModal({
           referenceId: resolvedProduct?.id ?? line.referenceId,
           referenceCode: resolvedProduct?.code || line.referenceCode,
           description: line.normalizedDescription,
-          quantity: formatCompactDecimal(line.quantity, 3),
+          quantity: formatStoredDecimal(line.quantity, 3),
           volumeCbm: formatDecimal(line.volumeCbm, 4),
           unitPriceUsd: formatDecimal(line.unitPriceUsd, 4),
           goodsValueEur: formatDecimal(line.goodsValueEurBase, 4),
