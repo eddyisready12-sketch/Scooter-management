@@ -3748,7 +3748,10 @@ async function readContainerCostImportFile(file: File) {
       const rawRows = XLSX.utils.sheet_to_json<(string | number | null)[]>(workbook.Sheets[name], {
         header: 1,
         defval: '',
-        raw: false,
+        // Import the underlying cell values instead of Excel's formatted text.
+        // This prevents quantities such as 1016 becoming the US-formatted
+        // string "1,016", which the Dutch decimal parser reads as 1.016.
+        raw: true,
       });
 
       return {
