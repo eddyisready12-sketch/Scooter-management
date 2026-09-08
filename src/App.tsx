@@ -5929,10 +5929,16 @@ export function App() {
         </header>
 
         <section className="content">
-          {view === 'dashboard' && <Dashboard data={data} onNavigate={(nextView, scooterStatus) => {
-            if (scooterStatus) setStatusFilter(scooterStatus);
-            setView(nextView);
-          }} />}
+          {view === 'dashboard' && (
+            <Dashboard
+              data={data}
+              onBulkRdwCheck={checkScootersWithRdw}
+              onNavigate={(nextView, scooterStatus) => {
+                if (scooterStatus) setStatusFilter(scooterStatus);
+                setView(nextView);
+              }}
+            />
+          )}
           {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onUpdateContainerEta={updateContainerEta} onMarkContainerAvailable={markContainerAvailable} focusedContainerId={focusedContainerId} />}
           {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onPrintOuterBoxLabel={printBatchOuterBoxLabel} onPreviewOuterBoxLabel={previewBatchOuterBoxLabel} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveBatchPackagingPlan={saveBatchPackagingPlan} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
           {view === 'packaging' && (
@@ -6197,10 +6203,13 @@ function ExpandableNotice({ message, details }: { message: string; details?: str
   );
 }
 
-function Dashboard({ data, onNavigate }: {
+function Dashboard({ data, onNavigate, onBulkRdwCheck }: {
   data: AppData;
   onNavigate: (view: View, scooterStatus?: ScooterStatus) => void;
+  onBulkRdwCheck: (scooters: Scooter[]) => Promise<string>;
 }) {
+  const [rdwChecking, setRdwChecking] = useState(false);
+  const [rdwCheckMessage, setRdwCheckMessage] = useState('');
   const dashboardLinks = views
     .filter(({ id }) => id !== 'dashboard')
     .sort((a, b) => a.label.localeCompare(b.label, 'nl', { sensitivity: 'base' }));
@@ -6220,6 +6229,14 @@ function Dashboard({ data, onNavigate }: {
   const soldCustomer = statusCounts.get('Verkocht klant') ?? 0;
   const soldDealer = statusCounts.get('Verkocht dealer') ?? 0;
   const sold = soldCustomer + soldDealer;
+  const currentYear = new Date().getFullYear();
+  const registeredThisYear = scooters.filter((scooter) => {
+    const registrationDate = normalizeDateValue(scooter.lastRegistrationDate);
+    return registrationDate instanceof Date
+      && !Number.isNaN(registrationDate.getTime())
+      && registrationDate.getFullYear() === currentYear;
+  }).length;
+  const soldDealerScooters = scooters.filter((scooter) => scooter.status === 'Verkocht dealer');
 
   const containersEnRoute = data.containers.filter((c) => c.status !== 'Aangekomen');
   const nextContainerArrival = containersEnRoute
@@ -6258,7 +6275,20 @@ function Dashboard({ data, onNavigate }: {
     { label: 'Onderweg', value: enRoute, sub: `${containersEnRoute.length} ${containersEnRoute.length === 1 ? 'container' : 'containers'} actief${arrivalCountdown}`, icon: Truck, tone: 'amber', view: 'containers' },
     { label: 'Verkocht', value: sold, sub: `${soldDealer} dealer · ${soldCustomer} klant`, icon: CircleDollarSign, tone: 'violet', view: 'sales' },
     { label: 'Totaal geïmporteerd', value: total, sub: 'inclusief verkochte scooters', icon: Bike, tone: 'brand', view: 'scooters' },
+    { label: 'Tenaamgesteld dit jaar', value: registeredThisYear, sub: `${currentYear} · volgens RDW`, icon: CalendarDays, tone: 'blue', view: 'sales' },
   ];
+
+  async function handleDashboardRdwCheck() {
+    setRdwChecking(true);
+    setRdwCheckMessage('');
+    try {
+      setRdwCheckMessage(await onBulkRdwCheck(soldDealerScooters));
+    } catch (error) {
+      setRdwCheckMessage(`RDW controle mislukt: ${importErrorMessage(error)}`);
+    } finally {
+      setRdwChecking(false);
+    }
+  }
 
   return (
     <>
@@ -6273,17 +6303,25 @@ function Dashboard({ data, onNavigate }: {
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (
-            <button key={kpi.label} type="button" className={`dash-kpi tone-${kpi.tone}`} onClick={() => onNavigate(kpi.view)}>
-              <span className="dash-kpi-icon"><Icon size={19} /></span>
-              <span className="dash-kpi-body">
-                <span className="dash-kpi-label">{kpi.label}</span>
-                <strong className="dash-kpi-value">{kpi.value}</strong>
-                <span className="dash-kpi-sub">{kpi.sub}</span>
-              </span>
-            </button>
+            <div key={kpi.label} className={`dash-kpi tone-${kpi.tone}`}>
+              <button type="button" className="dash-kpi-main" onClick={() => onNavigate(kpi.view)}>
+                <span className="dash-kpi-icon"><Icon size={19} /></span>
+                <span className="dash-kpi-body">
+                  <span className="dash-kpi-label">{kpi.label}</span>
+                  <strong className="dash-kpi-value">{kpi.value}</strong>
+                  <span className="dash-kpi-sub">{kpi.sub}</span>
+                </span>
+              </button>
+              {kpi.label === 'Verkocht' ? (
+                <button type="button" className="dash-kpi-rdw" disabled={rdwChecking || soldDealerScooters.length === 0} onClick={() => void handleDashboardRdwCheck()}>
+                  <RefreshCw size={13} /> {rdwChecking ? 'RDW check bezig…' : 'Check voertuigen bij RDW'}
+                </button>
+              ) : null}
+            </div>
           );
         })}
       </div>
+      {rdwCheckMessage ? <div className="inline-notice dashboard-rdw-message">{rdwCheckMessage}</div> : null}
 
       <div className="dash-columns">
         <section className="panel">
