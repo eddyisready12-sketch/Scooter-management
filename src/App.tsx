@@ -6273,9 +6273,9 @@ function Dashboard({ data, onNavigate, onBulkRdwCheck }: {
   const kpis: Array<{ label: string; value: number; sub: string; icon: typeof Home; tone: string; view: View }> = [
     { label: 'Beschikbaar', value: available, sub: `${directlyAvailable} beschikbaar · ${inConsignment} consignatie`, icon: CheckCircle2, tone: 'green', view: 'scooters' },
     { label: 'Onderweg', value: enRoute, sub: `${containersEnRoute.length} ${containersEnRoute.length === 1 ? 'container' : 'containers'} actief${arrivalCountdown}`, icon: Truck, tone: 'amber', view: 'containers' },
+    { label: 'Tenaamgesteld dit jaar', value: registeredThisYear, sub: `${currentYear} · volgens RDW`, icon: CalendarDays, tone: 'blue', view: 'sales' },
     { label: 'Verkocht', value: sold, sub: `${soldDealer} dealer · ${soldCustomer} klant`, icon: CircleDollarSign, tone: 'violet', view: 'sales' },
     { label: 'Totaal geïmporteerd', value: total, sub: 'inclusief verkochte scooters', icon: Bike, tone: 'brand', view: 'scooters' },
-    { label: 'Tenaamgesteld dit jaar', value: registeredThisYear, sub: `${currentYear} · volgens RDW`, icon: CalendarDays, tone: 'blue', view: 'sales' },
   ];
 
   async function handleDashboardRdwCheck() {
@@ -6312,7 +6312,7 @@ function Dashboard({ data, onNavigate, onBulkRdwCheck }: {
                   <span className="dash-kpi-sub">{kpi.sub}</span>
                 </span>
               </button>
-              {kpi.label === 'Verkocht' ? (
+              {kpi.label === 'Tenaamgesteld dit jaar' ? (
                 <button type="button" className="dash-kpi-rdw" disabled={rdwChecking || soldDealerScooters.length === 0} onClick={() => void handleDashboardRdwCheck()}>
                   <RefreshCw size={13} /> {rdwChecking ? 'RDW check bezig…' : 'Check voertuigen bij RDW'}
                 </button>
