@@ -6231,7 +6231,7 @@ function Dashboard({ data, onNavigate, onBulkRdwCheck }: {
   const sold = soldCustomer + soldDealer;
   const currentYear = new Date().getFullYear();
   const registeredThisYear = scooters.filter((scooter) => {
-    const registrationDate = normalizeDateValue(scooter.lastRegistrationDate);
+    const registrationDate = normalizeDateValue(scooter.firstRegistrationDate);
     return registrationDate instanceof Date
       && !Number.isNaN(registrationDate.getTime())
       && registrationDate.getFullYear() === currentYear;
