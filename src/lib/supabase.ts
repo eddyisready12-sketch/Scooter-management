@@ -585,7 +585,12 @@ export async function upsertScooters(scooters: Scooter[]) {
 
   const { error } = await supabase
     .from('scooters')
-    .upsert(scooters);
+    .upsert(scooters.map((scooter) => ({
+      ...scooter,
+      // An empty/omitted value would either violate the foreign key or leave
+      // the previous dealer untouched. NULL explicitly removes the relation.
+      dealerId: scooter.dealerId || null,
+    })));
 
   if (error) throw error;
 }

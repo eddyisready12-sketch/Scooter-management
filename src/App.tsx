@@ -14912,7 +14912,7 @@ function ScooterDrawer({
               <label>Kenteken<input value={draft.licensePlate ?? ''} onChange={(e) => setDraft({ ...draft, licensePlate: e.target.value })} /></label>
               <label>Accu nummer<input value={battery?.lotNumber || draft.batteryNumber || ''} readOnly /></label>
               <label>Status<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as ScooterStatus })}>{(Object.keys(statusColor) as ScooterStatus[]).map((status) => <option key={status} value={status}>{scooterStatusLabel(status)}</option>)}</select></label>
-              <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value })}><option value="">Geen dealer</option>{selectableDealers.map((dealer) => <option value={dealer.id} key={dealer.id}>{dealer.company || dealer.name}</option>)}</select></label>
+              <label>Dealer<select value={draft.dealerId ?? ''} onChange={(e) => setDraft({ ...draft, dealerId: e.target.value || undefined })}><option value="">Geen dealer</option>{selectableDealers.map((dealer) => <option value={dealer.id} key={dealer.id}>{dealer.company || dealer.name}</option>)}</select></label>
               <label>Factuur<input value={draft.invoiceNumber ?? ''} onChange={(e) => setDraft({ ...draft, invoiceNumber: e.target.value })} /></label>
               <label className="checkbox-field">
                 <input type="checkbox" checked={Boolean(draft.isUnpacked)} onChange={(e) => setDraft({ ...draft, isUnpacked: e.target.checked })} />
