@@ -11843,6 +11843,7 @@ function ProductsPage({
                   <th className="product-checkbox-column">
                     <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisibleSelection} aria-label="Selecteer zichtbare producten" />
                   </th>
+                  <th className="product-image-column">Foto</th>
                   <th>
                     <button type="button" className="column-sort-button" onClick={() => handleSort('code')}>
                       Artikelnummer {renderSortIcon('code')}
@@ -11905,6 +11906,20 @@ function ProductsPage({
                         onChange={() => toggleProductSelection(product.id)}
                         aria-label={`Selecteer ${product.code || product.description || 'product'}`}
                       />
+                    </td>
+                    <td className="product-image-column">
+                      <span className="product-table-thumbnail">
+                        <PackageX size={18} aria-hidden="true" />
+                        {product.imageUrl?.trim() ? (
+                          <img
+                            src={product.imageUrl.trim()}
+                            alt=""
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                          />
+                        ) : null}
+                      </span>
                     </td>
                     <td>{product.code || '-'}</td>
                     <td>{product.description || '-'}</td>
