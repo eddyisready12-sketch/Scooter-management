@@ -48,6 +48,7 @@ import { buildScooterBarcodeDataUrl, openOuterBoxLabelPreview, previewProductZeb
 import type { ZebraProductLabelSize } from './lib/labels';
 import { asOptionalTrimmedString, certificationRuleForArticleGroup, createEmptyPackagingLayer, createProductDraft, formatCertificationPresence, getProductBatchOverviewRows, getProductComplianceResponsibility, getProductComplianceSummary, isCeMissing, isCeRelevant, isEMarkMissing, isEMarkRelevant, isStickerPackagingLayer, normalizePackagingLayers, productComplianceIssueLevelLabel, sumPackagingLayerWeights, summarizePackagingWasteStream, unitsPerPackageFromProduct } from './lib/products';
 import type { ProductComplianceLevel } from './lib/products';
+import { ImagePreview } from './modals/ImagePreview';
 import { parseProbeEndpoint, rdwDateToInputDate } from './lib/rdw';
 import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, fetchProductById, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceComplianceFamilyDocuments, replaceComplianceFamilyRequirements, replaceComplianceFamilyRevisions, replaceComplianceFamilyRisks, replaceComplianceFamilyTestPlans, replaceComplianceFamilyWarnings, replaceComplianceProductTests, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, uploadSupplierDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRequirements, upsertComplianceFamilyRevisions, upsertComplianceFamilyRisks, upsertComplianceFamilyTestPlans, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertComplianceProductTests, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
@@ -4184,17 +4185,6 @@ function ExpandableNotice({ message, details }: { message: string; details?: str
           </div>
         </details>
       )}
-    </div>
-  );
-}
-
-function ImagePreview({ url, alt, onClose }: { url: string; alt: string; onClose: () => void }) {
-  return (
-    <div className="modal-backdrop image-preview-backdrop" role="presentation" onMouseDown={onClose}>
-      <div className="image-preview-dialog" role="dialog" aria-modal="true" aria-label={`Afbeelding ${alt}`} onMouseDown={(event) => event.stopPropagation()}>
-        <button type="button" className="image-preview-close" onClick={onClose} aria-label="Afbeelding sluiten"><XCircle size={22} /></button>
-        <img src={url} alt={alt} referrerPolicy="no-referrer" />
-      </div>
     </div>
   );
 }
