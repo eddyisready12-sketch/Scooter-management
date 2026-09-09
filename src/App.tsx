@@ -5928,7 +5928,7 @@ export function App() {
           </div>
         </header>
 
-        <section className="content">
+        <section className={`content${view === 'products' ? ' content-wide' : ''}`}>
           {view === 'dashboard' && (
             <Dashboard
               data={data}
@@ -6199,6 +6199,17 @@ function ExpandableNotice({ message, details }: { message: string; details?: str
           </div>
         </details>
       )}
+    </div>
+  );
+}
+
+function ImagePreview({ url, alt, onClose }: { url: string; alt: string; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop image-preview-backdrop" role="presentation" onMouseDown={onClose}>
+      <div className="image-preview-dialog" role="dialog" aria-modal="true" aria-label={`Afbeelding ${alt}`} onMouseDown={(event) => event.stopPropagation()}>
+        <button type="button" className="image-preview-close" onClick={onClose} aria-label="Afbeelding sluiten"><XCircle size={22} /></button>
+        <img src={url} alt={alt} referrerPolicy="no-referrer" />
+      </div>
     </div>
   );
 }
@@ -8902,6 +8913,7 @@ function CostBatchesPage({
   ]);
   const [packagingPlanSaving, setPackagingPlanSaving] = useState(false);
   const [packagingMessage, setPackagingMessage] = useState('');
+  const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null);
   const [importToolTab, setImportToolTab] = useState<'batch' | 'scooterPackaging'>('batch');
   const [packagingDraft, setPackagingDraft] = useState<ScooterPackagingSpec>({
     id: '',
@@ -9355,6 +9367,7 @@ function CostBatchesPage({
                                     <thead>
                                       <tr>
                                         <th>#</th>
+                                        <th>Foto</th>
                                         <th>Type</th>
                                         <th>Omschrijving</th>
                                         <th>EAN</th>
@@ -9418,6 +9431,13 @@ function CostBatchesPage({
                                         return (
                                           <tr key={line.id}>
                                             <td className="import-line-number">{index + 1}</td>
+                                            <td className="import-batch-image-cell">
+                                              {product?.imageUrl?.trim() ? (
+                                                <button type="button" className="product-table-thumbnail thumbnail-button" onClick={(event) => { event.stopPropagation(); setPreviewImage({ url: product.imageUrl!.trim(), alt: product.description || line.description }); }}>
+                                                  <img src={product.imageUrl.trim()} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+                                                </button>
+                                              ) : <span className="product-table-thumbnail"><PackageX size={18} aria-hidden="true" /></span>}
+                                            </td>
                                             <td>{line.type}</td>
                                             <td className="import-batch-description-cell">
                                               {product ? (
@@ -9680,6 +9700,7 @@ function CostBatchesPage({
           }}
         />
       )}
+      {previewImage ? <ImagePreview url={previewImage.url} alt={previewImage.alt} onClose={() => setPreviewImage(null)} /> : null}
     </>
   );
 }
@@ -11420,6 +11441,7 @@ function ProductsPage({
   const [sortField, setSortField] = useState<'code' | 'description' | 'salePrice' | 'costPrice' | 'supplier' | 'articleGroup' | 'stock' | 'startDate'>('code');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null);
 
   function handleSort(field: 'code' | 'description' | 'salePrice' | 'costPrice' | 'supplier' | 'articleGroup' | 'stock' | 'startDate') {
     if (sortField === field) {
@@ -11670,6 +11692,7 @@ function ProductsPage({
 
   return (
     <>
+      {previewImage ? <ImagePreview url={previewImage.url} alt={previewImage.alt} onClose={() => setPreviewImage(null)} /> : null}
       <div className="page-title-row">
         <div>
           <h1>Producten</h1>
@@ -11907,8 +11930,14 @@ function ProductsPage({
                         aria-label={`Selecteer ${product.code || product.description || 'product'}`}
                       />
                     </td>
-                    <td className="product-image-column">
-                      <span className="product-table-thumbnail">
+                    <td className="product-image-column" onClick={(event) => event.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="product-table-thumbnail thumbnail-button"
+                        disabled={!product.imageUrl?.trim()}
+                        onClick={() => product.imageUrl?.trim() && setPreviewImage({ url: product.imageUrl.trim(), alt: product.description || product.code })}
+                        aria-label={product.imageUrl?.trim() ? `Vergroot afbeelding van ${product.description || product.code}` : 'Geen afbeelding beschikbaar'}
+                      >
                         <PackageX size={18} aria-hidden="true" />
                         {product.imageUrl?.trim() ? (
                           <img
@@ -11919,7 +11948,7 @@ function ProductsPage({
                             onError={(event) => { event.currentTarget.style.display = 'none'; }}
                           />
                         ) : null}
-                      </span>
+                      </button>
                     </td>
                     <td>{product.code || '-'}</td>
                     <td>{product.description || '-'}</td>

@@ -266,6 +266,7 @@ h1, h2, h3, h4 { color: var(--c-ink); letter-spacing: -0.01em; }
   flex-direction: column;
   gap: 20px;
 }
+.content.content-wide { max-width: none; }
 
 .page-title-row {
   display: flex; align-items: flex-end; justify-content: space-between;
