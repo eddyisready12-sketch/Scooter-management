@@ -67,6 +67,8 @@ function SupplierPackagingLabelPreview({ materialCode }: { materialCode: string 
 }
 
 type CompliancePageProps = {
+  query: string;
+  setQuery: (value: string) => void;
   products: Product[];
   scooters: Scooter[];
   families: ComplianceProductFamily[];
@@ -237,6 +239,8 @@ function supplierStatusLabel(supplier?: Supplier) {
 }
 
 export function CompliancePage({
+  query,
+  setQuery,
   products,
   scooters,
   families,
@@ -264,10 +268,8 @@ export function CompliancePage({
   const [moduleView, setModuleView] = useState<ComplianceModuleView>(embedded ? 'packagingSuppliers' : 'dashboard');
   const [detailTab, setDetailTab] = useState<ComplianceDetailTab>('basic');
   const [dashboardTab, setDashboardTab] = useState<ComplianceDashboardTab>('incomplete');
-  const [familyQuery, setFamilyQuery] = useState('');
   const [familyCategoryFilter, setFamilyCategoryFilter] = useState('all');
   const [familyStatusFilter, setFamilyStatusFilter] = useState('all');
-  const [templateQuery, setTemplateQuery] = useState('');
   const [templateRiskFilter, setTemplateRiskFilter] = useState<'all' | ComplianceProductFamily['riskLevel']>('all');
   const [selectedFamilyId, setSelectedFamilyId] = useState<string>('');
   const [familyDialogOpen, setFamilyDialogOpen] = useState(false);
@@ -278,8 +280,6 @@ export function CompliancePage({
   const [dossierPickerOpen, setDossierPickerOpen] = useState(false);
   const [dossierProductId, setDossierProductId] = useState('');
   const [dossierProductQuery, setDossierProductQuery] = useState('');
-  const [documentQuery, setDocumentQuery] = useState('');
-  const [unlinkedQuery, setUnlinkedQuery] = useState('');
   const [unlinkedSort, setUnlinkedSort] = useState<{
     field: 'code' | 'name' | 'category' | 'suggestion';
     direction: 'asc' | 'desc';
@@ -287,7 +287,6 @@ export function CompliancePage({
   const [manualFamilyByProduct, setManualFamilyByProduct] = useState<Record<string, string>>({});
   const [manualLinkingProductId, setManualLinkingProductId] = useState('');
   const [unlinkedActionMessage, setUnlinkedActionMessage] = useState('');
-  const [supplierQuery, setSupplierQuery] = useState('');
   const [supplierStatusFilter, setSupplierStatusFilter] = useState<'all' | 'complete' | 'blocked' | 'attention'>('all');
   const [selectedPackagingSupplierKey, setSelectedPackagingSupplierKey] = useState('');
   const [packagingDialogOpen, setPackagingDialogOpen] = useState(false);
@@ -360,13 +359,13 @@ export function CompliancePage({
   const filteredFamilies = useMemo(() => familyRows
     .filter(({ family, stats }) => {
       const haystack = `${family.code} ${family.name} ${family.category ?? ''}`.toLowerCase();
-      const matchesQuery = haystack.includes(familyQuery.toLowerCase());
+      const matchesQuery = haystack.includes(query.toLowerCase().trim());
       const matchesCategory = familyCategoryFilter === 'all' || (family.category || '') === familyCategoryFilter;
       const matchesStatus = familyStatusFilter === 'all' || (stats.calculatedStatus || 'concept') === familyStatusFilter;
       return matchesQuery && matchesCategory && matchesStatus;
     })
     .sort((left, right) => left.family.name.localeCompare(right.family.name, 'nl', { sensitivity: 'base' })),
-  [familyCategoryFilter, familyQuery, familyRows, familyStatusFilter]);
+  [familyCategoryFilter, familyRows, familyStatusFilter, query]);
 
   const familyCategories = useMemo(() => Array.from(new Set(
     familyRows.map(({ family }) => family.category || '').filter(Boolean),
@@ -383,8 +382,8 @@ export function CompliancePage({
   const productsWithoutFamily = useMemo(() => products.filter((product) => {
     if (!product.id || linkedProductIds.has(product.id) || outsourcedProductIds.has(product.id)) return false;
     const haystack = `${product.code} ${product.description} ${product.articleGroup ?? ''} ${product.brand ?? ''}`.toLowerCase();
-    return haystack.includes(unlinkedQuery.toLowerCase());
-  }), [linkedProductIds, outsourcedProductIds, products, unlinkedQuery]);
+    return haystack.includes(query.toLowerCase().trim());
+  }), [linkedProductIds, outsourcedProductIds, products, query]);
 
   const expiringDocuments = useMemo(() => documents.filter((document) => expiryState(document.validUntil) === 'soon'), [documents]);
   const expiredDocuments = useMemo(() => documents.filter((document) => expiryState(document.validUntil) === 'expired'), [documents]);
@@ -513,7 +512,7 @@ export function CompliancePage({
   }, [packagingSupplierUsageRows, suppliers]);
 
   const packagingSupplierRows = useMemo(() => allPackagingSupplierRows.filter((row) => {
-    const needle = supplierQuery.trim().toLowerCase();
+    const needle = query.trim().toLowerCase();
     const profileMaterials = row.supplier?.packagingProfile?.map((layer) => `${layer.naam ?? ''} ${layer.materiaalcode}`).join(' ') ?? '';
     const haystack = `${row.supplier?.name ?? row.usage?.name ?? ''} ${profileMaterials} ${Array.from(row.usage?.materials ?? []).join(' ')}`.toLowerCase();
     const status = ppwrSupplierStatus(row.supplier);
@@ -522,7 +521,7 @@ export function CompliancePage({
       || (supplierStatusFilter === 'blocked' && status === 'geblokkeerd')
       || (supplierStatusFilter === 'attention' && status === 'aanvullen');
     return (!needle || haystack.includes(needle)) && matchesStatus;
-  }), [allPackagingSupplierRows, supplierQuery, supplierStatusFilter]);
+  }), [allPackagingSupplierRows, query, supplierStatusFilter]);
 
   const packagingSupplierTotals = useMemo(() => allPackagingSupplierRows.reduce((summary, row) => {
     summary.total += 1;
@@ -638,14 +637,14 @@ export function CompliancePage({
     }))
     .filter(({ document, family }) => {
       const haystack = `${document.documentName} ${document.documentType ?? ''} ${family?.name ?? ''} ${family?.code ?? ''}`.toLowerCase();
-      return haystack.includes(documentQuery.toLowerCase());
+      return haystack.includes(query.toLowerCase().trim());
     })
     .sort((left, right) => {
       const leftState = expiryState(left.document.validUntil);
       const rightState = expiryState(right.document.validUntil);
       const priority = { expired: 0, soon: 1, ok: 2, none: 3 } as const;
       return priority[leftState] - priority[rightState];
-    }), [documentQuery, documents, families]);
+    }), [documents, families, query]);
 
   async function handleSeedTemplates() {
     setSaving(true);
@@ -1359,7 +1358,7 @@ export function CompliancePage({
                 expiringDocuments.length === 0 ? <p className="empty">Geen documenten verlopen binnen 60 dagen.</p> : expiringDocuments.map((document) => {
                   const family = families.find((item) => item.id === document.familyId);
                   return (
-                    <button type="button" key={document.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
+                    <button type="button" key={document.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('documents'); setQuery(document.documentName); }}>
                       <strong>{family?.name || document.documentName}</strong>
                       <span className="compliance-inline-status warning">{formatDate(document.validUntil)}</span>
                     </button>
@@ -1371,7 +1370,7 @@ export function CompliancePage({
                 expiredDocuments.length === 0 ? <p className="empty">Geen verlopen documenten.</p> : expiredDocuments.map((document) => {
                   const family = families.find((item) => item.id === document.familyId);
                   return (
-                    <button type="button" key={document.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('documents'); setDocumentQuery(document.documentName); }}>
+                    <button type="button" key={document.id} className="compliance-dashboard-row compliance-dashboard-row-wide" onClick={() => { setModuleView('documents'); setQuery(document.documentName); }}>
                       <strong>{family?.name || document.documentName}</strong>
                       <span className="compliance-inline-status danger">{formatDate(document.validUntil)}</span>
                     </button>
@@ -1397,10 +1396,6 @@ export function CompliancePage({
             <button type="button" className="primary-button" onClick={createNewFamily}><Plus size={14} /> Nieuwe familie</button>
           </div>
           <div className="compliance-family-table-toolbar">
-            <div className="search-field">
-              <Search size={16} />
-              <input value={familyQuery} onChange={(event) => setFamilyQuery(event.target.value)} placeholder="Zoeken op naam of code..." />
-            </div>
             <select value={familyCategoryFilter} onChange={(event) => setFamilyCategoryFilter(event.target.value)}>
               <option value="all">Alle categorieen</option>
               {familyCategories.map((category) => <option key={category} value={category}>{category}</option>)}
@@ -2049,10 +2044,6 @@ export function CompliancePage({
           </div>
           <div className="compliance-panel-body compliance-view-stack">
             {unlinkedActionMessage ? <div className={`inline-notice ${unlinkedActionMessage.startsWith('Koppelen mislukt') ? 'warning-notice' : 'success-notice'}`}>{unlinkedActionMessage}</div> : null}
-            <div className="search-field">
-              <Search size={16} />
-              <input value={unlinkedQuery} onChange={(event) => setUnlinkedQuery(event.target.value)} placeholder="Zoeken op artikelnummer, omschrijving of categorie" />
-            </div>
             <div className="compliance-linked-products-table">
               <div className="compliance-linked-products-header compliance-unlinked-products-header">
                 {sortHeader('code', 'Artikelnummer')}
@@ -2107,10 +2098,6 @@ export function CompliancePage({
         <section className="panel">
           <div className="panel-title">Documenten</div>
           <div className="compliance-panel-body compliance-view-stack">
-            <div className="search-field">
-              <Search size={16} />
-              <input value={documentQuery} onChange={(event) => setDocumentQuery(event.target.value)} placeholder="Zoeken op document of productfamilie" />
-            </div>
             <div className="compliance-linked-products-table">
               <div className="compliance-linked-products-header">
                 <span>Familie</span>
@@ -2138,8 +2125,8 @@ export function CompliancePage({
     const sortedTemplateFamilies = [...templateSummary.families]
       .sort((left, right) => left.name.localeCompare(right.name, 'nl', { sensitivity: 'base' }));
     const filteredTemplateFamilies = sortedTemplateFamilies.filter((family) => {
-      const query = templateQuery.trim().toLocaleLowerCase('nl');
-      const matchesQuery = !query || `${family.name} ${family.code} ${family.category || ''} ${family.description || ''}`.toLocaleLowerCase('nl').includes(query);
+      const searchNeedle = query.trim().toLocaleLowerCase('nl');
+      const matchesQuery = !searchNeedle || `${family.name} ${family.code} ${family.category || ''} ${family.description || ''}`.toLocaleLowerCase('nl').includes(searchNeedle);
       const matchesRisk = templateRiskFilter === 'all' || family.riskLevel === templateRiskFilter;
       return matchesQuery && matchesRisk;
     });
@@ -2154,10 +2141,6 @@ export function CompliancePage({
           </div>
           <div className="compliance-panel-body">
             <div className="compliance-template-toolbar">
-              <div className="search-field">
-                <Search size={16} />
-                <input value={templateQuery} onChange={(event) => setTemplateQuery(event.target.value)} placeholder="Zoek op naam, code, categorie of omschrijving" />
-              </div>
               <select value={templateRiskFilter || 'all'} onChange={(event) => setTemplateRiskFilter(event.target.value as typeof templateRiskFilter)}>
                 <option value="all">Alle risiconiveaus</option>
                 <option value="low">Laag</option>
@@ -2349,10 +2332,6 @@ export function CompliancePage({
               <button type="button" className={`stat-card packaging-filter-card danger ${supplierStatusFilter === 'blocked' ? 'active' : ''}`} onClick={() => setSupplierStatusFilter('blocked')}><AlertTriangle size={18} /><div><span>Geblokkeerd</span><strong>{packagingSupplierTotals.blocked}</strong></div></button>
             </section>
             <button type="button" className={`packaging-attention-filter ${supplierStatusFilter === 'attention' ? 'active' : ''}`} onClick={() => setSupplierStatusFilter(supplierStatusFilter === 'attention' ? 'all' : 'attention')}>Toon alleen status Aanvullen</button>
-            <div className="search-field">
-              <Search size={16} />
-              <input value={supplierQuery} onChange={(event) => setSupplierQuery(event.target.value)} placeholder="Zoeken op leverancier of materiaal..." />
-            </div>
             <div className="compliance-family-table-scroll">
               <table className="compliance-family-table">
                 <thead><tr><th>Naam</th><th>Status</th><th>Profiellagen</th><th>Productlagen</th><th>Acties</th></tr></thead>

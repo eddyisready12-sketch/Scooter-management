@@ -5896,6 +5896,7 @@ export function App() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Zoeken in de huidige pagina"
+                disabled={view === 'dashboard'}
               />
             </label>
           </div>
@@ -5920,8 +5921,8 @@ export function App() {
               }}
             />
           )}
-          {view === 'containers' && <Containers data={data} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onUpdateContainerEta={updateContainerEta} onMarkContainerAvailable={markContainerAvailable} focusedContainerId={focusedContainerId} />}
-          {view === 'costBatches' && <CostBatchesPage data={data} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onPrintOuterBoxLabel={printBatchOuterBoxLabel} onPreviewOuterBoxLabel={previewBatchOuterBoxLabel} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveBatchPackagingPlan={saveBatchPackagingPlan} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
+          {view === 'containers' && <Containers data={data} query={query} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onUpdateContainerEta={updateContainerEta} onMarkContainerAvailable={markContainerAvailable} focusedContainerId={focusedContainerId} />}
+          {view === 'costBatches' && <CostBatchesPage data={data} query={query} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onPrintOuterBoxLabel={printBatchOuterBoxLabel} onPreviewOuterBoxLabel={previewBatchOuterBoxLabel} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveBatchPackagingPlan={saveBatchPackagingPlan} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
           {view === 'packaging' && (
             <>
               <div className="subtabs">
@@ -5935,11 +5936,14 @@ export function App() {
                   batches={data.containerCostBatches}
                   products={data.products}
                   supplierRecords={data.suppliers}
+                  query={query}
                   onSelectProduct={openProduct}
                 />
               ) : (
                 <CompliancePage
                   embedded
+                  query={query}
+                  setQuery={setQuery}
                   products={data.products}
                   scooters={data.scooters}
                   families={data.complianceFamilies}
@@ -5966,9 +5970,9 @@ export function App() {
               )}
             </>
           )}
-          {view === 'scooters' && <Scooters data={data} query={query} setQuery={setQuery} scooters={filteredScooters} onSelect={setSelectedScooter} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
-          {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} onSelect={setSelectedScooter} />}
-          {view === 'batteries' && <Batteries data={data} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
+          {view === 'scooters' && <Scooters data={data} scooters={filteredScooters} onSelect={setSelectedScooter} message={csvMessage} messageDetails={csvMessageDetails} statusFilter={statusFilter} setStatusFilter={setStatusFilter} onBulkRdwCheck={checkScootersWithRdw} />}
+          {view === 'sales' && <SalesPage scooters={data.scooters} dealers={data.dealers} query={query} onSelect={setSelectedScooter} />}
+          {view === 'batteries' && <Batteries data={data} query={query} addBatteries={addBatteries} addBatteryModel={addBatteryModel} updateBattery={updateBattery} onSelectScooter={setSelectedScooter} message={batteryMessage} />}
           {view === 'products' && (
             <ProductsPage
               products={data.products}
@@ -5983,11 +5987,14 @@ export function App() {
               onBulkUpdateProducts={bulkUpdateProducts}
               onSelectProduct={openProduct}
               message={productMessage}
+              query={query}
             />
           )}
           {view === 'compliance' && (
             <CompliancePage
               products={data.products}
+              query={query}
+              setQuery={setQuery}
               scooters={data.scooters}
               families={data.complianceFamilies}
               risks={data.complianceFamilyRisks}
@@ -6011,10 +6018,10 @@ export function App() {
               onSelectProduct={openProduct}
             />
           )}
-          {view === 'suppliers' && <SuppliersPage suppliers={data.suppliers} importers={data.importers} supplierContacts={data.supplierContacts} products={data.products} onSaveSupplier={upsertSupplierRecord} onSaveImporter={upsertImporterRecord} onSaveSupplierContact={upsertSupplierContactRecord} onImportFromProducts={importSuppliersFromProducts} message={supplierMessage} />}
-          {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
-          {view === 'warranty' && <Warranty data={data} products={data.products} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
-          {view === 'maintenance' && <Maintenance data={data} addMaintenance={addMaintenance} message={maintenanceMessage} />}
+          {view === 'suppliers' && <SuppliersPage suppliers={data.suppliers} importers={data.importers} supplierContacts={data.supplierContacts} products={data.products} query={query} onSaveSupplier={upsertSupplierRecord} onSaveImporter={upsertImporterRecord} onSaveSupplierContact={upsertSupplierContactRecord} onImportFromProducts={importSuppliersFromProducts} message={supplierMessage} />}
+          {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} query={query} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
+          {view === 'warranty' && <Warranty data={data} products={data.products} query={query} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
+          {view === 'maintenance' && <Maintenance data={data} query={query} addMaintenance={addMaintenance} message={maintenanceMessage} />}
         </section>
       </main>
 
@@ -6393,6 +6400,7 @@ function ExactConnectionPanel({
   batches = [],
   products = [],
   supplierRecords = [],
+  query,
   onSelectProduct,
 }: {
   registrations?: ProductPackagingRegistration[];
@@ -6400,6 +6408,7 @@ function ExactConnectionPanel({
   batches?: ContainerCostBatch[];
   products?: Product[];
   supplierRecords?: Supplier[];
+  query: string;
   onSelectProduct: (product: Product, tab?: ProductModalTab, applyBatchNumber?: string) => void;
 }) {
   const [status, setStatus] = useState<ExactConnectionStatus | null>(null);
@@ -6424,7 +6433,6 @@ function ExactConnectionPanel({
   const [knownBatchNumber, setKnownBatchNumber] = useState('');
   const [showBatchProbeDetails, setShowBatchProbeDetails] = useState(false);
   const [showSalesLines, setShowSalesLines] = useState(false);
-  const [salesSummaryArticleFilter, setSalesSummaryArticleFilter] = useState('');
   const [salesSummaryStatusFilter, setSalesSummaryStatusFilter] = useState<'all' | 'linked' | 'unlinked'>('all');
   const eigenImportBatchIds = useMemo(
     () => new Set(
@@ -6830,7 +6838,7 @@ function ExactConnectionPanel({
     }))
   ), [productsByCode, productsByNormalizedCode, salesArticleTotalsByArticle, salesPackagingRows, salesSoldTotals.batchTotals]);
   const filteredSalesSummaryRows = (() => {
-    const needle = salesSummaryArticleFilter.trim();
+    const needle = query.trim();
     const normalizedNeedle = needle ? normalizeLookup(needle) : '';
 
     return salesSummaryRows.filter((row) => {
@@ -7192,15 +7200,6 @@ function ExactConnectionPanel({
                 <div className="panel-title sales-summary-panel-title">
                   <span className="panel-title-label"><BriefcaseBusiness size={16} /> Verkooptotalen per artikel, batch en land</span>
                 </div>
-                <label className="sales-summary-search" aria-label="Zoek artikel of omschrijving">
-                  <Search size={14} />
-                  <input
-                    type="text"
-                    placeholder="Zoek artikel of omschrijving"
-                    value={salesSummaryArticleFilter}
-                    onChange={(event) => setSalesSummaryArticleFilter(event.target.value)}
-                  />
-                </label>
               </div>
               <div className="sales-summary-helper">
                 <span>Een detailregel per artikel, batch en land, met direct daarnaast het artikeltotaal uit dezelfde rapportageperiode.</span>
@@ -7522,6 +7521,7 @@ function PackagingOverviewPage({
   batches,
   products,
   supplierRecords,
+  query,
   onSelectProduct,
 }: {
   registrations: ProductPackagingRegistration[];
@@ -7529,6 +7529,7 @@ function PackagingOverviewPage({
   batches: ContainerCostBatch[];
   products: Product[];
   supplierRecords: Supplier[];
+  query: string;
   onSelectProduct: (product: Product, tab?: ProductModalTab, applyBatchNumber?: string) => void;
 }) {
   const [batchFilter, setBatchFilter] = useState('all');
@@ -7539,10 +7540,13 @@ function PackagingOverviewPage({
   ), [batches]);
   const filteredRegistrations = useMemo(() => registrations.filter((registration) => {
     const compliance = batchComplianceMap.get(registration.batchId);
+    const needle = query.trim().toLowerCase();
+    const matchesQuery = !needle || [registration.productCode, registration.productDescription, registration.batchOrderNumber, registration.batchNumber, registration.containerNumber, registration.material, registration.packagingSupplier]
+      .filter(Boolean).some((value) => String(value).toLowerCase().includes(needle));
     return (batchFilter === 'all' || registration.batchOrderNumber === batchFilter) &&
       (materialFilter === 'all' || registration.material === materialFilter) &&
-      (reportingFilter === 'all' || (compliance?.reportingMode || 'Alles registreren') === reportingFilter);
-  }), [batchComplianceMap, batchFilter, materialFilter, registrations, reportingFilter]);
+      (reportingFilter === 'all' || (compliance?.reportingMode || 'Alles registreren') === reportingFilter) && matchesQuery;
+  }), [batchComplianceMap, batchFilter, materialFilter, query, registrations, reportingFilter]);
   const totalWeightKg = filteredRegistrations.reduce((total, registration) => total + parseDecimal(registration.totalWeightGrams) / 1000, 0);
   const uniqueProducts = new Set(filteredRegistrations.map((registration) => registration.productCode).filter(Boolean)).size;
   const batchOptions = Array.from(new Set(registrations.map((registration) => registration.batchOrderNumber).filter(Boolean) as string[])).sort();
@@ -7776,6 +7780,7 @@ function PackagingOverviewPage({
         batches={batches}
         products={products}
         supplierRecords={supplierRecords}
+        query={query}
         onSelectProduct={onSelectProduct}
       />
       <section className="stat-grid packaging-overview-stats">
@@ -8006,7 +8011,10 @@ function PackagingOverviewPage({
   );
 }
 
-function SalesPage({ scooters, dealers, onSelect }: { scooters: Scooter[]; dealers: Dealer[]; onSelect: (scooter: Scooter) => void }) {
+function SalesPage({ scooters, dealers, query, onSelect }: { scooters: Scooter[]; dealers: Dealer[]; query: string; onSelect: (scooter: Scooter) => void }) {
+  const needle = query.trim().toLowerCase();
+  const filteredScooters = scooters.filter((scooter) => !needle || [scooter.frameNumber, scooter.licensePlate, scooter.model, scooter.color, scooter.invoiceNumber, dealerName(dealers, scooter.dealerId)]
+    .filter(Boolean).some((value) => String(value).toLowerCase().includes(needle)));
   return (
     <>
       <div className="page-title-row">
@@ -8015,7 +8023,7 @@ function SalesPage({ scooters, dealers, onSelect }: { scooters: Scooter[]; deale
           <span>Analyse per jaar, model en dealer</span>
         </div>
       </div>
-      <SalesDashboard scooters={scooters} dealers={dealers} onSelect={onSelect} />
+      <SalesDashboard scooters={filteredScooters} dealers={dealers} onSelect={onSelect} />
     </>
   );
 }
@@ -8393,11 +8401,9 @@ function SalesDashboard({ scooters, dealers, onSelect }: { scooters: Scooter[]; 
   );
 }
 
-function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'Beschikbare scooters', onBulkRdwCheck, defaultSortOrder = 'model-asc' }: {
+function ScooterTable({ scooters, dealers, onSelect, title = 'Beschikbare scooters', onBulkRdwCheck, defaultSortOrder = 'model-asc' }: {
   scooters: Scooter[];
   dealers: Dealer[];
-  query: string;
-  setQuery: (value: string) => void;
   onSelect: (scooter: Scooter) => void;
   title?: string;
   onBulkRdwCheck?: (scooters: Scooter[]) => Promise<string>;
@@ -8658,7 +8664,6 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
               <option value="newest-added">Nieuwste eerst</option>
             </select>
           </label>
-          <label>Search: <input value={query} onChange={(event) => setQuery(event.target.value)} /></label>
         </div>
       </div>
       <div className="table-wrap scooter-table-wrap">
@@ -8737,6 +8742,7 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
 
 function Containers({
   data,
+  query,
   message,
   messageDetails,
   onImport,
@@ -8746,6 +8752,7 @@ function Containers({
   focusedContainerId,
 }: {
   data: AppData;
+  query: string;
   message: string;
   messageDetails: string[];
   onImport: (event: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -8755,7 +8762,10 @@ function Containers({
   focusedContainerId?: string | null;
 }) {
   const [showImport, setShowImport] = useState(false);
-  const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
+  const needle = query.trim().toLowerCase();
+  const sortedContainers = data.containers.filter((container) => !needle || [container.number, container.sealNumber, container.invoiceNumber, container.status]
+    .filter(Boolean).some((value) => String(value).toLowerCase().includes(needle)))
+    .sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const pending = sortedContainers.filter((container) => container.status !== 'Aangekomen');
   const arrived = sortedContainers.filter((container) => container.status === 'Aangekomen');
   return (
@@ -8880,6 +8890,7 @@ type OuterBoxLabelDialog = {
 
 function CostBatchesPage({
   data,
+  query,
   onSaveCostBatch,
   onSelectProduct,
   onOpenBatchLabelProduct,
@@ -8890,6 +8901,7 @@ function CostBatchesPage({
   onSaveScooterPackagingSpec,
 }: {
   data: AppData;
+  query: string;
   onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
   onSelectProduct: (product: Product, tab?: ProductModalTab) => void;
   onOpenBatchLabelProduct: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
@@ -8902,7 +8914,6 @@ function CostBatchesPage({
   const [showCostModal, setShowCostModal] = useState(false);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
-  const [importBatchSearchQuery, setImportBatchSearchQuery] = useState('');
   const [importBatchLabelFilter, setImportBatchLabelFilter] = useState<'all' | 'printed' | 'pending'>('all');
   const [printMessage, setPrintMessage] = useState('');
   const [packagingPlanLine, setPackagingPlanLine] = useState<ContainerCostLine | null>(null);
@@ -8955,6 +8966,14 @@ function CostBatchesPage({
   }
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const sortedBatches = [...data.containerCostBatches].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const visibleBatches = sortedBatches.filter((batch) => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return true;
+    return [batch.orderNumber, batch.containerNumber, batch.supplierName, batch.importerName, batch.exactReference]
+      .filter(Boolean).some((value) => String(value).toLowerCase().includes(needle))
+      || data.containerCostLines.some((line) => line.batchId === batch.id && [line.referenceCode, line.description, line.quantity]
+        .filter(Boolean).some((value) => String(value).toLowerCase().includes(needle)));
+  });
   const sortedPackagingSpecs = [...data.scooterPackagingSpecs].sort((a, b) =>
     a.model.localeCompare(b.model, 'nl', { sensitivity: 'base' }) || a.component.localeCompare(b.component),
   );
@@ -9241,7 +9260,7 @@ function CostBatchesPage({
                 </tr>
               </thead>
               <tbody>
-                {sortedBatches.slice(0, 25).map((batch) => {
+                {visibleBatches.slice(0, 25).map((batch) => {
                   const container = data.containers.find((item) => item.id === batch.containerId);
                   const lines = visibleContainerCostLines
                     .filter((line) => line.batchId === batch.id)
@@ -9258,7 +9277,7 @@ function CostBatchesPage({
                     });
                   const isExpanded = expandedBatchId === batch.id;
                   const filteredLines = lines.filter((line) => {
-                    const needle = importBatchSearchQuery.trim().toLowerCase();
+                    const needle = query.trim().toLowerCase();
                     const isPrinted = data.productPackagingRegistrations.some((registration) =>
                       packagingRegistrationMatchesCostLine(registration, batch, line)
                       && Boolean(registration.labelPrintedAt),
@@ -9289,7 +9308,6 @@ function CostBatchesPage({
                         className={`batch-summary-row${isExpanded ? ' is-expanded' : ''}`}
                         onClick={() => {
                           setExpandedBatchId(isExpanded ? null : batch.id);
-                          setImportBatchSearchQuery('');
                           setImportBatchLabelFilter('all');
                         }}
                       >
@@ -9343,14 +9361,6 @@ function CostBatchesPage({
                               </div>
                               <div className="import-batch-toolbar">
                                 <div className="import-batch-toolbar-left">
-                                  <label className="import-batch-search-field" onClick={(event) => event.stopPropagation()}>
-                                    <Search size={16} />
-                                    <input
-                                      value={importBatchSearchQuery}
-                                      onChange={(event) => setImportBatchSearchQuery(event.target.value)}
-                                      placeholder="Zoek in importregels"
-                                    />
-                                  </label>
                                 </div>
                                 <div className="import-batch-toolbar-right">
                                   <div className="import-batch-filter-group" onClick={(event) => event.stopPropagation()}>
@@ -11150,10 +11160,8 @@ function ContainerAvailabilityBoard({
   );
 }
 
-function Scooters({ data, query, setQuery, scooters, onSelect, message, messageDetails, statusFilter, setStatusFilter, onBulkRdwCheck }: {
+function Scooters({ data, scooters, onSelect, message, messageDetails, statusFilter, setStatusFilter, onBulkRdwCheck }: {
   data: AppData;
-  query: string;
-  setQuery: (value: string) => void;
   scooters: Scooter[];
   onSelect: (scooter: Scooter) => void;
   message: string;
@@ -11197,8 +11205,6 @@ function Scooters({ data, query, setQuery, scooters, onSelect, message, messageD
       <ScooterTable
         scooters={scooters}
         dealers={data.dealers}
-        query={query}
-        setQuery={setQuery}
         onSelect={onSelect}
         title={statusFilter === 'all' ? `Alle scooters (${scooters.length})` : `Scooters: ${scooterStatusLabel(statusFilter)} (${scooters.length})`}
         onBulkRdwCheck={statusFilter === 'Verkocht dealer' || statusFilter === 'Verkocht klant' ? onBulkRdwCheck : undefined}
@@ -11208,11 +11214,10 @@ function Scooters({ data, query, setQuery, scooters, onSelect, message, messageD
   );
 }
 
-function Batteries({ data, addBatteries, addBatteryModel, updateBattery, onSelectScooter, message }: { data: AppData; addBatteries: (event: FormEvent<HTMLFormElement>) => Promise<void>; addBatteryModel: (event: FormEvent<HTMLFormElement>) => Promise<void>; updateBattery: (battery: Battery) => Promise<void>; onSelectScooter: (scooter: Scooter) => void; message: string }) {
+function Batteries({ data, query, addBatteries, addBatteryModel, updateBattery, onSelectScooter, message }: { data: AppData; query: string; addBatteries: (event: FormEvent<HTMLFormElement>) => Promise<void>; addBatteryModel: (event: FormEvent<HTMLFormElement>) => Promise<void>; updateBattery: (battery: Battery) => Promise<void>; onSelectScooter: (scooter: Scooter) => void; message: string }) {
   const { batteries, batteryModels, dealers, scooters } = data;
   const [selectedBattery, setSelectedBattery] = useState<Battery | null>(null);
   const [showAddBattery, setShowAddBattery] = useState(false);
-  const [batteryQuery, setBatteryQuery] = useState('');
   const defaultBatteryModel = batteryModels[0]?.name ?? '';
   const filteredBatteries = batteries.filter((battery) => {
     const scooter = scooters.find((item) => item.frameNumber === battery.scooterFrame);
@@ -11229,7 +11234,7 @@ function Batteries({ data, addBatteries, addBatteryModel, updateBattery, onSelec
       scooter?.model,
       scooter?.color,
     ].filter(Boolean).join(' ');
-    return searchable.toLowerCase().includes(batteryQuery.toLowerCase().trim());
+    return searchable.toLowerCase().includes(query.toLowerCase().trim());
   });
   const batteryGroups = [
     {
@@ -11257,13 +11262,6 @@ function Batteries({ data, addBatteries, addBatteryModel, updateBattery, onSelec
         </div>
       </div>
       {message && <div className="notice">{message}</div>}
-      <section className="panel compact-search">
-        <div className="panel-title"><Search size={16} /> Accu zoeken</div>
-        <div className="inline-search">
-          <input value={batteryQuery} onChange={(event) => setBatteryQuery(event.target.value)} placeholder="Lotnummer, model, dealer, kenteken of gekoppelde scooter" />
-          {batteryQuery && <button className="secondary-button" onClick={() => setBatteryQuery('')}>Reset</button>}
-        </div>
-      </section>
       <div className="battery-layout">
         <div className="battery-groups">
           {batteryGroups.map((group) => (
@@ -11505,6 +11503,7 @@ function ProductsPage({
   onBulkUpdateProducts,
   onSelectProduct,
   message,
+  query,
 }: {
   products: Product[];
   supplierRecords: Supplier[];
@@ -11518,8 +11517,8 @@ function ProductsPage({
   onBulkUpdateProducts: (updatedProducts: Product[], messagePrefix?: string) => Promise<void>;
   onSelectProduct: (product: Product, tab?: ProductModalTab, applyBatchNumber?: string) => void;
   message: string;
+  query: string;
 }) {
-  const [query, setQuery] = useState('');
   const [productsTab, setProductsTab] = useState<'catalog' | 'importCompanies'>('catalog');
   const [catalogView, setCatalogView] = useState<'all' | 'new'>('all');
   const [groupFilter, setGroupFilter] = useState('');
@@ -11855,10 +11854,6 @@ function ProductsPage({
         {productsTab === 'catalog' ? (
           <>
         <div className="product-toolbar">
-          <div className="product-search-field">
-            <Search size={16} />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Zoek op artikelnummer, omschrijving, barcode of leverancier" />
-          </div>
           <select value={catalogView} onChange={(event) => setCatalogView(event.target.value as 'all' | 'new')}>
             <option value="all">Alle producten</option>
             <option value="new">Nieuwe producten ({products.filter((product) => product.isNewProduct).length})</option>
@@ -13458,6 +13453,7 @@ function SuppliersPage({
   importers,
   supplierContacts,
   products,
+  query,
   onSaveSupplier,
   onSaveImporter,
   onSaveSupplierContact,
@@ -13468,6 +13464,7 @@ function SuppliersPage({
   importers: Importer[];
   supplierContacts: SupplierContact[];
   products: Product[];
+  query: string;
   onSaveSupplier: (supplier: Supplier) => Promise<void>;
   onSaveImporter: (importer: Importer) => Promise<void>;
   onSaveSupplierContact: (contact: SupplierContact) => Promise<void>;
@@ -13479,12 +13476,15 @@ function SuppliersPage({
   const [showAddImporter, setShowAddImporter] = useState(false);
   const [selectedImporter, setSelectedImporter] = useState<Importer | null>(null);
   const [gpsrSupplierFilter, setGpsrSupplierFilter] = useState<'all' | 'ready' | 'attention' | 'blocked' | 'outsourced'>('all');
-  const sortedSuppliers = [...suppliers].sort((a, b) => {
+  const supplierNeedle = query.trim().toLowerCase();
+  const sortedSuppliers = suppliers.filter((supplier) => !supplierNeedle || [supplier.name, supplier.contactName, supplier.email, supplier.phone, supplier.mobile, supplier.city, supplier.country]
+    .filter(Boolean).some((value) => String(value).toLowerCase().includes(supplierNeedle))).sort((a, b) => {
     const activeRank = Number(b.active !== false) - Number(a.active !== false);
     if (activeRank !== 0) return activeRank;
     return a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' });
   });
-  const sortedImporters = [...importers].sort((a, b) => {
+  const sortedImporters = importers.filter((importer) => !supplierNeedle || [importer.name, importer.email, importer.city, importer.country]
+    .filter(Boolean).some((value) => String(value).toLowerCase().includes(supplierNeedle))).sort((a, b) => {
     const activeRank = Number(b.active !== false) - Number(a.active !== false);
     if (activeRank !== 0) return activeRank;
     return a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' });
@@ -14019,10 +14019,12 @@ function SupplierContactModal({ supplierId, contact, title, onClose, onSave }: {
   );
 }
 
-function Dealers({ dealers, scooters, onImport, onAddDealer, onUpdateDealer, message }: { dealers: Dealer[]; scooters: Scooter[]; onImport: (event: ChangeEvent<HTMLInputElement>) => void; onAddDealer: (event: FormEvent<HTMLFormElement>) => Promise<void>; onUpdateDealer: (dealer: Dealer) => Promise<void>; message: string }) {
+function Dealers({ dealers, scooters, query, onImport, onAddDealer, onUpdateDealer, message }: { dealers: Dealer[]; scooters: Scooter[]; query: string; onImport: (event: ChangeEvent<HTMLInputElement>) => void; onAddDealer: (event: FormEvent<HTMLFormElement>) => Promise<void>; onUpdateDealer: (dealer: Dealer) => Promise<void>; message: string }) {
   const [showAddDealer, setShowAddDealer] = useState(false);
   const [selectedDealer, setSelectedDealer] = useState<Dealer | null>(null);
-  const sortedDealers = [...dealers].sort((a, b) => {
+  const dealerNeedle = query.trim().toLowerCase();
+  const sortedDealers = dealers.filter((dealer) => !dealerNeedle || [dealer.company, dealer.name, dealer.city, dealer.email, dealer.phone, dealer.address, dealer.Postalcode]
+    .filter(Boolean).some((value) => String(value).toLowerCase().includes(dealerNeedle))).sort((a, b) => {
     const activeRank = Number(b.active !== false) - Number(a.active !== false);
     if (activeRank !== 0) return activeRank;
     return (a.company || a.name).localeCompare(b.company || b.name, 'nl', { sensitivity: 'base' });
@@ -14255,10 +14257,9 @@ function DealerDetailModal({ dealer, scooters, onClose, onUpdate }: { dealer: De
   );
 }
 
-function Warranty({ data, products, addWarranty, updateWarranty, message }: { data: AppData; products: Product[]; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<boolean>; updateWarranty: (warranty: WarrantyPart) => Promise<void>; message: string }) {
+function Warranty({ data, products, query, addWarranty, updateWarranty, message }: { data: AppData; products: Product[]; query: string; addWarranty: (event: FormEvent<HTMLFormElement>) => Promise<boolean>; updateWarranty: (warranty: WarrantyPart) => Promise<void>; message: string }) {
   const [selectedFrame, setSelectedFrame] = useState('');
   const [selectedClaim, setSelectedClaim] = useState<WarrantyPart | null>(null);
-  const [claimQuery, setClaimQuery] = useState('');
   const [claimStatusFilter, setClaimStatusFilter] = useState('');
   const [claimDealerFilter, setClaimDealerFilter] = useState('');
   const [claimWarrantyFilter, setClaimWarrantyFilter] = useState<'all' | 'active' | 'expired'>('all');
@@ -14303,17 +14304,17 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
     [data.dealers, data.warranties],
   );
   const filteredClaims = useMemo(() => {
-    const query = normalizeLookup(claimQuery);
+    const queryNeedle = normalizeLookup(query);
     return data.warranties.filter((claim) => {
       const dealerName = data.dealers.find((dealer) => dealer.id === claim.dealerId)?.company || '';
-      const matchesQuery = !query || [
+      const matchesQuery = !queryNeedle || [
         claim.claimNumber || '',
         claim.scooterFrame,
         claim.licensePlate || '',
         claim.partName || '',
         claim.partNumber || '',
         dealerName,
-      ].some((value) => normalizeLookup(value).includes(query));
+      ].some((value) => normalizeLookup(value).includes(queryNeedle));
       const matchesStatus = !claimStatusFilter || claim.status === claimStatusFilter;
       const matchesDealer = !claimDealerFilter || dealerName === claimDealerFilter;
       const isExpired = Boolean(claim.warrantyUntil) && isPastInputDate(claim.warrantyUntil);
@@ -14324,7 +14325,7 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
           : !isExpired;
       return matchesQuery && matchesStatus && matchesDealer && matchesWarranty;
     });
-  }, [claimDealerFilter, claimQuery, claimStatusFilter, claimWarrantyFilter, data.dealers, data.warranties]);
+  }, [claimDealerFilter, claimStatusFilter, claimWarrantyFilter, data.dealers, data.warranties, query]);
   const openClaims = data.warranties.filter((claim) => claim.status === 'Open').length;
   const processingClaims = data.warranties.filter((claim) => claim.status === 'In behandeling').length;
   const closedClaims = data.warranties.filter((claim) => claim.status === 'Afgehandeld').length;
@@ -14427,11 +14428,6 @@ function Warranty({ data, products, addWarranty, updateWarranty, message }: { da
       <section className="panel">
         <div className="panel-title"><ShieldCheck size={16} /> Garantie dashboard</div>
         <div className="warranty-dashboard-toolbar">
-          <input
-            value={claimQuery}
-            onChange={(event) => setClaimQuery(event.target.value)}
-            placeholder="Zoek op claimnummer, framenummer, kenteken, onderdeel of dealer"
-          />
           <select value={claimStatusFilter} onChange={(event) => setClaimStatusFilter(event.target.value)}>
             <option value="">Alle statussen</option>
             {warrantyStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
@@ -14661,23 +14657,25 @@ function WarrantyDetailModal({ claim, scooter, dealer, onClose }: { claim: Warra
   );
 }
 
-function Maintenance({ data, addMaintenance, message }: { data: AppData; addMaintenance: (event: FormEvent<HTMLFormElement>) => void; message: string }) {
-  const [historyQuery, setHistoryQuery] = useState('');
+function Maintenance({ data, query, addMaintenance, message }: { data: AppData; query: string; addMaintenance: (event: FormEvent<HTMLFormElement>) => void; message: string }) {
   const [selectedPackage, setSelectedPackage] = useState<keyof typeof maintenancePackages>('small');
   const [selectedMaintenance, setSelectedMaintenance] = useState<MaintenanceRecord | null>(null);
   const sortedMaintenance = [...data.maintenance].sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
   const [selectedFrame, setSelectedFrame] = useState(data.scooters[0]?.frameNumber ?? '');
   const [maintenanceLicensePlate, setMaintenanceLicensePlate] = useState(data.scooters[0]?.licensePlate ?? '');
   const selectedScooter = data.scooters.find((scooter) => scooter.frameNumber === selectedFrame);
-  const historyNeedle = normalizePlate(historyQuery);
+  const historyNeedle = normalizePlate(query);
   const historyScooter = historyNeedle
     ? data.scooters.find((scooter) =>
       normalizePlate(scooter.licensePlate ?? '').includes(historyNeedle) ||
       normalizePlate(scooter.frameNumber).includes(historyNeedle))
     : null;
-  const visibleMaintenance = historyScooter
-    ? sortedMaintenance.filter((record) => record.scooterFrame === historyScooter.frameNumber || normalizePlate(record.licensePlate ?? '') === normalizePlate(historyScooter.licensePlate ?? ''))
-    : sortedMaintenance;
+  const visibleMaintenance = sortedMaintenance.filter((record) => {
+    if (!historyNeedle) return true;
+    if (historyScooter && (record.scooterFrame === historyScooter.frameNumber || normalizePlate(record.licensePlate ?? '') === normalizePlate(historyScooter.licensePlate ?? ''))) return true;
+    return [record.scooterFrame, record.licensePlate, record.servicePackage, record.serviceType, record.status, record.notes]
+      .filter(Boolean).some((value) => normalizePlate(String(value)).includes(historyNeedle));
+  });
   const historyWarranties = historyScooter
     ? data.warranties.filter((claim) => claim.scooterFrame === historyScooter.frameNumber)
     : [];
@@ -14709,10 +14707,7 @@ function Maintenance({ data, addMaintenance, message }: { data: AppData; addMain
       {message && <div className="notice">{message}</div>}
       <section className="panel maintenance-search">
         <div className="panel-title"><Search size={16} /> Scooter historie zoeken</div>
-        <div className="inline-search">
-          <input value={historyQuery} onChange={(event) => setHistoryQuery(event.target.value)} placeholder="Zoek kenteken of framenummer" />
-        </div>
-        {historyQuery && !historyScooter && <p className="empty">Geen scooter gevonden voor deze zoekopdracht.</p>}
+        {query && !historyScooter && visibleMaintenance.length === 0 && <p className="empty">Geen onderhoud of scooter gevonden voor deze zoekopdracht.</p>}
         {historyScooter && (
           <div className="history-card">
             <dl className="detail-list rdw-list">
