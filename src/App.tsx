@@ -306,6 +306,11 @@ const navGroups: Array<{ group: string; items: Array<{ id: View; label: string; 
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = navGroups.flatMap((section) => section.items);
 
+function viewFromLocation(): View {
+  const route = window.location.hash.replace(/^#\/?/, '').split(/[/?]/)[0];
+  return views.some((item) => item.id === route) ? route as View : 'dashboard';
+}
+
 const statusColor: Record<ScooterStatus, string> = {
   Beschikbaar: 'pink',
   'Verkocht dealer': 'teal',
@@ -4178,7 +4183,7 @@ async function fetchRdwRegistration(licensePlate: string) {
 export function App() {
   const [loginSession, setLoginSession] = useState<LoginSession | null>(() => (supabase ? null : readStoredLoginSession()));
   const [authLoading, setAuthLoading] = useState(Boolean(supabase));
-  const [view, setView] = useState<View>('dashboard');
+  const [view, setView] = useState<View>(() => viewFromLocation());
   const [navOpen, setNavOpen] = useState(false);
   const [packagingTab, setPackagingTab] = useState<'overview' | 'ppwrSuppliers'>('overview');
   const [data, setData] = useState<AppData>(demoData);
@@ -4206,6 +4211,28 @@ export function App() {
     setCsvMessage(message);
     setCsvMessageDetails(details);
   }
+
+  function navigateToView(nextView: View) {
+    const nextHash = `#/${nextView}`;
+    if (window.location.hash === nextHash) {
+      setView(nextView);
+      return;
+    }
+    window.location.hash = nextHash;
+  }
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      setView(viewFromLocation());
+      setNavOpen(false);
+    };
+
+    if (!window.location.hash || viewFromLocation() === 'dashboard' && !/^#\/?dashboard(?:[/?]|$)/.test(window.location.hash)) {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#/dashboard`);
+    }
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => window.removeEventListener('hashchange', handleLocationChange);
+  }, []);
 
   useEffect(() => {
     migratePpwrLocalStorage();
@@ -5887,7 +5914,7 @@ export function App() {
               {section.items.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <button className={view === item.id ? 'active' : ''} key={item.id} onClick={() => { setView(item.id); setNavOpen(false); }}>
+                  <button className={view === item.id ? 'active' : ''} key={item.id} onClick={() => navigateToView(item.id)}>
                     <Icon size={16} />
                     {item.label}
                   </button>
@@ -5935,7 +5962,7 @@ export function App() {
               onBulkRdwCheck={checkScootersWithRdw}
               onNavigate={(nextView, scooterStatus) => {
                 if (scooterStatus) setStatusFilter(scooterStatus);
-                setView(nextView);
+                navigateToView(nextView);
               }}
             />
           )}
@@ -6058,7 +6085,7 @@ export function App() {
           onOpenContainer={(containerId) => {
             setFocusedContainerId(containerId);
             setSelectedScooter(null);
-            setView('containers');
+            navigateToView('containers');
           }}
           onAddDocument={addDocument}
           onOpenDocument={openDocument}
