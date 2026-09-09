@@ -42,7 +42,7 @@
   --nav-bg-2: #0c0c0c;
   --nav-item: #b3b3b8;
   --nav-item-hover: #ffffff;
-  --nav-active-bg: rgba(255, 255, 255, 0.07);
+  --nav-active-bg: rgba(22, 119, 210, 0.32);
   --nav-active-ink: #ffffff;
   --nav-group: #74747c;
 
@@ -190,9 +190,9 @@ h1, h2, h3, h4 { color: var(--c-ink); letter-spacing: -0.01em; }
 .sidebar nav button.active::before {
   content: "";
   position: absolute;
-  left: -12px; top: 8px; bottom: 8px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
+  left: 0; top: 7px; bottom: 7px;
+  width: 5px;
+  border-radius: 0 4px 4px 0;
   background: var(--rso-brand);
 }
 .sidebar nav button.active svg { opacity: 1; color: #69b9ff; }
