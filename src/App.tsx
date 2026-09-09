@@ -5009,82 +5009,36 @@ export function App() {
     return printerName;
   }
 
-  async function printBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
+  async function printBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, label: OuterBoxLabelInput) {
     const sourceProduct = productFromCostLine(line, product);
-    const packagingPlan = batchPackagingCounts(line);
-    const defaultUnits = packagingPlan?.groups[0]?.unitsPerPackage ?? Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
-    const unitsAnswer = window.prompt('Hoeveel stuks moeten op de omdoos-sticker staan?', String(defaultUnits));
-    if (unitsAnswer === null) return null;
-    const quantityPerLabel = Number(unitsAnswer.replace(',', '.'));
-    if (!Number.isInteger(quantityPerLabel) || quantityPerLabel < 1 || quantityPerLabel > 100000) {
-      throw new Error('Vul een heel aantal stuks in tussen 1 en 100000.');
-    }
-
-    const matchingGroup = packagingPlan?.groups.find((group) => group.unitsPerPackage === quantityPerLabel);
-    const labelsAnswer = window.prompt('Hoeveel omdoos-stickers wil je printen?', String(matchingGroup?.packages ?? 1));
-    if (labelsAnswer === null) return null;
-    const labelsToPrint = Number(labelsAnswer.replace(',', '.'));
-    if (!Number.isInteger(labelsToPrint) || labelsToPrint < 1) {
-      throw new Error('Vul een heel aantal stickers in vanaf 1.');
-    }
-
     const batchCode = batch.orderNumber?.trim() || sourceProduct.batchNumber?.trim() || batch.containerNumber?.trim() || line.batchId;
     const articleNumber = sourceProduct.code?.trim() || line.referenceCode.trim();
-    const defaultDescription = sourceProduct.labelTitle?.trim()
-      || sourceProduct.shortDescription?.trim()
-      || sourceProduct.description?.trim()
-      || line.description.trim();
-    const descriptionAnswer = window.prompt(
-      'Welke artikelomschrijving wil je op de omdoos-sticker zetten? Laat staan voor origineel of pas hem aan.',
-      defaultDescription,
-    );
-    if (descriptionAnswer === null) return null;
-    const description = descriptionAnswer.trim() || defaultDescription;
     const barcodeValue = sourceProduct.barcode?.trim() || articleNumber;
 
     return printOuterBoxDymoLabel({
       articleNumber,
-      description,
+      description: label.description,
       barcodeValue,
       batchCode,
-      quantityPerLabel,
-      labelsToPrint,
+      quantityPerLabel: label.quantityPerLabel,
+      labelsToPrint: label.labelsToPrint,
       responsibleParty: productImporterLabelValue(sourceProduct),
       countryOfOrigin: sourceProduct.countryOfOrigin?.trim() || 'China',
     });
   }
 
-  function previewBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
+  function previewBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, label: OuterBoxLabelInput) {
     const sourceProduct = productFromCostLine(line, product);
-    const packagingPlan = batchPackagingCounts(line);
-    const defaultUnits = packagingPlan?.groups[0]?.unitsPerPackage ?? Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
-    const unitsAnswer = window.prompt('Hoeveel stuks moeten op de omdoos-sticker staan?', String(defaultUnits));
-    if (unitsAnswer === null) return;
-    const quantityPerLabel = Number(unitsAnswer.replace(',', '.'));
-    if (!Number.isInteger(quantityPerLabel) || quantityPerLabel < 1 || quantityPerLabel > 100000) {
-      throw new Error('Vul een heel aantal stuks in tussen 1 en 100000.');
-    }
-
     const batchCode = batch.orderNumber?.trim() || sourceProduct.batchNumber?.trim() || batch.containerNumber?.trim() || line.batchId;
     const articleNumber = sourceProduct.code?.trim() || line.referenceCode.trim();
-    const defaultDescription = sourceProduct.labelTitle?.trim()
-      || sourceProduct.shortDescription?.trim()
-      || sourceProduct.description?.trim()
-      || line.description.trim();
-    const descriptionAnswer = window.prompt(
-      'Welke artikelomschrijving wil je in het voorbeeld laten zien? Laat staan voor origineel of pas hem aan.',
-      defaultDescription,
-    );
-    if (descriptionAnswer === null) return;
-    const description = descriptionAnswer.trim() || defaultDescription;
     const barcodeValue = sourceProduct.barcode?.trim() || articleNumber;
 
     openOuterBoxLabelPreview({
       articleNumber,
-      description,
+      description: label.description,
       barcodeValue,
       batchCode,
-      quantityPerLabel,
+      quantityPerLabel: label.quantityPerLabel,
       responsibleParty: productImporterLabelValue(sourceProduct),
       countryOfOrigin: sourceProduct.countryOfOrigin?.trim() || 'China',
     });
@@ -8906,6 +8860,21 @@ function Containers({
   );
 }
 
+type OuterBoxLabelInput = {
+  quantityPerLabel: number;
+  labelsToPrint: number;
+  description: string;
+};
+
+type OuterBoxLabelDialog = {
+  batch: ContainerCostBatch;
+  line: ContainerCostLine;
+  product?: Product;
+  quantityPerLabel: string;
+  labelsToPrint: string;
+  description: string;
+};
+
 function CostBatchesPage({
   data,
   onSaveCostBatch,
@@ -8921,8 +8890,8 @@ function CostBatchesPage({
   onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
   onSelectProduct: (product: Product, tab?: ProductModalTab) => void;
   onOpenBatchLabelProduct: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
-  onPrintOuterBoxLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => Promise<string | null>;
-  onPreviewOuterBoxLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
+  onPrintOuterBoxLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, label: OuterBoxLabelInput) => Promise<string | null>;
+  onPreviewOuterBoxLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, label: OuterBoxLabelInput) => void;
   onTogglePurchaseOrderLine: (line: ContainerCostLine, purchaseOrderAdded: boolean) => Promise<void>;
   onSaveBatchPackagingPlan: (line: ContainerCostLine, plan: BatchPackagingPlan) => Promise<void>;
   onSaveScooterPackagingSpec: (spec: ScooterPackagingSpec) => Promise<boolean>;
@@ -8941,6 +8910,8 @@ function CostBatchesPage({
   const [packagingPlanSaving, setPackagingPlanSaving] = useState(false);
   const [packagingMessage, setPackagingMessage] = useState('');
   const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null);
+  const [outerBoxLabelDialog, setOuterBoxLabelDialog] = useState<OuterBoxLabelDialog | null>(null);
+  const [outerBoxLabelPrinting, setOuterBoxLabelPrinting] = useState(false);
   const [importToolTab, setImportToolTab] = useState<'batch' | 'scooterPackaging'>('batch');
   const [packagingDraft, setPackagingDraft] = useState<ScooterPackagingSpec>({
     id: '',
@@ -8952,6 +8923,33 @@ function CostBatchesPage({
     hasLining: false,
     boxWeightKg: '',
   });
+
+  useEffect(() => {
+    if (!outerBoxLabelDialog) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !outerBoxLabelPrinting) setOuterBoxLabelDialog(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [outerBoxLabelDialog, outerBoxLabelPrinting]);
+
+  function openOuterBoxLabelDialog(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
+    const sourceProduct = productFromCostLine(line, product);
+    const packagingPlan = batchPackagingCounts(line);
+    const quantityPerLabel = packagingPlan?.groups[0]?.unitsPerPackage ?? Math.max(1, Math.round(parseDecimal(line.quantity) || 1));
+    const matchingGroup = packagingPlan?.groups.find((group) => group.unitsPerPackage === quantityPerLabel);
+    setOuterBoxLabelDialog({
+      batch,
+      line,
+      product,
+      quantityPerLabel: String(quantityPerLabel),
+      labelsToPrint: String(matchingGroup?.packages ?? 1),
+      description: sourceProduct.labelTitle?.trim()
+        || sourceProduct.shortDescription?.trim()
+        || sourceProduct.description?.trim()
+        || line.description.trim(),
+    });
+  }
   const sortedContainers = [...data.containers].sort((a, b) => containerSortTime(b) - containerSortTime(a));
   const sortedBatches = [...data.containerCostBatches].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   const sortedPackagingSpecs = [...data.scooterPackagingSpecs].sort((a, b) =>
@@ -9085,6 +9083,21 @@ function CostBatchesPage({
       setPackagingPlanSaving(false);
     }
   }
+
+  const outerBoxQuantity = outerBoxLabelDialog ? Number(outerBoxLabelDialog.quantityPerLabel.replace(',', '.')) : 0;
+  const outerBoxLabels = outerBoxLabelDialog ? Number(outerBoxLabelDialog.labelsToPrint.replace(',', '.')) : 0;
+  const outerBoxQuantityError = outerBoxLabelDialog && (!Number.isInteger(outerBoxQuantity) || outerBoxQuantity < 1 || outerBoxQuantity > 100000)
+    ? 'Vul een heel aantal stuks in tussen 1 en 100000.'
+    : '';
+  const outerBoxLabelsError = outerBoxLabelDialog && (!Number.isInteger(outerBoxLabels) || outerBoxLabels < 1)
+    ? 'Vul een heel aantal stickers in vanaf 1.'
+    : '';
+  const outerBoxLabelValid = Boolean(outerBoxLabelDialog && !outerBoxQuantityError && !outerBoxLabelsError && outerBoxLabelDialog.description.trim());
+  const outerBoxSourceProduct = outerBoxLabelDialog ? productFromCostLine(outerBoxLabelDialog.line, outerBoxLabelDialog.product) : null;
+  const outerBoxArticleNumber = outerBoxLabelDialog ? outerBoxSourceProduct?.code?.trim() || outerBoxLabelDialog.line.referenceCode.trim() : '';
+  const outerBoxBatchCode = outerBoxLabelDialog
+    ? outerBoxLabelDialog.batch.orderNumber?.trim() || outerBoxSourceProduct?.batchNumber?.trim() || outerBoxLabelDialog.batch.containerNumber?.trim() || outerBoxLabelDialog.line.batchId
+    : '';
 
   return (
     <>
@@ -9572,11 +9585,7 @@ function CostBatchesPage({
                                                     onClick={(event) => {
                                                       event.stopPropagation();
                                                       setPrintMessage('');
-                                                      try {
-                                                        onPreviewOuterBoxLabel(batch, line, product);
-                                                      } catch (error) {
-                                                        setPrintMessage(`Omdoos-sticker voorbeeld mislukt: ${importErrorMessage(error)}`);
-                                                      }
+                                                      openOuterBoxLabelDialog(batch, line, product);
                                                     }}
                                                   >
                                                     <FileText size={16} />
@@ -9586,17 +9595,10 @@ function CostBatchesPage({
                                                     className="icon-button import-label-print-button import-outer-box-button"
                                                     title="Omdoos-sticker printen"
                                                     aria-label={`Omdoos-sticker printen voor ${line.referenceCode}`}
-                                                    onClick={async (event) => {
+                                                    onClick={(event) => {
                                                       event.stopPropagation();
                                                       setPrintMessage('');
-                                                      try {
-                                                        const printerName = await onPrintOuterBoxLabel(batch, line, product);
-                                                        if (printerName) {
-                                                          setPrintMessage(`Omdoos-sticker verstuurd naar ${printerName} voor ${line.referenceCode}.`);
-                                                        }
-                                                      } catch (error) {
-                                                        setPrintMessage(`Omdoos-sticker print mislukt: ${importErrorMessage(error)}`);
-                                                      }
+                                                      openOuterBoxLabelDialog(batch, line, product);
                                                     }}
                                                   >
                                                     <Boxes size={16} />
@@ -9646,6 +9648,79 @@ function CostBatchesPage({
           </div>
         )}
       </section>
+      {outerBoxLabelDialog ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => !outerBoxLabelPrinting && setOuterBoxLabelDialog(null)}>
+          <form
+            className="modal-card outer-box-label-modal"
+            onMouseDown={(event) => event.stopPropagation()}
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (!outerBoxLabelValid) return;
+              setOuterBoxLabelPrinting(true);
+              try {
+                const printerName = await onPrintOuterBoxLabel(
+                  outerBoxLabelDialog.batch,
+                  outerBoxLabelDialog.line,
+                  outerBoxLabelDialog.product,
+                  { quantityPerLabel: outerBoxQuantity, labelsToPrint: outerBoxLabels, description: outerBoxLabelDialog.description.trim() },
+                );
+                if (printerName) {
+                  setPrintMessage(`Omdoos-sticker verstuurd naar ${printerName} voor ${outerBoxLabelDialog.line.referenceCode}.`);
+                  setOuterBoxLabelDialog(null);
+                }
+              } catch (error) {
+                setPrintMessage(`Omdoos-sticker print mislukt: ${importErrorMessage(error)}`);
+              } finally {
+                setOuterBoxLabelPrinting(false);
+              }
+            }}
+          >
+            <div className="modal-header">
+              <div><span className="eyebrow">Omdoos-sticker</span><h2>{outerBoxArticleNumber}</h2><p>Controleer de gegevens en bekijk hetzelfde label voordat je print.</p></div>
+              <button type="button" className="secondary-button" disabled={outerBoxLabelPrinting} onClick={() => setOuterBoxLabelDialog(null)}>Sluiten</button>
+            </div>
+            <div className="outer-box-label-layout">
+              <div className="outer-box-label-fields">
+                <label>Stuks per omdoos
+                  <input autoFocus type="number" min="1" max="100000" step="1" value={outerBoxLabelDialog.quantityPerLabel} onChange={(event) => setOuterBoxLabelDialog((current) => current ? { ...current, quantityPerLabel: event.target.value } : current)} />
+                  {outerBoxQuantityError ? <small className="field-error">{outerBoxQuantityError}</small> : null}
+                </label>
+                <label>Aantal stickers
+                  <input type="number" min="1" step="1" value={outerBoxLabelDialog.labelsToPrint} onChange={(event) => setOuterBoxLabelDialog((current) => current ? { ...current, labelsToPrint: event.target.value } : current)} />
+                  {outerBoxLabelsError ? <small className="field-error">{outerBoxLabelsError}</small> : null}
+                </label>
+                <label>Artikelomschrijving
+                  <textarea rows={4} value={outerBoxLabelDialog.description} onChange={(event) => setOuterBoxLabelDialog((current) => current ? { ...current, description: event.target.value } : current)} />
+                  {!outerBoxLabelDialog.description.trim() ? <small className="field-error">Vul een artikelomschrijving in.</small> : null}
+                </label>
+              </div>
+              <div className="outer-box-label-preview" aria-live="polite">
+                <small>Live voorbeeld</small>
+                <strong>{outerBoxArticleNumber}</strong>
+                <span>{outerBoxLabelDialog.description || 'Artikelomschrijving'}</span>
+                <div className="outer-box-label-barcode" aria-hidden="true" />
+                <code>{outerBoxSourceProduct?.barcode?.trim() || outerBoxArticleNumber}</code>
+                <dl><div><dt>Batch</dt><dd>{outerBoxBatchCode}</dd></div><div><dt>Aantal</dt><dd>{outerBoxQuantity || '—'} stuks</dd></div></dl>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={!outerBoxLabelValid || outerBoxLabelPrinting}
+                onClick={() => {
+                  try {
+                    onPreviewOuterBoxLabel(outerBoxLabelDialog.batch, outerBoxLabelDialog.line, outerBoxLabelDialog.product, { quantityPerLabel: outerBoxQuantity, labelsToPrint: outerBoxLabels, description: outerBoxLabelDialog.description.trim() });
+                  } catch (error) {
+                    setPrintMessage(`Omdoos-sticker voorbeeld mislukt: ${importErrorMessage(error)}`);
+                  }
+                }}
+              ><FileText size={16} /> Voorbeeld</button>
+              <button type="submit" className="primary-button" disabled={!outerBoxLabelValid || outerBoxLabelPrinting}><Printer size={16} /> {outerBoxLabelPrinting ? 'Printen…' : `Printen (${outerBoxLabels || 0})`}</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
       {packagingPlanLine && packagingPlanPreview ? (
         <div className="modal-backdrop" role="presentation" onMouseDown={() => !packagingPlanSaving && setPackagingPlanLine(null)}>
           <form className="modal-card packaging-plan-modal" onSubmit={submitPackagingPlan} onMouseDown={(event) => event.stopPropagation()}>

@@ -8405,6 +8405,77 @@ dd {
   width: min(620px, calc(100vw - 32px));
 }
 
+.outer-box-label-modal {
+  width: min(860px, calc(100vw - 32px));
+}
+
+.outer-box-label-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
+  gap: 24px;
+  padding: 20px;
+}
+
+.outer-box-label-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.outer-box-label-fields label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.field-error {
+  color: #b42318;
+  font-weight: 600;
+}
+
+.outer-box-label-preview {
+  align-self: start;
+  display: grid;
+  gap: 10px;
+  min-height: 260px;
+  padding: 22px;
+  border: 2px solid #243447;
+  border-radius: 10px;
+  background: #fff;
+  color: #101828;
+}
+
+.outer-box-label-preview > strong {
+  font-size: 22px;
+}
+
+.outer-box-label-preview > span {
+  min-height: 42px;
+}
+
+.outer-box-label-barcode {
+  height: 58px;
+  background: repeating-linear-gradient(90deg, #111 0 2px, transparent 2px 4px, #111 4px 7px, transparent 7px 9px);
+}
+
+.outer-box-label-preview code {
+  text-align: center;
+}
+
+.outer-box-label-preview dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: auto 0 0;
+}
+
+.outer-box-label-preview dl div { display: grid; gap: 2px; }
+.outer-box-label-preview dt { color: #667085; font-size: 12px; }
+.outer-box-label-preview dd { margin: 0; font-weight: 800; }
+
+@media (max-width: 700px) {
+  .outer-box-label-layout { grid-template-columns: 1fr; }
+}
+
 .packaging-plan-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
