@@ -2,6 +2,7 @@ import * as bwipjs from 'bwip-js';
 import Dymo from 'dymo-connect';
 import rsoLogoUrl from '../assets/rso-logo.png';
 import { findPackagingMaterialOption, packagingMaterialOptions } from './packaging-materials';
+import { isStickerPackagingLayer, normalizePackagingLayers } from './products';
 import type { Dealer, Product, ProductPackagingLayer, Scooter } from '../types';
 
 const packagingLayerNames = Array.from({ length: 10 }, (_, index) => `Verpakkingscomponent ${index + 1}`);
@@ -10,170 +11,6 @@ function formatQuantity(value?: string | number | null) {
   const numericValue = typeof value === 'number' ? value : Number(String(value ?? '').replace(',', '.'));
   if (!Number.isFinite(numericValue)) return '0';
   return numericValue.toLocaleString('nl-NL', { maximumFractionDigits: 2 });
-}
-
-export function isStickerPackagingLayer(layer: ProductPackagingLayer) {
-  const name = (layer.name ?? '').toLowerCase();
-  return layer.componentType === 'product_sticker' || name.includes('sticker') || name.includes('label') || name.includes('etiket');
-}
-
-export function asOptionalTrimmedString(value: unknown): string | undefined {
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return trimmed || undefined;
-  }
-
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return String(value);
-  }
-
-  return undefined;
-}
-
-export function createEmptyPackagingLayer(index: number): ProductPackagingLayer {
-  return { name: packagingLayerNames[index], componentType: 'packaging' };
-}
-
-export function toPackagingLayerRecords(value: unknown): Record<string, unknown>[] {
-  const collect = (input: unknown): Record<string, unknown>[] => {
-    if (Array.isArray(input)) {
-      return input.filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object');
-    }
-
-    if (typeof input === 'string') {
-      try {
-        return collect(JSON.parse(input));
-      } catch {
-        return [];
-      }
-    }
-
-    if (input && typeof input === 'object') {
-      const record = input as Record<string, unknown>;
-      if (Array.isArray(record.layers)) {
-        return collect(record.layers);
-      }
-      return Object.values(record).filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object');
-    }
-
-    return [];
-  };
-
-  return collect(value);
-}
-
-export function readPackagingLayerField(record: Record<string, unknown>, keys: string[]): string | undefined {
-  for (const key of keys) {
-    const value = asOptionalTrimmedString(record[key]);
-    if (value) return value;
-  }
-  return undefined;
-}
-
-export function normalizePackagingLayers(product: Product): ProductPackagingLayer[] {
-  const storedLayers = toPackagingLayerRecords(product.packagingLayers)
-    .slice(0, packagingLayerNames.length)
-    .map((layer, index) => {
-      const record = layer && typeof layer === 'object' ? (layer as Record<string, unknown>) : {};
-      return {
-        name: readPackagingLayerField(record, ['name', 'layerName', 'title']) || packagingLayerNames[index],
-        componentType: readPackagingLayerField(record, ['componentType', 'component_type']) as ProductPackagingLayer['componentType'],
-        material: readPackagingLayerField(record, ['material', 'packagingMaterial', 'packaging_material']),
-        recycleCode: readPackagingLayerField(record, ['recycleCode', 'recycle_code', 'code']),
-        packagingSupplier: readPackagingLayerField(record, ['packagingSupplier', 'packaging_supplier', 'supplier', 'supplierName', 'supplier_name']),
-        packagingCatalogItemId: readPackagingLayerField(record, ['packagingCatalogItemId', 'packaging_catalog_item_id']),
-        weightBasis: readPackagingLayerField(record, ['weightBasis', 'weight_basis']) as ProductPackagingLayer['weightBasis'],
-        weightGrams: readPackagingLayerField(record, ['weightGrams', 'weight', 'grams']),
-        recycledContentPercent: readPackagingLayerField(record, ['recycledContentPercent', 'pcrPercent', 'pcr_percentage']),
-        recyclabilityClass: readPackagingLayerField(record, ['recyclabilityClass', 'recyclability_class']) as ProductPackagingLayer['recyclabilityClass'],
-        packagingRole: readPackagingLayerField(record, ['packagingRole', 'role', 'packaging_role']) as ProductPackagingLayer['packagingRole'],
-        productStickerMaterial: readPackagingLayerField(record, ['productStickerMaterial', 'product_sticker_material', 'adhesiveType', 'adhesive_type', 'glueType']) as ProductPackagingLayer['productStickerMaterial'],
-      };
-    })
-    .filter((layer) => (
-      layer.material
-      || layer.recycleCode
-      || layer.packagingSupplier
-      || layer.packagingCatalogItemId
-      || layer.weightGrams
-      || layer.recycledContentPercent
-      || layer.recyclabilityClass
-      || layer.packagingRole
-      || layer.productStickerMaterial
-    ));
-
-  const fallbackLayers: ProductPackagingLayer[] = [];
-
-  if (product.packagingMaterialPrimary || product.packagingRecycleCodePrimary || product.packagingWeightPrimaryGrams) {
-    fallbackLayers.push({
-      name: packagingLayerNames[0],
-      material: asOptionalTrimmedString(product.packagingMaterialPrimary),
-      recycleCode: asOptionalTrimmedString(product.packagingRecycleCodePrimary),
-      weightGrams: asOptionalTrimmedString(product.packagingWeightPrimaryGrams),
-    });
-  }
-
-  if (product.packagingMaterialSecondary || product.packagingRecycleCodeSecondary || product.packagingWeightSecondaryGrams) {
-    fallbackLayers.push({
-      name: packagingLayerNames[1],
-      material: asOptionalTrimmedString(product.packagingMaterialSecondary),
-      recycleCode: asOptionalTrimmedString(product.packagingRecycleCodeSecondary),
-      weightGrams: asOptionalTrimmedString(product.packagingWeightSecondaryGrams),
-    });
-  }
-
-  const layers = (storedLayers.length > 0 ? storedLayers : fallbackLayers).slice(0, packagingLayerNames.length);
-
-  const hasSeparateStickerLayer = layers.some(isStickerPackagingLayer);
-  const legacyStickerMaterial = layers.find((layer) => (
-    !isStickerPackagingLayer(layer)
-    && layer.productStickerMaterial
-    && layer.productStickerMaterial !== 'Geen'
-  ))?.productStickerMaterial;
-
-  if (!hasSeparateStickerLayer && legacyStickerMaterial && layers.length < packagingLayerNames.length) {
-    layers.forEach((layer) => {
-      if (!isStickerPackagingLayer(layer)) layer.productStickerMaterial = undefined;
-    });
-    const stickerIsPlastic = legacyStickerMaterial === 'Plastic PP';
-    layers.push({
-      name: 'Productsticker',
-      componentType: 'product_sticker',
-      material: stickerIsPlastic ? 'PP' : 'PAP 22',
-      recycleCode: stickerIsPlastic ? 'PP 5' : 'PAP 22',
-      packagingRole: 'Primair',
-      productStickerMaterial: legacyStickerMaterial,
-    });
-  }
-
-  if (!layers.some(isStickerPackagingLayer)) {
-    layers.unshift({
-      name: 'Productsticker',
-      componentType: 'product_sticker',
-      packagingRole: 'Primair',
-    });
-  }
-
-  layers.sort((left, right) => Number(isStickerPackagingLayer(right)) - Number(isStickerPackagingLayer(left)));
-
-  while (layers.length < 1) {
-    layers.push(createEmptyPackagingLayer(layers.length));
-  }
-
-  return layers.map((layer, index) => ({
-    name: asOptionalTrimmedString(layer.name) || packagingLayerNames[index],
-    componentType: layer.componentType || (isStickerPackagingLayer(layer) ? 'product_sticker' : 'packaging'),
-    material: asOptionalTrimmedString(layer.material),
-    recycleCode: asOptionalTrimmedString(layer.recycleCode),
-    packagingSupplier: asOptionalTrimmedString(layer.packagingSupplier),
-    packagingCatalogItemId: asOptionalTrimmedString(layer.packagingCatalogItemId),
-    weightBasis: layer.weightBasis,
-    weightGrams: asOptionalTrimmedString(layer.weightGrams),
-    recycledContentPercent: asOptionalTrimmedString(layer.recycledContentPercent),
-    recyclabilityClass: layer.recyclabilityClass,
-    packagingRole: layer.packagingRole,
-    productStickerMaterial: layer.productStickerMaterial,
-  }));
 }
 
 export type DymoBrowserPrinter = {
@@ -1460,4 +1297,3 @@ export function openOuterBoxLabelPreview({
   `);
   previewWindow.document.close();
 }
-
