@@ -11540,6 +11540,10 @@ function ProductsPage({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [previewImage, setPreviewImage] = useState<{ url: string; alt: string } | null>(null);
+  const [bulkNotice, setBulkNotice] = useState('');
+  const [showOutsourceModal, setShowOutsourceModal] = useState(false);
+  const [outsourceReference, setOutsourceReference] = useState('');
+  const [outsourceSaving, setOutsourceSaving] = useState(false);
 
   function handleSort(field: 'code' | 'description' | 'salePrice' | 'costPrice' | 'supplier' | 'articleGroup' | 'stock' | 'startDate') {
     if (sortField === field) {
@@ -11758,26 +11762,36 @@ function ProductsPage({
     await onBulkUpdateProducts(updatedProducts, 'E-mark niet van toepassing ingesteld');
   }
 
-  async function outsourceSelectedProducts() {
+  function openOutsourceSelectedProducts() {
     const selectedSupplierNames = new Set(selectedProducts.map((product) => product.supplier?.trim()).filter(Boolean));
     if (selectedProducts.length === 0) return;
     if (selectedSupplierNames.size !== 1) {
-      window.alert('Selecteer producten van precies één leverancier voor deze bulkactie.');
+      setBulkNotice('Selecteer producten van precies één leverancier voor deze bulkactie.');
       return;
     }
-    const reference = window.prompt('Verplichte onderbouwing / referentie voor deze overdracht:')?.trim();
-    if (!reference) {
-      window.alert('De bulkactie is niet uitgevoerd: onderbouwing / referentie is verplicht.');
-      return;
-    }
+    setBulkNotice('');
+    setOutsourceReference('');
+    setShowOutsourceModal(true);
+  }
+
+  async function outsourceSelectedProducts(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const reference = outsourceReference.trim();
+    if (!reference) return;
     const now = new Date().toISOString();
-    await onBulkUpdateProducts(selectedProducts.map((product) => ({
-      ...product,
-      complianceResponsibilityOverride: 'outsourced' as const,
-      complianceResponsibilityReference: reference,
-      complianceResponsibilitySetAt: now,
-      complianceResponsibilitySetBy: 'Bulkactie Producten',
-    })), 'Compliance overgedragen aan leverancier');
+    setOutsourceSaving(true);
+    try {
+      await onBulkUpdateProducts(selectedProducts.map((product) => ({
+        ...product,
+        complianceResponsibilityOverride: 'outsourced' as const,
+        complianceResponsibilityReference: reference,
+        complianceResponsibilitySetAt: now,
+        complianceResponsibilitySetBy: 'Bulkactie Producten',
+      })), 'Compliance overgedragen aan leverancier');
+      setShowOutsourceModal(false);
+    } finally {
+      setOutsourceSaving(false);
+    }
   }
 
   const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(visibleProducts.length / pageSize));
@@ -11817,6 +11831,7 @@ function ProductsPage({
         </div>
       </div>
       {message && <div className="notice">{message}</div>}
+      {bulkNotice && <div className="notice">{bulkNotice}</div>}
       <section className="panel maintenance-search">
         <div className="panel-title"><BriefcaseBusiness size={16} /> Productcatalogus</div>
         <div className="product-import-groups">
@@ -11941,7 +11956,7 @@ function ProductsPage({
               >
                 E-mark niet van toepassing
               </button>
-              <button type="button" className="secondary-button" disabled={selectedProductIds.length === 0} onClick={() => void outsourceSelectedProducts()}>
+              <button type="button" className="secondary-button" disabled={selectedProductIds.length === 0} onClick={openOutsourceSelectedProducts}>
                 Overdragen aan leverancier
               </button>
             </div>
@@ -12105,6 +12120,26 @@ function ProductsPage({
           </article>
         </section>
       )}
+      {showOutsourceModal ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => !outsourceSaving && setShowOutsourceModal(false)}>
+          <form className="modal-card product-outsource-modal" onSubmit={outsourceSelectedProducts} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div><span className="eyebrow">Bulkactie Producten</span><h2>Overdragen aan leverancier</h2><p>Leg vast waarom de complianceverantwoordelijkheid wordt overgedragen.</p></div>
+              <button type="button" className="secondary-button" disabled={outsourceSaving} onClick={() => setShowOutsourceModal(false)}>Sluiten</button>
+            </div>
+            <div className="modal-form-body">
+              <label>Verplichte onderbouwing / referentie
+                <textarea autoFocus rows={5} required value={outsourceReference} onChange={(event) => setOutsourceReference(event.target.value)} />
+                {!outsourceReference.trim() ? <small>Dit veld is verplicht.</small> : null}
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="secondary-button" disabled={outsourceSaving} onClick={() => setShowOutsourceModal(false)}>Annuleren</button>
+              <button type="submit" className="primary-button" disabled={outsourceSaving || !outsourceReference.trim()}>{outsourceSaving ? 'Overdragen…' : 'Overdragen'}</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </>
   );
 }

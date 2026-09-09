@@ -8413,6 +8413,24 @@ dd {
   width: min(860px, calc(100vw - 32px));
 }
 
+.product-outsource-modal {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.modal-form-body {
+  padding: 20px;
+}
+
+.modal-form-body label {
+  display: grid;
+  gap: 7px;
+  font-weight: 700;
+}
+
+.modal-form-body small {
+  color: #667085;
+}
+
 .outer-box-label-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
