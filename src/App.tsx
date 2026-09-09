@@ -306,9 +306,43 @@ const navGroups: Array<{ group: string; items: Array<{ id: View; label: string; 
 
 const views: Array<{ id: View; label: string; icon: typeof Home }> = navGroups.flatMap((section) => section.items);
 
+const viewSlugs: Record<View, string> = {
+  dashboard: 'dashboard',
+  scooters: 'scooters',
+  batteries: 'accu',
+  sales: 'verkoop',
+  containers: 'containers',
+  costBatches: 'import-china',
+  suppliers: 'leveranciers',
+  products: 'producten',
+  compliance: 'compliance',
+  packaging: 'verpakking',
+  dealers: 'dealers',
+  warranty: 'garantie-claims',
+  maintenance: 'onderhoud',
+};
+
+const viewsBySlug = new Map(Object.entries(viewSlugs).map(([view, slug]) => [slug, view as View]));
+
+function routeFromLocation() {
+  const raw = window.location.hash.replace(/^#\/?/, '');
+  const [path = '', queryString = ''] = raw.split('?');
+  const segments = path.split('/').filter(Boolean).map((segment) => decodeURIComponent(segment));
+  return {
+    view: viewsBySlug.get(segments[0] || '') ?? 'dashboard',
+    segments,
+    params: new URLSearchParams(queryString),
+  };
+}
+
 function viewFromLocation(): View {
-  const route = window.location.hash.replace(/^#\/?/, '').split(/[/?]/)[0];
-  return views.some((item) => item.id === route) ? route as View : 'dashboard';
+  return routeFromLocation().view;
+}
+
+function viewHash(view: View, recordId?: string, params?: URLSearchParams) {
+  const path = `#/${viewSlugs[view]}${recordId ? `/${encodeURIComponent(recordId)}` : ''}`;
+  const queryString = params?.toString();
+  return queryString ? `${path}?${queryString}` : path;
 }
 
 const statusColor: Record<ScooterStatus, string> = {
@@ -4187,10 +4221,14 @@ export function App() {
   const [navOpen, setNavOpen] = useState(false);
   const [packagingTab, setPackagingTab] = useState<'overview' | 'ppwrSuppliers'>('overview');
   const [data, setData] = useState<AppData>(demoData);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => routeFromLocation().params.get('zoek') || '');
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [selectedBattery, setSelectedBattery] = useState<Battery | null>(null);
   const [focusedContainerId, setFocusedContainerId] = useState<string | null>(null);
+  const [focusedCostBatchId, setFocusedCostBatchId] = useState<string | null>(() => {
+    const route = routeFromLocation();
+    return route.view === 'costBatches' ? route.segments[1] || null : null;
+  });
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedProductTab, setSelectedProductTab] = useState<ProductModalTab>('basic');
   const [selectedProductApplyBatchNumber, setSelectedProductApplyBatchNumber] = useState('');
@@ -4205,7 +4243,10 @@ export function App() {
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
   const [batteryMessage, setBatteryMessage] = useState('');
   const [warrantyMessage, setWarrantyMessage] = useState('');
-  const [statusFilter, setStatusFilter] = useState<ScooterStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<ScooterStatus | 'all'>(() => {
+    const status = routeFromLocation().params.get('status');
+    return (Object.keys(statusColor) as ScooterStatus[]).includes(status as ScooterStatus) ? status as ScooterStatus : 'all';
+  });
 
   function showCsvMessage(message: string, details: string[] = []) {
     setCsvMessage(message);
@@ -4213,7 +4254,7 @@ export function App() {
   }
 
   function navigateToView(nextView: View) {
-    const nextHash = `#/${nextView}`;
+    const nextHash = viewHash(nextView);
     if (window.location.hash === nextHash) {
       setView(nextView);
       return;
@@ -4223,16 +4264,31 @@ export function App() {
 
   useEffect(() => {
     const handleLocationChange = () => {
-      setView(viewFromLocation());
+      const route = routeFromLocation();
+      setView(route.view);
+      setQuery(route.params.get('zoek') || '');
+      const routeStatus = route.params.get('status');
+      setStatusFilter((Object.keys(statusColor) as ScooterStatus[]).includes(routeStatus as ScooterStatus) ? routeStatus as ScooterStatus : 'all');
+      setFocusedCostBatchId(route.view === 'costBatches' ? route.segments[1] || null : null);
       setNavOpen(false);
     };
 
     if (!window.location.hash || viewFromLocation() === 'dashboard' && !/^#\/?dashboard(?:[/?]|$)/.test(window.location.hash)) {
-      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#/dashboard`);
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${viewHash('dashboard')}`);
     }
     window.addEventListener('hashchange', handleLocationChange);
     return () => window.removeEventListener('hashchange', handleLocationChange);
   }, []);
+
+  useEffect(() => {
+    if (view !== 'products' && view !== 'scooters') return;
+    const route = routeFromLocation();
+    const params = new URLSearchParams(route.params);
+    if (query.trim()) params.set('zoek', query.trim()); else params.delete('zoek');
+    if (view === 'scooters' && statusFilter !== 'all') params.set('status', statusFilter); else params.delete('status');
+    const nextHash = viewHash(view, route.segments[1], params);
+    if (window.location.hash !== nextHash) window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash}`);
+  }, [query, statusFilter, view]);
 
   useEffect(() => {
     migratePpwrLocalStorage();
@@ -4656,6 +4712,9 @@ export function App() {
     setSelectedProductTab(tab);
     setSelectedProductApplyBatchNumber(applyBatchNumber);
     setSelectedProduct(product);
+    const params = view === 'products' ? routeFromLocation().params : undefined;
+    const nextHash = viewHash('products', product.id || product.code, params);
+    if (window.location.hash !== nextHash) window.location.hash = nextHash;
     if (supabase && product.id) {
       void fetchProductById(product.id)
         .then((freshProduct) => {
@@ -4671,6 +4730,15 @@ export function App() {
         });
     }
   }
+
+  useEffect(() => {
+    const route = routeFromLocation();
+    if (route.view !== 'products') return;
+    if (!route.segments[1]) { setSelectedProduct(null); return; }
+    const recordKey = route.segments[1].toLowerCase();
+    const product = data.products.find((item) => item.id.toLowerCase() === recordKey || item.code.toLowerCase() === recordKey);
+    if (product) setSelectedProduct(product);
+  }, [data.products, view]);
 
   function openBatchLabelProduct(batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) {
     const labelProduct = productFromCostLine(line, product);
@@ -5922,7 +5990,7 @@ export function App() {
             />
           )}
           {view === 'containers' && <Containers data={data} query={query} message={csvMessage} messageDetails={csvMessageDetails} onImport={addContainerImport} onSelect={setSelectedScooter} onUpdateContainerEta={updateContainerEta} onMarkContainerAvailable={markContainerAvailable} focusedContainerId={focusedContainerId} />}
-          {view === 'costBatches' && <CostBatchesPage data={data} query={query} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onPrintOuterBoxLabel={printBatchOuterBoxLabel} onPreviewOuterBoxLabel={previewBatchOuterBoxLabel} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveBatchPackagingPlan={saveBatchPackagingPlan} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
+          {view === 'costBatches' && <CostBatchesPage data={data} query={query} focusedBatchId={focusedCostBatchId} onSaveCostBatch={saveContainerCostBatch} onSelectProduct={openProduct} onOpenBatchLabelProduct={openBatchLabelProduct} onPrintOuterBoxLabel={printBatchOuterBoxLabel} onPreviewOuterBoxLabel={previewBatchOuterBoxLabel} onTogglePurchaseOrderLine={togglePurchaseOrderLine} onSaveBatchPackagingPlan={saveBatchPackagingPlan} onSaveScooterPackagingSpec={saveScooterPackagingSpec} />}
           {view === 'packaging' && (
             <>
               <div className="subtabs">
@@ -6088,6 +6156,9 @@ export function App() {
             setPendingBatchLabelPrint(null);
             setSelectedProductTab('basic');
             setSelectedProductApplyBatchNumber('');
+            if (routeFromLocation().view === 'products' && routeFromLocation().segments[1]) {
+              window.location.hash = viewHash('products', undefined, routeFromLocation().params);
+            }
           }}
           onSave={async (nextProduct) => {
             await updateProduct(nextProduct);
@@ -8891,6 +8962,7 @@ type OuterBoxLabelDialog = {
 function CostBatchesPage({
   data,
   query,
+  focusedBatchId,
   onSaveCostBatch,
   onSelectProduct,
   onOpenBatchLabelProduct,
@@ -8902,6 +8974,7 @@ function CostBatchesPage({
 }: {
   data: AppData;
   query: string;
+  focusedBatchId?: string | null;
   onSaveCostBatch: (batch: ContainerCostBatch, lines: ContainerCostLine[], productUpdates: Product[]) => Promise<void>;
   onSelectProduct: (product: Product, tab?: ProductModalTab) => void;
   onOpenBatchLabelProduct: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
@@ -8937,6 +9010,12 @@ function CostBatchesPage({
     hasLining: false,
     boxWeightKg: '',
   });
+
+  useEffect(() => {
+    if (!focusedBatchId) return;
+    const batch = data.containerCostBatches.find((item) => item.id === focusedBatchId || item.orderNumber === focusedBatchId || item.containerNumber === focusedBatchId);
+    if (batch) setExpandedBatchId(batch.id);
+  }, [data.containerCostBatches, focusedBatchId]);
 
   useEffect(() => {
     if (!outerBoxLabelDialog) return undefined;
@@ -9309,6 +9388,7 @@ function CostBatchesPage({
                         onClick={() => {
                           setExpandedBatchId(isExpanded ? null : batch.id);
                           setImportBatchLabelFilter('all');
+                          window.location.hash = isExpanded ? viewHash('costBatches') : viewHash('costBatches', batch.id);
                         }}
                       >
                         <td>
@@ -11520,18 +11600,19 @@ function ProductsPage({
   query: string;
 }) {
   const [productsTab, setProductsTab] = useState<'catalog' | 'importCompanies'>('catalog');
-  const [catalogView, setCatalogView] = useState<'all' | 'new'>('all');
-  const [groupFilter, setGroupFilter] = useState('');
-  const [supplierFilter, setSupplierFilter] = useState('');
-  const [stockFilter, setStockFilter] = useState('');
-  const [importCompanyFilter, setImportCompanyFilter] = useState<'__all__' | string>('');
-  const [lifecycleFilter, setLifecycleFilter] = useState('');
-  const [availableFromFilter, setAvailableFromFilter] = useState('');
-  const [complianceFilter, setComplianceFilter] = useState('');
-  const [responsibilityFilter, setResponsibilityFilter] = useState('');
-  const [codeFilter, setCodeFilter] = useState('');
-  const [descriptionFilter, setDescriptionFilter] = useState('');
-  const [barcodeFilter, setBarcodeFilter] = useState('');
+  const productRouteParams = routeFromLocation().params;
+  const [catalogView, setCatalogView] = useState<'all' | 'new'>(() => productRouteParams.get('weergave') === 'nieuw' ? 'new' : 'all');
+  const [groupFilter, setGroupFilter] = useState(() => productRouteParams.get('groep') || '');
+  const [supplierFilter, setSupplierFilter] = useState(() => productRouteParams.get('leverancier') || '');
+  const [stockFilter, setStockFilter] = useState(() => productRouteParams.get('voorraad') || '');
+  const [importCompanyFilter, setImportCompanyFilter] = useState<'__all__' | string>(() => productRouteParams.get('importeur') || '');
+  const [lifecycleFilter, setLifecycleFilter] = useState(() => productRouteParams.get('levenscyclus') || '');
+  const [availableFromFilter, setAvailableFromFilter] = useState(() => productRouteParams.get('vanaf') || '');
+  const [complianceFilter, setComplianceFilter] = useState(() => productRouteParams.get('compliance') || '');
+  const [responsibilityFilter, setResponsibilityFilter] = useState(() => productRouteParams.get('verantwoordelijkheid') || '');
+  const [codeFilter, setCodeFilter] = useState(() => productRouteParams.get('code') || '');
+  const [descriptionFilter, setDescriptionFilter] = useState(() => productRouteParams.get('omschrijving') || '');
+  const [barcodeFilter, setBarcodeFilter] = useState(() => productRouteParams.get('barcode') || '');
   const [exactProductImportCode, setExactProductImportCode] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number | 'all'>(25);
@@ -11543,6 +11624,29 @@ function ProductsPage({
   const [showOutsourceModal, setShowOutsourceModal] = useState(false);
   const [outsourceReference, setOutsourceReference] = useState('');
   const [outsourceSaving, setOutsourceSaving] = useState(false);
+
+  useEffect(() => {
+    const route = routeFromLocation();
+    if (route.view !== 'products') return;
+    const params = new URLSearchParams(route.params);
+    const values: Record<string, string> = {
+      weergave: catalogView === 'new' ? 'nieuw' : '',
+      groep: groupFilter,
+      leverancier: supplierFilter,
+      voorraad: stockFilter,
+      importeur: importCompanyFilter,
+      levenscyclus: lifecycleFilter,
+      vanaf: availableFromFilter,
+      compliance: complianceFilter,
+      verantwoordelijkheid: responsibilityFilter,
+      code: codeFilter,
+      omschrijving: descriptionFilter,
+      barcode: barcodeFilter,
+    };
+    Object.entries(values).forEach(([key, value]) => value ? params.set(key, value) : params.delete(key));
+    const nextHash = viewHash('products', route.segments[1], params);
+    if (window.location.hash !== nextHash) window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash}`);
+  }, [availableFromFilter, barcodeFilter, catalogView, codeFilter, complianceFilter, descriptionFilter, groupFilter, importCompanyFilter, lifecycleFilter, responsibilityFilter, stockFilter, supplierFilter]);
 
   function handleSort(field: 'code' | 'description' | 'salePrice' | 'costPrice' | 'supplier' | 'articleGroup' | 'stock' | 'startDate') {
     if (sortField === field) {
