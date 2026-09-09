@@ -46,6 +46,7 @@ import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseExactBatchTransactionsImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
 import { migratePpwrLocalStorage, migrateSupplierPpwr, ppwrSupplierStatus } from './lib/ppwr-suppliers';
 import { findPackagingMaterialOption, packagingMaterialOptions } from './lib/packaging-materials';
+import { parseProbeEndpoint, rdwDateToInputDate } from './lib/rdw';
 import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, fetchProductById, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceComplianceFamilyDocuments, replaceComplianceFamilyRequirements, replaceComplianceFamilyRevisions, replaceComplianceFamilyRisks, replaceComplianceFamilyTestPlans, replaceComplianceFamilyWarnings, replaceComplianceProductTests, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, uploadSupplierDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRequirements, upsertComplianceFamilyRevisions, upsertComplianceFamilyRisks, upsertComplianceFamilyTestPlans, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertComplianceProductTests, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
@@ -428,14 +429,6 @@ function toInputDateTimeValue(value: Date) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-function parseProbeEndpoint(endpoint: string) {
-  const [path, requestUrl] = endpoint.split('\n');
-  return {
-    path: path || endpoint,
-    requestUrl: requestUrl || '',
-  };
-}
-
 function compactProbeLabel(endpoint: string) {
   const { path } = parseProbeEndpoint(endpoint);
   const parts = path.split('/');
@@ -676,13 +669,6 @@ function buildBatchProbeSummary(
     availableQuantity,
     stockQuantity,
   };
-}
-
-function rdwDateToInputDate(value?: string) {
-  if (!value) return '';
-  if (value.includes('T')) return value.slice(0, 10);
-  if (/^\d{8}$/.test(value)) return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
-  return value;
 }
 
 function dealerName(dealers: Dealer[], dealerId?: string) {
