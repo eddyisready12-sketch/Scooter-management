@@ -8405,6 +8405,12 @@ dd {
   width: min(620px, calc(100vw - 32px));
 }
 
+.table-empty-state {
+  padding: 28px 16px !important;
+  text-align: center;
+  color: #667085;
+}
+
 .outer-box-label-modal {
   width: min(860px, calc(100vw - 32px));
 }

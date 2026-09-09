@@ -8722,6 +8722,9 @@ function ScooterTable({ scooters, dealers, query, setQuery, onSelect, title = 'B
                 <td className="registration-cell">{isRegistrationComplete(scooter) ? <CheckCircle2 className="registration-check" size={18} aria-label="Tenaamgesteld" /> : '-'}</td>
               </tr>
             ))}
+            {visibleScooters.length === 0 ? (
+              <tr><td colSpan={11} className="table-empty-state">Geen scooters gevonden voor deze filters en zoekopdracht.</td></tr>
+            ) : null}
           </tbody>
         </table>
       </div>
@@ -11159,7 +11162,8 @@ function Scooters({ data, query, setQuery, scooters, onSelect, message, messageD
   setStatusFilter: (status: ScooterStatus | 'all') => void;
   onBulkRdwCheck: (scooters: Scooter[]) => Promise<string>;
 }) {
-  const cards: Array<{ status: ScooterStatus; label: string; icon: typeof Bike }> = [
+  const cards: Array<{ status: ScooterStatus | 'all'; label: string; icon: typeof Bike }> = [
+    { status: 'all', label: 'Alle', icon: ClipboardList },
     { status: 'Beschikbaar', label: 'Beschikbaar', icon: Bike },
     { status: 'In consignatie', label: 'In consignatie', icon: BriefcaseBusiness },
     { status: 'Verkocht dealer', label: 'Verkocht dealer', icon: Wrench },
@@ -11185,29 +11189,21 @@ function Scooters({ data, query, setQuery, scooters, onSelect, message, messageD
             key={status}
             onClick={() => setStatusFilter(statusFilter === status ? 'all' : status)}
           >
-            <div className={`stat-icon ${statusColor[status]}`}><Icon size={22} /></div>
-            <div><span>{label}</span><strong>{countByStatus(data.scooters, status)}</strong></div>
+            <div className={`stat-icon ${status === 'all' ? 'blue' : statusColor[status]}`}><Icon size={22} /></div>
+            <div><span>{label}</span><strong>{status === 'all' ? data.scooters.length : countByStatus(data.scooters, status)}</strong></div>
           </button>
         ))}
       </div>
-      {statusFilter === 'all' && (
-        <div className="empty-state">
-          <strong>Selecteer een categorie hierboven</strong>
-          <span>Klik op een statuskaart om de bijbehorende scooters te bekijken, te sorteren en te exporteren.</span>
-        </div>
-      )}
-      {statusFilter !== 'all' && (
-        <ScooterTable
-          scooters={scooters}
-          dealers={data.dealers}
-          query={query}
-          setQuery={setQuery}
-          onSelect={onSelect}
-          title={`Scooters: ${scooterStatusLabel(statusFilter)} (${scooters.length})`}
-          onBulkRdwCheck={statusFilter === 'Verkocht dealer' || statusFilter === 'Verkocht klant' ? onBulkRdwCheck : undefined}
-          defaultSortOrder={statusFilter === 'Verkocht klant' ? 'registration-newest' : 'model-asc'}
-        />
-      )}
+      <ScooterTable
+        scooters={scooters}
+        dealers={data.dealers}
+        query={query}
+        setQuery={setQuery}
+        onSelect={onSelect}
+        title={statusFilter === 'all' ? `Alle scooters (${scooters.length})` : `Scooters: ${scooterStatusLabel(statusFilter)} (${scooters.length})`}
+        onBulkRdwCheck={statusFilter === 'Verkocht dealer' || statusFilter === 'Verkocht klant' ? onBulkRdwCheck : undefined}
+        defaultSortOrder={statusFilter === 'Verkocht klant' ? 'registration-newest' : 'model-asc'}
+      />
     </>
   );
 }
