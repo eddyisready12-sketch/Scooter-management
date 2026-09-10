@@ -49,6 +49,7 @@ import type { ZebraProductLabelSize } from './lib/labels';
 import { asOptionalTrimmedString, certificationRuleForArticleGroup, createEmptyPackagingLayer, createProductDraft, formatCertificationPresence, getProductBatchOverviewRows, getProductComplianceResponsibility, getProductComplianceSummary, isCeMissing, isCeRelevant, isEMarkMissing, isEMarkRelevant, isStickerPackagingLayer, normalizePackagingLayers, productComplianceIssueLevelLabel, sumPackagingLayerWeights, summarizePackagingWasteStream, unitsPerPackageFromProduct } from './lib/products';
 import type { ProductComplianceLevel } from './lib/products';
 import { ImagePreview } from './modals/ImagePreview';
+import { SupplierContactModal } from './modals/SupplierContactModal';
 import { parseProbeEndpoint, rdwDateToInputDate } from './lib/rdw';
 import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, fetchProductById, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceComplianceFamilyDocuments, replaceComplianceFamilyRequirements, replaceComplianceFamilyRevisions, replaceComplianceFamilyRisks, replaceComplianceFamilyTestPlans, replaceComplianceFamilyWarnings, replaceComplianceProductTests, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, uploadSupplierDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRequirements, upsertComplianceFamilyRevisions, upsertComplianceFamilyRisks, upsertComplianceFamilyTestPlans, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertComplianceProductTests, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
 import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
@@ -11756,31 +11757,6 @@ function importerFromForm(form: FormData, existing?: Importer): Importer {
   };
 }
 
-function supplierContactFromForm(form: FormData, supplierId: string, existing?: SupplierContact): SupplierContact {
-  const name = String(form.get('name') ?? '').trim();
-  const role = String(form.get('role') ?? '').trim();
-  const email = String(form.get('email') ?? '').trim();
-  const phone = String(form.get('phone') ?? '').trim();
-  const mobile = String(form.get('mobile') ?? '').trim();
-  const wechat = String(form.get('wechat') ?? '').trim();
-  const notes = String(form.get('notes') ?? '').trim();
-  const isPrimary = form.get('isPrimary') === 'on';
-
-  return {
-    id: existing?.id ?? stableId('supplier-contact', `${supplierId}-${name || email || mobile || wechat}-${Date.now()}`),
-    supplierId,
-    name,
-    role: role || undefined,
-    email: email || undefined,
-    phone: phone || undefined,
-    mobile: mobile || undefined,
-    wechat: wechat || undefined,
-    notes: notes || undefined,
-    isPrimary,
-    active: existing?.active ?? true,
-  };
-}
-
 function SupplierModal({
   supplier,
   title,
@@ -11994,41 +11970,6 @@ function ImporterModal({
             Actief
           </label>
           <label className="span-2">Notities<textarea name="notes" defaultValue={importer?.notes ?? ''} /></label>
-        </div>
-        <div className="modal-actions">
-          <button type="button" className="secondary-button" onClick={onClose}>Annuleren</button>
-          <button className="primary-button" type="submit">Opslaan</button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function SupplierContactModal({ supplierId, contact, title, onClose, onSave }: { supplierId: string; contact?: SupplierContact; title: string; onClose: () => void; onSave: (contact: SupplierContact) => Promise<void> }) {
-  async function submitContact(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await onSave(supplierContactFromForm(new FormData(event.currentTarget), supplierId, contact));
-  }
-
-  return (
-    <div className="modal-backdrop nested-modal" onMouseDown={onClose}>
-      <form className="modal-card dealer-modal" onSubmit={submitContact} onMouseDown={(event) => event.stopPropagation()}>
-        <div className="modal-header">
-          <div>
-            <span>Contactpersoon</span>
-            <h2>{title}</h2>
-          </div>
-          <button type="button" onClick={onClose}>Close</button>
-        </div>
-        <div className="form-grid">
-          <label>Naam*<input name="name" defaultValue={contact?.name ?? ''} required /></label>
-          <label>Functie<input name="role" defaultValue={contact?.role ?? ''} /></label>
-          <label>E-mail<input name="email" type="email" defaultValue={contact?.email ?? ''} /></label>
-          <label>Telefoon<input name="phone" defaultValue={contact?.phone ?? ''} /></label>
-          <label>Mobiel<input name="mobile" defaultValue={contact?.mobile ?? ''} /></label>
-          <label>WeChat<input name="wechat" defaultValue={contact?.wechat ?? ''} /></label>
-          <label className="checkbox-field"><input name="isPrimary" type="checkbox" defaultChecked={Boolean(contact?.isPrimary)} /> Primair contact</label>
-          <label className="span-2">Notities<textarea name="notes" defaultValue={contact?.notes ?? ''} /></label>
         </div>
         <div className="modal-actions">
           <button type="button" className="secondary-button" onClick={onClose}>Annuleren</button>
