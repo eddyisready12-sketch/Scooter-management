@@ -7845,7 +7845,7 @@ function ContainerCostModal({
   const initialPackagingCompliance = parseBatchPackagingCompliance(initialBatch);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
   const [batchStatus, setBatchStatus] = useState<'Concept' | 'Definitief'>(initialBatch?.status || 'Concept');
-  const [containerNumber, setContainerNumber] = useState(initialBatch?.containerNumber ?? containers[0]?.number ?? '');
+  const [containerNumber, setContainerNumber] = useState(initialBatch?.containerNumber ?? '');
   const [containerProfile, setContainerProfile] = useState<(typeof containerVolumePresets)[number]['value']>((initialBatch?.containerProfile as (typeof containerVolumePresets)[number]['value']) || '40hc');
   const [containerVolumeCbm, setContainerVolumeCbm] = useState(initialBatch?.containerVolumeCbm ?? '76,3');
   const [orderNumber, setOrderNumber] = useState(initialBatch?.orderNumber ?? '');
@@ -7883,6 +7883,7 @@ function ContainerCostModal({
   const [scooterVolumeRows, setScooterVolumeRows] = useState<ScooterVolumeDraftRow[]>(() => parseInitialScooterVolumeRows(initialLines));
   const [saving, setSaving] = useState(false);
   const normalizedContainerNumber = containerNumber.trim().toLowerCase();
+  const containerRequired = batchStatus === 'Definitief';
   const selectedContainer = containers.find((container) => container.number.trim().toLowerCase() === normalizedContainerNumber);
   const selectedContainerId = selectedContainer?.id;
   const selectedSupplierRecord = suppliers.find((supplier) => supplierNameMatches(supplier, supplierName));
@@ -8270,10 +8271,10 @@ function ContainerCostModal({
   }
 
   async function handleSave() {
-    if (!containerNumber.trim() || !orderNumber.trim() || calculatedLines.length === 0) return;
+    if ((containerRequired && !containerNumber.trim()) || !orderNumber.trim() || calculatedLines.length === 0) return;
     setSaving(true);
     try {
-      const batchId = initialBatch?.id ?? stableId('container-cost-batch', `${containerNumber}-${orderNumber}-${Date.now()}`);
+      const batchId = initialBatch?.id ?? stableId('container-cost-batch', `${containerNumber.trim() || 'concept'}-${orderNumber}-${Date.now()}`);
       const packagingComplianceConfig: BatchPackagingComplianceConfig = {
         scope: packagingComplianceScope,
         reportingMode: packagingComplianceReportingMode,
@@ -8452,12 +8453,12 @@ function ContainerCostModal({
                   <option value="Definitief">Definitief</option>
                 </select>
               </label>
-              <label>Containernummer
+              <label>Containernummer {containerRequired ? '' : '(later invullen mogelijk)'}
                 <input
                   list="container-number-options"
                   value={containerNumber}
                   onChange={(event) => setContainerNumber(event.target.value)}
-                  placeholder="Bijv. FSCU8979996"
+                  placeholder={containerRequired ? 'Bijv. FSCU8979996' : 'Nog geen container / luchtpost'}
                 />
                 <datalist id="container-number-options">
                   {containers.map((container) => <option key={container.id} value={container.number}>{container.number} - {container.invoiceNumber}</option>)}
@@ -8871,7 +8872,9 @@ function ContainerCostModal({
             )}
             <div className="inline-notice">
               <span>
-            Onderdelen krijgen bij opslaan direct de actuele `kostprijs` en het `batch`-nummer van deze order. Scooters worden nu alleen historisch vastgelegd in de importregels.
+                {batchStatus === 'Concept' && !containerNumber.trim()
+                  ? 'Conceptorder zonder container: je kunt ontvangen luchtpostregels nu al opslaan en de labels printen. Vul later bij dezelfde order het containernummer en de overige regels aan.'
+                  : 'Onderdelen krijgen bij opslaan direct de actuele kostprijs en het batchnummer van deze order. Scooters worden alleen historisch vastgelegd in de importregels.'}
               </span>
             </div>
           </section>
@@ -8881,7 +8884,7 @@ function ContainerCostModal({
           <button
             type="button"
             className="primary-button"
-            disabled={saving || !containerNumber.trim() || !orderNumber.trim() || calculatedLines.length === 0}
+            disabled={saving || (containerRequired && !containerNumber.trim()) || !orderNumber.trim() || calculatedLines.length === 0}
             onClick={() => void handleSave()}
           >
             {saving ? 'Opslaan...' : initialBatch ? 'Importbatch bijwerken' : 'Importbatch opslaan'}
