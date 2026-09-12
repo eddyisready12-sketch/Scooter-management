@@ -7968,6 +7968,25 @@ function ContainerCostModal({
     setDraftLines((current) => current.map((line) => line.id === id ? { ...line, ...patch } : line));
   }
 
+  function addManualDraftLine() {
+    setDraftLines((current) => [
+      ...current,
+      {
+        id: `manual-draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        type: 'onderdeel',
+        referenceCode: '',
+        description: '',
+        quantity: '1',
+        volumeCbm: '0',
+        unitPriceUsd: '0',
+      },
+    ]);
+  }
+
+  function removeDraftLine(id: string) {
+    setDraftLines((current) => current.filter((line) => line.id !== id));
+  }
+
   function replaceDraftLineProduct(id: string, productCode: string) {
     const normalizedCode = productCode.trim().toLowerCase();
     const product = products.find((item) => item.code.trim().toLowerCase() === normalizedCode);
@@ -8051,7 +8070,10 @@ function ContainerCostModal({
   const mergedDraftLines = initialBatch && !importFileName
     ? draftLines
     : mergeContainerCostDraftLines(draftLines);
-  const importLines = [...scooterDraftLines, ...mergedDraftLines];
+  const importLines = [
+    ...scooterDraftLines,
+    ...mergedDraftLines.filter((line) => line.referenceCode.trim() && line.description.trim()),
+  ];
 
   const computedLines = importLines.map((line) => {
     const quantity = Math.max(1, parseDecimal(line.quantity));
@@ -8682,15 +8704,18 @@ function ContainerCostModal({
             </div>
           </section>
 
-          {initialBatch && draftLines.length > 0 ? (
+          {draftLines.length > 0 ? (
             <section className="product-form-subsection container-cost-card">
               <div className="section-header-with-actions compact-header">
                 <div>
-                  <h3>Importregels aanpassen</h3>
+                  <h3>{initialBatch ? 'Importregels aanpassen' : 'Handmatige artikelregels'}</h3>
                   <p className="section-subtitle">
-                    Kies bij ‘Geleverd artikel’ het artikel dat werkelijk is ontvangen. Aantal, volume en inkoopprijs van de importregel blijven behouden.
+                    Kies het ontvangen artikel of vul een nieuw artikelnummer, omschrijving, aantal en inkoopprijs in.
                   </p>
                 </div>
+                <button type="button" className="secondary-button" onClick={addManualDraftLine}>
+                  <Plus size={16} /> Artikel toevoegen
+                </button>
               </div>
               <datalist id="import-batch-product-options">
                 {products
@@ -8711,6 +8736,7 @@ function ContainerCostModal({
                       <th>Aantal</th>
                       <th>Volume</th>
                       <th>USD / stuk</th>
+                      <th aria-label="Acties" />
                     </tr>
                   </thead>
                   <tbody>
@@ -8752,6 +8778,11 @@ function ContainerCostModal({
                             inputMode="decimal"
                           />
                         </td>
+                        <td>
+                          <button type="button" className="danger-icon-button" onClick={() => removeDraftLine(line.id)} aria-label="Artikelregel verwijderen">
+                            <XCircle size={18} />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -8767,6 +8798,9 @@ function ContainerCostModal({
                 <p className="section-subtitle">Kies een `.xlsx`, `.xls` of `.csv` bestand. De preview hieronder wordt daarna automatisch gevuld.</p>
               </div>
               <div className="container-command-actions compact-actions">
+                <button type="button" className="secondary-button" onClick={addManualDraftLine}>
+                  <Plus size={16} /> Artikel handmatig toevoegen
+                </button>
                 <button type="button" className="secondary-button" onClick={() => importFileInputRef.current?.click()}>
                   <Upload size={16} /> Excel kiezen
                 </button>
