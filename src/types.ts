@@ -600,6 +600,21 @@ export type MaintenanceRecord = {
   notes: string;
 };
 
+export type LoanRecord = {
+  id: string;
+  itemName: string;
+  itemCode?: string;
+  quantity: string;
+  borrower: string;
+  borrowerCompany?: string;
+  borrowerPhone?: string;
+  loanDate: string;
+  expectedReturnDate?: string;
+  returnedAt?: string;
+  status: 'Uitgeleend' | 'Te laat' | 'Teruggebracht';
+  notes: string;
+};
+
 export type DocumentRecord = {
   id: string;
   scooterFrame: string;
@@ -720,6 +735,7 @@ export type AppData = {
   batteryModels: BatteryModel[];
   warranties: WarrantyPart[];
   maintenance: MaintenanceRecord[];
+  loans: LoanRecord[];
   documents: DocumentRecord[];
 };
 

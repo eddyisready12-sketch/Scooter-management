@@ -632,6 +632,21 @@ create table if not exists maintenance_records (
   notes text
 );
 
+create table if not exists loan_records (
+  id text primary key,
+  "itemName" text not null,
+  "itemCode" text,
+  quantity text not null default '1',
+  borrower text not null,
+  "borrowerCompany" text,
+  "borrowerPhone" text,
+  "loanDate" date not null,
+  "expectedReturnDate" date,
+  "returnedAt" date,
+  status text not null default 'Uitgeleend',
+  notes text not null default ''
+);
+
 create table if not exists documents (
   id text primary key,
   "scooterFrame" text references scooters("frameNumber"),
@@ -658,6 +673,7 @@ alter publication supabase_realtime add table batteries;
 alter publication supabase_realtime add table battery_models;
 alter publication supabase_realtime add table warranty_parts;
 alter publication supabase_realtime add table maintenance_records;
+alter publication supabase_realtime add table loan_records;
 alter publication supabase_realtime add table documents;
 
 alter table dealers enable row level security;
@@ -679,6 +695,7 @@ alter table batteries enable row level security;
 alter table battery_models enable row level security;
 alter table warranty_parts enable row level security;
 alter table maintenance_records enable row level security;
+alter table loan_records enable row level security;
 
 create policy "Allow public read dealers"
 on dealers
@@ -1097,5 +1114,24 @@ create policy "Allow public update maintenance"
 on maintenance_records
 for update
 to anon
+using (true)
+with check (true);
+
+create policy "Allow public read loans"
+on loan_records
+for select
+to anon, authenticated
+using (true);
+
+create policy "Allow public insert loans"
+on loan_records
+for insert
+to anon, authenticated
+with check (true);
+
+create policy "Allow public update loans"
+on loan_records
+for update
+to anon, authenticated
 using (true)
 with check (true);

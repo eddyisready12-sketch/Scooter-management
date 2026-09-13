@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AppData, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactProductImportResponse, ExactSalesPackagingOverride, ExactSalesPreviewResponse, Importer, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
+import type { AppData, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostBatch, ContainerCostLine, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactProductImportResponse, ExactSalesPackagingOverride, ExactSalesPreviewResponse, Importer, LoanRecord, MaintenanceRecord, Product, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, Supplier, SupplierContact, WarrantyPart } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -132,6 +132,7 @@ const tableMap: Record<keyof AppData, string> = {
   batteryModels: 'battery_models',
   warranties: 'warranty_parts',
   maintenance: 'maintenance_records',
+  loans: 'loan_records',
   documents: 'documents',
 };
 
@@ -1091,6 +1092,16 @@ export async function upsertMaintenanceRecords(records: MaintenanceRecord[]) {
 
   const { error } = await supabase
     .from('maintenance_records')
+    .upsert(records);
+
+  if (error) throw error;
+}
+
+export async function upsertLoanRecords(records: LoanRecord[]) {
+  if (!supabase || records.length === 0) return;
+
+  const { error } = await supabase
+    .from('loan_records')
     .upsert(records);
 
   if (error) throw error;

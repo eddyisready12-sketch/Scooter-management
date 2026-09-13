@@ -3640,6 +3640,79 @@ tbody tr:hover {
   align-items: start;
 }
 
+.loan-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 16px;
+  border: 1px solid #dce1e6;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.loans-layout {
+  align-items: start;
+}
+
+.loan-list {
+  display: grid;
+}
+
+.loan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 15px 0;
+  border-bottom: 1px solid #e1e7ec;
+}
+
+.loan-row:last-child {
+  border-bottom: 0;
+}
+
+.loan-row-main,
+.loan-row-actions {
+  display: grid;
+  gap: 5px;
+}
+
+.loan-row-main span,
+.loan-row-main small,
+.loan-row-actions small {
+  color: #65717d;
+}
+
+.loan-row-actions {
+  justify-items: end;
+  flex: 0 0 auto;
+}
+
+.status-pill.warning {
+  border-color: #f2c888;
+  background: #fff4df;
+  color: #a15c00;
+}
+
+@media (max-width: 720px) {
+  .loan-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .loan-summary div {
+    border-right: 0;
+    border-bottom: 1px solid #dce1e6;
+  }
+
+  .loan-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .loan-row-actions {
+    justify-items: start;
+  }
+}
+
 .form-section-label {
   display: grid;
   gap: 4px;

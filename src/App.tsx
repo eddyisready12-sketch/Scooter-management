@@ -52,10 +52,10 @@ import { ImagePreview } from './modals/ImagePreview';
 import { SupplierContactModal } from './modals/SupplierContactModal';
 import { ImporterModal } from './modals/ImporterModal';
 import { parseProbeEndpoint, rdwDateToInputDate } from './lib/rdw';
-import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, fetchProductById, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceComplianceFamilyDocuments, replaceComplianceFamilyRequirements, replaceComplianceFamilyRevisions, replaceComplianceFamilyRisks, replaceComplianceFamilyTestPlans, replaceComplianceFamilyWarnings, replaceComplianceProductTests, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, uploadSupplierDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRequirements, upsertComplianceFamilyRevisions, upsertComplianceFamilyRisks, upsertComplianceFamilyTestPlans, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertComplianceProductTests, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
-import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
+import { buildExactAuthStartUrl, createScooterDocumentUrl, fetchExactConnectionStatus, fetchExactProductsImport, fetchExactSalesPreview, fetchProductById, getAuthSession, loadSupabaseData, onAuthSessionChange, probeExactBatchLookup, replaceComplianceFamilyDocuments, replaceComplianceFamilyRequirements, replaceComplianceFamilyRevisions, replaceComplianceFamilyRisks, replaceComplianceFamilyTestPlans, replaceComplianceFamilyWarnings, replaceComplianceProductTests, replaceContainerCostLines, resolveScooterDocumentPath, signInWithPassword, signOut, signUpWithPassword, subscribeToSupabase, supabase, uploadScooterDocument, uploadSupplierDocument, upsertBatteries, upsertBatteryModels, upsertComplianceFamilies, upsertComplianceFamilyDocuments, upsertComplianceFamilyRequirements, upsertComplianceFamilyRevisions, upsertComplianceFamilyRisks, upsertComplianceFamilyTestPlans, upsertComplianceFamilyWarnings, upsertComplianceProductLinks, upsertComplianceProductTests, upsertContainerCostBatches, upsertContainerCostLines, upsertContainers, upsertDealers, upsertDocuments, upsertExactSalesPackagingOverrides, upsertImporters, upsertLoanRecords, upsertMaintenanceRecords, upsertProductPackagingRegistrations, upsertProducts, upsertScooterPackagingSpecs, upsertScooters, upsertSupplierContacts, upsertSuppliers, upsertWarrantyParts } from './lib/supabase';
+import type { AppData, BatchPackagingComplianceConfig, BatchPackagingExactSource, BatchPackagingReportingMode, BatchPackagingScope, Battery, BatteryModel, ComplianceFamilyDocument, ComplianceFamilyRequirement, ComplianceFamilyRevision, ComplianceFamilyRisk, ComplianceFamilyTestPlan, ComplianceFamilyWarning, ComplianceProductFamily, ComplianceProductLink, ComplianceProductTest, Container, ContainerCostAllocationMode, ContainerCostBatch, ContainerCostLine, ContainerCostLineType, CsvScooterRow, Dealer, DocumentRecord, ExactBatchProbeResult, ExactConnectionStatus, ExactEndpointProbeResult, ExactProductImportRow, ExactSalesPackagingOverride, ExactSalesPreviewLine, Importer, LoanRecord, MaintenanceRecord, Product, ProductPackagingLayer, ProductPackagingRegistration, Scooter, ScooterPackagingSpec, ScooterStatus, Supplier, SupplierContact, WarrantyPart } from './types';
 
-type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'compliance' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance';
+type View = 'dashboard' | 'containers' | 'costBatches' | 'packaging' | 'compliance' | 'scooters' | 'sales' | 'batteries' | 'products' | 'suppliers' | 'dealers' | 'warranty' | 'maintenance' | 'loans';
 type ImportTarget = 'scooters' | 'scooterUpdates' | 'dealers';
 type ImportScooterStatus = ScooterStatus | 'file';
 type ProductModalTab = 'basic' | 'gpsr' | 'packaging' | 'certification' | 'batches';
@@ -266,6 +266,7 @@ const navGroups: Array<{ group: string; items: Array<{ id: View; label: string; 
       { id: 'dealers', label: 'Dealers', icon: UsersRound },
       { id: 'warranty', label: 'Garantie claims', icon: ShieldCheck },
       { id: 'maintenance', label: 'Onderhoud', icon: ClipboardList },
+      { id: 'loans', label: 'Uitgeleende spullen', icon: PackagePlus },
     ],
   },
 ];
@@ -286,6 +287,7 @@ const viewSlugs: Record<View, string> = {
   dealers: 'dealers',
   warranty: 'garantie-claims',
   maintenance: 'onderhoud',
+  loans: 'uitgeleende-spullen',
 };
 
 const viewsBySlug = new Map(Object.entries(viewSlugs).map(([view, slug]) => [slug, view as View]));
@@ -2170,6 +2172,7 @@ export function App() {
   const [exactProductImporting, setExactProductImporting] = useState(false);
   const [supplierMessage, setSupplierMessage] = useState('');
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
+  const [loanMessage, setLoanMessage] = useState('');
   const [batteryMessage, setBatteryMessage] = useState('');
   const [warrantyMessage, setWarrantyMessage] = useState('');
   const [statusFilter, setStatusFilter] = useState<ScooterStatus | 'all'>(() => {
@@ -2210,7 +2213,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (view !== 'products' && view !== 'scooters') return;
+    if (view !== 'products' && view !== 'scooters' && view !== 'loans') return;
     const route = routeFromLocation();
     const params = new URLSearchParams(route.params);
     if (query.trim()) params.set('zoek', query.trim()); else params.delete('zoek');
@@ -3667,6 +3670,48 @@ export function App() {
     }
   }
 
+  async function addLoan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const record: LoanRecord = {
+      id: `loan-${Date.now()}`,
+      itemName: String(form.get('itemName') ?? '').trim(),
+      itemCode: String(form.get('itemCode') ?? '').trim() || undefined,
+      quantity: String(form.get('quantity') ?? '1').trim() || '1',
+      borrower: String(form.get('borrower') ?? '').trim(),
+      borrowerCompany: String(form.get('borrowerCompany') ?? '').trim() || undefined,
+      borrowerPhone: String(form.get('borrowerPhone') ?? '').trim() || undefined,
+      loanDate: String(form.get('loanDate') ?? ''),
+      expectedReturnDate: String(form.get('expectedReturnDate') ?? '').trim() || undefined,
+      status: 'Uitgeleend',
+      notes: String(form.get('notes') ?? '').trim(),
+    };
+    try {
+      await upsertLoanRecords([record]);
+      setData((current) => ({ ...current, loans: [record, ...current.loans] }));
+      setLoanMessage(`${record.itemName} is geregistreerd als uitgeleend aan ${record.borrower}.`);
+      formElement.reset();
+    } catch (error) {
+      setLoanMessage(`Uitlening opslaan mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
+  async function updateLoan(record: LoanRecord) {
+    try {
+      await upsertLoanRecords([record]);
+      setData((current) => ({
+        ...current,
+        loans: current.loans.map((item) => item.id === record.id ? record : item),
+      }));
+      setLoanMessage(record.status === 'Teruggebracht'
+        ? `${record.itemName} is als teruggebracht geregistreerd.`
+        : `${record.itemName} is bijgewerkt.`);
+    } catch (error) {
+      setLoanMessage(`Uitlening bijwerken mislukt: ${importErrorMessage(error)}`);
+    }
+  }
+
   async function addDocument(scooterFrame: string, type: DocumentRecord['type'], note: string, file: File) {
     if (!file) throw new Error('Selecteer eerst een bestand.');
     const storagePath = await uploadScooterDocument(file, scooterFrame);
@@ -4019,6 +4064,7 @@ export function App() {
           {view === 'dealers' && <Dealers dealers={data.dealers} scooters={data.scooters} query={query} onImport={handleDealerImport} onAddDealer={addDealer} onUpdateDealer={updateDealer} message={dealerImportMessage} />}
           {view === 'warranty' && <Warranty data={data} products={data.products} query={query} addWarranty={addWarranty} updateWarranty={updateWarranty} message={warrantyMessage} />}
           {view === 'maintenance' && <Maintenance data={data} query={query} addMaintenance={addMaintenance} message={maintenanceMessage} />}
+          {view === 'loans' && <LoansPage loans={data.loans} query={query} message={loanMessage} onAdd={addLoan} onUpdate={updateLoan} />}
         </section>
       </main>
 
@@ -12577,6 +12623,109 @@ function WarrantyDetailModal({ claim, scooter, dealer, onClose }: { claim: Warra
         </section>
       </section>
     </div>
+  );
+}
+
+function LoansPage({
+  loans,
+  query,
+  message,
+  onAdd,
+  onUpdate,
+}: {
+  loans: LoanRecord[];
+  query: string;
+  message: string;
+  onAdd: (event: FormEvent<HTMLFormElement>) => void;
+  onUpdate: (record: LoanRecord) => void;
+}) {
+  const today = toInputDateValue(new Date());
+  const needle = query.trim().toLowerCase();
+  const visibleLoans = [...loans]
+    .filter((loan) => !needle || [loan.itemName, loan.itemCode, loan.borrower, loan.borrowerCompany, loan.borrowerPhone, loan.notes]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(needle)))
+    .sort((left, right) => right.loanDate.localeCompare(left.loanDate));
+  const activeLoans = loans.filter((loan) => loan.status !== 'Teruggebracht');
+  const overdueLoans = activeLoans.filter((loan) => Boolean(loan.expectedReturnDate && loan.expectedReturnDate < today));
+  const returnedLoans = loans.filter((loan) => loan.status === 'Teruggebracht');
+
+  function effectiveStatus(loan: LoanRecord): LoanRecord['status'] {
+    if (loan.status === 'Teruggebracht') return loan.status;
+    return loan.expectedReturnDate && loan.expectedReturnDate < today ? 'Te laat' : 'Uitgeleend';
+  }
+
+  return (
+    <>
+      <div className="page-title-row">
+        <div>
+          <h1>Uitgeleende spullen</h1>
+          <span>Registreer spullen die tijdelijk buiten de zaak zijn</span>
+        </div>
+      </div>
+      {message && <div className="notice">{message}</div>}
+      <div className="sales-summary loan-summary">
+        <div><span>Nu uitgeleend</span><strong>{activeLoans.length}</strong></div>
+        <div><span>Te laat</span><strong>{overdueLoans.length}</strong></div>
+        <div><span>Teruggebracht</span><strong>{returnedLoans.length}</strong></div>
+      </div>
+      <div className="two-col loans-layout">
+        <section className="panel">
+          <div className="panel-title"><PackagePlus size={16} /> Overzicht</div>
+          {visibleLoans.length === 0 ? (
+            <div className="empty-state inline">
+              <PackagePlus size={22} />
+              <strong>{loans.length ? 'Geen resultaten' : 'Nog niets uitgeleend'}</strong>
+              <span>{loans.length ? 'Pas de zoekopdracht aan.' : 'Nieuwe uitleningen verschijnen hier zodra je ze toevoegt.'}</span>
+            </div>
+          ) : (
+            <div className="loan-list">
+              {visibleLoans.map((loan) => {
+                const status = effectiveStatus(loan);
+                return (
+                  <article className="loan-row" key={loan.id}>
+                    <div className="loan-row-main">
+                      <strong>{loan.itemName}</strong>
+                      <span>{loan.itemCode ? `${loan.itemCode} · ` : ''}{loan.quantity} stuks · {loan.borrower}</span>
+                      <small>{loan.borrowerCompany || 'Geen bedrijf'}{loan.borrowerPhone ? ` · ${loan.borrowerPhone}` : ''}</small>
+                      <small>Uitgeleend {formatDate(loan.loanDate)} · retour verwacht {formatDate(loan.expectedReturnDate)}</small>
+                      {loan.notes ? <small>{loan.notes}</small> : null}
+                    </div>
+                    <div className="loan-row-actions">
+                      <span className={`status-pill ${status === 'Te laat' ? 'warning' : ''}`}>{status}</span>
+                      {loan.status !== 'Teruggebracht' ? (
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={() => onUpdate({ ...loan, status: 'Teruggebracht', returnedAt: today })}
+                        >
+                          <CheckCircle2 size={15} /> Teruggebracht
+                        </button>
+                      ) : <small>Terug op {formatDate(loan.returnedAt)}</small>}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+        <form className="panel form-panel" onSubmit={onAdd}>
+          <div className="panel-title"><Plus size={16} /> Nieuwe uitlening</div>
+          <div className="form-grid warranty-form-grid">
+            <label>Spul / artikel<input name="itemName" required placeholder="Bijv. acculader" /></label>
+            <label>Artikel- of serienummer<input name="itemCode" placeholder="Optioneel" /></label>
+            <label>Aantal<input name="quantity" type="number" min="1" step="1" defaultValue="1" required /></label>
+            <label>Uitgeleend aan<input name="borrower" required placeholder="Naam persoon" /></label>
+            <label>Bedrijf<input name="borrowerCompany" placeholder="Optioneel" /></label>
+            <label>Telefoonnummer<input name="borrowerPhone" type="tel" placeholder="Optioneel" /></label>
+            <label>Uitleendatum<input name="loanDate" type="date" defaultValue={today} required /></label>
+            <label>Verwachte retourdatum<input name="expectedReturnDate" type="date" min={today} /></label>
+            <label className="wide-field">Opmerkingen<textarea name="notes" placeholder="Bijv. inclusief kabel en koffer" /></label>
+          </div>
+          <button className="primary-button">Uitlening opslaan</button>
+        </form>
+      </div>
+    </>
   );
 }
 
