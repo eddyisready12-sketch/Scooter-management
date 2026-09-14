@@ -915,13 +915,13 @@ export function buildDymoOuterBoxLabelXml({
   </DrawCommands>
   ${textObject({ name: 'ArticleValue', value: escapedArticleNumber, x: 220, y: 130, width: 2200, height: 260, size: 16, bold: true })}
   ${textObject({ name: 'DescriptionValue', value: escapedDescription, x: 220, y: 410, width: 2050, height: 390, size: 14, bold: true })}
-  ${textObject({ name: 'ResponsibleParty', value: escapedResponsibleParty, x: 220, y: 820, width: 2050, height: 760, size: 6 })}
-  ${textObject({ name: 'Origin', value: escapedOrigin, x: 220, y: 1600, width: 1100, height: 140, size: 6, bold: true })}
+  ${textObject({ name: 'ResponsibleParty', value: escapedResponsibleParty, x: 220, y: 820, width: 2050, height: 540, size: 6 })}
+  ${textObject({ name: 'Origin', value: escapedOrigin, x: 220, y: 1840, width: 1900, height: 130, size: 6, bold: true })}
   ${barcodeObject}
   ${textObject({ name: 'QuantityLabel', value: 'Aantal', x: 2450, y: 100, width: 2220, height: 130, size: 8, bold: true, alignment: 'Center' })}
   ${textObject({ name: 'QuantityValue', value: escapedQuantity, x: 2450, y: 240, width: 2220, height: 300, size: 18, bold: true, alignment: 'Center' })}
-  ${textObject({ name: 'BatchLabel', value: 'Batch', x: 260, y: 1180, width: 1900, height: 140, size: 8, bold: true })}
-  ${textObject({ name: 'BatchValue', value: escapedBatchCode, x: 260, y: 1330, width: 1900, height: 340, size: 18, bold: true })}
+  ${textObject({ name: 'BatchLabel', value: 'Batch', x: 220, y: 1380, width: 2050, height: 130, size: 7, bold: true })}
+  ${textObject({ name: 'BatchValue', value: escapedBatchCode, x: 220, y: 1510, width: 2050, height: 310, size: 16, bold: true })}
 </DieCutLabel>`;
 }
 
@@ -1186,8 +1186,15 @@ export function openOuterBoxLabelPreview({
             padding: 3mm 4mm;
             box-sizing: border-box;
             display: grid;
-            grid-template-rows: auto auto 1fr;
-            gap: 1.5mm;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+            gap: 3mm;
+            overflow: hidden;
+          }
+          .left-column {
+            min-width: 0;
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+            align-content: stretch;
           }
           .article-number {
             font-size: 4.6mm;
@@ -1202,7 +1209,7 @@ export function openOuterBoxLabelPreview({
             letter-spacing: 0.04em;
           }
           .description {
-            max-width: 42mm;
+            max-width: 100%;
             font-size: 3.6mm;
             font-weight: 700;
             line-height: 1.08;
@@ -1212,34 +1219,23 @@ export function openOuterBoxLabelPreview({
             -webkit-box-orient: vertical;
           }
           .responsible-party {
-            max-width: 42mm;
+            max-width: 100%;
             font-size: 1.65mm;
             line-height: 1.2;
             color: #334155;
+            overflow: hidden;
           }
           .origin {
             margin-top: 0.6mm;
             font-size: 1.7mm;
             font-weight: 700;
           }
-          .bottom-row {
+          .right-column {
             display: grid;
-            grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-            align-items: center;
-            gap: 2mm;
-            width: 100%;
-          }
-          .details-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.6mm;
-            align-items: center;
-          }
-          .barcode-column {
-            display: grid;
-            grid-template-rows: auto 1fr;
-            gap: 1mm;
+            grid-template-rows: auto minmax(0, 1fr);
+            gap: 1.5mm;
             min-width: 0;
+            min-height: 0;
           }
           .quantity-block {
             text-align: center;
@@ -1248,20 +1244,19 @@ export function openOuterBoxLabelPreview({
             margin-top: 0.2mm;
             font-size: 4mm;
           }
-          .detail-card {
-            border: 1px solid #d7dee6;
-            border-radius: 6px;
-            padding: 1.4mm 1.8mm;
-            min-height: 16mm;
-            box-sizing: border-box;
-            background: #f8fafc;
-          }
           .detail-value {
-            margin-top: 0.8mm;
+            margin-top: 0.3mm;
             font-size: 5mm;
             font-weight: 700;
             line-height: 1.1;
             word-break: break-word;
+          }
+          .batch-block {
+            padding-top: 0.6mm;
+          }
+          .batch-block .detail-value {
+            font-size: 4.2mm;
+            line-height: 1;
           }
           .barcode-wrap {
             display: flex;
@@ -1269,13 +1264,14 @@ export function openOuterBoxLabelPreview({
             align-items: end;
             min-width: 0;
             width: 100%;
-            min-height: 15mm;
+            min-height: 0;
+            overflow: hidden;
           }
           .barcode-wrap img {
             width: 100%;
             max-width: 100%;
             height: 100%;
-            max-height: 15mm;
+            max-height: 100%;
             object-fit: fill;
             object-position: right bottom;
             display: block;
@@ -1294,24 +1290,20 @@ export function openOuterBoxLabelPreview({
             <h1 class="preview-title">Omdoos sticker voorbeeld</h1>
             <p class="preview-note">Lokale preview zonder printer. Verhouding is afgestemd op de DYMO-sticker.</p>
             <div class="sticker">
-              <div class="article-number">${articleHtml}</div>
-              <div>
+              <div class="left-column">
+                <div class="article-number">${articleHtml}</div>
                 <div class="description">${descriptionHtml}</div>
                 <div class="responsible-party">${responsiblePartyHtml}</div>
+                <div class="batch-block">
+                  <div class="label-caption">Batch</div>
+                  <div class="detail-value">${batchHtml}</div>
+                </div>
                 <div class="origin">${originHtml}</div>
               </div>
-              <div class="bottom-row">
-                <div class="details-grid">
-                  <div class="detail-card">
-                    <div class="label-caption">Batch</div>
-                    <div class="detail-value">${batchHtml}</div>
-                  </div>
-                </div>
-                <div class="barcode-column">
-                  <div class="quantity-block"><div class="label-caption">Aantal</div><div class="detail-value">${quantityHtml}</div></div>
-                  <div class="barcode-wrap">
-                    ${barcodeImage ? `<img src="${barcodeImage}" alt="Barcode ${barcodeHtml}" />` : `<div class="barcode-fallback">${barcodeHtml}</div>`}
-                  </div>
+              <div class="right-column">
+                <div class="quantity-block"><div class="label-caption">Aantal</div><div class="detail-value">${quantityHtml}</div></div>
+                <div class="barcode-wrap">
+                  ${barcodeImage ? `<img src="${barcodeImage}" alt="Barcode ${barcodeHtml}" />` : `<div class="barcode-fallback">${barcodeHtml}</div>`}
                 </div>
               </div>
             </div>
