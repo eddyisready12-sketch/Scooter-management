@@ -43,12 +43,35 @@ export const dymo99012Layout = {
 };
 
 export type ZebraProductLabelSize = '80x42' | '80x36';
+export type ZebraPrinterDpi = 203 | 300;
 
-export const zebraProductLabelLayouts: Record<ZebraProductLabelSize, { width: number; height: number; label: string }> = {
-  // Zebra ZD421 (203 dpi): approximately 8 dots per millimetre.
-  '80x42': { width: 640, height: 336, label: '80 x 42 mm' },
-  '80x36': { width: 640, height: 288, label: '80 x 36 mm' },
+export const zebraProductLabelLayouts: Record<ZebraProductLabelSize, { width: number; height: number; widthMm: number; heightMm: number; label: string }> = {
+  // The design grid uses the original 203-DPI coordinates. Raster output is
+  // scaled to the selected printer's native resolution before it is sent.
+  '80x42': { width: 640, height: 336, widthMm: 80, heightMm: 42, label: '80 x 42 mm' },
+  '80x36': { width: 640, height: 288, widthMm: 80, heightMm: 36, label: '80 x 36 mm' },
 };
+
+const zebraPrinterDpiStorageKey = 'rso-zebra-printer-dpi';
+
+export function readZebraPrinterDpi(): ZebraPrinterDpi {
+  if (typeof window === 'undefined') return 203;
+  return window.localStorage.getItem(zebraPrinterDpiStorageKey) === '300' ? 300 : 203;
+}
+
+export function saveZebraPrinterDpi(dpi: ZebraPrinterDpi) {
+  window.localStorage.setItem(zebraPrinterDpiStorageKey, String(dpi));
+}
+
+function zebraRasterLayout(size: ZebraProductLabelSize, dpi = readZebraPrinterDpi()) {
+  const design = zebraProductLabelLayouts[size];
+  return {
+    ...design,
+    dpi,
+    rasterWidth: Math.round((design.widthMm / 25.4) * dpi),
+    rasterHeight: Math.round((design.heightMm / 25.4) * dpi),
+  };
+}
 
 export function escapeZplField(value: string) {
   return value
@@ -167,19 +190,21 @@ export function canvasToZplGraphic(canvas: HTMLCanvasElement) {
 }
 
 export async function buildZebraProductLabelRasterZpl(product: Product, size: ZebraProductLabelSize, quantityPerPackage?: number) {
-  const layout = zebraProductLabelLayouts[size];
+  const layout = zebraRasterLayout(size);
   const barcodeSource = product.barcode?.trim() || product.code.trim();
   const batchCode = product.batchNumber?.trim() || product.batch?.trim() || product.traceabilityCode?.trim();
   if (!barcodeSource) throw new Error('Product heeft geen barcode of code om te printen.');
   if (!batchCode) throw new Error('Product heeft geen batchcode om als QR-code te printen.');
 
   const canvas = document.createElement('canvas');
-  canvas.width = layout.width;
-  canvas.height = layout.height;
+  canvas.width = layout.rasterWidth;
+  canvas.height = layout.rasterHeight;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Zebra-label kon niet worden opgebouwd.');
+  context.scale(layout.rasterWidth / layout.width, layout.rasterHeight / layout.height);
+  context.imageSmoothingEnabled = false;
   context.fillStyle = '#fff';
-  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillRect(0, 0, layout.width, layout.height);
   context.fillStyle = '#000';
   context.textBaseline = 'top';
 
@@ -266,8 +291,8 @@ export async function buildZebraProductLabelRasterZpl(product: Product, size: Ze
   return {
     dataUrl: canvas.toDataURL('image/png'),
     zpl: `^XA
-^PW${layout.width}
-^LL${layout.height}
+^PW${layout.rasterWidth}
+^LL${layout.rasterHeight}
 ^LH0,0
 ^FO0,0${canvasToZplGraphic(canvas)}^FS
 ^PQ1,0,1,N
@@ -1003,7 +1028,7 @@ export async function printProductZebraLabel(product: Product, quantity = 1, siz
     }
   }
 
-  return `${printer.name || 'Zebra ZD421'} (${zebraProductLabelLayouts[size].label})`;
+  return `${printer.name || 'Zebra ZD421'} (${zebraProductLabelLayouts[size].label}, ${readZebraPrinterDpi()} DPI)`;
 }
 
 export async function previewProductZebraLabel(product: Product, size: ZebraProductLabelSize, quantityPerPackage?: number) {
@@ -1014,7 +1039,7 @@ export async function previewProductZebraLabel(product: Product, size: ZebraProd
 
   try {
     const { dataUrl } = await buildZebraProductLabelRasterZpl(product, size, quantityPerPackage);
-    const layout = zebraProductLabelLayouts[size];
+    const layout = zebraRasterLayout(size);
     previewWindow.document.open();
     previewWindow.document.write(`<!doctype html>
 <html lang="nl">
@@ -1028,13 +1053,13 @@ export async function previewProductZebraLabel(product: Product, size: ZebraProd
     h1 { margin: 0; font-size: 18px; }
     p { margin: 5px 0 0; color: #c7c9cc; font-size: 13px; }
     .sheet { width: min(100%, 900px); margin: 0 auto; padding: 28px; background: #34363a; border-radius: 12px; overflow: auto; }
-    img { display: block; width: ${layout.width}px; max-width: none; height: ${layout.height}px; background: #fff; image-rendering: pixelated; box-shadow: 0 8px 26px rgba(0,0,0,.35); }
+    img { display: block; width: ${layout.rasterWidth}px; max-width: none; height: ${layout.rasterHeight}px; background: #fff; image-rendering: pixelated; box-shadow: 0 8px 26px rgba(0,0,0,.35); }
   </style>
 </head>
 <body>
   <header>
     <div>
-      <h1>Zebra ZD421 — ${layout.label} liggend</h1>
+      <h1>Zebra ZD421 — ${layout.label} liggend · ${layout.dpi} DPI</h1>
       <p>Dit is exact de zwart-witafbeelding die naar de printer wordt gestuurd.</p>
     </div>
   </header>

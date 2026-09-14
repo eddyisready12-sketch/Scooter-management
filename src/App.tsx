@@ -44,8 +44,8 @@ import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseExactBatchTransactionsImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
 import { migratePpwrLocalStorage, migrateSupplierPpwr, ppwrSupplierStatus } from './lib/ppwr-suppliers';
 import { findPackagingMaterialOption, packagingMaterialOptions } from './lib/packaging-materials';
-import { buildScooterBarcodeDataUrl, openOuterBoxLabelPreview, previewProductZebraLabel, printOuterBoxDymoLabel, printProductDymoLabel, printProductZebraLabel, printScooterDymoLabel, productImporterLabelValue, zebraProductLabelLayouts } from './lib/labels';
-import type { ZebraProductLabelSize } from './lib/labels';
+import { buildScooterBarcodeDataUrl, openOuterBoxLabelPreview, previewProductZebraLabel, printOuterBoxDymoLabel, printProductDymoLabel, printProductZebraLabel, printScooterDymoLabel, productImporterLabelValue, readZebraPrinterDpi, saveZebraPrinterDpi, zebraProductLabelLayouts } from './lib/labels';
+import type { ZebraPrinterDpi, ZebraProductLabelSize } from './lib/labels';
 import { asOptionalTrimmedString, certificationRuleForArticleGroup, createEmptyPackagingLayer, createProductDraft, formatCertificationPresence, getProductBatchOverviewRows, getProductComplianceResponsibility, getProductComplianceSummary, isCeMissing, isCeRelevant, isEMarkMissing, isEMarkRelevant, isStickerPackagingLayer, normalizePackagingLayers, productComplianceIssueLevelLabel, sumPackagingLayerWeights, summarizePackagingWasteStream, unitsPerPackageFromProduct } from './lib/products';
 import type { ProductComplianceLevel } from './lib/products';
 import { ImagePreview } from './modals/ImagePreview';
@@ -10300,6 +10300,7 @@ function ProductDetailModal({
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [labelPrinter, setLabelPrinter] = useState<'dymo' | 'zebra'>('zebra');
   const [zebraLabelSize, setZebraLabelSize] = useState<ZebraProductLabelSize>('80x42');
+  const [zebraPrinterDpi, setZebraPrinterDpi] = useState<ZebraPrinterDpi>(() => readZebraPrinterDpi());
   const [labelQuantity, setLabelQuantity] = useState('1');
   const [labelPackageUnits, setLabelPackageUnits] = useState<number | null>(null);
   const [productImageFailed, setProductImageFailed] = useState(false);
@@ -10742,23 +10743,45 @@ function ProductDetailModal({
               </fieldset>
 
               {labelPrinter === 'zebra' && (
-                <fieldset className="product-print-choice-group">
-                  <legend>Etiketformaat — liggend</legend>
-                  <div className="product-print-options size-options">
-                    {(['80x42', '80x36'] as ZebraProductLabelSize[]).map((size) => (
-                      <button
-                        type="button"
-                        key={size}
-                        className={`product-print-option size-option ${zebraLabelSize === size ? 'selected' : ''}`}
-                        onClick={() => setZebraLabelSize(size)}
-                      >
-                        <span className="product-print-option-check">{zebraLabelSize === size && <CheckCircle2 size={19} />}</span>
-                        <span className={`label-size-shape ${size}`} />
-                        <span><strong>{zebraProductLabelLayouts[size].label}</strong><small>Liggend</small></span>
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
+                <>
+                  <fieldset className="product-print-choice-group">
+                    <legend>Printerresolutie</legend>
+                    <div className="product-print-options size-options">
+                      {([203, 300] as ZebraPrinterDpi[]).map((dpi) => (
+                        <button
+                          type="button"
+                          key={dpi}
+                          className={`product-print-option size-option ${zebraPrinterDpi === dpi ? 'selected' : ''}`}
+                          onClick={() => {
+                            setZebraPrinterDpi(dpi);
+                            saveZebraPrinterDpi(dpi);
+                          }}
+                        >
+                          <span className="product-print-option-check">{zebraPrinterDpi === dpi && <CheckCircle2 size={19} />}</span>
+                          <Printer size={22} />
+                          <span><strong>{dpi} DPI</strong><small>{dpi === 300 ? 'Nieuwe scherpe printer' : 'Oude printer'}</small></span>
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+                  <fieldset className="product-print-choice-group">
+                    <legend>Etiketformaat — liggend</legend>
+                    <div className="product-print-options size-options">
+                      {(['80x42', '80x36'] as ZebraProductLabelSize[]).map((size) => (
+                        <button
+                          type="button"
+                          key={size}
+                          className={`product-print-option size-option ${zebraLabelSize === size ? 'selected' : ''}`}
+                          onClick={() => setZebraLabelSize(size)}
+                        >
+                          <span className="product-print-option-check">{zebraLabelSize === size && <CheckCircle2 size={19} />}</span>
+                          <span className={`label-size-shape ${size}`} />
+                          <span><strong>{zebraProductLabelLayouts[size].label}</strong><small>Liggend · {zebraPrinterDpi} DPI</small></span>
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+                </>
               )}
 
               {packagingVariants?.length ? (
