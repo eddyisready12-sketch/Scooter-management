@@ -44,7 +44,7 @@ import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseExactBatchTransactionsImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
 import { migratePpwrLocalStorage, migrateSupplierPpwr, ppwrSupplierStatus } from './lib/ppwr-suppliers';
 import { findPackagingMaterialOption, packagingMaterialOptions } from './lib/packaging-materials';
-import { buildScooterBarcodeDataUrl, openOuterBoxLabelPreview, previewProductZebraLabel, printOuterBoxDymoLabel, printProductDymoLabel, printProductZebraLabel, printScooterDymoLabel, productImporterLabelValue, readZebraPrinterDpi, saveZebraPrinterDpi, zebraProductLabelLayouts } from './lib/labels';
+import { buildScooterBarcodeDataUrl, previewProductZebraLabel, printProductDymoLabel, printProductZebraLabel, printScooterDymoLabel, productImporterLabelValue, readZebraPrinterDpi, saveZebraPrinterDpi, zebraProductLabelLayouts } from './lib/labels';
 import type { ZebraPrinterDpi, ZebraProductLabelSize } from './lib/labels';
 import { asOptionalTrimmedString, certificationRuleForArticleGroup, createEmptyPackagingLayer, createProductDraft, formatCertificationPresence, getProductBatchOverviewRows, getProductComplianceResponsibility, getProductComplianceSummary, isCeMissing, isCeRelevant, isEMarkMissing, isEMarkRelevant, isStickerPackagingLayer, normalizePackagingLayers, productComplianceIssueLevelLabel, sumPackagingLayerWeights, summarizePackagingWasteStream, unitsPerPackageFromProduct } from './lib/products';
 import type { ProductComplianceLevel } from './lib/products';
@@ -3016,33 +3016,30 @@ export function App() {
     const articleNumber = sourceProduct.code?.trim() || line.referenceCode.trim();
     const barcodeValue = sourceProduct.barcode?.trim() || articleNumber;
 
-    return printOuterBoxDymoLabel({
-      articleNumber,
-      description: label.description,
-      barcodeValue,
-      batchCode,
-      quantityPerLabel: label.quantityPerLabel,
-      labelsToPrint: label.labelsToPrint,
-      responsibleParty: productImporterLabelValue(sourceProduct),
-      countryOfOrigin: sourceProduct.countryOfOrigin?.trim() || 'China',
-    });
+    saveZebraPrinterDpi(label.zebraDpi);
+    return printProductZebraLabel({
+      ...sourceProduct,
+      code: articleNumber,
+      barcode: barcodeValue,
+      labelTitle: label.description,
+      batchNumber: batchCode,
+    }, label.labelsToPrint, label.zebraSize, label.quantityPerLabel);
   }
 
-  function previewBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, label: OuterBoxLabelInput) {
+  async function previewBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, label: OuterBoxLabelInput) {
     const sourceProduct = productFromCostLine(line, product);
     const batchCode = batch.orderNumber?.trim() || sourceProduct.batchNumber?.trim() || batch.containerNumber?.trim() || line.batchId;
     const articleNumber = sourceProduct.code?.trim() || line.referenceCode.trim();
     const barcodeValue = sourceProduct.barcode?.trim() || articleNumber;
 
-    openOuterBoxLabelPreview({
-      articleNumber,
-      description: label.description,
-      barcodeValue,
-      batchCode,
-      quantityPerLabel: label.quantityPerLabel,
-      responsibleParty: productImporterLabelValue(sourceProduct),
-      countryOfOrigin: sourceProduct.countryOfOrigin?.trim() || 'China',
-    });
+    saveZebraPrinterDpi(label.zebraDpi);
+    await previewProductZebraLabel({
+      ...sourceProduct,
+      code: articleNumber,
+      barcode: barcodeValue,
+      labelTitle: label.description,
+      batchNumber: batchCode,
+    }, label.zebraSize, label.quantityPerLabel);
   }
 
   async function togglePurchaseOrderLine(line: ContainerCostLine, purchaseOrderAdded: boolean) {
@@ -6913,6 +6910,8 @@ type OuterBoxLabelInput = {
   quantityPerLabel: number;
   labelsToPrint: number;
   description: string;
+  zebraSize: ZebraProductLabelSize;
+  zebraDpi: ZebraPrinterDpi;
 };
 
 type OuterBoxLabelDialog = {
@@ -6922,6 +6921,8 @@ type OuterBoxLabelDialog = {
   quantityPerLabel: string;
   labelsToPrint: string;
   description: string;
+  zebraSize: ZebraProductLabelSize;
+  zebraDpi: ZebraPrinterDpi;
 };
 
 function CostBatchesPage({
@@ -6944,7 +6945,7 @@ function CostBatchesPage({
   onSelectProduct: (product: Product, tab?: ProductModalTab) => void;
   onOpenBatchLabelProduct: (batch: ContainerCostBatch, line: ContainerCostLine, product?: Product) => void;
   onPrintOuterBoxLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, label: OuterBoxLabelInput) => Promise<string | null>;
-  onPreviewOuterBoxLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, label: OuterBoxLabelInput) => void;
+  onPreviewOuterBoxLabel: (batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, label: OuterBoxLabelInput) => Promise<void>;
   onTogglePurchaseOrderLine: (line: ContainerCostLine, purchaseOrderAdded: boolean) => Promise<void>;
   onSaveBatchPackagingPlan: (line: ContainerCostLine, plan: BatchPackagingPlan) => Promise<void>;
   onSaveScooterPackagingSpec: (spec: ScooterPackagingSpec) => Promise<boolean>;
@@ -7002,6 +7003,8 @@ function CostBatchesPage({
       product,
       quantityPerLabel: String(quantityPerLabel),
       labelsToPrint: String(matchingGroup?.packages ?? 1),
+      zebraSize: '80x42',
+      zebraDpi: readZebraPrinterDpi(),
       description: sourceProduct.labelTitle?.trim()
         || sourceProduct.shortDescription?.trim()
         || sourceProduct.description?.trim()
@@ -7720,7 +7723,7 @@ function CostBatchesPage({
                   outerBoxLabelDialog.batch,
                   outerBoxLabelDialog.line,
                   outerBoxLabelDialog.product,
-                  { quantityPerLabel: outerBoxQuantity, labelsToPrint: outerBoxLabels, description: outerBoxLabelDialog.description.trim() },
+                  { quantityPerLabel: outerBoxQuantity, labelsToPrint: outerBoxLabels, description: outerBoxLabelDialog.description.trim(), zebraSize: outerBoxLabelDialog.zebraSize, zebraDpi: outerBoxLabelDialog.zebraDpi },
                 );
                 if (printerName) {
                   setPrintMessage(`Omdoos-sticker verstuurd naar ${printerName} voor ${outerBoxLabelDialog.line.referenceCode}.`);
@@ -7747,6 +7750,18 @@ function CostBatchesPage({
                   <input type="number" min="1" step="1" value={outerBoxLabelDialog.labelsToPrint} onChange={(event) => setOuterBoxLabelDialog((current) => current ? { ...current, labelsToPrint: event.target.value } : current)} />
                   {outerBoxLabelsError ? <small className="field-error">{outerBoxLabelsError}</small> : null}
                 </label>
+                <label>Etiketformaat
+                  <select value={outerBoxLabelDialog.zebraSize} onChange={(event) => setOuterBoxLabelDialog((current) => current ? { ...current, zebraSize: event.target.value as ZebraProductLabelSize } : current)}>
+                    <option value="80x42">80 × 42 mm</option>
+                    <option value="80x36">80 × 36 mm</option>
+                  </select>
+                </label>
+                <label>Zebra printer
+                  <select value={outerBoxLabelDialog.zebraDpi} onChange={(event) => setOuterBoxLabelDialog((current) => current ? { ...current, zebraDpi: Number(event.target.value) as ZebraPrinterDpi } : current)}>
+                    <option value="300">ZD421 300 DPI (nieuw)</option>
+                    <option value="203">ZD421 203 DPI (oud)</option>
+                  </select>
+                </label>
                 <label>Artikelomschrijving
                   <textarea rows={4} value={outerBoxLabelDialog.description} onChange={(event) => setOuterBoxLabelDialog((current) => current ? { ...current, description: event.target.value } : current)} />
                   {!outerBoxLabelDialog.description.trim() ? <small className="field-error">Vul een artikelomschrijving in.</small> : null}
@@ -7766,9 +7781,9 @@ function CostBatchesPage({
                 type="button"
                 className="secondary-button"
                 disabled={!outerBoxLabelValid || outerBoxLabelPrinting}
-                onClick={() => {
+                onClick={async () => {
                   try {
-                    onPreviewOuterBoxLabel(outerBoxLabelDialog.batch, outerBoxLabelDialog.line, outerBoxLabelDialog.product, { quantityPerLabel: outerBoxQuantity, labelsToPrint: outerBoxLabels, description: outerBoxLabelDialog.description.trim() });
+                    await onPreviewOuterBoxLabel(outerBoxLabelDialog.batch, outerBoxLabelDialog.line, outerBoxLabelDialog.product, { quantityPerLabel: outerBoxQuantity, labelsToPrint: outerBoxLabels, description: outerBoxLabelDialog.description.trim(), zebraSize: outerBoxLabelDialog.zebraSize, zebraDpi: outerBoxLabelDialog.zebraDpi });
                   } catch (error) {
                     setPrintMessage(`Omdoos-sticker voorbeeld mislukt: ${importErrorMessage(error)}`);
                   }
