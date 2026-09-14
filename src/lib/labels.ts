@@ -1073,6 +1073,117 @@ export async function previewProductZebraLabel(product: Product, size: ZebraProd
   }
 }
 
+export function buildZebraOuterBoxLabelRasterZpl({
+  articleNumber,
+  description,
+  barcodeValue,
+  batchCode,
+  quantityPerLabel,
+  size,
+}: {
+  articleNumber: string;
+  description: string;
+  barcodeValue: string;
+  batchCode: string;
+  quantityPerLabel: number;
+  size: ZebraProductLabelSize;
+}) {
+  const layout = zebraRasterLayout(size);
+  const canvas = document.createElement('canvas');
+  canvas.width = layout.rasterWidth;
+  canvas.height = layout.rasterHeight;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Zebra-omdoossticker kon niet worden opgebouwd.');
+  context.scale(layout.rasterWidth / layout.width, layout.rasterHeight / layout.height);
+  context.imageSmoothingEnabled = false;
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, layout.width, layout.height);
+  context.fillStyle = '#000';
+  context.textBaseline = 'top';
+
+  context.font = '700 34px Arial';
+  context.fillText(articleNumber, 22, 16, 596);
+
+  const normalizedDescription = truncateLabelText(description, 86);
+  let descriptionSize = 24;
+  do {
+    context.font = `${descriptionSize}px Arial`;
+    if (context.measureText(normalizedDescription).width <= 596 || descriptionSize <= 16) break;
+    descriptionSize -= 1;
+  } while (descriptionSize > 16);
+  context.fillText(normalizedDescription, 22, 62, 596);
+
+  const barcodeCanvas = document.createElement('canvas');
+  (bwipjs as unknown as { toCanvas: (canvas: HTMLCanvasElement, options: Record<string, unknown>) => HTMLCanvasElement }).toCanvas(barcodeCanvas, {
+    bcid: 'code128',
+    text: barcodeValue.replace(/\s/g, ''),
+    scaleX: 3,
+    scaleY: 3,
+    height: 14,
+    includetext: true,
+    textxalign: 'center',
+    textsize: 10,
+    paddingwidth: 0,
+    paddingheight: 0,
+    backgroundcolor: 'FFFFFF',
+    barcolor: '000000',
+    textcolor: '000000',
+  });
+  const compact = size === '80x36';
+  drawContainedImage(context, barcodeCanvas, 22, 102, 596, compact ? 92 : 112);
+
+  const dividerY = compact ? 205 : 235;
+  context.fillRect(22, dividerY, 596, 2);
+  context.font = '700 14px Arial';
+  context.fillText('Batch', 28, dividerY + 12);
+  context.fillText('Aantal', 416, dividerY + 12);
+  context.font = compact ? '700 29px Arial' : '700 34px Arial';
+  context.fillText(batchCode, 28, dividerY + 32, 350);
+  context.textAlign = 'right';
+  context.fillText(`${formatQuantity(quantityPerLabel)} stuks`, 612, dividerY + 32, 190);
+  context.textAlign = 'left';
+
+  return {
+    dataUrl: canvas.toDataURL('image/png'),
+    layout,
+    zpl: `^XA
+^PW${layout.rasterWidth}
+^LL${layout.rasterHeight}
+^LH0,0
+^FO0,0${canvasToZplGraphic(canvas)}^FS
+^PQ1,0,1,N
+^XZ`,
+  };
+}
+
+export async function printOuterBoxZebraLabel(input: Parameters<typeof buildZebraOuterBoxLabelRasterZpl>[0] & { labelsToPrint: number }) {
+  const { endpoint, printer } = await getAvailableZebraPrinter();
+  const { zpl, layout } = buildZebraOuterBoxLabelRasterZpl(input);
+  for (let index = 0; index < input.labelsToPrint; index += 1) {
+    const response = await fetch(`${endpoint}/write`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device: printer, data: zpl }),
+    });
+    if (!response.ok) throw new Error(`Zebra Browser Print gaf fout ${response.status} bij label ${index + 1}.`);
+  }
+  return `${printer.name || 'Zebra ZD421'} (${layout.label}, ${layout.dpi} DPI)`;
+}
+
+export async function previewOuterBoxZebraLabel(input: Parameters<typeof buildZebraOuterBoxLabelRasterZpl>[0]) {
+  const previewWindow = window.open('', '_blank', 'popup,width=920,height=650');
+  if (!previewWindow) throw new Error('Het voorbeeldvenster is geblokkeerd. Sta pop-ups voor deze website toe en probeer opnieuw.');
+  try {
+    const { dataUrl, layout } = buildZebraOuterBoxLabelRasterZpl(input);
+    previewWindow.document.open();
+    previewWindow.document.write(`<!doctype html><html lang="nl"><head><meta charset="utf-8"><title>Voorbeeld Zebra-omdoossticker</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:32px;background:#202124;color:#fff;font-family:Arial,sans-serif}header,.sheet{width:min(100%,900px);margin:0 auto}header{margin-bottom:22px}h1{margin:0;font-size:18px}p{margin:5px 0 0;color:#c7c9cc;font-size:13px}.sheet{padding:28px;background:#34363a;border-radius:12px;overflow:auto}img{display:block;width:${layout.rasterWidth}px;height:${layout.rasterHeight}px;max-width:none;background:#fff;image-rendering:pixelated;box-shadow:0 8px 26px rgba(0,0,0,.35)}</style></head><body><header><h1>Zebra omdoossticker — ${layout.label} · ${layout.dpi} DPI</h1><p>Dit is exact de afbeelding die naar de printer wordt gestuurd.</p></header><div class="sheet"><img src="${dataUrl}" alt="Voorbeeld omdoossticker"></div></body></html>`);
+    previewWindow.document.close();
+  } catch (error) {
+    previewWindow.close();
+    throw error;
+  }
+}
+
 export async function printOuterBoxDymoLabel({
   articleNumber,
   description,

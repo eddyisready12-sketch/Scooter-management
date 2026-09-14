@@ -44,7 +44,7 @@ import { demoData } from './data/demo-data';
 import { csvRowsToScooters, dealerRowsFromScooterRows, parseDealerImport, parseExactBatchTransactionsImport, parseProductImport, parseScooterImport, updateScootersFromRows } from './lib/csv';
 import { migratePpwrLocalStorage, migrateSupplierPpwr, ppwrSupplierStatus } from './lib/ppwr-suppliers';
 import { findPackagingMaterialOption, packagingMaterialOptions } from './lib/packaging-materials';
-import { buildScooterBarcodeDataUrl, previewProductZebraLabel, printProductDymoLabel, printProductZebraLabel, printScooterDymoLabel, productImporterLabelValue, readZebraPrinterDpi, saveZebraPrinterDpi, zebraProductLabelLayouts } from './lib/labels';
+import { buildScooterBarcodeDataUrl, previewOuterBoxZebraLabel, previewProductZebraLabel, printOuterBoxZebraLabel, printProductDymoLabel, printProductZebraLabel, printScooterDymoLabel, productImporterLabelValue, readZebraPrinterDpi, saveZebraPrinterDpi, zebraProductLabelLayouts } from './lib/labels';
 import type { ZebraPrinterDpi, ZebraProductLabelSize } from './lib/labels';
 import { asOptionalTrimmedString, certificationRuleForArticleGroup, createEmptyPackagingLayer, createProductDraft, formatCertificationPresence, getProductBatchOverviewRows, getProductComplianceResponsibility, getProductComplianceSummary, isCeMissing, isCeRelevant, isEMarkMissing, isEMarkRelevant, isStickerPackagingLayer, normalizePackagingLayers, productComplianceIssueLevelLabel, sumPackagingLayerWeights, summarizePackagingWasteStream, unitsPerPackageFromProduct } from './lib/products';
 import type { ProductComplianceLevel } from './lib/products';
@@ -3017,13 +3017,15 @@ export function App() {
     const barcodeValue = sourceProduct.barcode?.trim() || articleNumber;
 
     saveZebraPrinterDpi(label.zebraDpi);
-    return printProductZebraLabel({
-      ...sourceProduct,
-      code: articleNumber,
-      barcode: barcodeValue,
-      labelTitle: label.description,
-      batchNumber: batchCode,
-    }, label.labelsToPrint, label.zebraSize, label.quantityPerLabel);
+    return printOuterBoxZebraLabel({
+      articleNumber,
+      description: label.description,
+      barcodeValue,
+      batchCode,
+      quantityPerLabel: label.quantityPerLabel,
+      labelsToPrint: label.labelsToPrint,
+      size: label.zebraSize,
+    });
   }
 
   async function previewBatchOuterBoxLabel(batch: ContainerCostBatch, line: ContainerCostLine, product: Product | undefined, label: OuterBoxLabelInput) {
@@ -3033,13 +3035,14 @@ export function App() {
     const barcodeValue = sourceProduct.barcode?.trim() || articleNumber;
 
     saveZebraPrinterDpi(label.zebraDpi);
-    await previewProductZebraLabel({
-      ...sourceProduct,
-      code: articleNumber,
-      barcode: barcodeValue,
-      labelTitle: label.description,
-      batchNumber: batchCode,
-    }, label.zebraSize, label.quantityPerLabel);
+    await previewOuterBoxZebraLabel({
+      articleNumber,
+      description: label.description,
+      barcodeValue,
+      batchCode,
+      quantityPerLabel: label.quantityPerLabel,
+      size: label.zebraSize,
+    });
   }
 
   async function togglePurchaseOrderLine(line: ContainerCostLine, purchaseOrderAdded: boolean) {
